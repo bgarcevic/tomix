@@ -1,0 +1,22 @@
+table Customers
+
+	column CustomerID
+		dataType: int64
+		sourceColumn: CustomerID
+
+	column CustomerName
+		dataType: string
+		sourceColumn: CustomerName
+
+	column City
+		dataType: string
+		sourceColumn: City
+
+	column Country
+		dataType: string
+		sourceColumn: Country
+
+	partition Customers = m
+		mode: import
+		source =
+				let Source = #table({"CustomerID", "CustomerName", "City", "Country"}, {}) in Source

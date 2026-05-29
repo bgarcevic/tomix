@@ -2,7 +2,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Mdl.App.Doctor;
+using Mdl.App.Info;
 using Mdl.Core.Doctor;
+using Mdl.Core.Models;
+using Mdl.Provider.Tmdl;
 
 namespace Mdl.Cli;
 
@@ -62,6 +65,56 @@ internal static class Program
 
         root.Subcommands.Add(doctorCommand);
 
+        var modelArgument = new Argument<string>("model")
+        {
+            Description = "Path to the semantic model folder."
+        };
+
+        var infoFormatOption = new Option<string>("--format")
+        {
+            Description = "Output format: human or json.",
+            DefaultValueFactory = _ => "human"
+        };
+
+        infoFormatOption.Aliases.Add("-f");
+
+        var infoCommand = new Command("info", "Show a summary of a semantic model.")
+        {
+            modelArgument,
+            infoFormatOption
+        };
+
+        infoCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var path   = parseResult.GetValue(modelArgument) ?? "";
+            var format = parseResult.GetValue(infoFormatOption) ?? "human";
+
+            if (format is not "human" and not "json")
+            {
+                Console.Error.WriteLine("Invalid --format value. Expected: human or json.");
+                return 2;
+            }
+
+            var handler = new InfoModelHandler([new TmdlModelProvider()]);
+            var result  = await handler.HandleAsync(new InfoModelRequest(new ModelReference(path)), cancellationToken);
+
+            if (!result.Success)
+            {
+                foreach (var d in result.Diagnostics)
+                    Console.Error.WriteLine(d.Message);
+                return result.ExitCode;
+            }
+
+            if (format == "json")
+                RenderInfoJson(result.Data!.Summary);
+            else
+                RenderInfoHuman(result.Data!.Summary);
+
+            return result.ExitCode;
+        });
+
+        root.Subcommands.Add(infoCommand);
+
         return root.Parse(args).Invoke();
     }
 
@@ -99,5 +152,23 @@ internal static class Program
         options.Converters.Add(new JsonStringEnumConverter());
 
         Console.WriteLine(JsonSerializer.Serialize(result, options));
+    }
+
+    private static void RenderInfoHuman(ModelSummary s)
+    {
+        Console.WriteLine(s.Name);
+        Console.WriteLine();
+        Console.WriteLine($"Compatibility level: {s.CompatibilityLevel}");
+        Console.WriteLine($"Tables:              {s.Tables}");
+        Console.WriteLine($"Columns:             {s.Columns}");
+        Console.WriteLine($"Measures:            {s.Measures}");
+        Console.WriteLine($"Relationships:       {s.Relationships}");
+        Console.WriteLine($"Roles:               {s.Roles}");
+    }
+
+    private static void RenderInfoJson(ModelSummary s)
+    {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        Console.WriteLine(JsonSerializer.Serialize(s, options));
     }
 }

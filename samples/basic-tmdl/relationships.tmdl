@@ -1,0 +1,7 @@
+relationship rel-customers
+	fromColumn: Sales.CustomerID
+	toColumn: Customers.CustomerID
+
+relationship rel-products
+	fromColumn: Sales.ProductID
+	toColumn: Products.ProductID

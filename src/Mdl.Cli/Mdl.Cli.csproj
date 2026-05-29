@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Mdl.App\Mdl.App.csproj" />
     <ProjectReference Include="..\Mdl.Core\Mdl.Core.csproj" />
+    <ProjectReference Include="..\Mdl.Provider.Tmdl\Mdl.Provider.Tmdl.csproj" />
   </ItemGroup>
 
   <ItemGroup>
