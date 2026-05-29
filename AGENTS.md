@@ -30,16 +30,23 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 | Task | Go to | Read | Notes |
 |------|-------|------|-------|
-| Add or change a CLI command | `/src/Mdl.Cli`, `/src/Mdl.App` | - | Keep CLI thin; put behavior in handlers |
-| Add domain types, diagnostics, paths, or result models | `/src/Mdl.Core` | - | Core must stay dependency-light |
-| Change command output | `/src/Mdl.Output`, `/tests/Mdl.GoldenTests` | - | Preserve JSON contracts |
-| Add `.bim`, TMDL, TOM, or XMLA support | `/src/Mdl.Provider.*` | - | Do not leak provider-specific types |
-| Add Power BI or Fabric behavior | `/src/Mdl.PowerBI` | - | Do not store secrets in config |
-| Add validation rules | `/src/Mdl.Rules` | - | Emit structured diagnostics |
-| Add semantic model tests | `/src/Mdl.Testing` | - | Keep tests scriptable and CI-friendly |
-| Add or change tests | `/tests` | - | Prefer fast deterministic tests |
-| Add documentation or samples | `/docs`, `/samples` | - | Keep examples copy-pasteable |
-| Change repo automation | `/.github` | - | Keep CI fast for contributors |
+| Add or change a CLI command | `/src/Mdl.Cli`, `/src/Mdl.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers |
+| Add domain types, diagnostics, paths, or result models | `/src/Mdl.Core` | `CONTEXT.md` | Core must stay dependency-light |
+| Change command output | `/src/Mdl.Output`, `/tests/Mdl.GoldenTests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts |
+| Add `.bim`, TMDL, TOM, or XMLA support | `/src/Mdl.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
+| Add Power BI or Fabric behavior | `/src/Mdl.PowerBI` | `CONTEXT.md` | Do not store secrets in config |
+| Add validation rules | `/src/Mdl.Rules` | `CONTEXT.md` | Emit structured diagnostics |
+| Add semantic model tests | `/src/Mdl.Testing` | `CONTEXT.md` | Keep tests scriptable and CI-friendly |
+| Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |
+| Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
+| Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |
+
+## Local Context Files
+
+- Each major folder has a `CONTEXT.md` with local responsibilities, rules, tests, and cross-folder dependencies.
+- Read the relevant `CONTEXT.md` before changing files in that area.
+- Follow the `Cross-folder dependencies` section to avoid circular dependencies and provider-specific leaks.
+- Keep `CONTEXT.md` files lightweight and update them when folder responsibilities or dependency rules change.
 
 ## Naming Conventions
 
@@ -55,5 +62,6 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 - Build: `dotnet build`
 - Test: `dotnet test`
-- Run CLI: `dotnet run --project src/Mdl.Cli -- doctor`
-- Run JSON output: `dotnet run --project src/Mdl.Cli -- doctor --format json`
+- Run CLI (dev): `dotnet run --project src/Mdl.Cli -- doctor`
+- Run JSON output (dev): `dotnet run --project src/Mdl.Cli -- doctor --format json`
+- Install/update global tool: `./scripts/install-dev.ps1` — packs and installs `mdl` globally so you can run `mdl <command>` directly
