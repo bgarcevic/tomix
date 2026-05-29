@@ -16,12 +16,22 @@ CLI entry point for `mdl`.
 - May depend on `/src/Mdl.Output` for rendering.
 - Must not depend directly on `/src/Mdl.Provider.*`, `/src/Mdl.PowerBI`, `/src/Mdl.Rules`, or `/src/Mdl.Testing` unless wired through App-level abstractions.
 
+## Structure
+
+- `Commands/` - one `ICommandModule` per command. Each module builds its `Command`, parses input,
+  calls a handler, and renders the result. `Program` just registers every module on the root command.
+- `Output/` - shared output wiring used by every command:
+  - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
+  - `JsonOutput` - the single JSON serializer (the `--format json` contract).
+  - `CommandOutput` - format validation, human/JSON dispatch, diagnostic printing, exit-code mapping.
+
 ## Rules
 
 - Keep command classes thin.
 - Do not put business logic here.
 - Do not access TOM, Power BI, XMLA, BIM, or TMDL APIs directly.
-- Do not hand-roll JSON output inside commands.
+- Do not hand-roll JSON output inside commands; serialize through `Output/JsonOutput`.
+- Add a new command as its own `ICommandModule` in `Commands/`; reuse `Output/` rather than re-deriving format handling.
 
 ## Test
 

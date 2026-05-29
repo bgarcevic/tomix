@@ -18,6 +18,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>mdl</ToolCommandName>
     <Version>0.1.0-dev</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
 </Project>

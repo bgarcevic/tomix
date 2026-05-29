@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Mdl.Core.Configuration;
 using Mdl.Core.Doctor;
 using Mdl.Core.Results;
 
@@ -20,7 +21,7 @@ public sealed class DoctorHandler
             Status: DoctorCheckStatus.Pass,
             Message: RuntimeInformation.OSDescription));
 
-        var configDirectory = GetConfigDirectory();
+        var configDirectory = MdlPaths.ConfigDirectory;
 
         try
         {
@@ -53,17 +54,5 @@ public sealed class DoctorHandler
             Data: result,
             Diagnostics: Array.Empty<Mdl.Core.Diagnostics.MdlDiagnostic>(),
             ExitCode: hasFailure ? 1 : 0);
-    }
-
-    private static string GetConfigDirectory()
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-
-        if (string.IsNullOrWhiteSpace(home))
-        {
-            return Path.Combine(Environment.CurrentDirectory, ".mdl");
-        }
-
-        return Path.Combine(home, ".mdl");
     }
 }

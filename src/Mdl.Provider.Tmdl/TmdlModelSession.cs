@@ -14,8 +14,15 @@ public sealed class TmdlModelSession : IModelSession
     public Task<ModelSummary> GetSummaryAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _database ??= TmdlSerializer.DeserializeDatabaseFromFolder(_path);
-        return Task.FromResult(TomModelSummarizer.Summarize(_database, Path.GetFileName(_path)));
+        var database = GetDatabase();
+        return Task.FromResult(TomModelSummarizer.Summarize(database, Path.GetFileName(_path)));
+    }
+
+    public Task<ModelInventory> GetInventoryAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var database = GetDatabase();
+        return Task.FromResult(TomModelSummarizer.Inventory(database, Path.GetFileName(_path)));
     }
 
     public ValueTask DisposeAsync()
@@ -23,4 +30,6 @@ public sealed class TmdlModelSession : IModelSession
         _database = null;
         return ValueTask.CompletedTask;
     }
+
+    private Database GetDatabase() => _database ??= TmdlSerializer.DeserializeDatabaseFromFolder(_path);
 }

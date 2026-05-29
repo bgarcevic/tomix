@@ -42,6 +42,9 @@ public sealed class InfoModelHandlerTests
         public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
             => Task.FromResult(new ModelSummary("stub", 1601, 3, 12, 4, 2, 0));
 
+        public Task<ModelInventory> GetInventoryAsync(CancellationToken _)
+            => Task.FromResult(new ModelInventory("stub", 1601, 3, 12, 4, 2, 0, 0, []));
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
