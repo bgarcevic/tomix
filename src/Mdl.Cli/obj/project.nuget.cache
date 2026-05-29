@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "VOSUjrok87I=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\BorisKamberGarcevic\\repos\\mdl-cli\\src\\Mdl.Cli\\Mdl.Cli.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\BorisKamberGarcevic\\.nuget\\packages\\system.commandline\\2.0.8\\system.commandline.2.0.8.nupkg.sha512"
+  ],
+  "logs": []
+}

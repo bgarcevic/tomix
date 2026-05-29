@@ -1,0 +1,16 @@
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\bin\Debug\net10.0\Mdl.App.deps.json
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\bin\Debug\net10.0\Mdl.App.dll
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\bin\Debug\net10.0\Mdl.App.pdb
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\bin\Debug\net10.0\Mdl.Core.dll
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\bin\Debug\net10.0\Mdl.Core.pdb
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.csproj.AssemblyReference.cache
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.AssemblyInfoInputs.cache
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.AssemblyInfo.cs
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.csproj.CoreCompileInputs.cache
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.sourcelink.json
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.csproj.Up2Date
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.dll
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\refint\Mdl.App.dll
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\Mdl.App.pdb
+C:\Users\BorisKamberGarcevic\repos\mdl-cli\src\Mdl.App\obj\Debug\net10.0\ref\Mdl.App.dll
