@@ -13,8 +13,8 @@ CLI entry point for `mdl`.
 
 - Depends on `/src/Mdl.App` for command behavior.
 - Depends on `/src/Mdl.Core` for shared result and diagnostic types.
-- May depend on `/src/Mdl.Output` for rendering.
-- Must not depend directly on `/src/Mdl.Provider.*`, `/src/Mdl.PowerBI`, `/src/Mdl.Rules`, or `/src/Mdl.Testing` unless wired through App-level abstractions.
+- Renders output in `Output/` (see Structure below).
+- Must not depend directly on `/src/Mdl.Provider.*` unless wired through App-level abstractions.
 
 ## Structure
 

@@ -18,11 +18,11 @@ public sealed class TmdlModelSession : IModelSession
         return Task.FromResult(TomModelSummarizer.Summarize(database, Path.GetFileName(_path)));
     }
 
-    public Task<ModelInventory> GetInventoryAsync(CancellationToken cancellationToken)
+    public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var database = GetDatabase();
-        return Task.FromResult(TomModelSummarizer.Inventory(database, Path.GetFileName(_path)));
+        return Task.FromResult(TomModelSummarizer.Snapshot(database, Path.GetFileName(_path)));
     }
 
     public ValueTask DisposeAsync()

@@ -16,9 +16,8 @@ Automated tests for MDL.
 - `/tests/Mdl.Core.Tests` tests `/src/Mdl.Core`.
 - `/tests/Mdl.App.Tests` tests `/src/Mdl.App` and may use `/src/Mdl.Core`.
 - `/tests/Mdl.Cli.Tests` tests `/src/Mdl.Cli`.
-- `/tests/Mdl.GoldenTests` protects output from `/src/Mdl.Output` and `/src/Mdl.Cli`.
+- `/tests/Mdl.GoldenTests` protects output from `/src/Mdl.Cli`.
 - `/tests/Mdl.Provider.Tests` tests `/src/Mdl.Provider.*`.
-- `/tests/Mdl.IntegrationTests` may test `/src/Mdl.PowerBI` and `/src/Mdl.Provider.Xmla`.
 
 ## Rules
 

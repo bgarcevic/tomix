@@ -4,5 +4,5 @@ public interface IModelSession : IAsyncDisposable
 {
     Task<ModelSummary> GetSummaryAsync(CancellationToken cancellationToken);
 
-    Task<ModelInventory> GetInventoryAsync(CancellationToken cancellationToken);
+    Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken);
 }

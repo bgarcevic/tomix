@@ -13,7 +13,6 @@ Application use cases and command handlers.
 
 - Depends on `/src/Mdl.Core`.
 - May depend on abstractions implemented by `/src/Mdl.Provider.*`.
-- May coordinate `/src/Mdl.Rules` and `/src/Mdl.Testing`.
 - Must not depend on `/src/Mdl.Cli`.
 - Must not depend on console or command-line libraries.
 

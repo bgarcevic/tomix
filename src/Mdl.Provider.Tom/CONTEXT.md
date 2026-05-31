@@ -11,9 +11,9 @@ Adapter around Microsoft Tabular Object Model.
 ## Cross-folder dependencies
 
 - Depends on `/src/Mdl.Core`.
-- May be used by `/src/Mdl.Provider.Bim`, `/src/Mdl.Provider.Tmdl`, and `/src/Mdl.Provider.Xmla`.
+- May be used by `/src/Mdl.Provider.Tmdl`.
 - Must not depend on `/src/Mdl.Cli`.
-- Must not leak TOM types into `/src/Mdl.Core`, `/src/Mdl.App`, or `/src/Mdl.Output`.
+- Must not leak TOM types into `/src/Mdl.Core` or `/src/Mdl.App`.
 
 ## Rules
 

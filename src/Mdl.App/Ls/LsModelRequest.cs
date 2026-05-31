@@ -2,4 +2,11 @@ using Mdl.Core.Models;
 
 namespace Mdl.App.Ls;
 
-public sealed record LsModelRequest(ModelReference Model);
+/// <summary>
+/// A request to list model objects. <paramref name="PathFilter"/> is the optional object-path
+/// selector (null/empty lists tables); <paramref name="Type"/> optionally narrows to one kind.
+/// </summary>
+public sealed record LsModelRequest(
+    ModelReference Model,
+    string? PathFilter,
+    ModelObjectKind? Type);

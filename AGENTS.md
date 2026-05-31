@@ -13,15 +13,10 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 ## Workspaces
 
-- `/src/Mdl.Cli` - CLI entry point, commands, argument parsing, and exit codes
+- `/src/Mdl.Cli` - CLI entry point, commands, argument parsing, exit codes, and output rendering (`Output/`)
 - `/src/Mdl.App` - Application use cases and command handlers
 - `/src/Mdl.Core` - Core abstractions, diagnostics, results, and shared domain types
-- `/src/Mdl.Output` - Human, JSON, CSV, and CI output renderers
-- `/src/Mdl.Provider.*` - Model providers for TOM, TMDL, BIM, XMLA, and related sources
-- `/src/Mdl.PowerBI` - Power BI and Fabric-specific APIs, auth, and workspace/model lookup
-- `/src/Mdl.Rules` - Built-in validation rules and rule engine
-- `/src/Mdl.Testing` - Semantic model test runner
-- `/src/Mdl.Plugins` - Future plugin system
+- `/src/Mdl.Provider.*` - Model providers for TOM and TMDL
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
 - `/samples` - Sample models, rules, tests, and CI workflows
 - `/docs` - Architecture, command docs, JSON schemas, ADRs, and detailed contributor context
@@ -32,11 +27,8 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 |------|-------|------|-------|
 | Add or change a CLI command | `/src/Mdl.Cli`, `/src/Mdl.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers |
 | Add domain types, diagnostics, paths, or result models | `/src/Mdl.Core` | `CONTEXT.md` | Core must stay dependency-light |
-| Change command output | `/src/Mdl.Output`, `/tests/Mdl.GoldenTests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts |
-| Add `.bim`, TMDL, TOM, or XMLA support | `/src/Mdl.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
-| Add Power BI or Fabric behavior | `/src/Mdl.PowerBI` | `CONTEXT.md` | Do not store secrets in config |
-| Add validation rules | `/src/Mdl.Rules` | `CONTEXT.md` | Emit structured diagnostics |
-| Add semantic model tests | `/src/Mdl.Testing` | `CONTEXT.md` | Keep tests scriptable and CI-friendly |
+| Change command output | `/src/Mdl.Cli/Output`, `/tests/Mdl.GoldenTests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts |
+| Add TMDL or TOM support | `/src/Mdl.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
 | Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
 | Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |

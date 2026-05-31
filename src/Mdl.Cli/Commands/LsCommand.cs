@@ -7,8 +7,6 @@ namespace Mdl.Cli.Commands;
 
 internal sealed class LsCommand : ICommandModule
 {
-    private const char Esc = (char)27;
-
     private readonly IReadOnlyList<IModelProvider> _providers;
 
     public LsCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
@@ -20,59 +18,95 @@ internal sealed class LsCommand : ICommandModule
             Description = "Path to the semantic model folder."
         };
 
+        var pathArgument = new Argument<string?>("path-filter")
+        {
+            Description =
+                "Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container " +
+                "keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard " +
+                "('Sa*', '*/Amount'); quote names with spaces (\"'Net Sales'/'Sales Amount'\").",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
+        var typeOption = new Option<string?>("--type")
+        {
+            Description = "Filter by type: table, measure, column, hierarchy, partition, " +
+                          "relationship, role, perspective, culture."
+        };
+
+        var pathsOnlyOption = new Option<bool>("--paths-only")
+        {
+            Description = "Output one object path per line, suitable for piping to other commands."
+        };
+
+        var noMultilineOption = new Option<bool>("--no-multiline")
+        {
+            Description = "Collapse multi-line cell content (e.g. measure expressions) to a single " +
+                          "line and truncate. Text output only."
+        };
+
         var format = OutputFormats.CreateOption();
 
         var command = new Command("ls", "List semantic model objects.")
         {
             modelArgument,
+            pathArgument,
+            typeOption,
+            pathsOnlyOption,
+            noMultilineOption,
             format
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var path = parseResult.GetValue(modelArgument) ?? "";
+            var pathFilter = parseResult.GetValue(pathArgument);
+            var typeValue = parseResult.GetValue(typeOption);
+            var pathsOnly = parseResult.GetValue(pathsOnlyOption);
+            var noMultiline = parseResult.GetValue(noMultilineOption);
             var formatValue = parseResult.GetValue(format) ?? OutputFormats.Human;
 
             if (!CommandOutput.TryValidateFormat(formatValue))
                 return 2;
 
-            var handler = new LsModelHandler(_providers);
-            var result = await handler.HandleAsync(new LsModelRequest(new ModelReference(path)), cancellationToken);
+            ModelObjectKind? type = null;
+            if (!string.IsNullOrWhiteSpace(typeValue))
+            {
+                if (!TryParseType(typeValue, out var parsed))
+                {
+                    Console.Error.WriteLine(
+                        "Invalid --type value. Expected: table, measure, column, hierarchy, " +
+                        "partition, relationship, role, perspective, culture.");
+                    return 2;
+                }
 
-            return CommandOutput.Render(result, formatValue, data => Render(data.Inventory));
+                type = parsed;
+            }
+
+            var handler = new LsModelHandler(_providers);
+            var result = await handler.HandleAsync(
+                new LsModelRequest(new ModelReference(path), pathFilter, type),
+                cancellationToken);
+
+            return CommandOutput.Render(result, formatValue, data => LsRenderer.Render(data, pathsOnly, noMultiline));
         });
 
         return command;
     }
 
-    private static void Render(ModelInventory inventory)
+    private static bool TryParseType(string value, out ModelObjectKind kind)
     {
-        var cyan = $"{Esc}[36m";
-        var dim = $"{Esc}[2m";
-        var reset = $"{Esc}[0m";
-
-        Console.WriteLine($"{cyan}{inventory.Name}{reset}");
-        Console.WriteLine();
-        Console.WriteLine(
-            $"{inventory.Tables} tables, " +
-            $"{inventory.Measures} measures, " +
-            $"{inventory.Columns} columns, " +
-            $"{inventory.Relationships} relationships, " +
-            $"{inventory.Roles} roles, " +
-            $"{inventory.CalculationGroups} calc groups");
-        Console.WriteLine();
-
-        var nameWidth = Math.Max(
-            "Table".Length,
-            inventory.TableDetails.Count == 0 ? 0 : inventory.TableDetails.Max(t => t.Name.Length));
-
-        Console.WriteLine($"{"Table".PadRight(nameWidth)}  {"Columns",7}  {"Measures",8}  {"Type",10}");
-
-        foreach (var table in inventory.TableDetails)
+        switch (value.Trim().ToLowerInvariant())
         {
-            var tableType = table.Calculated ? "calculated" : "regular";
-            var line = $"{table.Name.PadRight(nameWidth)}  {table.Columns,7}  {table.Measures,8}  {tableType,10}";
-            Console.WriteLine(table.Hidden ? $"{dim}{line}{reset}" : line);
+            case "table": kind = ModelObjectKind.Table; return true;
+            case "measure": kind = ModelObjectKind.Measure; return true;
+            case "column": kind = ModelObjectKind.Column; return true;
+            case "hierarchy": kind = ModelObjectKind.Hierarchy; return true;
+            case "partition": kind = ModelObjectKind.Partition; return true;
+            case "relationship": kind = ModelObjectKind.Relationship; return true;
+            case "role": kind = ModelObjectKind.Role; return true;
+            case "perspective": kind = ModelObjectKind.Perspective; return true;
+            case "culture": kind = ModelObjectKind.Culture; return true;
+            default: kind = default; return false;
         }
     }
 }
