@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tomix.App\Tomix.App.csproj" />
+    <ProjectReference Include="..\Tomix.Auth\Tomix.Auth.csproj" />
+    <ProjectReference Include="..\Tomix.Core\Tomix.Core.csproj" />
+    <ProjectReference Include="..\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
+    <ProjectReference Include="..\Tomix.Provider.Tmdl\Tomix.Provider.Tmdl.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All" />
+    <PackageReference Include="Spectre.Console" Version="0.55.2" />
+    <PackageReference Include="System.CommandLine" Version="2.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tomix.Cli.Tests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>tx</ToolCommandName>
+  </PropertyGroup>
+
+</Project>

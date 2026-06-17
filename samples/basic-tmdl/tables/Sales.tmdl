@@ -1,5 +1,13 @@
 table Sales
 
+	measure 'Total Sales' = SUM ( Sales[Amount] )
+
+	measure 'Order Count' = COUNTROWS(Sales)
+
+	measure 'Avg Sale' = AVERAGE(Sales[Amount])
+
+	measure 'Distinct Customers' = DISTINCTCOUNT(Sales[CustomerID])
+
 	column SaleID
 		dataType: int64
 		sourceColumn: SaleID
@@ -16,15 +24,7 @@ table Sales
 		dataType: decimal
 		sourceColumn: Amount
 
-	measure 'Total Sales' = SUM(Sales[Amount])
-
-	measure 'Order Count' = COUNTROWS(Sales)
-
-	measure 'Avg Sale' = AVERAGE(Sales[Amount])
-
-	measure 'Distinct Customers' = DISTINCTCOUNT(Sales[CustomerID])
-
 	partition Sales = m
 		mode: import
-		source =
-				let Source = #table({"SaleID", "CustomerID", "ProductID", "Amount"}, {}) in Source
+		source = let Source = #table({"SaleID", "CustomerID", "ProductID", "Amount"}, {}) in Source
+

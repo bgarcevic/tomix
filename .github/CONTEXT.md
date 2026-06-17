@@ -13,7 +13,7 @@ GitHub automation and project metadata.
 
 - CI should build `/src`.
 - CI should test `/tests`.
-- Release workflows should package `/src/Mdl.Cli`.
+- Release workflows should package `/src/Tomix.Cli`.
 - Workflows may reference `/samples` for smoke tests.
 - Workflows should not require integration-test secrets for normal PR validation.
 

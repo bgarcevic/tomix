@@ -18,5 +18,5 @@ table Products
 
 	partition Products = m
 		mode: import
-		source =
-				let Source = #table({"ProductID", "ProductName", "Category", "Price"}, {}) in Source
+		source = let Source = #table({"ProductID", "ProductName", "Category", "Price"}, {}) in Source
+

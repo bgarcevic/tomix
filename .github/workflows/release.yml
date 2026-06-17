@@ -1,0 +1,158 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: publish ${{ matrix.rid }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            archive: zip
+            exe: tx.exe
+          - rid: win-arm64
+            archive: zip
+            exe: tx.exe
+          - rid: osx-x64
+            archive: tar.gz
+            exe: tx
+          - rid: osx-arm64
+            archive: tar.gz
+            exe: tx
+          - rid: linux-x64
+            archive: tar.gz
+            exe: tx
+          - rid: linux-arm64
+            archive: tar.gz
+            exe: tx
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -m:1 --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test -m:1 --configuration Release --no-build
+
+      - name: Publish
+        run: >
+          dotnet publish src/Tomix.Cli/Tomix.Cli.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --output artifacts/publish/${{ matrix.rid }}
+          -p:PublishSingleFile=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+
+      - name: Stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          rid="${{ matrix.rid }}"
+          publish_dir="artifacts/publish/${rid}"
+          stage_dir="artifacts/stage/tx-${rid}"
+          mkdir -p "${stage_dir}"
+          cp -R "${publish_dir}/." "${stage_dir}/"
+          rm -f "${stage_dir}/Tomix.Cli.pdb"
+          if [[ -f "${stage_dir}/Tomix.Cli.exe" ]]; then
+            mv "${stage_dir}/Tomix.Cli.exe" "${stage_dir}/${{ matrix.exe }}"
+          elif [[ -f "${stage_dir}/Tomix.Cli" ]]; then
+            mv "${stage_dir}/Tomix.Cli" "${stage_dir}/${{ matrix.exe }}"
+          fi
+          cp LICENSE README.md "${stage_dir}/"
+
+      - name: Archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rid="${{ matrix.rid }}"
+          mkdir -p artifacts/packages
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            (cd artifacts/stage && zip -qr "../packages/tx-${rid}.zip" "tx-${rid}")
+          else
+            tar -C artifacts/stage -czf "artifacts/packages/tx-${rid}.tar.gz" "tx-${rid}"
+          fi
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: tx-${{ matrix.rid }}
+          path: artifacts/packages/*
+          if-no-files-found: error
+
+  pack:
+    name: pack tool
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Pack
+        run: dotnet pack src/Tomix.Cli/Tomix.Cli.csproj --configuration Release --output artifacts/packages
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: tx-tool-package
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+
+  release:
+    name: create release
+    needs: [publish, pack]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/packages
+          pattern: tx-*
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: artifacts/packages
+        run: sha256sum tx-*.zip tx-*.tar.gz > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/packages/tx-*.zip
+            artifacts/packages/tx-*.tar.gz
+            artifacts/packages/checksums.txt
+          generate_release_notes: true
+          draft: false

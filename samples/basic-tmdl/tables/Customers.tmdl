@@ -18,5 +18,5 @@ table Customers
 
 	partition Customers = m
 		mode: import
-		source =
-				let Source = #table({"CustomerID", "CustomerName", "City", "Country"}, {}) in Source
+		source = let Source = #table({"CustomerID", "CustomerName", "City", "Country"}, {}) in Source
+

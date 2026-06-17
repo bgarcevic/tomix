@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tomix.App/Tomix.App.csproj" />
+    <Project Path="src/Tomix.Auth/Tomix.Auth.csproj" />
+    <Project Path="src/Tomix.Cli/Tomix.Cli.csproj" />
+    <Project Path="src/Tomix.Core/Tomix.Core.csproj" />
+    <Project Path="src/Tomix.Provider.Tmdl/Tomix.Provider.Tmdl.csproj" />
+    <Project Path="src/Tomix.Provider.Tom/Tomix.Provider.Tom.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tomix.App.Tests/Tomix.App.Tests.csproj" />
+    <Project Path="tests/Tomix.Cli.Tests/Tomix.Cli.Tests.csproj" />
+    <Project Path="tests/Tomix.Provider.Tom.Tests/Tomix.Provider.Tom.Tests.csproj" />
+  </Folder>
+</Solution>

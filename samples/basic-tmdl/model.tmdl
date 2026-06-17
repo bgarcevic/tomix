@@ -1,2 +1,9 @@
 model Model
 	culture: en-US
+
+annotation __TEdtr = 1
+
+ref table Customers
+ref table Products
+ref table Sales
+

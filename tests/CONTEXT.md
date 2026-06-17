@@ -1,6 +1,6 @@
 # tests
 
-Automated tests for MDL.
+Automated tests for Tomix.
 
 ## Responsibilities
 
@@ -13,11 +13,11 @@ Automated tests for MDL.
 
 ## Cross-folder dependencies
 
-- `/tests/Mdl.Core.Tests` tests `/src/Mdl.Core`.
-- `/tests/Mdl.App.Tests` tests `/src/Mdl.App` and may use `/src/Mdl.Core`.
-- `/tests/Mdl.Cli.Tests` tests `/src/Mdl.Cli`.
-- `/tests/Mdl.GoldenTests` protects output from `/src/Mdl.Cli`.
-- `/tests/Mdl.Provider.Tests` tests `/src/Mdl.Provider.*`.
+- `/tests/Tomix.Core.Tests` tests `/src/Tomix.Core`.
+- `/tests/Tomix.App.Tests` tests `/src/Tomix.App` and may use `/src/Tomix.Core`.
+- `/tests/Tomix.Cli.Tests` tests `/src/Tomix.Cli`.
+- `/tests/Tomix.GoldenTests` protects output from `/src/Tomix.Cli`.
+- `/tests/Tomix.Provider.Tests` tests `/src/Tomix.Provider.*`.
 
 ## Rules
 

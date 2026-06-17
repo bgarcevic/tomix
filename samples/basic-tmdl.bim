@@ -1,0 +1,157 @@
+{
+  "compatibilityLevel": 1601,
+  "model": {
+    "culture": "en-US",
+    "tables": [
+      {
+        "name": "Customers",
+        "columns": [
+          {
+            "name": "CustomerID",
+            "dataType": "int64",
+            "sourceColumn": "CustomerID"
+          },
+          {
+            "name": "CustomerName",
+            "dataType": "string",
+            "sourceColumn": "CustomerName"
+          },
+          {
+            "name": "City",
+            "dataType": "string",
+            "sourceColumn": "City"
+          },
+          {
+            "name": "Country",
+            "dataType": "string",
+            "sourceColumn": "Country"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Customers",
+            "mode": "import",
+            "source": {
+              "type": "m",
+              "expression": "let Source = #table({\u0022CustomerID\u0022, \u0022CustomerName\u0022, \u0022City\u0022, \u0022Country\u0022}, {}) in Source"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Products",
+        "columns": [
+          {
+            "name": "ProductID",
+            "dataType": "int64",
+            "sourceColumn": "ProductID"
+          },
+          {
+            "name": "ProductName",
+            "dataType": "string",
+            "sourceColumn": "ProductName"
+          },
+          {
+            "name": "Category",
+            "dataType": "string",
+            "sourceColumn": "Category"
+          },
+          {
+            "name": "Price",
+            "dataType": "decimal",
+            "sourceColumn": "Price"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Products",
+            "mode": "import",
+            "source": {
+              "type": "m",
+              "expression": "let Source = #table({\u0022ProductID\u0022, \u0022ProductName\u0022, \u0022Category\u0022, \u0022Price\u0022}, {}) in Source"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Sales",
+        "columns": [
+          {
+            "name": "SaleID",
+            "dataType": "int64",
+            "sourceColumn": "SaleID"
+          },
+          {
+            "name": "CustomerID",
+            "dataType": "int64",
+            "sourceColumn": "CustomerID"
+          },
+          {
+            "name": "ProductID",
+            "dataType": "int64",
+            "sourceColumn": "ProductID"
+          },
+          {
+            "name": "Amount",
+            "dataType": "decimal",
+            "sourceColumn": "Amount"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Sales",
+            "mode": "import",
+            "source": {
+              "type": "m",
+              "expression": "let Source = #table({\u0022SaleID\u0022, \u0022CustomerID\u0022, \u0022ProductID\u0022, \u0022Amount\u0022}, {}) in Source"
+            }
+          }
+        ],
+        "measures": [
+          {
+            "name": "Total Sales",
+            "expression": "SUM ( Sales[Amount] )"
+          },
+          {
+            "name": "Order Count",
+            "expression": "COUNTROWS(Sales)"
+          },
+          {
+            "name": "Avg Sale",
+            "expression": "AVERAGE(Sales[Amount])"
+          },
+          {
+            "name": "Distinct Customers",
+            "expression": "DISTINCTCOUNT(Sales[CustomerID])"
+          },
+          {
+            "name": "TestMeasure",
+            "expression": "1"
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "name": "rel-customers",
+        "fromTable": "Sales",
+        "fromColumn": "CustomerID",
+        "toTable": "Customers",
+        "toColumn": "CustomerID"
+      },
+      {
+        "name": "rel-products",
+        "fromTable": "Sales",
+        "fromColumn": "ProductID",
+        "toTable": "Products",
+        "toColumn": "ProductID"
+      }
+    ],
+    "annotations": [
+      {
+        "name": "__TEdtr",
+        "value": "1"
+      }
+    ]
+  }
+}

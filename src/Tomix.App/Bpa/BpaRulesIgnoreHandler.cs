@@ -1,0 +1,83 @@
+using Tomix.App.Mutations;
+using Tomix.Core.Bpa;
+using Tomix.Core.Models;
+using Tomix.Core.Results;
+
+namespace Tomix.App.Bpa;
+
+public sealed record BpaRulesIgnoreRequest(
+    ModelReference Model,
+    string RuleId,
+    bool Ignore,
+    bool Save = false,
+    string? SaveTo = null,
+    string Serialization = "",
+    bool Force = false,
+    bool Stage = false,
+    bool Revert = false);
+
+public sealed record BpaRulesIgnoreResult(
+    string RuleId,
+    bool Ignored,
+    bool Changed,
+    IReadOnlyList<string> RuleIds,
+    object Saved,
+    bool? Staged,
+    string ModelName);
+
+public sealed class BpaRulesIgnoreHandler
+{
+    private readonly IReadOnlyList<IModelProvider> _providers;
+
+    public BpaRulesIgnoreHandler(IEnumerable<IModelProvider> providers)
+        => _providers = providers.ToList();
+
+    public async Task<TomixResult<BpaRulesIgnoreResult>> HandleAsync(
+        BpaRulesIgnoreRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.RuleId))
+            return TomixResult<BpaRulesIgnoreResult>.Fail(
+                "TOMIX_BPA_RULE_ID_REQUIRED", "A rule id is required.", exitCode: 2);
+
+        var options = new MutationOptions(
+            request.Save, request.SaveTo, request.Stage, request.Revert,
+            request.Serialization, request.Force);
+
+        return await MutationRunner.RunAsync(
+            _providers, request.Model, options, "bpa-ignore",
+            async (mutator, session, _) =>
+            {
+                var snapshot = await session.GetSnapshotAsync(cancellationToken);
+
+                var current = new HashSet<string>(
+                    BpaIgnoreStore.ReadRuleIds(snapshot.Properties), StringComparer.OrdinalIgnoreCase);
+                var hadLegacyKey = BpaIgnoreStore.HasLegacyKey(snapshot.Properties);
+
+                var setChanged = request.Ignore ? current.Add(request.RuleId) : current.Remove(request.RuleId);
+                var changed = setChanged || hadLegacyKey;
+
+                if (!changed)
+                    return (false, "", _ => new BpaRulesIgnoreResult(
+                        request.RuleId, request.Ignore, false,
+                        current.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                        false, null, snapshot.Name));
+
+                mutator.SetProperty(new ModelObjectSetRequest(
+                    ".",
+                    [
+                        new ModelPropertyAssignment($"Annotation:{BpaIgnoreStore.Key}", BpaIgnoreStore.Serialize(current)),
+                        new ModelPropertyAssignment($"Annotation:{BpaIgnoreStore.LegacyKey}", "")
+                    ],
+                    Type: null));
+
+                return (true, $"bpa-ignore {request.RuleId}",
+                    outcome => new BpaRulesIgnoreResult(
+                        request.RuleId, request.Ignore, true,
+                        current.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                        outcome.Saved, outcome.Staged, snapshot.Name));
+            },
+            new BpaRulesIgnoreResult("", false, false, [], false, null, ""),
+            cancellationToken);
+    }
+}

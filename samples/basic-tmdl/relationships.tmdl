@@ -5,3 +5,4 @@ relationship rel-customers
 relationship rel-products
 	fromColumn: Sales.ProductID
 	toColumn: Products.ProductID
+
