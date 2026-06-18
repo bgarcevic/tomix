@@ -3,6 +3,7 @@ using Tomix.App.Connect;
 using Tomix.App.Info;
 using Tomix.App.State;
 using Tomix.Cli.Output;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Spectre.Console;
 
@@ -162,10 +163,27 @@ internal sealed class ConnectCommand : ICommandModule
                 isRemoteEndpoint = ModelReference.IsRemoteEndpoint(remoteServer);
             }
 
+            // A bare server that is neither a remote endpoint nor a local model path can never be
+            // opened by any provider (the TOM server provider requires a remote endpoint; file/TMDL
+            // providers require a path). Reject it here instead of storing a dead-end connection.
+            if (!string.IsNullOrWhiteSpace(remoteServer) && !ModelReference.IsRemoteEndpoint(remoteServer))
+            {
+                ErrorOutput.Write(
+                    new[]
+                    {
+                        new TomixDiagnostic(
+                            "TOMIX_CONNECT_INVALID_TARGET",
+                            DiagnosticSeverity.Error,
+                            $"Not a recognized server endpoint or model path: '{remoteServer}'",
+                            Hint: "Pass a workspace URL (powerbi://...), an Analysis Services endpoint (asazure://...), a local TMDL folder or .bim path, or use --local for a running Power BI Desktop instance.")
+                    },
+                    format);
+                return 1;
+            }
+
             // Validate by opening before storing: local model paths always, and remote XMLA
             // endpoints when a dataset is given (so we open that specific catalog, not the whole
-            // workspace). A bare workspace name or a remote endpoint without a dataset is stored
-            // as-is without opening.
+            // workspace). A remote endpoint without a dataset is stored as-is without opening.
             ModelReference? validation = null;
             if (string.IsNullOrWhiteSpace(profile))
             {
@@ -197,9 +215,12 @@ internal sealed class ConnectCommand : ICommandModule
                     !string.IsNullOrWhiteSpace(database) &&
                     ModelReference.IsRemoteEndpoint(workspace))
                 {
-                    var workspaceResult = await infoHandler.HandleAsync(
-                        new InfoModelRequest(ModelReference.Remote(workspace, database)),
-                        cancellationToken);
+                    var workspaceResult = await CliSpinner.RunAsync(
+                        "Checking workspace target...",
+                        () => infoHandler.HandleAsync(
+                            new InfoModelRequest(ModelReference.Remote(workspace, database)),
+                            cancellationToken),
+                        suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 
                     if (workspaceResult.Success)
                     {
@@ -208,9 +229,20 @@ internal sealed class ConnectCommand : ICommandModule
                             parseResult.GetValue(GlobalOptions.Yes),
                             parseResult.GetValue(GlobalOptions.NonInteractive)))
                         {
-                            RenderConnectedModel(infoResult.Data!, format, model, remoteServer, database, workspace);
+                            handler.Set(new ConnectSetRequest(
+                                remoteServer,
+                                database,
+                                model,
+                                auth,
+                                Local: model is not null || local,
+                                profile,
+                                Workspace: null,
+                                WorkspaceFormat: null,
+                                WorkspaceAuth: null));
+
+                            RenderConnectedModel(infoResult.Data!, format, model, remoteServer, database, workspace: null);
                             AnsiConsole.MarkupLine(Styling.Warning("Workspace setup cancelled."));
-                            return 1;
+                            return 0;
                         }
                     }
                     else if (workspaceResult.Diagnostics.Any(d => d.Code == "TOMIX_DATABASE_NOT_FOUND"))

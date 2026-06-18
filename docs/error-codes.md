@@ -165,6 +165,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_NO_PROVIDER` | 2 | No registered provider can open the model. |
 | `TOMIX_NO_MODEL` | 2 | No model reference was provided and none could be inferred. |
 | `TOMIX_CONNECT_FAILED` | 1 | `connect` failed to establish a session. |
+| `TOMIX_CONNECT_INVALID_TARGET` | 1 | `connect` was given a server that is neither a remote endpoint nor a local model path. |
 | `TOMIX_DATABASE_NOT_FOUND` | 1 | The database/model name was not found on the server. |
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
 | `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` called for an unsupported object type or operation. |

@@ -24,6 +24,16 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `connect --workspace` no longer drops the primary connection when the workspace
+  overwrite prompt is declined. The primary source (local path or remote) is now
+  persisted as the active connection first, and only the mirror setup is cancelled.
+  The command now exits `0` in that case (primary connected) instead of `1`.
+- `connect --workspace` shows a spinner ("Checking workspace target...") while probing
+  the remote workspace target, closing the silent gap between the primary connect and
+  the overwrite prompt.
+- `connect` now rejects a server argument that is neither a remote endpoint nor a local
+  model path (e.g. a typo like `tx connect clear`) with `TOMIX_CONNECT_INVALID_TARGET`,
+  instead of silently storing a connection that no command could open.
 - `--save-to` on mutation commands now honors the absence of `--force`: the TOM and TMDL sessions
   previously forwarded `Force: true` to the exporter, bypassing `TomModelExporter`'s overwrite guard
   and silently overwriting existing BIM/TMDL targets. They now forward the user's `--force` choice.
