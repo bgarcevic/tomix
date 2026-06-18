@@ -100,7 +100,8 @@ internal sealed class DepsCommand : ICommandModule
                     new DepsModelRequest(
                         new ActiveModelResolver().ResolveReference(
                             GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database)),
+                            parseResult.GetValue(GlobalOptions.Database),
+                            parseResult.GetValue(GlobalOptions.Server)),
                         parseResult.GetValue(pathArgument),
                         type,
                         upstreamOnly,

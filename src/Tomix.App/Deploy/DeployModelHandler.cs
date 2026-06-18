@@ -162,25 +162,66 @@ public sealed class DeployModelHandler
 
         var snapshot = await session.GetSnapshotAsync(cancellationToken);
         var engine = new BpaEngine();
-        var result = engine.Evaluate(snapshot, new BpaEngineOptions(rules, null, null));
+        var options = new BpaEngineOptions(rules, null, null);
+        var result = engine.Evaluate(snapshot, options);
 
-        if (request.FixBpa && result.Violations.Any(v => v.CanFix))
+        if (result.Violations.Count == 0)
+            return null;
+
+        BpaRunResult? postFixResult = null;
+        if (request.FixBpa)
         {
-            if (session is IModelMutationSession mutationSession)
-            {
-                var fixer = new BpaFixer();
-                fixer.ApplyFixes(mutationSession, result.Violations, rules);
-            }
+            if (session is not IModelMutationSession mutationSession)
+                return TomixResult<DeployModelResult>.Fail(
+                    "TOMIX_DEPLOY_FIX_UNSUPPORTED",
+                    $"Provider cannot apply BPA fixes for model: {request.Model.Value}. Use --skip-bpa to bypass.",
+                    exitCode: 2);
+
+            var fixer = new BpaFixer();
+            fixer.ApplyFixes(mutationSession, result.Violations, rules);
+
+            // Re-evaluate so the gate reflects the actual post-fix state, catching both
+            // unfixable violations and any fixes that did not resolve their target.
+            var postFixSnapshot = await session.GetSnapshotAsync(cancellationToken);
+            postFixResult = engine.Evaluate(postFixSnapshot, options);
         }
 
-        var remaining = result.Violations.Where(v => !v.CanFix || !request.FixBpa).ToList();
-        if (remaining.Count > 0 && !request.FixBpa)
+        return EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa);
+    }
+
+    /// <summary>
+    /// Pure decision logic for the BPA deploy gate, extracted for branch-complete testing.
+    /// Without <paramref name="fixBpa"/>: fail on any violation. With <paramref name="fixBpa"/>:
+    /// fail only if any error-severity violation remains after fixes (warnings/info are tolerated).
+    /// Returns <c>null</c> when the deploy may proceed.
+    /// </summary>
+    internal static TomixResult<DeployModelResult>? EvaluateBpaGate(
+        IReadOnlyList<BpaViolation> violations,
+        IReadOnlyList<BpaViolation>? postFixViolations,
+        bool fixBpa)
+    {
+        if (violations.Count == 0)
+            return null;
+
+        if (fixBpa)
+        {
+            var remainingErrors = (postFixViolations ?? [])
+                .Where(v => v.Severity == BpaSeverity.Error)
+                .ToList();
+
+            if (remainingErrors.Count == 0)
+                return null;
+
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_BPA_VIOLATIONS",
-                $"BPA check found {remaining.Count} violation(s). Use --skip-bpa to bypass or --fix-bpa to auto-fix.",
+                $"BPA check found {remainingErrors.Count} error-severity violation(s) remaining after auto-fix. Use --skip-bpa to bypass.",
                 exitCode: 1);
+        }
 
-        return null;
+        return TomixResult<DeployModelResult>.Fail(
+            "TOMIX_BPA_VIOLATIONS",
+            $"BPA check found {violations.Count} violation(s). Use --fix-bpa to auto-fix or --skip-bpa to bypass.",
+            exitCode: 1);
     }
 
     private static (string? server, string? database) ResolveTarget(

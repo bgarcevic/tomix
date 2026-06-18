@@ -112,7 +112,8 @@ internal sealed class ScriptCommand : ICommandModule
                     new ScriptRunRequest(
                         new ActiveModelResolver().ResolveReference(
                             explicitModel,
-                            parseResult.GetValue(GlobalOptions.Database)),
+                            parseResult.GetValue(GlobalOptions.Database),
+                            parseResult.GetValue(GlobalOptions.Server)),
                         scriptFiles,
                         expressions,
                         parseResult.GetValue(dryRunOption),

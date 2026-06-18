@@ -60,10 +60,10 @@ internal sealed class LsCommand : ICommandModule
         {
             var modelValue = parseResult.GetValue(modelArgument);
             var globalModel = GlobalOptions.ModelValue(parseResult);
+            var server = parseResult.GetValue(GlobalOptions.Server);
+            var database = parseResult.GetValue(GlobalOptions.Database);
 
-            var activeReference = string.IsNullOrWhiteSpace(globalModel)
-                ? new ActiveModelResolver().ResolveReference(null)
-                : new ModelReference(globalModel);
+            var activeReference = new ActiveModelResolver().ResolveReference(globalModel, database, server);
             var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
 
             var positionalIsModel = !string.IsNullOrWhiteSpace(modelValue)

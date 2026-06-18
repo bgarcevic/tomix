@@ -67,7 +67,7 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
             new ModelExportRequest(
                 string.IsNullOrWhiteSpace(outputPath) ? _path : outputPath,
                 string.IsNullOrWhiteSpace(serialization) ? "tmdl" : serialization,
-                Force: true,
+                Force: force,
                 SupportingFiles: false),
             cancellationToken);
 

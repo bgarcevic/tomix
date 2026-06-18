@@ -197,7 +197,8 @@ internal sealed class BpaCommand : ICommandModule
                     new BpaRunRequest(
                         new ActiveModelResolver().ResolveReference(
                             GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database)),
+                            parseResult.GetValue(GlobalOptions.Database),
+                            parseResult.GetValue(GlobalOptions.Server)),
                         ruleFiles,
                         parseResult.GetValue(noDefaultsOption),
                         parseResult.GetValue(pathOption),
@@ -318,7 +319,10 @@ internal sealed class BpaCommand : ICommandModule
             var modelPath = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
             var model = string.IsNullOrWhiteSpace(modelPath)
                 ? null
-                : new ActiveModelResolver().ResolveReference(modelPath, parseResult.GetValue(GlobalOptions.Database));
+                : new ActiveModelResolver().ResolveReference(
+                    modelPath,
+                    parseResult.GetValue(GlobalOptions.Database),
+                    parseResult.GetValue(GlobalOptions.Server));
 
             var result = await new BpaRulesListHandler(_providers).HandleAsync(
                 new BpaRulesListRequest(
@@ -493,7 +497,8 @@ internal sealed class BpaCommand : ICommandModule
 
             var model = new ActiveModelResolver().ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database));
+                parseResult.GetValue(GlobalOptions.Database),
+                parseResult.GetValue(GlobalOptions.Server));
 
             var result = await new BpaRulesIgnoreHandler(_providers).HandleAsync(
                 new BpaRulesIgnoreRequest(

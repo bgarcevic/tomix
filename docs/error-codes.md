@@ -73,7 +73,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` value (expected: error, warning). |
 | `TOMIX_BPA_RULE_ID_REQUIRED` | 2 | `bpa rules ignore/unignore` called without a rule id. |
 | `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog. |
-| `TOMIX_BPA_VIOLATIONS` | 1 | BPA run found violations (exit non-zero when `--fail-on` is triggered). |
+| `TOMIX_BPA_VIOLATIONS` | 1 | BPA gate blocked the operation: violations found (or, under `--fix-bpa`, error-severity violations remained after auto-fix). Use `--skip-bpa` to bypass. |
 
 ## Staging Codes (`TOMIX_STAGE_*`)
 
@@ -103,6 +103,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 |------|------|---------|
 | `TOMIX_DEPLOY_NO_TARGET` | 2 | `deploy` called without a target server/database. |
 | `TOMIX_DEPLOY_UNSUPPORTED` | 2 | The source model cannot be deployed (wrong provider/type). |
+| `TOMIX_DEPLOY_FIX_UNSUPPORTED` | 2 | `deploy --fix-bpa` was requested but the provider session does not implement `IModelMutationSession`. |
 | `TOMIX_DEPLOY_FAILED` | 1 | The deployment operation failed. |
 
 ## Init Codes (`TOMIX_INIT_*`)

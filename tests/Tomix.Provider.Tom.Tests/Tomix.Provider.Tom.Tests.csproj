@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
+    <ProjectReference Include="..\..\src\Tomix.Provider.Tmdl\Tomix.Provider.Tmdl.csproj" />
     <ProjectReference Include="..\..\src\Tomix.Core\Tomix.Core.csproj" />
   </ItemGroup>
 

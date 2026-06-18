@@ -122,7 +122,8 @@ internal sealed class FormatCommand : ICommandModule
                     new FormatModelRequest(
                         new ActiveModelResolver().ResolveReference(
                             GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database)),
+                            parseResult.GetValue(GlobalOptions.Database),
+                            parseResult.GetValue(GlobalOptions.Server)),
                         expression,
                         parseResult.GetValue(pathOption),
                         parseResult.GetValue(langOption) ?? "",

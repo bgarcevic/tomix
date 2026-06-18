@@ -93,7 +93,7 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
             new ModelExportRequest(
                 string.IsNullOrWhiteSpace(outputPath) ? _path : outputPath,
                 string.IsNullOrWhiteSpace(serialization) ? InferSerialization(_path) : serialization,
-                Force: true,
+                Force: force,
                 SupportingFiles: false),
             cancellationToken);
 

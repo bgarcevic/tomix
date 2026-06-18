@@ -29,13 +29,18 @@ public sealed class ActiveModelResolver
     }
 
     /// <summary>
-    /// Resolves the model to open as a <see cref="ModelReference"/>. An explicit value is taken
-    /// verbatim (local path or remote endpoint). Otherwise the active session is used: a local
-    /// model path if present, else a remote endpoint built from the session server + database.
+    /// Resolves the model to open as a <see cref="ModelReference"/>. Precedence:
+    /// <list type="number">
+    ///   <item>An explicit <paramref name="explicitModel"/> (local path or remote endpoint).</item>
+    ///   <item>An explicit <paramref name="server"/> (workspace name or endpoint), paired with
+    ///         <paramref name="database"/>. This overrides the active session.</item>
+    ///   <item>The active session: a local workspace/model path, else a remote endpoint built
+    ///         from the session server + database.</item>
+    /// </list>
     /// An explicit <paramref name="database"/> applies to remote endpoints (the dataset/catalog)
     /// and overrides the session database.
     /// </summary>
-    public ModelReference ResolveReference(string? explicitModel, string? database = null)
+    public ModelReference ResolveReference(string? explicitModel, string? database = null, string? server = null)
     {
         if (!string.IsNullOrWhiteSpace(explicitModel))
             return ModelReference.IsRemoteEndpoint(explicitModel)
@@ -43,6 +48,13 @@ public sealed class ActiveModelResolver
                 : new ModelReference(explicitModel);
 
         var session = _store.LoadCurrentSession();
+
+        // An explicit --server targets a model (endpoint or workspace name) directly and
+        // overrides the active session. --database names the dataset/catalog on that server,
+        // falling back to the session database when omitted.
+        if (!string.IsNullOrWhiteSpace(server))
+            return new ModelReference(server, NullIfBlank(database) ?? session?.Database);
+
         if (session is null)
             return new ModelReference("");
 

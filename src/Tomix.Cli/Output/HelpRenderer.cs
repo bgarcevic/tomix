@@ -9,7 +9,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 {
     private static readonly (string Heading, string[] Commands)[] RootSections =
     [
-        ("Discover", ["ls", "get", "find", "info", "deps"]),
+        ("Discover", ["ls", "get", "find", "deps"]),
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "macro"]),
         ("Connect", ["connect", "deploy", "load", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "diff", "doctor"]),
@@ -35,10 +35,6 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["find"] = [
             "tx find CALCULATE",
             "tx find \"SUM(Sales\" --type measure",
-        ],
-        ["info"] = [
-            "tx info",
-            "tx info --output-format json",
         ],
         ["deps"] = [
             "tx deps \"Table[Measure]\"",

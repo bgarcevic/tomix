@@ -4,7 +4,7 @@ namespace Tomix.App.Tests;
 
 public sealed class CompletionHandlerTests
 {
-    private static readonly IReadOnlyList<string> Commands = ["doctor", "config", "completion", "info", "ls"];
+    private static readonly IReadOnlyList<string> Commands = ["doctor", "config", "completion", "load", "ls"];
 
     [Theory]
     [InlineData("bash")]

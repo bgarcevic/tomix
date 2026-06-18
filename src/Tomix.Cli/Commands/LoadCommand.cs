@@ -31,7 +31,8 @@ internal sealed class LoadCommand : ICommandModule
             var path = parseResult.GetValue(modelArgument);
             var reference = new ActiveModelResolver().ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? path,
-                parseResult.GetValue(GlobalOptions.Database));
+                parseResult.GetValue(GlobalOptions.Database),
+                parseResult.GetValue(GlobalOptions.Server));
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 

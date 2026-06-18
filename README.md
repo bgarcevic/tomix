@@ -52,7 +52,7 @@ Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 
 ## Commands
 
-Explore: `ls`, `get`, `find`, `info`, `deps`
+Explore: `ls`, `get`, `find`, `deps`
 Edit: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
 formatter APIs)
 Quality: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `diff`

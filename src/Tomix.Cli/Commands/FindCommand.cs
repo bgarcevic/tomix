@@ -70,7 +70,8 @@ internal sealed class FindCommand : ICommandModule
 
             var reference = new ActiveModelResolver().ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database));
+                parseResult.GetValue(GlobalOptions.Database),
+                parseResult.GetValue(GlobalOptions.Server));
             var result = await CliSpinner.RunAsync(
                 "Searching...",
                 () => new FindModelHandler(_providers).HandleAsync(

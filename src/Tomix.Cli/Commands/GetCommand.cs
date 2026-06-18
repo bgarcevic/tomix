@@ -71,7 +71,8 @@ internal sealed class GetCommand : ICommandModule
 
             var reference = new ActiveModelResolver().ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database));
+                parseResult.GetValue(GlobalOptions.Database),
+                parseResult.GetValue(GlobalOptions.Server));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Loading model...",

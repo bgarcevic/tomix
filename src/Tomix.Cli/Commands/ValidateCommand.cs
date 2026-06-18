@@ -72,7 +72,8 @@ internal sealed class ValidateCommand : ICommandModule
                     new ValidateModelRequest(
                         new ActiveModelResolver().ResolveReference(
                             GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database)),
+                            parseResult.GetValue(GlobalOptions.Database),
+                            parseResult.GetValue(GlobalOptions.Server)),
                         errorsOnly,
                         parseResult.GetValue(noWarningsOption) || errorsOnly,
                         parseResult.GetValue(serverOnlyOption)),

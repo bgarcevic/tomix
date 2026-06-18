@@ -105,7 +105,8 @@ internal sealed class ReplaceCommand : ICommandModule
 
             var reference = new ActiveModelResolver().ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database));
+                parseResult.GetValue(GlobalOptions.Database),
+                parseResult.GetValue(GlobalOptions.Server));
             var saving = parseResult.GetValue(saveOption) || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(

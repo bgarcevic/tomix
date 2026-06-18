@@ -45,7 +45,7 @@ internal sealed class CompletionCommand : ICommandModule
                 foreach (var diagnostic in result.Diagnostics)
                     Console.Error.WriteLine(diagnostic.Message);
 
-                return 0;
+                return result.ExitCode == 0 ? 1 : result.ExitCode;
             }
 
             Console.WriteLine(result.Data.Script);

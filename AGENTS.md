@@ -46,7 +46,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 ## Naming Conventions
 
 - Projects and namespaces: `Tomix.<Area>`
-- Commands: lowercase and short, for example `doctor`, `info`, `ls`, `get`, `find`
+- Commands: lowercase and short, for example `doctor`, `deps`, `ls`, `get`, `find`
 - Handlers: `<CommandName>Handler`
 - Requests and results: `<CommandName>Request`, `<CommandName>Result`
 - Diagnostics: uppercase snake case prefixed with `TOMIX_`

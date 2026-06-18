@@ -92,7 +92,8 @@ internal sealed class SaveCommand : ICommandModule
             var resolver = new ActiveModelResolver();
             var reference = resolver.ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database));
+                parseResult.GetValue(GlobalOptions.Database),
+                parseResult.GetValue(GlobalOptions.Server));
 
             var syncTarget = noSync ? null : resolver.ResolveSyncTarget();
 
