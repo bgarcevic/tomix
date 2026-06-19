@@ -163,6 +163,17 @@ internal sealed class ConnectCommand : ICommandModule
                 isRemoteEndpoint = ModelReference.IsRemoteEndpoint(remoteServer);
             }
 
+            // A bare workspace name (e.g. "MyWorkspace") is shorthand for the workspace's XMLA
+            // endpoint. Expand it to a fully-qualified endpoint so the stored connection can be
+            // opened by every remote provider (CanOpen checks IsRemote) and validated below when
+            // a database is supplied. The TOM provider applies the same normalization at connect
+            // time, but expanding here keeps the active connection usable by every later command.
+            if (!string.IsNullOrWhiteSpace(remoteServer) && !ModelReference.IsRemoteEndpoint(remoteServer))
+            {
+                remoteServer = ModelReference.NormalizeEndpoint(remoteServer);
+                isRemoteEndpoint = true;
+            }
+
             // A bare server that is neither a remote endpoint nor a local model path can never be
             // opened by any provider (the TOM server provider requires a remote endpoint; file/TMDL
             // providers require a path). Reject it here instead of storing a dead-end connection.
@@ -175,7 +186,7 @@ internal sealed class ConnectCommand : ICommandModule
                             "TOMIX_CONNECT_INVALID_TARGET",
                             DiagnosticSeverity.Error,
                             $"Not a recognized server endpoint or model path: '{remoteServer}'",
-                            Hint: "Pass a workspace URL (powerbi://...), an Analysis Services endpoint (asazure://...), a local TMDL folder or .bim path, or use --local for a running Power BI Desktop instance.")
+                            Hint: "Pass a workspace name (e.g. MyWorkspace), a workspace URL (powerbi://...), an Analysis Services endpoint (asazure://...), a local TMDL folder or .bim path, or use --local for a running Power BI Desktop instance.")
                     },
                     format);
                 return 1;

@@ -106,6 +106,17 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_DEPLOY_FIX_UNSUPPORTED` | 2 | `deploy --fix-bpa` was requested but the provider session does not implement `IModelMutationSession`. |
 | `TOMIX_DEPLOY_FAILED` | 1 | The deployment operation failed. |
 
+## Refresh Codes (`TOMIX_REFRESH_*`)
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_REFRESH_NO_REMOTE_TARGET` | 2 | `refresh` could not resolve a remote endpoint (default connection is local and no remote workspace-mode secondary is set). |
+| `TOMIX_REFRESH_UNSUPPORTED` | 2 | The provider session does not implement `IModelRefreshSession` (e.g. a local TMDL/BIM model). |
+| `TOMIX_REFRESH_BAD_TYPE` | 2 | `--type` was not one of `full`, `dataonly`, `automatic`, `calculate`, `clearvalues`, `defragment`, `add`. |
+| `TOMIX_REFRESH_TABLE_PARTITION_CONFLICT` | 2 | `--table` and `--partition` were passed together; choose one. |
+| `TOMIX_REFRESH_BAD_PARTITION` | 2 | A `--partition` value was not formatted as `TableName.PartitionName`. |
+| `TOMIX_REFRESH_FAILED` | 1 | The refresh command was rejected by the server (table not found, no permissions, etc.). |
+
 ## Init Codes (`TOMIX_INIT_*`)
 
 | Code | Exit | Trigger |

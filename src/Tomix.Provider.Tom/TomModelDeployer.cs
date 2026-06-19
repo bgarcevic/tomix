@@ -99,15 +99,7 @@ public static class TomModelDeployer
     }
 
     public static string ResolveEndpoint(string server)
-    {
-        if (string.IsNullOrWhiteSpace(server))
-            return server;
-
-        if (server.Contains("://", StringComparison.Ordinal) ||
-            server.StartsWith("localhost:", StringComparison.OrdinalIgnoreCase) ||
-            server.StartsWith("127.0.0.1:", StringComparison.OrdinalIgnoreCase))
-            return server;
-
-        return $"powerbi://api.powerbi.com/v1.0/myorg/{server}";
-    }
+        => string.IsNullOrWhiteSpace(server)
+            ? server
+            : ModelReference.NormalizeEndpoint(server);
 }

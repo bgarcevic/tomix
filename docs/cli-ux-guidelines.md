@@ -190,5 +190,6 @@ the bottom for where each concern lives.
 - [x] Empty-state messages with next-step hints on `ls`/`find`
 - [x] "Did you mean?" suggestions for unknown subcommands
 - [x] Spinners on slow commands (P0: deploy, bpa, connect, auth; P1: format, save, diff, validate, script, stage commit; P2: conditional for ls/get/find/deps/load/set/add/mv/rm/replace when remote or --save)
+- [x] `refresh` command (live per-table rows via XMLA SessionTrace; final summary table)
 - [ ] Ctrl-C handling audit on long-running remote operations
 - [ ] `--no-input` global flag (covered by `--non-interactive`; adding a duplicate is confusing)

@@ -69,7 +69,7 @@ internal static class Program
             new MvCommand(providers),
             new ProfileCommand(),
             stubs["query"],
-            stubs["refresh"],
+            new RefreshCommand(providers),
             new ReplaceCommand(providers),
             new RmCommand(providers),
             new SaveCommand(providers),

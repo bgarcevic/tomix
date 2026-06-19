@@ -67,7 +67,7 @@ public sealed class TomServerModelProvider : IModelProvider
     }
 }
 
-internal sealed class TomServerModelSession : IModelSession, IModelExportSession, IModelMutationSession, IModelDeploySession
+internal sealed class TomServerModelSession : IModelSession, IModelExportSession, IModelMutationSession, IModelDeploySession, IModelRefreshSession
 {
     private readonly TabularServer _server;
     private readonly TabularDatabase _database;
@@ -147,6 +147,16 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
 
     public string GenerateScript(ModelDeployRequest request)
         => TomModelDeployer.GenerateScript(_database, request);
+
+    public Task<ModelRefreshResult> RefreshAsync(
+        ModelRefreshRequest request,
+        IProgress<RefreshProgress>? progress,
+        TextWriter? traceWriter,
+        CancellationToken cancellationToken)
+        => TomModelRefresher.RefreshAsync(_server, _database, request, progress, traceWriter, cancellationToken);
+
+    public string GenerateRefreshScript(ModelRefreshRequest request)
+        => TomModelRefresher.GenerateRefreshScript(_database, request);
 
     private string ModelName()
         => string.IsNullOrWhiteSpace(_database.Name) ? _database.ID : _database.Name;

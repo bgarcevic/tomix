@@ -8,7 +8,7 @@ namespace Tomix.App.Tests;
 /// <summary>
 /// Regression tests for table-qualified <c>ReferencedBy</c>: a column referenced only via a
 /// qualified <c>'Table'[Col]</c> must not mark same-named columns in *other* tables as referenced
-/// (the bug that under-reported UNNECESSARY_COLUMNS vs Tabular Editor).
+/// (the bug that under-reported UNNECESSARY_COLUMNS).
 /// </summary>
 public sealed class BpaReferencedByTests
 {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Spectre.Console;
 
 namespace Tomix.Cli.Output;
@@ -53,6 +54,23 @@ internal static class Styling
 
         return table;
     }
+
+    /// <summary>
+    /// Group-formatted integer with invariant culture (e.g. <c>2,014,768</c>).
+    /// Use only in human output; JSON/CSV must emit raw numbers via <see cref="System.IFormattable"/>.
+    /// </summary>
+    public static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+    /// <summary>Group-formatted floating point with invariant culture.</summary>
+    public static string Number(double value)
+        => double.IsFinite(value) ? value.ToString("N0", CultureInfo.InvariantCulture) : "0";
+
+    /// <summary>
+    /// One-decimal seconds duration in invariant culture (e.g. <c>6.3s</c>).
+    /// Use only in human output.
+    /// </summary>
+    public static string DurationSeconds(double seconds)
+        => seconds.ToString("0.0", CultureInfo.InvariantCulture) + "s";
 
     public static string BoolText(bool value)
         => value ? $"[{Palette.Slate.ToMarkup()}]True[/]" : "False";

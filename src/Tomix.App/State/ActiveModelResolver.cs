@@ -4,21 +4,31 @@ namespace Tomix.App.State;
 
 public sealed class ActiveModelResolver
 {
-    private readonly CliStateStore _store;
+    private readonly Func<CliConnectionState?> _loadSession;
 
     public ActiveModelResolver()
-        : this(new CliStateStore())
+        : this(() => new CliStateStore().LoadCurrentSession())
     {
     }
 
-    public ActiveModelResolver(CliStateStore store) => _store = store;
+    public ActiveModelResolver(CliStateStore store)
+        : this(() => store.LoadCurrentSession())
+    {
+    }
+
+    /// <summary>
+    /// Resolves references against a caller-supplied session source (e.g. an injected
+    /// <see cref="CliConnectionState"/> for tests) instead of reading the user state dir.
+    /// </summary>
+    public ActiveModelResolver(Func<CliConnectionState?> sessionSource)
+        => _loadSession = sessionSource;
 
     public string Resolve(string? explicitModel)
     {
         if (!string.IsNullOrWhiteSpace(explicitModel))
             return explicitModel;
 
-        var sessionModel = _store.LoadCurrentSession()?.Model;
+        var sessionModel = _loadSession()?.Model;
         if (string.IsNullOrWhiteSpace(sessionModel))
             return "";
 
@@ -47,7 +57,7 @@ public sealed class ActiveModelResolver
                 ? new ModelReference(explicitModel, NullIfBlank(database))
                 : new ModelReference(explicitModel);
 
-        var session = _store.LoadCurrentSession();
+        var session = _loadSession();
 
         // An explicit --server targets a model (endpoint or workspace name) directly and
         // overrides the active session. --database names the dataset/catalog on that server,
@@ -78,7 +88,7 @@ public sealed class ActiveModelResolver
 
     public ModelReference? ResolveSyncTarget()
     {
-        var session = _store.LoadCurrentSession();
+        var session = _loadSession();
         if (session is null || string.IsNullOrWhiteSpace(session.Workspace))
             return null;
 

@@ -230,19 +230,6 @@ internal sealed class CompatibilityStubCommand : ICommandModule
                 Flag("--plan"),
                 Value("--runs")
             ]),
-        New("refresh", "Trigger a data refresh on a deployed model (--type full|auto|calculate|...)",
-            options:
-            [
-                Value("--type"),
-                Value("--table"),
-                Value("--partition"),
-                Value("--apply-refresh-policy"),
-                Value("--effective-date"),
-                Value("--max-parallelism"),
-                Flag("--dry-run"),
-                Flag("--no-progress"),
-                Value("--trace")
-            ]),
         New("replace", "Find and replace text across model objects",
             args: [Optional("pattern"), Optional("replacement"), Optional("model")],
             options:

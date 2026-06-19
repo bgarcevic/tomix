@@ -11,13 +11,13 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     [
         ("Discover", ["ls", "get", "find", "deps"]),
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "macro"]),
-        ("Connect", ["connect", "deploy", "load", "save", "auth", "session"]),
+        ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "interactive"]),
     ];
 
     private static readonly string[] NotImplementedCommands =
-        ["incremental-refresh", "query", "refresh", "test", "vertipaq"];
+        ["incremental-refresh", "query", "test", "vertipaq"];
 
     private static readonly Dictionary<string, string[]> CommandExamples = new(StringComparer.Ordinal)
     {
