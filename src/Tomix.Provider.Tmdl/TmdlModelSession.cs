@@ -43,7 +43,12 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
     public Task<ModelExportResult> ExportAsync(
         ModelExportRequest request,
         CancellationToken cancellationToken)
-        => TomModelExporter.ExportAsync(GetDatabase(), request, cancellationToken);
+    {
+        var effective = SamePath(request.OutputPath, _path)
+            ? request with { Force = true }
+            : request;
+        return TomModelExporter.ExportAsync(GetDatabase(), effective, cancellationToken);
+    }
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
         => new TomModelMutator(GetDatabase()).AddObject(request);
@@ -62,14 +67,29 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
         string serialization,
         bool force,
         CancellationToken cancellationToken)
-        => TomModelExporter.ExportAsync(
+    {
+        var inPlace = string.IsNullOrWhiteSpace(outputPath) || SamePath(outputPath, _path);
+        return TomModelExporter.ExportAsync(
             GetDatabase(),
             new ModelExportRequest(
                 string.IsNullOrWhiteSpace(outputPath) ? _path : outputPath,
                 string.IsNullOrWhiteSpace(serialization) ? "tmdl" : serialization,
-                Force: force,
+                Force: force || inPlace,
                 SupportingFiles: false),
             cancellationToken);
+    }
+
+    private static bool SamePath(string a, string b)
+    {
+        try
+        {
+            return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     public Task<ModelDeployResult> DeployAsync(
         ModelDeployRequest request,

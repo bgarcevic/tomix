@@ -45,6 +45,10 @@ internal sealed class MvCommand : ICommandModule
         {
             Description = "Revert a staged mutation"
         };
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
         var saveOption = new Option<bool>("--save")
         {
             Description = "Persist this command's mutation to the source location"
@@ -67,6 +71,7 @@ internal sealed class MvCommand : ICommandModule
             typeOption,
             stageOption,
             revertOption,
+            noSyncOption,
             saveOption,
             saveToOption,
             serializationOption
@@ -109,7 +114,8 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(serializationOption) ?? "",
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
-                        parseResult.GetValue(revertOption)),
+                        parseResult.GetValue(revertOption),
+                        parseResult.GetValue(noSyncOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -126,5 +132,10 @@ internal sealed class MvCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist."));
         else
             AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
+
+        if (result.Synced)
+            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
+        else if (result.SyncWarning is not null)
+            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
     }
 }

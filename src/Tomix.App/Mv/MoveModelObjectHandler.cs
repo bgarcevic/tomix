@@ -19,7 +19,7 @@ public sealed class MoveModelObjectHandler
             return TomixResult<MoveModelObjectResult>.Fail("TOMIX_MOVE_UNSUPPORTED", error);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "mv",
@@ -33,7 +33,8 @@ public sealed class MoveModelObjectHandler
                 return (true, $"mv {request.Source} -> {request.Destination}",
                     outcome => new MoveModelObjectResult(
                         NormalizePath(request.Source), NormalizePath(request.Destination),
-                        outcome.Saved, outcome.Staged));
+                        outcome.Saved, outcome.Staged,
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
             new MoveModelObjectResult(NormalizePath(request.Source), NormalizePath(request.Destination), false, null),
             cancellationToken);

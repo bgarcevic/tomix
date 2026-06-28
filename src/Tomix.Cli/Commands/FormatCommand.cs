@@ -78,6 +78,10 @@ internal sealed class FormatCommand : ICommandModule
         {
             Description = "Revert a staged mutation"
         };
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
 
         var command = new Command("format", "Format DAX or M/Power Query expressions (-e inline, -p object path, or all)")
         {
@@ -93,7 +97,8 @@ internal sealed class FormatCommand : ICommandModule
             saveOption,
             forceOption,
             stageOption,
-            revertOption
+            revertOption,
+            noSyncOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -136,7 +141,8 @@ internal sealed class FormatCommand : ICommandModule
                         "",
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
-                        parseResult.GetValue(revertOption)),
+                        parseResult.GetValue(revertOption),
+                        parseResult.GetValue(noSyncOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
@@ -162,6 +168,10 @@ internal sealed class FormatCommand : ICommandModule
 
             case ObjectFormatResult obj:
                 AnsiConsole.WriteLine(obj.Formatted);
+                if (obj.Synced)
+                    AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(obj.SyncTarget!)}"));
+                else if (obj.SyncWarning is not null)
+                    AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(obj.SyncWarning)));
                 break;
 
             case ModelFormatResult model:
@@ -175,6 +185,11 @@ internal sealed class FormatCommand : ICommandModule
                     AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
                 else if (model.Formatted > 0)
                     AnsiConsole.MarkupLine(Styling.Muted("Not saved — re-run with --save to persist or --stage to stage."));
+
+                if (model.Synced)
+                    AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(model.SyncTarget!)}"));
+                else if (model.SyncWarning is not null)
+                    AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(model.SyncWarning)));
                 break;
         }
     }

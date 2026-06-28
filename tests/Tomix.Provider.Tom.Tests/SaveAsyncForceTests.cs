@@ -25,7 +25,7 @@ public sealed class SaveAsyncForceTests
         }
         else
         {
-            await Assert.ThrowsAsync<IOException>(() =>
+            await Assert.ThrowsAsync<OutputExistsException>(() =>
                 session.SaveAsync(targetPath, "bim", force, CancellationToken.None));
         }
     }
@@ -50,7 +50,7 @@ public sealed class SaveAsyncForceTests
         }
         else
         {
-            await Assert.ThrowsAsync<IOException>(() =>
+            await Assert.ThrowsAsync<OutputExistsException>(() =>
                 session.SaveAsync(targetPath, "tmdl", force, CancellationToken.None));
         }
     }
@@ -75,9 +75,86 @@ public sealed class SaveAsyncForceTests
         }
         else
         {
-            await Assert.ThrowsAsync<IOException>(() =>
+            await Assert.ThrowsAsync<OutputExistsException>(() =>
                 session.SaveAsync(targetPath, "tmdl", force, CancellationToken.None));
         }
+    }
+
+    [Fact]
+    public async Task TmdlModelSession_SaveAsync_InPlaceOverwritesWithoutForce()
+    {
+        using var tempDir = new TempDir();
+        var sourcePath = CopySampleTmdl(tempDir);
+
+        await using var session = new TmdlModelSession(sourcePath);
+
+        // In-place save (null output) must succeed even without --force, and must not throw
+        // an OutputExistsException for the source directory.
+        var result = await session.SaveAsync(outputPath: null, "tmdl", force: false, CancellationToken.None);
+        Assert.Equal(sourcePath, result.SavedPath);
+    }
+
+    [Fact]
+    public async Task TmdlModelSession_ExportAsync_InPlaceOverwritesWithoutForce()
+    {
+        using var tempDir = new TempDir();
+        var sourcePath = CopySampleTmdl(tempDir);
+
+        await using var session = new TmdlModelSession(sourcePath);
+
+        // ExportAsync to the source path (the tx save path) must succeed without force.
+        var result = await session.ExportAsync(
+            new ModelExportRequest(sourcePath, "tmdl", Force: false, SupportingFiles: false),
+            CancellationToken.None);
+        Assert.Equal(sourcePath, result.SavedPath);
+    }
+
+    [Fact]
+    public async Task TmdlModelSession_SaveAsync_InPlaceClearsStaleFiles()
+    {
+        using var tempDir = new TempDir();
+        var targetPath = Path.Combine(tempDir.Path, "out");
+        Directory.CreateDirectory(targetPath);
+
+        // Seed the directory with a non-TMDL junk file that the serializer would NOT overwrite
+        // on its own. A proper in-place save must clear it so stale artifacts don't survive.
+        var junkPath = Path.Combine(targetPath, "stale-artifact.txt");
+        File.WriteAllText(junkPath, "old content");
+
+        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
+        await TomModelExporter.ExportAsync(
+            db,
+            new ModelExportRequest(targetPath, "tmdl", Force: true, SupportingFiles: false),
+            CancellationToken.None);
+
+        Assert.False(File.Exists(junkPath), "stale file should be cleared when force=true");
+    }
+
+    [Fact]
+    public async Task TmdlModelSession_SaveAsync_SaveToExisting_DistinctFromSource_ThrowsOutputExists()
+    {
+        using var tempDir = new TempDir();
+        var sourcePath = CopySampleTmdl(tempDir);
+        var otherPath = Path.Combine(tempDir.Path, "other");
+        Directory.CreateDirectory(otherPath);
+        File.WriteAllText(Path.Combine(otherPath, "database.tmdl"), "namespace foo");
+
+        await using var session = new TmdlModelSession(sourcePath);
+
+        await Assert.ThrowsAsync<OutputExistsException>(() =>
+            session.SaveAsync(otherPath, "tmdl", force: false, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TomFileModelSession_SaveAsync_InPlaceOverwritesWithoutForce()
+    {
+        using var tempDir = new TempDir();
+        var sourcePath = CopySampleBim(tempDir);
+
+        await using var session = new TomFileModelSession(sourcePath, null);
+
+        var result = await session.SaveAsync(outputPath: null, "bim", force: false, CancellationToken.None);
+        Assert.Equal(sourcePath, result.SavedPath);
     }
 
     private static string CopySampleBim(TempDir tempDir)

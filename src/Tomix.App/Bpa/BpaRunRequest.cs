@@ -18,4 +18,5 @@ public sealed record BpaRunRequest(
     bool NoModelRules = false,
     bool AllowExternalRules = false,
     bool Stage = false,
-    bool Revert = false);
+    bool Revert = false,
+    bool NoSync = false);

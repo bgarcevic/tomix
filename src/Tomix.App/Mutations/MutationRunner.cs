@@ -76,6 +76,10 @@ public static class MutationRunner
         {
             return TomixResult<TResult>.Fail("TOMIX_MUTATION_FAILED", ex.Message);
         }
+        catch (OutputExistsException ex)
+        {
+            return TomixResult<TResult>.Fail("TOMIX_SAVE_OUTPUT_EXISTS", ex.Message, exitCode: 2);
+        }
         catch (IOException ex)
         {
             return TomixResult<TResult>.Fail("TOMIX_MUTATION_SAVE_FAILED", ex.Message, exitCode: 2);

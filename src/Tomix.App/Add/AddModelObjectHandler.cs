@@ -16,7 +16,7 @@ public sealed class AddModelObjectHandler
         CancellationToken cancellationToken)
     {
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "add",
@@ -40,7 +40,7 @@ public sealed class AddModelObjectHandler
 
                 var added = mutation.Changed ? mutation.Path : (object)false;
                 return (mutation.Changed, $"add {mutation.Path}",
-                    outcome => new AddModelObjectResult(added, outcome.Saved, outcome.Staged));
+                    outcome => new AddModelObjectResult(added, outcome.Saved, outcome.Staged, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
             new AddModelObjectResult(false, false, null),
             cancellationToken);

@@ -14,4 +14,9 @@ public sealed record ReplaceModelTextResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     object? Saved,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged = null);
+    bool? Staged = null,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null);

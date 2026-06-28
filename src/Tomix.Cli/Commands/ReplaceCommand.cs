@@ -58,6 +58,10 @@ internal sealed class ReplaceCommand : ICommandModule
         {
             Description = "Revert a staged mutation"
         };
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
         var saveOption = new Option<bool>("--save")
         {
             Description = "Persist this command's mutation to the source location"
@@ -83,6 +87,7 @@ internal sealed class ReplaceCommand : ICommandModule
             forceOption,
             stageOption,
             revertOption,
+            noSyncOption,
             saveOption,
             saveToOption,
             serializationOption
@@ -125,7 +130,8 @@ internal sealed class ReplaceCommand : ICommandModule
                         parseResult.GetValue(serializationOption) ?? "",
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
-                        parseResult.GetValue(revertOption)),
+                        parseResult.GetValue(revertOption),
+                        parseResult.GetValue(noSyncOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -146,5 +152,10 @@ internal sealed class ReplaceCommand : ICommandModule
         }
 
         AnsiConsole.MarkupLine(result.Saved is false ? Styling.Warning("Saved: false") : Styling.Success($"Saved: {result.Saved}"));
+
+        if (result.Synced)
+            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
+        else if (result.SyncWarning is not null)
+            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
     }
 }

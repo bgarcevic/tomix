@@ -71,6 +71,10 @@ internal sealed class AddCommand : ICommandModule
         {
             Description = "Revert a staged mutation"
         };
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
 
         var modeOption = new Option<string?>("--mode")
         {
@@ -136,7 +140,8 @@ internal sealed class AddCommand : ICommandModule
             serializationOption,
             saveOption,
             stageOption,
-            revertOption
+            revertOption,
+            noSyncOption
         };
 
         foreach (var option in extraOptions)
@@ -175,6 +180,7 @@ internal sealed class AddCommand : ICommandModule
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
+                        parseResult.GetValue(noSyncOption),
                         parseResult.GetValue(columnsOption),
                         parseResult.GetValue(modeOption),
                         parseResult.GetValue(sourceOption),
@@ -202,6 +208,11 @@ internal sealed class AddCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
         else
             AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
+
+        if (result.Synced)
+            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
+        else if (result.SyncWarning is not null)
+            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
     }
 
     internal static (string? PrimaryValue, IReadOnlyList<ModelPropertyAssignment> Properties) ParseInterleavedQi(

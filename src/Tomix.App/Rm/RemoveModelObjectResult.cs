@@ -11,4 +11,9 @@ public sealed record RemoveModelObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Reason,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? Path);
+    string? Path,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null);

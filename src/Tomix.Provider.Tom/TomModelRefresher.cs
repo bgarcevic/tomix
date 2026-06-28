@@ -161,19 +161,13 @@ public static class TomModelRefresher
         // AMO's Execute returns a result collection that may contain errors/warnings even
         // when no exception is thrown. Surface them so refreshes don't silently no-op.
         var serverErrors = new List<string>();
-        if (results is { Count: > 0 })
+        var serverWarnings = traceWriter is not null ? new List<string>() : null;
+        XmlaResultHelper.ExtractMessages(results, serverErrors, serverWarnings);
+
+        if (serverWarnings is not null)
         {
-            foreach (dynamic r in results)
-            {
-                foreach (dynamic m in r.Messages)
-                {
-                    var typeName = ((Type)m.GetType()).Name;
-                    if (typeName == "XmlaError")
-                        serverErrors.Add($"{m.Description}");
-                    else if (typeName == "XmlaWarning" && traceWriter is not null)
-                        traceWriter.WriteLine($"warning: {m.Description}");
-                }
-            }
+            foreach (var description in serverWarnings)
+                traceWriter!.WriteLine($"warning: {description}");
         }
 
         if (serverErrors.Count > 0)

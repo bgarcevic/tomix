@@ -31,7 +31,8 @@ public sealed class BpaRunHandler
             request.Stage && request.Fix,
             request.Revert,
             request.Serialization,
-            request.Force);
+            request.Force,
+            request.NoSync);
         var stagingStore = new StagingStore();
         var connection = new CliStateStore().LoadCurrentSession();
 
@@ -114,7 +115,14 @@ public sealed class BpaRunHandler
                     mutationSession, context, "bpa-fix",
                     $"bpa-fix {fixResult.FixesApplied} violations", cancellationToken);
 
-                runResult = runResult with { Saved = outcome.Saved, Staged = outcome.Staged };
+                runResult = runResult with
+                {
+                    Saved = outcome.Saved,
+                    Staged = outcome.Staged,
+                    Synced = outcome.Synced,
+                    SyncTarget = outcome.SyncTarget,
+                    SyncWarning = outcome.SyncWarning
+                };
             }
         }
 

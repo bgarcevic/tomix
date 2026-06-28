@@ -18,3 +18,11 @@ public sealed class AmbiguousObjectException : Exception
     {
     }
 }
+
+public sealed class OutputExistsException : IOException
+{
+    public OutputExistsException(string message)
+        : base(message)
+    {
+    }
+}

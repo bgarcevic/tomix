@@ -96,6 +96,11 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Revert a staged mutation"
         };
 
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
+
         var ruleOption = new Option<string[]>("--rule")
         {
             Description = "Run only specific rule(s) by ID",
@@ -178,7 +183,8 @@ internal sealed class BpaCommand : ICommandModule
             warningsOption,
             infoOption,
             stageOption,
-            revertOption
+            revertOption,
+            noSyncOption
         };
 
         runCommand.SetAction(async (parseResult, cancellationToken) =>
@@ -213,7 +219,8 @@ internal sealed class BpaCommand : ICommandModule
                         parseResult.GetValue(noModelRulesOption),
                         parseResult.GetValue(allowExternalRulesOption),
                         parseResult.GetValue(stageOption),
-                        parseResult.GetValue(revertOption)),
+                        parseResult.GetValue(revertOption),
+                        NoSync: parseResult.GetValue(noSyncOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 
@@ -477,6 +484,10 @@ internal sealed class BpaCommand : ICommandModule
         {
             Description = "Revert a staged mutation"
         };
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
 
         var command = new Command(name, description)
         {
@@ -486,7 +497,8 @@ internal sealed class BpaCommand : ICommandModule
             saveToOption,
             serializationOption,
             stageOption,
-            revertOption
+            revertOption,
+            noSyncOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -509,7 +521,8 @@ internal sealed class BpaCommand : ICommandModule
                     SaveTo: parseResult.GetValue(saveToOption),
                     Serialization: parseResult.GetValue(serializationOption) ?? "",
                     Stage: parseResult.GetValue(stageOption),
-                    Revert: parseResult.GetValue(revertOption)),
+                    Revert: parseResult.GetValue(revertOption),
+                    NoSync: parseResult.GetValue(noSyncOption)),
                 cancellationToken);
 
             return CommandOutput.Render(result, format, RenderRulesIgnore, ProjectRulesIgnoreJson);
@@ -538,6 +551,11 @@ internal sealed class BpaCommand : ICommandModule
             AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
         else
             AnsiConsole.MarkupLine($"  {Styling.Muted("Not saved — re-run with --save to persist or --stage to stage.")}");
+
+        if (result.Synced)
+            AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}")}");
+        else if (result.SyncWarning is not null)
+            AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(result.SyncWarning))}");
     }
 
     private static object ProjectRulesIgnoreJson(BpaRulesIgnoreResult result)
@@ -740,6 +758,11 @@ internal sealed class BpaCommand : ICommandModule
                     AnsiConsole.MarkupLine($"  {Styling.Success("Model saved.")}");
                 else if (result.Staged == true)
                     AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
+
+                if (result.Synced)
+                    AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}")}");
+                else if (result.SyncWarning is not null)
+                    AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(result.SyncWarning))}");
             }
         else if (result.FixesSkipped > 0)
         {

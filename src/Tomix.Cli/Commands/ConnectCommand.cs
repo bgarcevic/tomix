@@ -235,6 +235,12 @@ internal sealed class ConnectCommand : ICommandModule
 
                     if (workspaceResult.Success)
                     {
+                        // Resolve the canonical dataset name from the remote so the stored mirror
+                        // target matches exactly. Power BI rejects XMLA deploys that change a
+                        // dataset's name (even casing), so storing the resolved name keeps later
+                        // syncs/deploys from being treated as a rename.
+                        database = ResolveWorkspaceDatabase(database, workspaceResult.Data!.Summary.DatabaseName);
+
                         if (!force && !ConfirmationHelper.ConfirmOrAbort(
                             "Overwrite workspace target", $"'{database}' on {workspace}",
                             parseResult.GetValue(GlobalOptions.Yes),
@@ -360,6 +366,28 @@ internal sealed class ConnectCommand : ICommandModule
     private static bool LooksLikeLocalModelPath(string? value)
         => !string.IsNullOrWhiteSpace(value) &&
            (Directory.Exists(value) || File.Exists(value) || value.Contains('\\') || value.Contains('/'));
+
+    // A bare workspace name as a mirror target (local primary) is shorthand for the workspace's
+    // XMLA endpoint, mirroring the primary-server normalization. Only applies when the primary
+    // is local; a remote primary expects -w to be a local folder/.bim path.
+    internal static string? NormalizeWorkspaceTarget(string? model, string? workspace)
+    {
+        if (model is not null &&
+            !string.IsNullOrWhiteSpace(workspace) &&
+            !ModelReference.IsRemoteEndpoint(workspace))
+        {
+            return ModelReference.NormalizeEndpoint(workspace);
+        }
+        return workspace;
+    }
+
+    // Returns the canonical dataset name reported by the remote workspace when available, so the
+    // stored mirror target matches exactly. Power BI rejects XMLA deploys that change a dataset's
+    // name (even a casing difference), so preferring the resolved name over the user-typed value
+    // keeps later syncs/deploys from being treated as a rename. Falls back to the requested name
+    // when the remote didn't report one.
+    internal static string ResolveWorkspaceDatabase(string? requested, string? resolvedFromRemote)
+        => string.IsNullOrWhiteSpace(resolvedFromRemote) ? (requested ?? "") : resolvedFromRemote;
 
     private static string WorkspaceConnectMessage(string workspace, string message)
     {

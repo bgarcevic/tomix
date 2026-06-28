@@ -21,7 +21,8 @@ public sealed class RemoveModelObjectHandler
             request.Stage && !request.DryRun,
             request.Revert,
             request.Serialization,
-            request.Force);
+            request.Force,
+            request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "rm",
@@ -36,7 +37,8 @@ public sealed class RemoveModelObjectHandler
                     outcome => new RemoveModelObjectResult(
                         mutation.Path, outcome.Saved, outcome.Staged,
                         mutation.Changed ? null : mutation.Reason,
-                        mutation.Changed ? null : mutation.Path));
+                        mutation.Changed ? null : mutation.Path,
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
             new RemoveModelObjectResult(false, null, null, null, null),
             cancellationToken);

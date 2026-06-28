@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Tomix.Core.Bpa;
 
 namespace Tomix.App.Bpa;
@@ -17,7 +18,12 @@ public sealed record BpaRunResult(
     IReadOnlyList<string>? FixErrors = null,
     object? Saved = null,
     bool? Staged = null,
-    IReadOnlyList<string>? RuleLoadDiagnostics = null)
+    IReadOnlyList<string>? RuleLoadDiagnostics = null,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null)
 {
     /// <summary>Visible violations: matched objects that are not suppressed by an object-level ignore.</summary>
     public IReadOnlyList<BpaViolation> Violations { get; } =

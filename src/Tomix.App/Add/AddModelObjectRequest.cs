@@ -15,6 +15,7 @@ public sealed record AddModelObjectRequest(
     bool Force,
     bool Stage = false,
     bool Revert = false,
+    bool NoSync = false,
     string? Columns = null,
     string? Mode = null,
     string? Source = null,

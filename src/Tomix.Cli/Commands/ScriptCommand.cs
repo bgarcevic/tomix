@@ -72,6 +72,11 @@ internal sealed class ScriptCommand : ICommandModule
             Description = "Revert a staged mutation"
         };
 
+        var noSyncOption = new Option<bool>("--no-sync")
+        {
+            Description = "Skip workspace sync when workspace mode is active."
+        };
+
         var command = new Command("script", "Execute C# script(s) against a semantic model")
         {
             modelArgument,
@@ -83,7 +88,8 @@ internal sealed class ScriptCommand : ICommandModule
             forceOption,
             saveOption,
             stageOption,
-            revertOption
+            revertOption,
+            noSyncOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -122,7 +128,8 @@ internal sealed class ScriptCommand : ICommandModule
                         parseResult.GetValue(saveToOption),
                         parseResult.GetValue(serializationOption),
                         parseResult.GetValue(stageOption),
-                        parseResult.GetValue(revertOption)),
+                        parseResult.GetValue(revertOption),
+                        parseResult.GetValue(noSyncOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
@@ -205,6 +212,7 @@ internal sealed class ScriptCommand : ICommandModule
         "--save",
         "--stage",
         "--revert",
+        "--no-sync",
         "--local",
         "--debug",
         "--non-interactive"
@@ -264,6 +272,11 @@ internal sealed class ScriptCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
         else if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
+
+        if (result.Synced)
+            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
+        else if (result.SyncWarning is not null)
+            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
     }
 
     private static object ToReferenceJson(ScriptRunResult result)

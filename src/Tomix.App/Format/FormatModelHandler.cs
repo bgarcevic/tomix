@@ -26,7 +26,7 @@ public sealed class FormatModelHandler
 
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert,
-            request.Serialization, request.Force);
+            request.Serialization, request.Force, request.NoSync);
 
         if (!string.IsNullOrWhiteSpace(request.Path))
         {
@@ -64,7 +64,8 @@ public sealed class FormatModelHandler
                     return (status == "formatted", $"format {obj.Path}",
                         outcome => (FormatModelResult)new ObjectFormatResult(
                             formatted.Success, obj.Path, FormatterLanguages.DisplayName(language),
-                            status, formatted.Formatted, outcome.Saved, outcome.Staged));
+                            status, formatted.Formatted, outcome.Saved, outcome.Staged,
+                            outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
                 },
                 (FormatModelResult)new ObjectFormatResult(false, "", "", "", "", null),
                 cancellationToken);
@@ -122,7 +123,8 @@ public sealed class FormatModelHandler
                 return (formattedCount > 0, $"format {formattedCount} expressions",
                     outcome => (FormatModelResult)new ModelFormatResult(
                         objects.Count, formattedCount, unchangedCount, failedCount,
-                        results, outcome.Saved, outcome.Staged));
+                        results, outcome.Saved, outcome.Staged,
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
             (FormatModelResult)new ModelFormatResult(0, 0, 0, 0, [], null),
             cancellationToken);

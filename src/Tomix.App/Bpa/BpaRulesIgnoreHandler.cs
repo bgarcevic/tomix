@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
@@ -14,7 +15,8 @@ public sealed record BpaRulesIgnoreRequest(
     string Serialization = "",
     bool Force = false,
     bool Stage = false,
-    bool Revert = false);
+    bool Revert = false,
+    bool NoSync = false);
 
 public sealed record BpaRulesIgnoreResult(
     string RuleId,
@@ -23,7 +25,12 @@ public sealed record BpaRulesIgnoreResult(
     IReadOnlyList<string> RuleIds,
     object Saved,
     bool? Staged,
-    string ModelName);
+    string ModelName,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null);
 
 public sealed class BpaRulesIgnoreHandler
 {
@@ -42,7 +49,7 @@ public sealed class BpaRulesIgnoreHandler
 
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert,
-            request.Serialization, request.Force);
+            request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "bpa-ignore",
@@ -75,7 +82,8 @@ public sealed class BpaRulesIgnoreHandler
                     outcome => new BpaRulesIgnoreResult(
                         request.RuleId, request.Ignore, true,
                         current.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
-                        outcome.Saved, outcome.Staged, snapshot.Name));
+                        outcome.Saved, outcome.Staged, snapshot.Name,
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
             new BpaRulesIgnoreResult("", false, false, [], false, null, ""),
             cancellationToken);

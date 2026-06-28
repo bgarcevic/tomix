@@ -41,19 +41,20 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx deps tables/Sales --direction downstream",
         ],
         ["add"] = [
-            "tx add measures/MyMeasure -q \"CALCULATE(SUM(Sales[Amount]))\"",
-            "tx add measures/MyMeasure -i - < query.txt",
+            "tx add tables/Sales/measures/Revenue -i \"CALCULATE(SUM(Sales[Amount]))\"",
+            "tx add tables/Sales/measures/Revenue -i - < query.txt",
+            "tx add Sales/Revenue -t Measure -i \"CALCULATE(SUM(Sales[Amount]))\"",
         ],
         ["set"] = [
             "tx set \"Table[Measure]\" -q \"CALCULATE(SUM(Sales[Amount]))\"",
             "tx set tables/Sales/Name -i \"Sales_v2\"",
         ],
         ["mv"] = [
-            "tx mv measures/OldName measures/NewName",
+            "tx mv tables/Sales/measures/OldName tables/Sales/measures/NewName",
             "tx mv tables/Sales tables/SalesData",
         ],
         ["rm"] = [
-            "tx rm measures/ObsoleteMeasure",
+            "tx rm tables/Sales/measures/ObsoleteMeasure",
             "tx rm tables/Staging --save",
         ],
         ["replace"] = [

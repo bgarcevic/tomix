@@ -19,11 +19,20 @@ and the API surface that major versions protect.
 - `tx refresh` — triggers data refresh on deployed models via XMLA. Supports `--type`, `--table`, `--partition`, `--apply-refresh-policy`/`--skip-refresh-policy`, `--effective-date`, `--max-parallelism`, `--dry-run`, `--no-progress`, `--trace`. Live per-table progress from XMLA `SessionTrace` with summary table (`Rows`, `Query`, `Read`, `Total`, `Rows/s`). JSON/CSV output support.
 - `TOMIX_REFRESH_*` diagnostic codes.
 - `Styling.Number(long)` and `Styling.DurationSeconds(double)` helpers.
+- `tx add` infers the object type from path keywords (`tables/Sales/measures/Revenue`), making `-t` optional for the common forms. Matches the convention used by `ls`/`get`.
+- `OutputExistsException` and `TOMIX_SAVE_OUTPUT_EXISTS` error code for save-target conflicts.
 
 ### Changed
 
 - `refresh` promoted from compatibility stub to real command.
 - `TomServerModelSession` implements `IModelRefreshSession`.
+- `tx add`/`set`/`rm`/`mv` help examples now use the canonical keyword-path form (`tables/Sales/measures/Revenue`) so they are copy-pasteable.
+- `--save` to the source model (in-place) no longer errors with "Output directory already exists". In-place saves overwrite cleanly; `--save-to <existing>` still errors unless `--force` (now mapped to `TOMIX_SAVE_OUTPUT_EXISTS`).
+
+### Fixed
+
+- `--save` on an existing model directory no longer fails; the directory is cleared and rewritten so deleted objects don't leave orphan files.
+- Empty `--type` on `tx add` now produces an actionable error ("No object type given…") instead of `Adding object type '' is not supported yet.`
 
 ### Added
 

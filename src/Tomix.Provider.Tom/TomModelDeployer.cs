@@ -39,16 +39,34 @@ public static class TomModelDeployer
 
         var status = existing is not null ? "updated" : "created";
 
+        // Power BI rejects XMLA deploys that change a dataset's name ("you can't rename this
+        // dataset"), even a casing difference. When the target already exists, pin the deployed
+        // name to the existing dataset's actual name so createOrReplace is never treated as a
+        // rename. For new datasets, use the requested name.
+        var deployName = existing?.Name ?? targetName;
+
         var clone = sourceDatabase.Clone();
-        clone.Name = targetName;
+        clone.Name = deployName;
 
         var dbJson = TabularJsonSerializer.SerializeDatabase(clone, new SerializeOptions());
-        server.Execute(BuildCreateOrReplaceCommand(targetName, dbJson));
+        var results = server.Execute(BuildCreateOrReplaceCommand(deployName, dbJson));
+
+        // AMO's Execute returns a result collection that may contain errors/warnings even
+        // when no exception is thrown. Surface them so deploys don't silently no-op.
+        var serverErrors = new List<string>();
+        XmlaResultHelper.ExtractMessages(results, serverErrors);
+        if (serverErrors.Count > 0)
+        {
+            var message = serverErrors.Count == 1
+                ? serverErrors[0]
+                : string.Join("; ", serverErrors);
+            throw new InvalidOperationException(message);
+        }
 
         sw.Stop();
         server.Disconnect();
         server.Dispose();
-        return new ModelDeployResult(request.Server, targetName, status, sw.ElapsedMilliseconds);
+        return new ModelDeployResult(request.Server, deployName, status, sw.ElapsedMilliseconds);
     }
 
     public static string GenerateScript(Database sourceDatabase, ModelDeployRequest request)

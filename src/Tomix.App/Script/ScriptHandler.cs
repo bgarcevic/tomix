@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Tomix.App.Diagnostics;
 using Tomix.App.Mutations;
@@ -43,7 +44,8 @@ public sealed class ScriptHandler
             request.Stage && !request.DryRun,
             request.Revert,
             request.Serialization ?? "",
-            request.Force);
+            request.Force,
+            request.NoSync);
         var stagingStore = new StagingStore();
         var connection = new CliStateStore().LoadCurrentSession();
 
@@ -120,7 +122,10 @@ public sealed class ScriptHandler
                     inputs,
                     messages,
                     outcome.Saved,
-                    outcome.Staged));
+                    outcome.Staged,
+                    outcome.Synced,
+                    outcome.SyncTarget,
+                    outcome.SyncWarning));
         }
         catch (AuthenticationRequiredException ex)
         {
@@ -186,7 +191,8 @@ public sealed record ScriptRunRequest(
     string? SaveTo,
     string? Serialization,
     bool Stage = false,
-    bool Revert = false);
+    bool Revert = false,
+    bool NoSync = false);
 
 public sealed record ScriptRunResult(
     string ModelName,
@@ -202,7 +208,12 @@ public sealed record ScriptRunResult(
     string? FailedScript,
     int? ScriptIndex,
     IReadOnlyList<string> CompileErrors,
-    string? RuntimeError)
+    string? RuntimeError,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null)
 {
     public static ScriptRunResult CreateDryRun(
         string modelName,
@@ -229,7 +240,10 @@ public sealed record ScriptRunResult(
         IReadOnlyList<ScriptInput> inputs,
         IReadOnlyList<ScriptMessage> messages,
         object saved,
-        bool? staged = null)
+        bool? staged = null,
+        bool synced = false,
+        string? syncTarget = null,
+        string? syncWarning = null)
         => new(
             modelName,
             DryRun: false,
@@ -244,7 +258,10 @@ public sealed record ScriptRunResult(
             FailedScript: null,
             ScriptIndex: null,
             CompileErrors: [],
-            RuntimeError: null);
+            RuntimeError: null,
+            Synced: synced,
+            SyncTarget: syncTarget,
+            SyncWarning: syncWarning);
 
     public static ScriptRunResult Failed(
         string modelName,

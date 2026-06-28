@@ -6,4 +6,9 @@ public sealed record AddModelObjectResult(
     object Added,
     object Saved,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged);
+    bool? Staged,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null);

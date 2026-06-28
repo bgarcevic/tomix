@@ -12,7 +12,8 @@ public sealed record MutationOptions(
     bool Stage,
     bool Revert,
     string Serialization,
-    bool Force);
+    bool Force,
+    bool NoSync = false);
 
 /// <summary>Where a handler should open/mutate and how it should persist, resolved up front by <see cref="MutationLifecycle"/>.</summary>
 public sealed record MutationContext(
@@ -21,7 +22,8 @@ public sealed record MutationContext(
     string? SaveTarget,
     string Serialization,
     bool Force,
-    StagingHandle? Staging);
+    StagingHandle? Staging,
+    ModelReference? SyncTarget = null);
 
 /// <summary>A failed pre-flight: the code/message/exit-code the handler should return verbatim.</summary>
 public sealed record MutationError(string Code, string Message, int ExitCode);
@@ -31,7 +33,12 @@ public sealed record MutationBegin(MutationContext? Context, MutationError? Erro
     public MutationMode Mode => Context?.Mode ?? MutationMode.None;
 }
 
-public sealed record MutationOutcome(object Saved, bool? Staged);
+public sealed record MutationOutcome(
+    object Saved,
+    bool? Staged,
+    bool Synced = false,
+    string? SyncTarget = null,
+    string? SyncWarning = null);
 
 /// <summary>
 /// The shared open/mutate/persist lifecycle for mutation handlers. It owns BOTH "which reference to
@@ -76,14 +83,18 @@ public static class MutationLifecycle
         if (error is not null)
             return new MutationBegin(null, error);
 
+        // Workspace mirror sync target, resolved from the active connection (suppressed by --no-sync).
+        // Only consumed by the Save branch of CompleteAsync; harmless on other modes.
+        var syncTarget = options.NoSync ? null : ResolveSyncTarget(connection);
+
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(
-                new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null),
+                new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null, syncTarget),
                 null);
 
         if (mode == MutationMode.Revert)
             return new MutationBegin(
-                new MutationContext(mode, source, null, options.Serialization, options.Force, null),
+                new MutationContext(mode, source, null, options.Serialization, options.Force, null, null),
                 null);
 
         // Stage: redirect to a local working copy.
@@ -105,7 +116,8 @@ public static class MutationLifecycle
                 SaveTarget: null,
                 handle.Manifest.Serialization,
                 Force: true,
-                handle),
+                handle,
+                SyncTarget: null),
             null);
     }
 
@@ -121,7 +133,9 @@ public static class MutationLifecycle
         {
             case MutationMode.Save:
                 var export = await mutator.SaveAsync(context.SaveTarget, context.Serialization, context.Force, cancellationToken);
-                return new MutationOutcome(export.SavedPath, null);
+                var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
+                    mutator, context.SyncTarget, context.Force, cancellationToken);
+                return new MutationOutcome(export.SavedPath, null, synced, syncTarget, syncWarning);
 
             case MutationMode.Stage:
                 // Flush the in-memory mutation into the working copy on disk, then record the op.
@@ -133,4 +147,26 @@ public static class MutationLifecycle
                 return new MutationOutcome(false, null);
         }
     }
+
+    /// <summary>
+    /// Resolves the remote workspace sync target from the active connection, mirroring
+    /// <c>ActiveModelResolver.ResolveSyncTarget</c>. A remote workspace endpoint wins; otherwise
+    /// the primary server is used. Returns null when there is no mirror configured.
+    /// </summary>
+    private static ModelReference? ResolveSyncTarget(CliConnectionState? connection)
+    {
+        if (connection is null || string.IsNullOrWhiteSpace(connection.Workspace))
+            return null;
+
+        if (ModelReference.IsRemoteEndpoint(connection.Workspace))
+            return new ModelReference(connection.Workspace, NullIfBlank(connection.Database));
+
+        if (!string.IsNullOrWhiteSpace(connection.Server))
+            return new ModelReference(connection.Server, NullIfBlank(connection.Database));
+
+        return null;
+    }
+
+    private static string? NullIfBlank(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value;
 }

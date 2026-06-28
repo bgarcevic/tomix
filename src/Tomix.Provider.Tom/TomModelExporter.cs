@@ -57,7 +57,7 @@ public static class TomModelExporter
             Directory.CreateDirectory(parent);
 
         if (File.Exists(target) && !force)
-            throw new IOException($"Output file already exists: {target}");
+            throw new OutputExistsException($"Output file already exists: {target}");
 
         File.WriteAllText(
             target,
@@ -101,12 +101,29 @@ public static class TomModelExporter
     {
         if (Directory.Exists(path))
         {
-            if (!force && Directory.EnumerateFileSystemEntries(path).Any())
-                throw new IOException($"Output directory already exists: {path}");
+            if (Directory.EnumerateFileSystemEntries(path).Any())
+            {
+                if (!force)
+                    throw new OutputExistsException($"Output directory already exists: {path}");
+
+                ClearDirectory(path);
+            }
         }
         else
         {
             Directory.CreateDirectory(path);
+        }
+    }
+
+    private static void ClearDirectory(string path)
+    {
+        foreach (var entry in Directory.EnumerateFileSystemEntries(path))
+        {
+            var full = Path.Combine(path, entry);
+            if (Directory.Exists(full))
+                Directory.Delete(full, recursive: true);
+            else
+                File.Delete(full);
         }
     }
 

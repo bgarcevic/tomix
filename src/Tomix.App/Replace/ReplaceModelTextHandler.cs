@@ -27,7 +27,8 @@ public sealed class ReplaceModelTextHandler
             request.Stage && !request.DryRun,
             request.Revert,
             request.Serialization,
-            request.Force);
+            request.Force,
+            request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "replace",
@@ -55,7 +56,8 @@ public sealed class ReplaceModelTextHandler
                     outcome => new ReplaceModelTextResult(
                         request.Pattern, request.Replacement,
                         DryRun: null, replace.ChangeCount, Previews: null,
-                        outcome.Saved, outcome.Staged));
+                        outcome.Saved, outcome.Staged,
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
             new ReplaceModelTextResult(
                 request.Pattern, request.Replacement,

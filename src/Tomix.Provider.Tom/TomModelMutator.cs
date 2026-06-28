@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
+using Tomix.Core.Paths;
 
 namespace Tomix.Provider.Tom;
 
@@ -12,8 +13,9 @@ public sealed partial class TomModelMutator
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
     {
-        var type = NormalizeType(request.Type);
-        var path = NormalizePath(request.Path);
+        var (effectiveType, effectivePath) = ResolveTypeAndPath(request.Type, request.Path);
+        var type = NormalizeType(effectiveType);
+        var path = NormalizePath(effectivePath);
 
         return type switch
         {
@@ -41,6 +43,9 @@ public sealed partial class TomModelMutator
             "role" => AddRole(path, request),
             "tablepermission" => AddTablePermission(path, request),
             "member" => AddMember(path, request),
+            "" => throw new ArgumentException(
+                $"No object type given for '{request.Path}'. Pass -t <type> or use a path keyword "
+                + "(e.g. 'tables/<Table>', 'tables/<Table>/measures/<Name>')."),
             _ => throw new NotSupportedException($"Adding object type '{request.Type}' is not supported yet.")
         };
     }
@@ -135,7 +140,12 @@ public sealed partial class TomModelMutator
     {
         var parts = SplitObjectPath(path);
         if (parts.Count != 2)
-            throw new InvalidOperationException($"Cannot add a Measure at path '{request.Path}'. Check that -t matches the path shape.");
+        {
+            throw parts.Count < 2
+                ? new InvalidOperationException(
+                    $"Measures require a table parent. Use 'tables/<Table>/measures/<Name>'. Path was '{request.Path}'.")
+                : new InvalidOperationException($"Cannot add a Measure at path '{request.Path}'. Expected '<Table>/<Measure>'.");
+        }
 
         var table = FindTable(parts[0]) ??
                     throw new InvalidOperationException($"Table not found: {parts[0]}");
@@ -735,6 +745,55 @@ public sealed partial class TomModelMutator
             var normalized => normalized
         };
     }
+
+    /// <summary>
+    /// Resolves the effective type and name-only path. When the path uses container keywords
+    /// (e.g. <c>tables/Sales/measures/Revenue</c>), keyword segments are stripped and the type is
+    /// inferred from the deepest keyword unless <paramref name="type"/> was given explicitly.
+    /// Paths without keywords are returned unchanged so existing <c>-t</c>-based usage is unaffected.
+    /// </summary>
+    private static (string? Type, string Path) ResolveTypeAndPath(string? type, string path)
+    {
+        var segments = ObjectPath.Parse(path);
+        if (segments.Count == 0 || segments.All(s => !s.IsKeyword))
+            return (type, path);
+
+        string? lastKeywordType = null;
+        var nameSegments = new List<string>();
+        foreach (var segment in segments)
+        {
+            if (segment.TryGetKeyword(out var kind))
+            {
+                if (TryMapKeywordToTypeName(kind) is { } mapped)
+                    lastKeywordType = mapped;
+            }
+            else
+            {
+                nameSegments.Add(segment.Text);
+            }
+        }
+
+        if (nameSegments.Count == 0 || lastKeywordType is null)
+            return (type, path);
+
+        var effectiveType = !string.IsNullOrWhiteSpace(type) ? type : lastKeywordType;
+        return (effectiveType, string.Join("/", nameSegments));
+    }
+
+    private static string? TryMapKeywordToTypeName(ModelObjectKind kind) => kind switch
+    {
+        ModelObjectKind.Table => "table",
+        ModelObjectKind.Measure => "measure",
+        ModelObjectKind.Column => "calccolumn",
+        ModelObjectKind.Hierarchy => "hierarchy",
+        ModelObjectKind.Level => "level",
+        ModelObjectKind.Partition => "partition",
+        ModelObjectKind.Role => "role",
+        ModelObjectKind.RoleMember => "member",
+        ModelObjectKind.Perspective => "perspective",
+        ModelObjectKind.Culture => "culture",
+        _ => null
+    };
 
     private static string NormalizeProperty(string property)
         => property.Trim().Replace(" ", "", StringComparison.Ordinal).ToLowerInvariant();

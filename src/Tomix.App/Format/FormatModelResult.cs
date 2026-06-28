@@ -18,7 +18,12 @@ public sealed record ObjectFormatResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     object? Saved,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged = null) : FormatModelResult;
+    bool? Staged = null,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null) : FormatModelResult;
 
 public sealed record ModelFormatResult(
     int Total,
@@ -29,7 +34,12 @@ public sealed record ModelFormatResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     object? Saved,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged = null) : FormatModelResult;
+    bool? Staged = null,
+    bool Synced = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncTarget = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SyncWarning = null) : FormatModelResult;
 
 public sealed record ModelFormatObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

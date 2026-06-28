@@ -1,4 +1,5 @@
 using Tomix.App.Bpa;
+using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -65,7 +66,7 @@ public sealed class SaveModelHandler
                 new ModelExportRequest(outputPath, serialization, request.Force, request.SupportingFiles),
                 cancellationToken);
 
-            var (synced, syncTarget, syncWarning) = await SyncToWorkspaceAsync(
+            var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
                 session, request.SyncTarget, request.Force, cancellationToken);
 
             return TomixResult<SaveModelResult>.Ok(new SaveModelResult(
@@ -78,36 +79,6 @@ public sealed class SaveModelHandler
         catch (IOException ex)
         {
             return TomixResult<SaveModelResult>.Fail("TOMIX_SAVE_OUTPUT_EXISTS", ex.Message, exitCode: 2);
-        }
-    }
-
-    private static async Task<(bool Synced, string? Target, string? Warning)> SyncToWorkspaceAsync(
-        IModelSession session,
-        ModelReference? syncTarget,
-        bool force,
-        CancellationToken cancellationToken)
-    {
-        if (syncTarget is null)
-            return (false, null, null);
-
-        if (session is not IModelDeploySession deployer)
-            return (false, null, $"Workspace sync skipped: provider does not support deploy.");
-
-        var targetLabel = syncTarget.Database is not null
-            ? $"{syncTarget.Value} / {syncTarget.Database}"
-            : syncTarget.Value;
-
-        try
-        {
-            await deployer.DeployAsync(
-                new ModelDeployRequest(syncTarget.Value, syncTarget.Database, DeployFull: false, CreateOnly: false, Force: force),
-                cancellationToken);
-
-            return (true, targetLabel, null);
-        }
-        catch (Exception ex)
-        {
-            return (false, targetLabel, $"Workspace sync failed: {ex.Message}");
         }
     }
 

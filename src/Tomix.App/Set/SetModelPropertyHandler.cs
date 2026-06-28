@@ -22,7 +22,7 @@ public sealed class SetModelPropertyHandler
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "set",
@@ -41,7 +41,10 @@ public sealed class SetModelPropertyHandler
                         mutation.Value ?? request.Properties[^1].Value,
                         outcome.Saved,
                         ValidationErrors: 0,
-                        outcome.Staged == true ? true : null));
+                        outcome.Staged == true ? true : null,
+                        Synced: outcome.Synced,
+                        SyncTarget: outcome.SyncTarget,
+                        SyncWarning: outcome.SyncWarning));
             },
             new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: 0),
             cancellationToken);

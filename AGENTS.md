@@ -53,11 +53,6 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - Tests: `<TypeOrFeature>Tests`
 - Sample folders and docs: kebab-case
 
-## Commit Conventions
-
-- When asked to commit, also update `CHANGELOG.md`: add a bullet under `[Unreleased]` in the appropriate section (`Added`, `Changed`, `Fixed`, `Removed`). Do not touch version headers — versions come from git tags via MinVer.
-- If `CHANGELOG.md` has no `[Unreleased]` section, add one before the latest version header.
-
 ## Development Commands
 
 - Build: `dotnet build`
