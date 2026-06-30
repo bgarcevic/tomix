@@ -47,16 +47,23 @@ public sealed record ModelReference(string Value, string? Database = null)
     /// as <c>MyWorkspace</c> becomes <c>powerbi://api.powerbi.com/v1.0/myorg/MyWorkspace</c> so it
     /// can be opened by remote providers and stored as an active connection.
     /// </summary>
+    /// <remarks>
+    /// Percent-escaped sequences are decoded first (e.g. <c>sandbox%20bkg</c> becomes
+    /// <c>sandbox bkg</c>), so workspace names pasted from browser URLs resolve to the real name
+    /// the XMLA endpoint expects. Already-formed endpoints are decoded too.
+    /// </remarks>
     public static string NormalizeEndpoint(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return value ?? string.Empty;
 
-        if (value.Contains("://", StringComparison.Ordinal) ||
-            value.StartsWith("localhost:", StringComparison.OrdinalIgnoreCase) ||
-            value.StartsWith("127.0.0.1:", StringComparison.OrdinalIgnoreCase))
-            return value;
+        var decoded = Uri.UnescapeDataString(value);
 
-        return $"powerbi://api.powerbi.com/v1.0/myorg/{value}";
+        if (decoded.Contains("://", StringComparison.Ordinal) ||
+            decoded.StartsWith("localhost:", StringComparison.OrdinalIgnoreCase) ||
+            decoded.StartsWith("127.0.0.1:", StringComparison.OrdinalIgnoreCase))
+            return decoded;
+
+        return $"powerbi://api.powerbi.com/v1.0/myorg/{decoded}";
     }
 }

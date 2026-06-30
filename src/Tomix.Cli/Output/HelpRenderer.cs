@@ -76,6 +76,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx connect MyWorkspace Sales",
             "tx connect ./model.tmdl",
             "tx connect --local",
+            "tx connect ./model.tmdl -w MyWorkspace Sales",
         ],
         ["deploy"] = [
             "tx deploy ./model.tmdl",

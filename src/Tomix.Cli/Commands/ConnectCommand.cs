@@ -174,6 +174,14 @@ internal sealed class ConnectCommand : ICommandModule
                 isRemoteEndpoint = true;
             }
 
+            // Mirror target normalization: a bare workspace name as a mirror target (local primary)
+            // is shorthand for the workspace's XMLA endpoint, mirroring the primary-server expansion
+            // above. Without this, a bare -w value is stored verbatim, IsRemoteEndpoint returns
+            // false, the probe below is skipped, and ResolveSyncTarget later returns null — so the
+            // mirror is rendered but never actually reachable. Remote-primary -w values (local
+            // folder/.bim paths) are returned unchanged.
+            workspace = NormalizeWorkspaceTarget(model, workspace);
+
             // A bare server that is neither a remote endpoint nor a local model path can never be
             // opened by any provider (the TOM server provider requires a remote endpoint; file/TMDL
             // providers require a path). Reject it here instead of storing a dead-end connection.
@@ -368,13 +376,13 @@ internal sealed class ConnectCommand : ICommandModule
            (Directory.Exists(value) || File.Exists(value) || value.Contains('\\') || value.Contains('/'));
 
     // A bare workspace name as a mirror target (local primary) is shorthand for the workspace's
-    // XMLA endpoint, mirroring the primary-server normalization. Only applies when the primary
-    // is local; a remote primary expects -w to be a local folder/.bim path.
+    // XMLA endpoint, mirroring the primary-server normalization. NormalizeEndpoint expands bare
+    // names to powerbi:// and decodes percent escapes (e.g. "sandbox%20bkg"), so both a typed
+    // name and a pasted URL resolve to the real workspace. Only applies when the primary is
+    // local; a remote primary expects -w to be a local folder/.bim path and is left untouched.
     internal static string? NormalizeWorkspaceTarget(string? model, string? workspace)
     {
-        if (model is not null &&
-            !string.IsNullOrWhiteSpace(workspace) &&
-            !ModelReference.IsRemoteEndpoint(workspace))
+        if (model is not null && !string.IsNullOrWhiteSpace(workspace))
         {
             return ModelReference.NormalizeEndpoint(workspace);
         }
