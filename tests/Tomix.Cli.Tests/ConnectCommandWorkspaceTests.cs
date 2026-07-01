@@ -42,15 +42,18 @@ public class ConnectCommandWorkspaceTests
         Assert.True(ModelReference.IsRemoteEndpoint(normalized));
     }
 
-    // An already-formed endpoint with percent escapes is decoded too, so a pasted URL resolves.
+    // An already-formed endpoint is returned verbatim, never decoded. This keeps
+    // NormalizeEndpoint idempotent so a percent-escaped workspace name (e.g. one whose
+    // real name contains "%20") survives the second normalization pass applied at connect
+    // time by TomModelDeployer.ResolveEndpoint instead of being turned into a space.
     [Fact]
-    public void NormalizeWorkspaceTarget_LocalPrimary_DecodesPercentEscapesInEndpoint()
+    public void NormalizeWorkspaceTarget_LocalPrimary_PassesEndpointWithPercentEscapesThrough()
     {
         var normalized = ConnectCommand.NormalizeWorkspaceTarget(
             model: "./local-model",
             "powerbi://api.powerbi.com/v1.0/myorg/sandbox%20bkg");
 
-        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/sandbox bkg", normalized);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/sandbox%20bkg", normalized);
         Assert.True(ModelReference.IsRemoteEndpoint(normalized));
     }
 

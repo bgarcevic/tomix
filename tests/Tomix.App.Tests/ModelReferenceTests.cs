@@ -54,8 +54,22 @@ public sealed class ModelReferenceTests
     [InlineData("localhost:52123")]
     [InlineData("127.0.0.1:52123")]
     [InlineData("https://example.com")] // non-XMLA scheme preserved as-is (not a bare name)
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/Sales%20Archive")] // endpoint %XX taken literally (idempotent)
     public void NormalizeEndpoint_PassesExistingEndpointsThrough(string input)
         => Assert.Equal(input, ModelReference.NormalizeEndpoint(input));
+
+    [Fact]
+    public void NormalizeEndpoint_IsIdempotent_ForBrowserEscapedWorkspaceName()
+    {
+        // "Sales%2520Archive" is the browser-escaped form of the literal workspace name
+        // "Sales%20Archive". One decode resolves it; a second pass (applied at connect time
+        // by TomModelDeployer.ResolveEndpoint) must not turn "%20" into a space.
+        var once = ModelReference.NormalizeEndpoint("Sales%2520Archive");
+        var twice = ModelReference.NormalizeEndpoint(once);
+
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/Sales%20Archive", once);
+        Assert.Equal(once, twice);
+    }
 
     [Theory]
     [InlineData(null, "")]
