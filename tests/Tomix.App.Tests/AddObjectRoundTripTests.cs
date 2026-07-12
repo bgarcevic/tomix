@@ -21,7 +21,7 @@ public sealed class AddObjectRoundTripTests
         ["Hierarchy"], ["Level"], ["Calendar"], ["CalcItem"], ["KPI"], ["Partition"],
         ["MPartition"], ["EntityPartition"], ["PolicyRangePartition"], ["Expression"], ["Function"],
         ["Perspective"], ["Culture"], ["ProviderDataSource"], ["StructuredDataSource"], ["Role"],
-        ["TablePermission"], ["Member"]
+        ["TablePermission"], ["Member"], ["Relationship"]
     ];
 
     [Theory]
@@ -33,8 +33,11 @@ public sealed class AddObjectRoundTripTests
         var db = BaseModel();
         var mutator = new TomModelMutator(db);
 
-        var result = mutator.AddObject(new ModelObjectAddRequest(
-            path, type, value, [], IfNotExists: false));
+        var request = new ModelObjectAddRequest(path, type, value, [], IfNotExists: false);
+        if (type == "PolicyRangePartition")
+            request = request with { RangeStart = "2024-01-01", RangeEnd = "2025-01-01", RangeGranularity = "Month" };
+
+        var result = mutator.AddObject(request);
         Assert.True(result.Changed, $"AddObject for '{type}' should report Changed=true.");
 
         var temp = Directory.CreateTempSubdirectory("tomix-add-rt");
@@ -98,6 +101,7 @@ public sealed class AddObjectRoundTripTests
         "Role" => ("Writer", null),
         "TablePermission" => ("Reader/Sales", "Sales[Amount] > 0"),
         "Member" => ("Reader/user1@contoso.com", null),
+        "Relationship" => ("Sales[Amount]->Product[Key]", null),
         _ => throw new InvalidOperationException($"No target defined for {type}")
     };
 
@@ -127,7 +131,10 @@ public sealed class AddObjectRoundTripTests
             "EntityPartition" => sales!.Partitions.Any(p => p.Name == "EP"
                 && p.Source is EntityPartitionSource e && e.EntityName == "Orders"),
             "PolicyRangePartition" => sales!.Partitions.Any(p => p.Name == "PR"
-                && p.Source is PolicyRangePartitionSource),
+                && p.Source is PolicyRangePartitionSource pr
+                && pr.Start == new DateTime(2024, 1, 1)
+                && pr.End == new DateTime(2025, 1, 1)
+                && pr.Granularity == RefreshGranularityType.Month),
             "Expression" => model.Expressions.Any(e => e.Name == "Expr1"),
             "Function" => model.Functions.Any(f => f.Name == "Func1"),
             "Perspective" => model.Perspectives.Any(p => p.Name == "Persp1"),
@@ -137,6 +144,9 @@ public sealed class AddObjectRoundTripTests
             "Role" => model.Roles.Any(r => r.Name == "Writer"),
             "TablePermission" => reader!.TablePermissions.Any(p => p.Name == "Sales"),
             "Member" => reader!.Members.Any(m => m.MemberName == "user1@contoso.com"),
+            "Relationship" => model.Relationships.OfType<SingleColumnRelationship>().Any(r =>
+                r.FromColumn.Table.Name == "Sales" && r.FromColumn.Name == "Amount"
+                && r.ToColumn.Table.Name == "Product" && r.ToColumn.Name == "Key"),
             _ => throw new InvalidOperationException($"No existence check defined for {type}")
         };
     }
@@ -159,6 +169,16 @@ public sealed class AddObjectRoundTripTests
         geo.Levels.Add(new Level { Name = "Lvl", Ordinal = 0, Column = amount });
         sales.Hierarchies.Add(geo);
         db.Model.Tables.Add(sales);
+
+        var product = new Table { Name = "Product" };
+        product.Columns.Add(new DataColumn { Name = "Key", DataType = DataType.Double, SourceColumn = "Key" });
+        product.Partitions.Add(new Partition
+        {
+            Name = "Product",
+            Mode = ModeType.Import,
+            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
+        });
+        db.Model.Tables.Add(product);
 
         var cg = new Table { Name = "CG" };
         cg.CalculationGroup = new CalculationGroup();

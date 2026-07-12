@@ -83,8 +83,9 @@ internal sealed class BpaCommand : ICommandModule
 
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, te-folder"
+            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
 
         var stageOption = new Option<bool>("--stage")
         {
@@ -474,8 +475,9 @@ internal sealed class BpaCommand : ICommandModule
         };
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization when saving: tmdl, bim, te-folder"
+            Description = "Model serialization when saving: tmdl, bim (tmsl and auto also accepted)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var stageOption = new Option<bool>("--stage")
         {
             Description = "Stage this command's mutation"

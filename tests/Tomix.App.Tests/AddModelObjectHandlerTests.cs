@@ -218,6 +218,121 @@ public sealed class AddModelObjectHandlerTests
         Assert.True(result.Success);
         Assert.Equal(false, result.Data!.Added);
         Assert.Null(result.Data.Staged);
+        Assert.True(result.Data.Reverted);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RevertWithSaveTo_ReturnsConflictError()
+    {
+        var session = new StubMutationSession();
+        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+
+        var result = await handler.HandleAsync(
+            new AddModelObjectRequest(
+                new ModelReference("any"),
+                "Sales/Revenue",
+                "Measure",
+                "1",
+                [],
+                IfNotExists: false,
+                Save: false,
+                SaveTo: "output/path",
+                Serialization: "",
+                Force: false,
+                Stage: false,
+                Revert: true),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_STAGE_OPTIONS_CONFLICT", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("--save-to", result.Diagnostics[0].Message);
+        Assert.Empty(session.AddRequests);
+    }
+
+    [Fact]
+    public async Task HandleAsync_IfNotExistsNoOp_ReturnsExistingPath()
+    {
+        var session = new StubMutationSession { ReturnChanged = false };
+        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+
+        var result = await handler.HandleAsync(
+            new AddModelObjectRequest(
+                new ModelReference("any"),
+                "Sales/Revenue",
+                "Measure",
+                "1",
+                [],
+                IfNotExists: true,
+                Save: false,
+                SaveTo: null,
+                Serialization: "",
+                Force: false),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(false, result.Data!.Added);
+        Assert.Equal("Sales/Revenue", result.Data.ExistingPath);
+        Assert.False(result.Data.Reverted);
+    }
+
+    [Fact]
+    public async Task HandleAsync_UnsupportedAddOption_ReturnsOptionUnsupportedError()
+    {
+        var session = new ThrowingMutationSession(
+            new UnsupportedAddOptionException("--columns is not supported for type 'CalcGroup'. It applies to: Table."));
+        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+
+        var result = await handler.HandleAsync(
+            new AddModelObjectRequest(
+                new ModelReference("any"),
+                "CG",
+                "CalcGroup",
+                null,
+                [],
+                IfNotExists: false,
+                Save: false,
+                SaveTo: null,
+                Serialization: "",
+                Force: false,
+                Columns: "X,Y"),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_ADD_OPTION_UNSUPPORTED", result.Diagnostics[0].Code);
+        Assert.Equal(1, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NewSourceAndRangeFields_PassThroughToProvider()
+    {
+        var session = new StubMutationSession();
+        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+
+        var result = await handler.HandleAsync(
+            new AddModelObjectRequest(
+                new ModelReference("any"),
+                "Sales/PR",
+                "PolicyRangePartition",
+                null,
+                [],
+                IfNotExists: false,
+                Save: false,
+                SaveTo: null,
+                Serialization: "",
+                Force: false,
+                SourceSchema: "dbo",
+                RangeStart: "2024-01-01",
+                RangeEnd: "2025-01-01",
+                RangeGranularity: "Month"),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var addRequest = Assert.Single(session.AddRequests);
+        Assert.Equal("dbo", addRequest.SourceSchema);
+        Assert.Equal("2024-01-01", addRequest.RangeStart);
+        Assert.Equal("2025-01-01", addRequest.RangeEnd);
+        Assert.Equal("Month", addRequest.RangeGranularity);
     }
 
     [Fact]
@@ -400,6 +515,7 @@ public sealed class AddModelObjectHandlerTests
         public string SourcePath => "";
 
         public List<ModelObjectAddRequest> AddRequests { get; } = [];
+        public bool ReturnChanged { get; set; } = true;
         public string? SaveOutputPath { get; private set; }
         public string SaveSerializationValue { get; private set; } = "";
         public bool SaveForceValue { get; private set; }
@@ -413,7 +529,7 @@ public sealed class AddModelObjectHandlerTests
         public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
         {
             AddRequests.Add(request);
-            return new ModelObjectMutationResult(request.Path, Changed: true);
+            return new ModelObjectMutationResult(request.Path, Changed: ReturnChanged);
         }
 
         public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request)

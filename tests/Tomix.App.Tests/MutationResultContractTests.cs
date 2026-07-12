@@ -99,6 +99,39 @@ public sealed class MutationResultContractTests
         Assert.Equal("custom/path", strJson.RootElement.GetProperty("saved").GetString());
     }
 
+    [Fact]
+    public void AddModelObjectResult_Defaults_OmitRevertedAndExistingPath()
+    {
+        var result = new AddModelObjectResult("Sales/M", Saved: false, Staged: null);
+        var json = Serialize(result);
+
+        Assert.DoesNotContain("\"reverted\"", json);
+        Assert.DoesNotContain("\"existingPath\"", json);
+    }
+
+    [Fact]
+    public void MoveAndRemoveResults_OmitRevertedAtDefault_IncludeOnRevert()
+    {
+        Assert.DoesNotContain("\"reverted\"", Serialize(new MoveModelObjectResult("A", "B", Saved: false, Staged: null)));
+        Assert.DoesNotContain("\"reverted\"", Serialize(new RemoveModelObjectResult(false, null, null, null, null)));
+
+        Assert.Contains("\"reverted\": true", Serialize(
+            new MoveModelObjectResult("A", "B", Saved: false, Staged: null, Reverted: true)));
+        Assert.Contains("\"reverted\": true", Serialize(
+            new RemoveModelObjectResult(false, null, null, null, null, Reverted: true)));
+    }
+
+    [Fact]
+    public void AddModelObjectResult_RevertAndNoOp_IncludeNewFields()
+    {
+        var reverted = Serialize(new AddModelObjectResult(false, Saved: false, Staged: null, Reverted: true));
+        Assert.Contains("\"reverted\": true", reverted);
+
+        var noOp = JsonDocument.Parse(Serialize(
+            new AddModelObjectResult(false, Saved: false, Staged: null, ExistingPath: "Sales/M")));
+        Assert.Equal("Sales/M", noOp.RootElement.GetProperty("existingPath").GetString());
+    }
+
     // ── Remove: RemoveModelObjectResult ─────────────────────────────────────
 
     [Fact]

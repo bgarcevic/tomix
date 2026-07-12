@@ -60,15 +60,101 @@ public sealed class TomAddOptionTests
     }
 
     [Fact]
-    public void SourceDatabase_SetsEntityPartitionSchemaName()
+    public void SourceSchema_SetsEntityPartitionSchemaName()
     {
         var db = WithSales();
         var mutator = new TomModelMutator(db);
 
-        mutator.AddObject(Add("Sales/EP", "EntityPartition") with { SourceTable = "Orders", SourceDatabase = "dbo" });
+        mutator.AddObject(Add("Sales/EP", "EntityPartition") with { SourceTable = "Orders", SourceSchema = "dbo" });
 
         var source = Assert.IsType<EntityPartitionSource>(Sales(db).Partitions.Single(p => p.Name == "EP").Source);
         Assert.Equal("dbo", source.SchemaName);
+    }
+
+    [Fact]
+    public void RangeOptions_SetPolicyRangePartitionSource()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        mutator.AddObject(Add("Sales/PR", "PolicyRangePartition") with
+        {
+            RangeStart = "2024-01-01",
+            RangeEnd = "2025-06-01",
+            RangeGranularity = "month"
+        });
+
+        var source = Assert.IsType<PolicyRangePartitionSource>(Sales(db).Partitions.Single(p => p.Name == "PR").Source);
+        Assert.Equal(new DateTime(2024, 1, 1), source.Start);
+        Assert.Equal(new DateTime(2025, 6, 1), source.End);
+        Assert.Equal(RefreshGranularityType.Month, source.Granularity);
+    }
+
+    [Fact]
+    public void RangeGranularity_DefaultsToDay()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        mutator.AddObject(Add("Sales/PR", "PolicyRangePartition") with
+        {
+            RangeStart = "2024-01-01",
+            RangeEnd = "2024-02-01"
+        });
+
+        var source = Assert.IsType<PolicyRangePartitionSource>(Sales(db).Partitions.Single(p => p.Name == "PR").Source);
+        Assert.Equal(RefreshGranularityType.Day, source.Granularity);
+    }
+
+    [Theory]
+    [InlineData(null, "2024-02-01")]
+    [InlineData("2024-01-01", null)]
+    public void MissingRangeDate_Throws(string? start, string? end)
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        var ex = Assert.Throws<ArgumentException>(() => mutator.AddObject(
+            Add("Sales/PR", "PolicyRangePartition") with { RangeStart = start, RangeEnd = end }));
+        Assert.Contains("--range-start and --range-end", ex.Message);
+    }
+
+    [Fact]
+    public void InvalidRangeDate_Throws()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        var ex = Assert.Throws<ArgumentException>(() => mutator.AddObject(
+            Add("Sales/PR", "PolicyRangePartition") with { RangeStart = "not-a-date", RangeEnd = "2024-02-01" }));
+        Assert.Contains("--range-start", ex.Message);
+    }
+
+    [Fact]
+    public void InvalidRangeGranularity_Throws()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        var ex = Assert.Throws<ArgumentException>(() => mutator.AddObject(
+            Add("Sales/PR", "PolicyRangePartition") with
+            {
+                RangeStart = "2024-01-01",
+                RangeEnd = "2024-02-01",
+                RangeGranularity = "fortnight"
+            }));
+        Assert.Contains("Unknown range granularity", ex.Message);
+    }
+
+    [Fact]
+    public void RangeStartAfterEnd_Throws()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        var ex = Assert.Throws<ArgumentException>(() => mutator.AddObject(
+            Add("Sales/PR", "PolicyRangePartition") with { RangeStart = "2025-01-01", RangeEnd = "2024-01-01" }));
+        Assert.Contains("--range-start must be before --range-end", ex.Message);
     }
 
     [Fact]

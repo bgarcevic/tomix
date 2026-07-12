@@ -31,7 +31,11 @@ public sealed record ModelObjectAddRequest(
     string? SourceTable = null,
     string? SourceDatabase = null,
     string? PartitionExpression = null,
-    string? SourceType = null);
+    string? SourceType = null,
+    string? SourceSchema = null,
+    string? RangeStart = null,
+    string? RangeEnd = null,
+    string? RangeGranularity = null);
 
 public sealed record ModelObjectSetRequest(
     string Path,

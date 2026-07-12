@@ -59,8 +59,9 @@ internal sealed class MvCommand : ICommandModule
         };
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, te-folder"
+            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
 
         var command = new Command("mv", "Move or rename a model object")
         {
@@ -99,10 +100,14 @@ internal sealed class MvCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
-            var saving = parseResult.GetValue(saveOption) || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption));
+            var label = MutationSpinnerLabel.For(
+                parseResult.GetValue(saveOption),
+                parseResult.GetValue(saveToOption),
+                parseResult.GetValue(stageOption),
+                parseResult.GetValue(revertOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
-                "Saving...",
+                label,
                 () => new MoveModelObjectHandler(_providers).HandleAsync(
                     new MoveModelObjectRequest(
                         reference,
@@ -127,6 +132,12 @@ internal sealed class MvCommand : ICommandModule
 
     private static void Render(MoveModelObjectResult result)
     {
+        if (result.Reverted)
+        {
+            AnsiConsole.MarkupLine(Styling.Success("Reverted."));
+            return;
+        }
+
         AnsiConsole.MarkupLine(Styling.Success($"Renamed: {result.Moved} -> {result.To}"));
         if (result.Saved is false)
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist."));

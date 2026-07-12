@@ -33,8 +33,9 @@ internal sealed class InitCommand : ICommandModule
 
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, te-folder, pbip (default: tmdl)"
+            Description = "Model serialization: tmdl, bim, pbip (default: tmdl)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "pbip");
 
         var forceOption = new Option<bool>("--force")
         {

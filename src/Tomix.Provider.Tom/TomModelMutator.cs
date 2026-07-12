@@ -13,8 +13,18 @@ public sealed partial class TomModelMutator
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
     {
+        // Relationship paths ('Sales'[Key]->'Product'[Key]) carry quotes and brackets that
+        // NormalizePath/ObjectPath would mangle, so they are detected and routed up front.
+        if (TryResolveRelationshipPath(request) is { } relationshipPath)
+        {
+            ValidateAddOptions("relationship", "Relationship", request);
+            return AddRelationship(relationshipPath, request);
+        }
+
         var (effectiveType, effectivePath) = ResolveTypeAndPath(request.Type, request.Path);
         var type = NormalizeType(effectiveType);
+        if (type.Length > 0)
+            ValidateAddOptions(type, effectiveType!.Trim(), request);
         var path = NormalizePath(effectivePath);
 
         return type switch
@@ -243,6 +253,9 @@ public sealed partial class TomModelMutator
                 return;
             case ModelRoleMember member:
                 ApplyMemberProperty(member, property, value, assignment.Property);
+                return;
+            case SingleColumnRelationship relationship:
+                ApplyRelationshipProperty(relationship, property, value, assignment.Property);
                 return;
             default:
                 throw new NotSupportedException($"Setting '{assignment.Property}' is not supported for this object.");
@@ -522,6 +535,53 @@ public sealed partial class TomModelMutator
             foreach (var operation in BuildFormatStringReplaceOperations(request))
                 yield return operation;
         }
+
+        // Annotations are explicit-only: values are often tool-generated JSON, so a blanket
+        // '--in all' replace must not rewrite them.
+        if (scope is "annotations")
+        {
+            foreach (var operation in BuildAnnotationReplaceOperations(request))
+                yield return operation;
+        }
+    }
+
+    private IEnumerable<ReplaceOperation> BuildAnnotationReplaceOperations(ModelReplaceRequest request)
+    {
+        foreach (var (path, annotations) in EnumerateAnnotationOwners())
+        {
+            foreach (var annotation in annotations)
+            {
+                var value = annotation;
+                yield return ReplaceProperty(
+                    path, $"Annotation:{annotation.Name}", annotation.Value, v => value.Value = v, request);
+            }
+        }
+    }
+
+    private IEnumerable<(string Path, IEnumerable<Annotation> Annotations)> EnumerateAnnotationOwners()
+    {
+        yield return (".", _database.Model.Annotations);
+
+        foreach (var table in _database.Model.Tables)
+        {
+            var tablePath = Segment(table.Name);
+            yield return (tablePath, table.Annotations);
+
+            foreach (var measure in table.Measures)
+                yield return ($"{tablePath}/{Segment(measure.Name)}", measure.Annotations);
+
+            foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
+                yield return ($"{tablePath}/{Segment(column.Name)}", column.Annotations);
+
+            foreach (var hierarchy in table.Hierarchies)
+                yield return ($"{tablePath}/{Segment(hierarchy.Name)}", hierarchy.Annotations);
+
+            foreach (var partition in table.Partitions)
+                yield return ($"{tablePath}/Partitions/{Segment(partition.Name)}", partition.Annotations);
+        }
+
+        foreach (var role in _database.Model.Roles)
+            yield return ($"Roles/{Segment(role.Name)}", role.Annotations);
     }
 
     private IEnumerable<ReplaceOperation> BuildNameReplaceOperations(ModelReplaceRequest request)
@@ -721,7 +781,10 @@ public sealed partial class TomModelMutator
             "formatstring" or "formatstrings" or "format-strings" => "formatstrings",
             "annotation" or "annotations" => "annotations",
             "all" => "all",
-            _ => scope.Trim().ToLowerInvariant()
+            // An unknown scope would match no Build*ReplaceOperations branch and silently
+            // replace nothing; reject it instead.
+            _ => throw new ArgumentException(
+                $"Unknown replace scope: '{scope}'. Known values: names, expressions, descriptions, displayFolders, formatStrings, annotations, all.")
         };
     }
 
@@ -741,7 +804,11 @@ public sealed partial class TomModelMutator
 
         return type.Trim().ToLowerInvariant() switch
         {
-            "calcmeasure" => "measure",
+            "calcmeasure" or "calculatedmeasure" => "measure",
+            "calculatedtable" => "calctable",
+            "calculatedcolumn" => "calccolumn",
+            "calculationgroup" or "calculatedgroup" => "calcgroup",
+            "calculationitem" or "calculateditem" => "calcitem",
             var normalized => normalized
         };
     }
@@ -755,7 +822,7 @@ public sealed partial class TomModelMutator
     private static (string? Type, string Path) ResolveTypeAndPath(string? type, string path)
     {
         var segments = ObjectPath.Parse(path);
-        if (segments.Count == 0 || segments.All(s => !s.IsKeyword))
+        if (segments.Count == 0 || segments.All(s => !s.IsKeyword && !IsSupplementalKeyword(s)))
             return (type, path);
 
         string? lastKeywordType = null;
@@ -766,6 +833,10 @@ public sealed partial class TomModelMutator
             {
                 if (TryMapKeywordToTypeName(kind) is { } mapped)
                     lastKeywordType = mapped;
+            }
+            else if (!segment.IsQuoted && SupplementalKeywords.TryGetValue(segment.Text, out var supplemental))
+            {
+                lastKeywordType = supplemental;
             }
             else
             {
@@ -792,8 +863,31 @@ public sealed partial class TomModelMutator
         ModelObjectKind.RoleMember => "member",
         ModelObjectKind.Perspective => "perspective",
         ModelObjectKind.Culture => "culture",
+        // ModelObjectKind.DataSource is deliberately unmapped: 'datasources/<Name>' cannot decide
+        // between ProviderDataSource and StructuredDataSource, so an explicit -t is required.
         _ => null
     };
+
+    /// <summary>
+    /// Container keywords recognized only for add-path type inference. These live here instead of
+    /// <see cref="PathSegment"/> so ls/find path semantics (where a table may be literally named
+    /// e.g. 'Expressions') are unaffected. Quoting a segment disables the keyword meaning.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> SupplementalKeywords =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CalculationGroups"] = "calcgroup",
+            ["CalcGroups"] = "calcgroup",
+            ["CalculationItems"] = "calcitem",
+            ["CalcItems"] = "calcitem",
+            ["Expressions"] = "expression",
+            ["Functions"] = "function",
+            ["Calendars"] = "calendar",
+            ["KPIs"] = "kpi"
+        };
+
+    private static bool IsSupplementalKeyword(PathSegment segment)
+        => !segment.IsQuoted && SupplementalKeywords.ContainsKey(segment.Text);
 
     private static string NormalizeProperty(string property)
         => property.Trim().Replace(" ", "", StringComparison.Ordinal).ToLowerInvariant();

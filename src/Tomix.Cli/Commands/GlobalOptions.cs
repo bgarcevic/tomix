@@ -80,7 +80,8 @@ internal static class GlobalOptions
         Server.Aliases.Add("-s");
         Database.Aliases.Add("-d");
         Yes.Aliases.Add("-y");
-        Quiet.Aliases.Add("-q");
+        // No -q alias: several commands (add, set, get, bpa, macro) use a local -q for
+        // property/query input, so -q-as-quiet would be silently shadowed there.
         OutputFormat.Recursive = true;
     }
 

@@ -42,8 +42,9 @@ internal sealed class RmCommand : ICommandModule
         };
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, te-folder"
+            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple table-children."
@@ -113,10 +114,14 @@ internal sealed class RmCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
-            var saving = parseResult.GetValue(saveOption) || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption));
+            var label = MutationSpinnerLabel.For(
+                parseResult.GetValue(saveOption),
+                parseResult.GetValue(saveToOption),
+                parseResult.GetValue(stageOption),
+                parseResult.GetValue(revertOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
-                "Saving...",
+                label,
                 () => new RemoveModelObjectHandler(_providers).HandleAsync(
                     new RemoveModelObjectRequest(
                         reference,
@@ -142,8 +147,21 @@ internal sealed class RmCommand : ICommandModule
 
     private static void Render(RemoveModelObjectResult result)
     {
-        if (result.Removed is false)
+        if (result.Reverted)
+        {
+            AnsiConsole.MarkupLine(Styling.Success("Reverted."));
             return;
+        }
+
+        if (result.Removed is false)
+        {
+            // The only Changed=false path is --if-exists on a missing object; say so instead of
+            // exiting silently.
+            if (result.Reason == "not_found" && result.Path is not null)
+                AnsiConsole.MarkupLine(Styling.Success(
+                    $"Not found: {Styling.MarkupEscape(result.Path)} (nothing removed)"));
+            return;
+        }
 
         AnsiConsole.MarkupLine(Styling.Success($"Removed: {result.Removed}"));
         if (result.Saved is false)

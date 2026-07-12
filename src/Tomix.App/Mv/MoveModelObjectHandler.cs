@@ -36,7 +36,7 @@ public sealed class MoveModelObjectHandler
                         outcome.Saved, outcome.Staged,
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
-            new MoveModelObjectResult(NormalizePath(request.Source), NormalizePath(request.Destination), false, null),
+            new MoveModelObjectResult(NormalizePath(request.Source), NormalizePath(request.Destination), false, null, Reverted: true),
             cancellationToken);
     }
 

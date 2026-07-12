@@ -273,6 +273,7 @@ internal sealed class MacroCommand : ICommandModule
         var saveOption = new Option<bool>("--save");
         var saveToOption = new Option<string?>("--save-to");
         var serializationOption = new Option<string?>("--serialization");
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
 
         var command = new Command("run", "Run a macro")
         {

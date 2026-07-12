@@ -35,12 +35,13 @@ public sealed class RemoveModelObjectHandler
 
                 return (mutation.Changed, $"rm {mutation.Path}",
                     outcome => new RemoveModelObjectResult(
-                        mutation.Path, outcome.Saved, outcome.Staged,
+                        mutation.Changed ? mutation.Path : (object)false,
+                        outcome.Saved, outcome.Staged,
                         mutation.Changed ? null : mutation.Reason,
                         mutation.Changed ? null : mutation.Path,
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
             },
-            new RemoveModelObjectResult(false, null, null, null, null),
+            new RemoveModelObjectResult(false, null, null, null, null, Reverted: true),
             cancellationToken);
     }
 }

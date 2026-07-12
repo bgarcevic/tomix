@@ -56,6 +56,10 @@ public static class MutationRunner
 
             return TomixResult<TResult>.Ok(buildResult(outcome));
         }
+        catch (UnsupportedAddOptionException ex)
+        {
+            return TomixResult<TResult>.Fail("TOMIX_ADD_OPTION_UNSUPPORTED", ex.Message);
+        }
         catch (NotSupportedException ex)
         {
             return TomixResult<TResult>.Fail("TOMIX_MUTATION_UNSUPPORTED", ex.Message);

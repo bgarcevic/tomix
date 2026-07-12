@@ -53,8 +53,8 @@ public static class MutationLifecycle
         mode = MutationMode.None;
         if (options.Save && options.Stage)
             return new MutationError("TOMIX_STAGE_SAVE_CONFLICT", "--save and --stage are mutually exclusive.", 2);
-        if (options.Revert && (options.Save || options.Stage))
-            return new MutationError("TOMIX_STAGE_OPTIONS_CONFLICT", "--revert cannot be combined with --save or --stage.", 2);
+        if (options.Revert && (options.Save || options.Stage || !string.IsNullOrWhiteSpace(options.SaveTo)))
+            return new MutationError("TOMIX_STAGE_OPTIONS_CONFLICT", "--revert cannot be combined with --save, --save-to, or --stage.", 2);
 
         if (options.Revert)
             mode = MutationMode.Revert;

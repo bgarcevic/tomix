@@ -97,6 +97,95 @@ public sealed class TomAddPathKeywordTests
     }
 
     [Fact]
+    public void ExpressionKeyword_InfersType()
+    {
+        var db = NewDatabase();
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.AddObject(Add("expressions/MyParam", Type: null, Value: "1 meta [IsParameterQuery=false]"));
+
+        Assert.True(result.Changed);
+        Assert.Contains(db.Model.Expressions, e => e.Name == "MyParam");
+    }
+
+    [Fact]
+    public void CalcGroupKeyword_InfersType()
+    {
+        var db = NewDatabase();
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.AddObject(Add("calcgroups/TimeIntel", Type: null, Value: null));
+
+        Assert.True(result.Changed);
+        Assert.Contains(db.Model.Tables, t => t.Name == "TimeIntel" && t.CalculationGroup is not null);
+    }
+
+    [Fact]
+    public void CalcItemKeyword_InfersType()
+    {
+        var db = NewDatabase();
+        var mutator = new TomModelMutator(db);
+        mutator.AddObject(Add("calcgroups/TimeIntel", Type: null, Value: null));
+
+        var result = mutator.AddObject(Add("calcitems/TimeIntel/YTD", Type: null, Value: "SELECTEDMEASURE()"));
+
+        Assert.True(result.Changed);
+        var cg = db.Model.Tables.Single(t => t.Name == "TimeIntel");
+        Assert.Contains(cg.CalculationGroup!.CalculationItems, i => i.Name == "YTD");
+    }
+
+    [Fact]
+    public void KpiKeyword_InfersType()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+        Sales(db).Measures.Add(new Measure { Name = "Rev", Expression = "1" });
+
+        var result = mutator.AddObject(Add("kpis/Sales/Rev", Type: null, Value: "0"));
+
+        Assert.True(result.Changed);
+        Assert.NotNull(Sales(db).Measures.Single(m => m.Name == "Rev").KPI);
+    }
+
+    [Theory]
+    [InlineData("calculatedtable", "{1}")]
+    [InlineData("calculationgroup", null)]
+    public void LongFormTypeAliases_ResolveToBuilders(string type, string? value)
+    {
+        var db = NewDatabase();
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.AddObject(Add("T1", type, value));
+
+        Assert.True(result.Changed);
+        Assert.Contains(db.Model.Tables, t => t.Name == "T1");
+    }
+
+    [Fact]
+    public void LongFormCalculatedColumnAlias_ResolvesToCalcColumn()
+    {
+        var db = WithSales();
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.AddObject(Add("Sales/CC", "calculatedcolumn", "Sales[Amount]"));
+
+        Assert.True(result.Changed);
+        Assert.Contains(Sales(db).Columns, c => c.Name == "CC" && c is CalculatedColumn);
+    }
+
+    [Fact]
+    public void DataSourcesKeyword_StillRequiresExplicitType()
+    {
+        var db = NewDatabase();
+        var mutator = new TomModelMutator(db);
+
+        // Provider vs Structured is ambiguous, so datasources/ does not infer a type.
+        var ex = Assert.Throws<ArgumentException>(() =>
+            mutator.AddObject(Add("datasources/DS", Type: null, Value: null)));
+        Assert.Contains("No object type given", ex.Message);
+    }
+
+    [Fact]
     public void QuotedKeywordSegment_IsTreatedAsLiteralName()
     {
         var db = NewDatabase();

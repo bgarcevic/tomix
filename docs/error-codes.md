@@ -53,6 +53,7 @@ Emitted by `MutationRunner` and handlers that participate in the mutation lifecy
 |------|------|---------|
 | `TOMIX_MUTATION_UNSUPPORTED_PROVIDER` | 1 | The model provider does not implement `IModelMutationSession`. |
 | `TOMIX_MUTATION_UNSUPPORTED` | 1 | A `NotSupportedException` was thrown during mutation. |
+| `TOMIX_ADD_OPTION_UNSUPPORTED` | 1 | An `add` option was supplied for an object type that cannot consume it (e.g. `--columns` on a CalcGroup). |
 | `TOMIX_MUTATION_INVALID_VALUE` | 1 | An `ArgumentException` was thrown — invalid argument value. |
 | `TOMIX_MUTATION_FAILED` | 1 | An `InvalidOperationException` was thrown — generic mutation failure. |
 | `TOMIX_MUTATION_SAVE_FAILED` | 2 | An `IOException` occurred while saving the model. |
@@ -84,7 +85,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_STAGE_COMMIT_REMOTE_FAILED` | 1 | Failed to deploy staged changes to the remote endpoint. |
 | `TOMIX_STAGE_COMMIT_LOCAL_FAILED` | 1 | Failed to apply staged changes locally. |
 | `TOMIX_STAGE_MATERIALIZE_FAILED` | 1 | Failed to materialize the working copy. |
-| `TOMIX_STAGE_OPTIONS_CONFLICT` | 2 | Conflicting stage options (e.g. `--stage` and `--revert` together). |
+| `TOMIX_STAGE_OPTIONS_CONFLICT` | 2 | Conflicting stage options (`--revert` combined with `--save`, `--save-to`, or `--stage`). |
 | `TOMIX_STAGE_SAVE_CONFLICT` | 2 | Conflicting save options (e.g. `--save` and `--stage` together). |
 
 ## Save Codes (`TOMIX_SAVE_*`)

@@ -36,13 +36,19 @@ public sealed class AddModelObjectHandler
                     request.SourceTable,
                     request.SourceDatabase,
                     request.PartitionExpression,
-                    request.SourceType));
+                    request.SourceType,
+                    request.SourceSchema,
+                    request.RangeStart,
+                    request.RangeEnd,
+                    request.RangeGranularity));
 
                 var added = mutation.Changed ? mutation.Path : (object)false;
+                // Changed == false is only reachable via --if-not-exists (everything else throws).
+                var existing = mutation.Changed ? null : mutation.Path;
                 return (mutation.Changed, $"add {mutation.Path}",
-                    outcome => new AddModelObjectResult(added, outcome.Saved, outcome.Staged, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
+                    outcome => new AddModelObjectResult(added, outcome.Saved, outcome.Staged, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning, ExistingPath: existing));
             },
-            new AddModelObjectResult(false, false, null),
+            new AddModelObjectResult(false, false, null, Reverted: true),
             cancellationToken);
     }
 }

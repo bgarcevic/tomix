@@ -28,8 +28,9 @@ internal sealed class SaveCommand : ICommandModule
 
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl (default), bim, te-folder, pbip, database.json. Defaults to the loaded model's format."
+            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted). Defaults to the loaded model's format."
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var forceOption = new Option<bool>("--force")
         {
             Description = "Skip validation and overwrite existing output. Does not override layout-safety refusals."

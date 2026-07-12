@@ -11,6 +11,14 @@ public sealed class ObjectNotFoundException : Exception
     }
 }
 
+public sealed class UnsupportedAddOptionException : Exception
+{
+    public UnsupportedAddOptionException(string message)
+        : base(message)
+    {
+    }
+}
+
 public sealed class AmbiguousObjectException : Exception
 {
     public AmbiguousObjectException(string message)

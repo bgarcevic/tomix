@@ -17,7 +17,7 @@ internal sealed class AddCommand : ICommandModule
     {
         var pathArgument = new Argument<string>("path")
         {
-            Description = "Object path of the new object. Slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX forms also accepted: \"'Sales'[Revenue]\". Pair with -t. Relationships use 'Sales[Key]->Product[Key]'."
+            Description = "Object path of the new object. Slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX forms also accepted: \"'Sales'[Revenue]\". Pair with -t. Relationships use 'Sales[Key]->Product[Key]' (many side -> one side)."
         };
         var modelArgument = new Argument<string>("model")
         {
@@ -26,7 +26,7 @@ internal sealed class AddCommand : ICommandModule
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Object type. Known values: Table, CalcTable, CalcGroup, Measure, CalcColumn, DataColumn, Hierarchy, Level, Calendar, CalcItem, KPI, Partition, MPartition, EntityPartition, PolicyRangePartition, Expression, Function, Perspective, Culture, ProviderDataSource, StructuredDataSource, Role, TablePermission, Member"
+            Description = "Object type. Known values: Table, CalcTable, CalcGroup, Measure, CalcColumn, DataColumn, Hierarchy, Level, Calendar, CalcItem, KPI, Partition, MPartition, EntityPartition, PolicyRangePartition, Expression, Function, Perspective, Culture, ProviderDataSource, StructuredDataSource, Role, TablePermission, Member, Relationship. Data sources always require -t (no path keyword infers them)."
         };
         typeOption.Aliases.Add("-t");
         var valueOption = new Option<string[]?>("-i")
@@ -57,8 +57,9 @@ internal sealed class AddCommand : ICommandModule
         };
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, te-folder, pbip"
+            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var saveOption = new Option<bool>("--save")
         {
             Description = "Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage."
@@ -78,8 +79,9 @@ internal sealed class AddCommand : ICommandModule
 
         var modeOption = new Option<string?>("--mode")
         {
-            Description = "Partition storage mode: Import, DirectQuery, Dual, DirectLake, Push."
+            Description = "Partition storage mode: Import, DirectQuery, Dual, DirectLake, Push, Default."
         };
+        modeOption.AcceptAmongIgnoreCase("Import", "DirectQuery", "Dual", "DirectLake", "Push", "Default");
         var sourceOption = new Option<string?>("--source")
         {
             Description = "Provider name for a ProviderDataSource (e.g. System.Data.SqlClient)."
@@ -98,7 +100,11 @@ internal sealed class AddCommand : ICommandModule
         };
         var sourceDatabaseOption = new Option<string?>("--source-database")
         {
-            Description = "Source database name for a data source or entity partition schema."
+            Description = "Source database name for a data source connection (Provider/Structured data sources)."
+        };
+        var sourceSchemaOption = new Option<string?>("--source-schema")
+        {
+            Description = "Source schema name for an EntityPartition."
         };
         var partitionExpressionOption = new Option<string?>("--partition-expression")
         {
@@ -106,12 +112,25 @@ internal sealed class AddCommand : ICommandModule
         };
         var columnsOption = new Option<string?>("--columns")
         {
-            Description = "Comma-separated column names to create on a new table."
+            Description = "Comma-separated column names to create on a new table (Table type only)."
         };
         var sourceTypeOption = new Option<string?>("--source-type")
         {
             Description = "Connection protocol for a StructuredDataSource (e.g. tds)."
         };
+        var rangeStartOption = new Option<string?>("--range-start")
+        {
+            Description = "Refresh-policy range start for a PolicyRangePartition (yyyy-MM-dd)."
+        };
+        var rangeEndOption = new Option<string?>("--range-end")
+        {
+            Description = "Refresh-policy range end for a PolicyRangePartition (yyyy-MM-dd)."
+        };
+        var rangeGranularityOption = new Option<string?>("--range-granularity")
+        {
+            Description = "Refresh-policy range granularity for a PolicyRangePartition: Day (default), Month, Quarter, Year."
+        };
+        rangeGranularityOption.AcceptAmongIgnoreCase("Day", "Month", "Quarter", "Year");
 
         var extraOptions = new Option[]
         {
@@ -121,9 +140,13 @@ internal sealed class AddCommand : ICommandModule
             connectionStringOption,
             sourceTableOption,
             sourceDatabaseOption,
+            sourceSchemaOption,
             partitionExpressionOption,
             columnsOption,
-            sourceTypeOption
+            sourceTypeOption,
+            rangeStartOption,
+            rangeEndOption,
+            rangeGranularityOption
         };
 
         var command = new Command("add", "Add an object to the model")
@@ -155,6 +178,14 @@ internal sealed class AddCommand : ICommandModule
 
             var file = parseResult.GetValue(fileOption);
             var parsed = ParseInterleavedQi(parseResult);
+            if (parsed.DanglingProperty is not null)
+            {
+                AnsiConsole.MarkupLine(Styling.Error(Styling.MarkupEscape(
+                    $"Option -q '{parsed.DanglingProperty}' has no matching -i value.")));
+                AnsiConsole.MarkupLine(Styling.Guidance("Pair each -q <property> with a following -i <value>."));
+                return 2;
+            }
+
             var value = InputValueResolver.Resolve(parsed.PrimaryValue, file);
             IReadOnlyList<ModelPropertyAssignment> properties = parsed.Properties;
 
@@ -162,10 +193,14 @@ internal sealed class AddCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
-            var saving = parseResult.GetValue(saveOption) || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption));
+            var label = MutationSpinnerLabel.For(
+                parseResult.GetValue(saveOption),
+                parseResult.GetValue(saveToOption),
+                parseResult.GetValue(stageOption),
+                parseResult.GetValue(revertOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
-                "Saving...",
+                label,
                 () => new AddModelObjectHandler(_providers).HandleAsync(
                     new AddModelObjectRequest(
                         reference,
@@ -189,7 +224,11 @@ internal sealed class AddCommand : ICommandModule
                         parseResult.GetValue(sourceTableOption),
                         parseResult.GetValue(sourceDatabaseOption),
                         parseResult.GetValue(partitionExpressionOption),
-                        parseResult.GetValue(sourceTypeOption)),
+                        parseResult.GetValue(sourceTypeOption),
+                        parseResult.GetValue(sourceSchemaOption),
+                        parseResult.GetValue(rangeStartOption),
+                        parseResult.GetValue(rangeEndOption),
+                        parseResult.GetValue(rangeGranularityOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -201,6 +240,19 @@ internal sealed class AddCommand : ICommandModule
 
     private static void Render(AddModelObjectResult result)
     {
+        if (result.Reverted)
+        {
+            AnsiConsole.MarkupLine(Styling.Success("Reverted."));
+            return;
+        }
+
+        if (result.ExistingPath is not null)
+        {
+            AnsiConsole.MarkupLine(Styling.Success(
+                $"Already exists: {Styling.MarkupEscape(result.ExistingPath)} (no changes made)"));
+            return;
+        }
+
         AnsiConsole.MarkupLine(Styling.Success($"Added: {result.Added}"));
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
@@ -215,17 +267,19 @@ internal sealed class AddCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
     }
 
-    internal static (string? PrimaryValue, IReadOnlyList<ModelPropertyAssignment> Properties) ParseInterleavedQi(
+    internal static (string? PrimaryValue, IReadOnlyList<ModelPropertyAssignment> Properties, string? DanglingProperty) ParseInterleavedQi(
         ParseResult parseResult)
     {
         string? primaryValue = null;
         var properties = new List<ModelPropertyAssignment>();
         string? pendingQuery = null;
+        string? dangling = null;
 
         foreach (var (option, value) in OrderedOptionTokens.ReadOptions(parseResult))
         {
             if (option == "-q")
             {
+                dangling ??= pendingQuery;
                 pendingQuery = value;
                 continue;
             }
@@ -249,10 +303,13 @@ internal sealed class AddCommand : ICommandModule
                 continue;
             }
 
-            // Any other option abandons a dangling -q that never received its -i value.
+            // Any other option interrupts a -q that never received its -i value; report it
+            // instead of silently dropping the property.
+            dangling ??= pendingQuery;
             pendingQuery = null;
         }
 
-        return (primaryValue, properties);
+        dangling ??= pendingQuery;
+        return (primaryValue, properties, dangling);
     }
 }

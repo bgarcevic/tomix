@@ -51,8 +51,9 @@ internal sealed class SetCommand : ICommandModule
         };
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, te-folder"
+            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
         };
+        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var stageOption = new Option<bool>("--stage")
         {
             Description = "Stage this command's mutation"
@@ -109,10 +110,14 @@ internal sealed class SetCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
-            var saving = parseResult.GetValue(saveOption) || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption));
+            var label = MutationSpinnerLabel.For(
+                parseResult.GetValue(saveOption),
+                parseResult.GetValue(saveToOption),
+                parseResult.GetValue(stageOption),
+                parseResult.GetValue(revertOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
-                "Saving...",
+                label,
                 () => new SetModelPropertyHandler(_providers).HandleAsync(
                     new SetModelPropertyRequest(
                         reference,

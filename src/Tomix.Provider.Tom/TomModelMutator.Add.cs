@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
 
@@ -16,6 +17,48 @@ public sealed partial class TomModelMutator
         M,
         Entity,
         PolicyRange
+    }
+
+    /// <summary>
+    /// Which add options each object type consumes. Any option supplied for a type not listed here
+    /// hard-errors instead of being silently dropped, so the user always learns their input was unusable.
+    /// </summary>
+    private static readonly (string Option, Func<ModelObjectAddRequest, string?> Get, string[] Types, string AppliesTo)[]
+        AddOptionConsumers =
+    [
+        ("--columns", r => r.Columns, ["table"], "Table"),
+        ("--mode", r => r.Mode,
+            ["table", "calctable", "partition", "mpartition", "entitypartition", "policyrangepartition"],
+            "Table, CalcTable, and partitions"),
+        ("--partition-expression", r => r.PartitionExpression,
+            ["table", "calctable", "partition", "mpartition"],
+            "Table, CalcTable, Partition, MPartition"),
+        ("--source", r => r.Source, ["providerdatasource"], "ProviderDataSource"),
+        ("--endpoint", r => r.Endpoint,
+            ["providerdatasource", "structureddatasource"], "ProviderDataSource, StructuredDataSource"),
+        ("--connection-string", r => r.ConnectionString, ["providerdatasource"], "ProviderDataSource"),
+        ("--source-table", r => r.SourceTable, ["entitypartition"], "EntityPartition"),
+        ("--source-database", r => r.SourceDatabase,
+            ["providerdatasource", "structureddatasource"], "ProviderDataSource, StructuredDataSource"),
+        ("--source-schema", r => r.SourceSchema, ["entitypartition"], "EntityPartition"),
+        ("--source-type", r => r.SourceType, ["structureddatasource"], "StructuredDataSource"),
+        ("--range-start", r => r.RangeStart, ["policyrangepartition"], "PolicyRangePartition"),
+        ("--range-end", r => r.RangeEnd, ["policyrangepartition"], "PolicyRangePartition"),
+        ("--range-granularity", r => r.RangeGranularity, ["policyrangepartition"], "PolicyRangePartition")
+    ];
+
+    private static void ValidateAddOptions(string type, string displayType, ModelObjectAddRequest request)
+    {
+        foreach (var (option, get, types, appliesTo) in AddOptionConsumers)
+        {
+            if (string.IsNullOrWhiteSpace(get(request)) || types.Contains(type))
+                continue;
+
+            var message = $"{option} is not supported for type '{displayType}'. It applies to: {appliesTo}.";
+            if (option == "--source-database" && type == "entitypartition")
+                message += " For an entity partition schema use --source-schema.";
+            throw new UnsupportedAddOptionException(message);
+        }
     }
 
     private ModelObjectMutationResult AddCalcTable(string path, ModelObjectAddRequest request)
@@ -249,19 +292,57 @@ public sealed partial class TomModelMutator
             PartitionKind.Entity => new EntityPartitionSource
             {
                 EntityName = request.SourceTable ?? request.Value ?? name,
-                SchemaName = string.IsNullOrWhiteSpace(request.SourceDatabase) ? null : request.SourceDatabase
+                SchemaName = string.IsNullOrWhiteSpace(request.SourceSchema) ? null : request.SourceSchema
             },
-            PartitionKind.PolicyRange => new PolicyRangePartitionSource
-            {
-                Start = new DateTime(2020, 1, 1),
-                End = new DateTime(2021, 1, 1),
-                Granularity = RefreshGranularityType.Day
-            },
+            PartitionKind.PolicyRange => BuildPolicyRangeSource(request),
             _ => new MPartitionSource
             {
                 Expression = request.PartitionExpression ?? request.Value ?? "let Source = #table({}, {}) in Source"
             }
         };
+
+    private static PolicyRangePartitionSource BuildPolicyRangeSource(ModelObjectAddRequest request)
+    {
+        var start = ParseRangeDate(request.RangeStart, "--range-start");
+        var end = ParseRangeDate(request.RangeEnd, "--range-end");
+        if (start >= end)
+            throw new ArgumentException($"--range-start must be before --range-end ({request.RangeStart} >= {request.RangeEnd}).");
+
+        return new PolicyRangePartitionSource
+        {
+            Start = start,
+            End = end,
+            Granularity = ParseRangeGranularity(request.RangeGranularity)
+        };
+    }
+
+    private static DateTime ParseRangeDate(string? value, string option)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("PolicyRangePartition requires --range-start and --range-end (yyyy-MM-dd).");
+
+        if (DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var exact))
+            return exact;
+
+        if (DateTime.TryParse(value.Trim(), System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+            return parsed;
+
+        throw new ArgumentException($"Invalid date for {option}: '{value}'. Use yyyy-MM-dd.");
+    }
+
+    private static RefreshGranularityType ParseRangeGranularity(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return RefreshGranularityType.Day;
+
+        if (Enum.TryParse<RefreshGranularityType>(value.Trim(), ignoreCase: true, out var parsed)
+            && parsed != RefreshGranularityType.Invalid)
+            return parsed;
+
+        throw new ArgumentException($"Unknown range granularity: '{value}'. Known values: Day, Month, Quarter, Year.");
+    }
 
     private ModelObjectMutationResult AddExpression(string path, ModelObjectAddRequest request)
     {
@@ -439,6 +520,107 @@ public sealed partial class TomModelMutator
         ApplyProperties(member, request.Properties);
         return new ModelObjectMutationResult($"{role.Name}/{member.MemberName}", Changed: true);
     }
+
+    /// <summary>
+    /// Detects a relationship add and returns the arrow path to build from, or null when the
+    /// request targets a different object type. Accepts an explicit <c>-t relationship</c>, a
+    /// <c>relationships/</c> keyword prefix, or a typeless path containing <c>-&gt;</c>.
+    /// </summary>
+    private static string? TryResolveRelationshipPath(ModelObjectAddRequest request)
+    {
+        var type = NormalizeType(request.Type);
+        var path = request.Path.Trim();
+
+        const string keywordPrefix = "relationships/";
+        if (path.StartsWith(keywordPrefix, StringComparison.OrdinalIgnoreCase))
+            return type is "" or "relationship" ? path[keywordPrefix.Length..].Trim() : null;
+
+        if (type == "relationship")
+            return path;
+
+        return type.Length == 0 && path.Contains("->", StringComparison.Ordinal) ? path : null;
+    }
+
+    private ModelObjectMutationResult AddRelationship(string path, ModelObjectAddRequest request)
+    {
+        var match = RelationshipPath().Match(path);
+        if (!match.Success)
+            throw new ArgumentException(
+                "Relationship paths use 'FromTable'[FromColumn]->'ToTable'[ToColumn], e.g. Sales[Key]->Product[Key].");
+
+        var fromColumn = ResolveRelationshipColumn(match.Groups["ft"].Value.Trim(), match.Groups["fc"].Value.Trim());
+        var toColumn = ResolveRelationshipColumn(match.Groups["tt"].Value.Trim(), match.Groups["tc"].Value.Trim());
+
+        var existing = _database.Model.Relationships
+            .OfType<SingleColumnRelationship>()
+            .FirstOrDefault(r => r.FromColumn == fromColumn && r.ToColumn == toColumn);
+        if (existing is not null)
+            return ExistingOrThrow(RelationshipDisplay(existing), request.IfNotExists, path);
+
+        var relationship = new SingleColumnRelationship
+        {
+            // TOM relationships are GUID-named (the Power BI Desktop convention); the display
+            // path below is what users see and what `tx ls relationships` shows.
+            Name = Guid.NewGuid().ToString(),
+            FromColumn = fromColumn,
+            ToColumn = toColumn,
+            FromCardinality = RelationshipEndCardinality.Many,
+            ToCardinality = RelationshipEndCardinality.One
+        };
+        _database.Model.Relationships.Add(relationship);
+
+        ApplyProperties(relationship, request.Properties);
+        return new ModelObjectMutationResult(RelationshipDisplay(relationship), Changed: true);
+    }
+
+    private Column ResolveRelationshipColumn(string tableName, string columnName)
+    {
+        var table = FindTable(tableName) ??
+                    throw new InvalidOperationException($"Table not found: {tableName}");
+        return table.Columns.FirstOrDefault(c => c.Type != ColumnType.RowNumber && NameEquals(c.Name, columnName)) ??
+               throw new InvalidOperationException($"Column not found: {table.Name}[{columnName}]");
+    }
+
+    private static string RelationshipDisplay(SingleColumnRelationship relationship)
+        => $"{relationship.FromColumn.Table.Name}[{relationship.FromColumn.Name}] -> " +
+           $"{relationship.ToColumn.Table.Name}[{relationship.ToColumn.Name}]";
+
+    private static void ApplyRelationshipProperty(SingleColumnRelationship relationship, string property, string value, string displayName)
+    {
+        switch (property)
+        {
+            case "name":
+                relationship.Name = value;
+                break;
+            case "isactive":
+                relationship.IsActive = ParseBool(value, displayName);
+                break;
+            case "crossfilteringbehavior":
+                relationship.CrossFilteringBehavior = ParseEnum<CrossFilteringBehavior>(value, displayName);
+                break;
+            case "fromcardinality":
+                relationship.FromCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
+                break;
+            case "tocardinality":
+                relationship.ToCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
+                break;
+            default:
+                throw new NotSupportedException($"Setting '{displayName}' is not supported for relationships.");
+        }
+    }
+
+    private static TEnum ParseEnum<TEnum>(string value, string property) where TEnum : struct, Enum
+    {
+        if (Enum.TryParse<TEnum>(value.Trim(), ignoreCase: true, out var parsed))
+            return parsed;
+
+        throw new ArgumentException(
+            $"Value for '{property}' must be one of: {string.Join(", ", Enum.GetNames<TEnum>())}.");
+    }
+
+    // Accepts 'Table'[Column]->'Table'[Column] and Table[Column]->Table[Column] (whitespace tolerated).
+    [GeneratedRegex(@"^\s*(?:'(?<ft>[^']+)'|(?<ft>[^'\[\]]+?))\s*\[(?<fc>[^\]]+)\]\s*->\s*(?:'(?<tt>[^']+)'|(?<tt>[^'\[\]]+?))\s*\[(?<tc>[^\]]+)\]\s*$")]
+    private static partial Regex RelationshipPath();
 
     // --- shared helpers --------------------------------------------------------------------
 
