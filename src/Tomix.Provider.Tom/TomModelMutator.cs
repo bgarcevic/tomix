@@ -65,9 +65,8 @@ public sealed partial class TomModelMutator
         if (request.Properties.Count == 0)
             throw new ArgumentException("At least one property assignment is required.", nameof(request));
 
-        var target = ResolveObject(request.Path, request.Type);
-        if (target is null)
-            throw new InvalidOperationException($"Object not found: {request.Path}");
+        var target = TryResolveForMutation(request.Path, request.Type)
+                     ?? throw NotFound(request.Path);
 
         ModelPropertyAssignment last = request.Properties[^1];
         foreach (var assignment in request.Properties)
@@ -77,7 +76,7 @@ public sealed partial class TomModelMutator
         }
 
         return new ModelObjectMutationResult(
-            NormalizePath(request.Path),
+            target.Display,
             Changed: true,
             Property: last.Property,
             Value: last.Value);
@@ -85,18 +84,17 @@ public sealed partial class TomModelMutator
 
     public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
     {
-        var path = NormalizePath(request.Path);
-        var target = ResolveObject(path, request.Type);
+        var target = TryResolveForMutation(request.Path, request.Type);
         if (target is null)
         {
             if (request.IfExists)
-                return new ModelObjectMutationResult(path, Changed: false, Reason: "not_found");
+                return new ModelObjectMutationResult(NormalizePath(request.Path), Changed: false, Reason: "not_found");
 
-            throw new InvalidOperationException($"Object not found: {request.Path}");
+            throw NotFound(request.Path);
         }
 
         RemoveResolvedObject(target);
-        return new ModelObjectMutationResult(path, Changed: true);
+        return new ModelObjectMutationResult(target.Display, Changed: true);
     }
 
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
@@ -239,7 +237,9 @@ public sealed partial class TomModelMutator
                 ApplyNameDescription(property, value, assignment.Property,
                     n => perspective.Name = n, d => perspective.Description = d);
                 return;
-            case Culture culture when property is "name":
+            case Culture culture:
+                if (property is not "name")
+                    throw new NotSupportedException($"Setting '{assignment.Property}' is not supported for cultures.");
                 culture.Name = value;
                 return;
             case DataSource dataSource:
@@ -258,7 +258,8 @@ public sealed partial class TomModelMutator
                 ApplyRelationshipProperty(relationship, property, value, assignment.Property);
                 return;
             default:
-                throw new NotSupportedException($"Setting '{assignment.Property}' is not supported for this object.");
+                throw new NotSupportedException(
+                    $"Setting '{assignment.Property}' is not supported for {target.GetType().Name} objects.");
         }
     }
 
@@ -414,66 +415,261 @@ public sealed partial class TomModelMutator
         }
     }
 
-    private ResolvedObject? ResolveObject(string path, ModelObjectKind? type)
+    /// <summary>
+    /// The object kinds mutation paths can address. A superset of <see cref="ModelObjectKind"/>:
+    /// named expressions and functions have container keywords but no public kind.
+    /// </summary>
+    private enum MutationTargetKind
     {
-        var normalized = NormalizePath(path);
-        if (normalized == ".")
-            return new ResolvedObject(_database, null);
+        Table, Measure, Column, Hierarchy, Partition, CalculationItem, Level,
+        Role, RoleMember, Relationship, Perspective, Culture, Expression, Function, DataSource
+    }
 
-        var parts = SplitObjectPath(normalized);
+    private static ObjectNotFoundException NotFound(string path)
+        => new(
+            $"Object not found: {path}",
+            hint: "Run 'tx ls' to list objects. Quote names containing '/'; pass --type to target a specific object kind.");
+
+    /// <summary>
+    /// Resolves a mutation target from a path. Accepts DAX forms (<c>'Table'[Child]</c>, restricted
+    /// to measures/columns like DAX itself), slash paths, container-keyword paths
+    /// (<c>tables/Sales/measures/Revenue</c>), and relationship endpoint paths
+    /// (<c>'Sales'[Key]-&gt;'Product'[Key]</c>). Throws <see cref="AmbiguousObjectException"/> when
+    /// the path matches more than one object and no <paramref name="type"/> narrows it; returns
+    /// null when nothing matches.
+    /// </summary>
+    private ResolvedObject? TryResolveForMutation(string path, ModelObjectKind? type)
+    {
+        var trimmed = path.Trim().Trim('/');
+        if (trimmed == ".")
+            return new ResolvedObject(_database, null, ".");
+
+        if (trimmed.Contains("->", StringComparison.Ordinal))
+            return type is null or ModelObjectKind.Relationship
+                ? ResolveRelationshipByEndpoints(trimmed)
+                : null;
+
+        var (parts, daxForm, keywordKind) = ParseMutationPath(trimmed);
         if (parts.Count == 0)
             return null;
 
-        var table = FindTable(parts[0]);
-        if (table is not null && parts.Count == 1)
-            return type is null or ModelObjectKind.Table
-                ? new ResolvedObject(table, null)
-                : null;
+        var filter = type is { } explicitType ? ToTargetKind(explicitType) : keywordKind;
+        var candidates = new List<(MutationTargetKind Kind, ResolvedObject Resolved)>();
 
-        if (table is not null && parts.Count == 2)
-            return ResolveTableChild(table, parts[1], type);
+        if (parts.Count == 1)
+            CollectModelLevelCandidates(parts[0], filter, daxForm, candidates);
+        else if (parts.Count == 2)
+            CollectChildCandidates(parts[0], parts[1], filter, daxForm, candidates);
+        else if (parts.Count == 3 && !daxForm)
+            CollectLevelCandidates(parts[0], parts[1], parts[2], filter, candidates);
 
-        var role = _database.Model.Roles.FirstOrDefault(r => NameEquals(r.Name, parts[0]));
-        if (role is not null && parts.Count == 1)
-            return type is null or ModelObjectKind.Role
-                ? new ResolvedObject(role, null)
-                : null;
+        if (candidates.Count > 1)
+            throw new AmbiguousObjectException(
+                $"Path '{path}' matches multiple objects: {string.Join(", ", candidates.Select(c => c.Kind.ToString().ToLowerInvariant()))}. "
+                + "Disambiguate with --type or a container keyword (e.g. 'tables/T/partitions/P').");
 
-        return null;
+        return candidates.Count == 1 ? candidates[0].Resolved : null;
     }
 
-    private ResolvedObject? ResolveTableChild(Table table, string name, ModelObjectKind? type)
+    private void CollectModelLevelCandidates(
+        string name,
+        MutationTargetKind? filter,
+        bool daxForm,
+        List<(MutationTargetKind, ResolvedObject)> candidates)
     {
-        if (type is null or ModelObjectKind.Measure)
-        {
-            var measure = table.Measures.FirstOrDefault(m => NameEquals(m.Name, name));
-            if (measure is not null)
-                return new ResolvedObject(measure, table);
-        }
+        var model = _database.Model;
 
-        if (type is null or ModelObjectKind.Column)
-        {
-            var column = table.Columns.FirstOrDefault(c => c.Type != ColumnType.RowNumber && NameEquals(c.Name, name));
-            if (column is not null)
-                return new ResolvedObject(column, table);
-        }
+        if (Allows(filter, daxForm, MutationTargetKind.Table) && FindTable(name) is { } table)
+            candidates.Add((MutationTargetKind.Table, new ResolvedObject(table, null, Segment(table.Name))));
 
-        if (type is null or ModelObjectKind.Hierarchy)
-        {
-            var hierarchy = table.Hierarchies.FirstOrDefault(h => NameEquals(h.Name, name));
-            if (hierarchy is not null)
-                return new ResolvedObject(hierarchy, table);
-        }
+        if (Allows(filter, daxForm, MutationTargetKind.Role)
+            && model.Roles.FirstOrDefault(r => NameEquals(r.Name, name)) is { } role)
+            candidates.Add((MutationTargetKind.Role, new ResolvedObject(role, null, role.Name)));
 
-        if (type is null or ModelObjectKind.Partition)
-        {
-            var partition = table.Partitions.FirstOrDefault(p => NameEquals(p.Name, name));
-            if (partition is not null)
-                return new ResolvedObject(partition, table);
-        }
+        if (Allows(filter, daxForm, MutationTargetKind.Relationship)
+            && model.Relationships.OfType<SingleColumnRelationship>().FirstOrDefault(r => NameEquals(r.Name, name)) is { } relationship)
+            candidates.Add((MutationTargetKind.Relationship, new ResolvedObject(relationship, null, RelationshipDisplay(relationship))));
 
-        return null;
+        if (Allows(filter, daxForm, MutationTargetKind.Expression)
+            && model.Expressions.FirstOrDefault(e => NameEquals(e.Name, name)) is { } expression)
+            candidates.Add((MutationTargetKind.Expression, new ResolvedObject(expression, null, expression.Name)));
+
+        if (Allows(filter, daxForm, MutationTargetKind.Function)
+            && model.Functions.FirstOrDefault(f => NameEquals(f.Name, name)) is { } function)
+            candidates.Add((MutationTargetKind.Function, new ResolvedObject(function, null, function.Name)));
+
+        if (Allows(filter, daxForm, MutationTargetKind.Perspective)
+            && model.Perspectives.FirstOrDefault(p => NameEquals(p.Name, name)) is { } perspective)
+            candidates.Add((MutationTargetKind.Perspective, new ResolvedObject(perspective, null, perspective.Name)));
+
+        if (Allows(filter, daxForm, MutationTargetKind.Culture)
+            && model.Cultures.FirstOrDefault(c => NameEquals(c.Name, name)) is { } culture)
+            candidates.Add((MutationTargetKind.Culture, new ResolvedObject(culture, null, culture.Name)));
+
+        if (Allows(filter, daxForm, MutationTargetKind.DataSource)
+            && model.DataSources.FirstOrDefault(d => NameEquals(d.Name, name)) is { } dataSource)
+            candidates.Add((MutationTargetKind.DataSource, new ResolvedObject(dataSource, null, dataSource.Name)));
     }
+
+    private void CollectChildCandidates(
+        string parent,
+        string name,
+        MutationTargetKind? filter,
+        bool daxForm,
+        List<(MutationTargetKind, ResolvedObject)> candidates)
+    {
+        if (FindTable(parent) is { } table)
+        {
+            var tablePath = Segment(table.Name);
+
+            if (Allows(filter, daxForm, MutationTargetKind.Measure)
+                && table.Measures.FirstOrDefault(m => NameEquals(m.Name, name)) is { } measure)
+                candidates.Add((MutationTargetKind.Measure, new ResolvedObject(measure, table, $"{tablePath}/{Segment(measure.Name)}")));
+
+            if (Allows(filter, daxForm, MutationTargetKind.Column)
+                && table.Columns.FirstOrDefault(c => c.Type != ColumnType.RowNumber && NameEquals(c.Name, name)) is { } column)
+                candidates.Add((MutationTargetKind.Column, new ResolvedObject(column, table, $"{tablePath}/{Segment(column.Name)}")));
+
+            if (Allows(filter, daxForm, MutationTargetKind.Hierarchy)
+                && table.Hierarchies.FirstOrDefault(h => NameEquals(h.Name, name)) is { } hierarchy)
+                candidates.Add((MutationTargetKind.Hierarchy, new ResolvedObject(hierarchy, table, $"{tablePath}/{Segment(hierarchy.Name)}")));
+
+            if (Allows(filter, daxForm, MutationTargetKind.Partition)
+                && table.Partitions.FirstOrDefault(p => NameEquals(p.Name, name)) is { } partition)
+                candidates.Add((MutationTargetKind.Partition, new ResolvedObject(partition, table, $"{tablePath}/{Segment(partition.Name)}")));
+
+            if (Allows(filter, daxForm, MutationTargetKind.CalculationItem)
+                && table.CalculationGroup?.CalculationItems.FirstOrDefault(i => NameEquals(i.Name, name)) is { } item)
+                candidates.Add((MutationTargetKind.CalculationItem, new ResolvedObject(item, table, $"{tablePath}/{Segment(item.Name)}")));
+        }
+
+        if (Allows(filter, daxForm, MutationTargetKind.RoleMember)
+            && _database.Model.Roles.FirstOrDefault(r => NameEquals(r.Name, parent)) is { } role
+            && role.Members.FirstOrDefault(m => NameEquals(m.MemberName, name)) is { } member)
+            candidates.Add((MutationTargetKind.RoleMember, new ResolvedObject(member, role, $"{role.Name}/{member.MemberName}")));
+    }
+
+    private void CollectLevelCandidates(
+        string tableName,
+        string hierarchyName,
+        string levelName,
+        MutationTargetKind? filter,
+        List<(MutationTargetKind, ResolvedObject)> candidates)
+    {
+        if (!Allows(filter, daxForm: false, MutationTargetKind.Level))
+            return;
+
+        if (FindTable(tableName) is { } table
+            && table.Hierarchies.FirstOrDefault(h => NameEquals(h.Name, hierarchyName)) is { } hierarchy
+            && hierarchy.Levels.FirstOrDefault(l => NameEquals(l.Name, levelName)) is { } level)
+            candidates.Add((MutationTargetKind.Level, new ResolvedObject(
+                level, hierarchy, $"{Segment(table.Name)}/{Segment(hierarchy.Name)}/{Segment(level.Name)}")));
+    }
+
+    /// <summary>
+    /// DAX bracket paths can only address measures and columns — a partition or hierarchy that
+    /// happens to share a name must never be picked for <c>'Table'[Child]</c> (a partition hit
+    /// would let a measure-looking set replace the partition's M source query).
+    /// </summary>
+    private static bool Allows(MutationTargetKind? filter, bool daxForm, MutationTargetKind kind)
+    {
+        if (daxForm && kind is not (MutationTargetKind.Measure or MutationTargetKind.Column))
+            return false;
+
+        return filter is null || filter == kind;
+    }
+
+    private ResolvedObject? ResolveRelationshipByEndpoints(string path)
+    {
+        var match = RelationshipPath().Match(path);
+        if (!match.Success)
+            throw new ArgumentException(
+                "Relationship paths use 'FromTable'[FromColumn]->'ToTable'[ToColumn], e.g. Sales[Key]->Product[Key].");
+
+        var ft = match.Groups["ft"].Value.Trim();
+        var fc = match.Groups["fc"].Value.Trim();
+        var tt = match.Groups["tt"].Value.Trim();
+        var tc = match.Groups["tc"].Value.Trim();
+
+        var relationship = _database.Model.Relationships
+            .OfType<SingleColumnRelationship>()
+            .FirstOrDefault(r => EndpointEquals(r.FromColumn, ft, fc) && EndpointEquals(r.ToColumn, tt, tc));
+
+        return relationship is null
+            ? null
+            : new ResolvedObject(relationship, null, RelationshipDisplay(relationship));
+
+        static bool EndpointEquals(Column column, string tableName, string columnName)
+            => column is not null
+               && NameEquals(column.Table.Name, tableName)
+               && NameEquals(column.Name, columnName);
+    }
+
+    /// <summary>
+    /// Splits a mutation path into name parts. DAX forms keep quoted table names intact
+    /// (doubled <c>''</c> unescapes to a literal apostrophe); slash paths go through
+    /// <see cref="ObjectPath.Parse"/> so quoting rules match ls/get. Container keyword segments
+    /// are stripped and the deepest one becomes the inferred kind, mirroring add-path inference.
+    /// </summary>
+    private static (IReadOnlyList<string> Parts, bool DaxForm, MutationTargetKind? KeywordKind) ParseMutationPath(string path)
+    {
+        var dax = DaxObjectPath().Match(path);
+        if (dax.Success)
+        {
+            var table = dax.Groups["qtable"].Success
+                ? dax.Groups["qtable"].Value.Replace("''", "'", StringComparison.Ordinal)
+                : dax.Groups["table"].Value;
+            return ([table.Trim(), dax.Groups["object"].Value.Trim()], true, null);
+        }
+
+        MutationTargetKind? keywordKind = null;
+        var parts = new List<string>();
+        foreach (var segment in ObjectPath.Parse(path))
+        {
+            if (segment.TryGetKeyword(out var kind))
+                keywordKind = ToTargetKind(kind) ?? keywordKind;
+            else if (!segment.IsQuoted && SetSupplementalKeywords.TryGetValue(segment.Text, out var supplemental))
+                keywordKind = supplemental;
+            else
+                parts.Add(segment.Text);
+        }
+
+        return (parts, false, keywordKind);
+    }
+
+    private static MutationTargetKind? ToTargetKind(ModelObjectKind kind) => kind switch
+    {
+        ModelObjectKind.Table => MutationTargetKind.Table,
+        ModelObjectKind.Measure => MutationTargetKind.Measure,
+        ModelObjectKind.Column => MutationTargetKind.Column,
+        ModelObjectKind.Hierarchy => MutationTargetKind.Hierarchy,
+        ModelObjectKind.Level => MutationTargetKind.Level,
+        ModelObjectKind.Partition => MutationTargetKind.Partition,
+        ModelObjectKind.Relationship => MutationTargetKind.Relationship,
+        ModelObjectKind.Role => MutationTargetKind.Role,
+        ModelObjectKind.RoleMember => MutationTargetKind.RoleMember,
+        ModelObjectKind.Perspective => MutationTargetKind.Perspective,
+        ModelObjectKind.Culture => MutationTargetKind.Culture,
+        ModelObjectKind.CalculationItem => MutationTargetKind.CalculationItem,
+        ModelObjectKind.DataSource => MutationTargetKind.DataSource,
+        _ => null
+    };
+
+    /// <summary>
+    /// Container keywords for mutation paths beyond <see cref="PathSegment"/>'s core set,
+    /// matching the supplemental keywords add-path inference accepts.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, MutationTargetKind> SetSupplementalKeywords =
+        new Dictionary<string, MutationTargetKind>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CalculationGroups"] = MutationTargetKind.Table,
+            ["CalcGroups"] = MutationTargetKind.Table,
+            ["CalculationItems"] = MutationTargetKind.CalculationItem,
+            ["CalcItems"] = MutationTargetKind.CalculationItem,
+            ["Expressions"] = MutationTargetKind.Expression,
+            ["Functions"] = MutationTargetKind.Function,
+            ["DataSources"] = MutationTargetKind.DataSource
+        };
 
     private void RemoveResolvedObject(ResolvedObject resolved)
     {
@@ -897,7 +1093,12 @@ public sealed partial class TomModelMutator
         var trimmed = path.Trim().Trim('/');
         var dax = DaxObjectPath().Match(trimmed);
         if (dax.Success)
-            return $"{dax.Groups["table"].Value}/{dax.Groups["object"].Value}";
+        {
+            var table = dax.Groups["qtable"].Success
+                ? dax.Groups["qtable"].Value.Replace("''", "'", StringComparison.Ordinal)
+                : dax.Groups["table"].Value;
+            return $"{table}/{dax.Groups["object"].Value}";
+        }
 
         return trimmed.Replace("'", "", StringComparison.Ordinal);
     }
@@ -928,10 +1129,12 @@ public sealed partial class TomModelMutator
         throw new ArgumentException($"Value for '{property}' must be an integer.");
     }
 
-    [GeneratedRegex("^'?(?<table>[^'\\[]+)'?\\[(?<object>[^\\]]+)\\]$")]
+    // Quoted table names may contain escaped apostrophes ('Høreprøver KPI''er'); unquoted ones
+    // may not contain quotes or brackets. The qtable group is unescaped by ParseMutationPath.
+    [GeneratedRegex("^(?:'(?<qtable>(?:[^']|'')+)'|(?<table>[^'\\[\\]]+))\\[(?<object>[^\\]]+)\\]$")]
     private static partial Regex DaxObjectPath();
 
-    private sealed record ResolvedObject(object Target, object? Parent);
+    private sealed record ResolvedObject(object Target, object? Parent, string Display);
 
     private sealed record ReplaceOperation(
         ModelReplacePreview Preview,

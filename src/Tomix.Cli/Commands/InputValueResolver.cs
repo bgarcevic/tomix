@@ -13,10 +13,15 @@ internal static class InputValueResolver
     /// </summary>
     public static string? Resolve(string? value)
         => value == "-"
-            ? Console.In.ReadToEnd()
+            ? ReadStdin()
             : string.IsNullOrEmpty(value) && Console.IsInputRedirected
-                ? Console.In.ReadToEnd()
+                ? ReadStdin()
                 : value;
+
+    // echo/heredoc pipes always end with a newline the user did not intend as part of the
+    // value; keep interior newlines (multiline DAX/M) but drop the trailing ones.
+    private static string ReadStdin()
+        => Console.In.ReadToEnd().TrimEnd('\r', '\n');
 
     /// <summary>Reads from <paramref name="file"/> when supplied, otherwise falls back to <see cref="Resolve(string?)"/>.</summary>
     public static string? Resolve(string? value, string? file)

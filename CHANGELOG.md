@@ -25,6 +25,9 @@ and the API surface that major versions protect.
 - `tx add -t PolicyRangePartition` accepts `--range-start`, `--range-end` (yyyy-MM-dd, both required) and `--range-granularity` (Day/Month/Quarter/Year) instead of a hardcoded 2020–2021 range.
 - `tx add --source-schema` sets the schema on an EntityPartition (previously mis-mapped from `--source-database`).
 - `tx add -t` accepts long-form type aliases: `CalculatedTable`, `CalculatedColumn`, `CalculationGroup`, `CalculationItem`, `CalculatedMeasure`.
+- `tx set` reaches previously unaddressable object types: relationships (endpoint path `Sales[Key]->Product[Key]` or GUID name), named expressions, functions, calculation items, cultures, perspectives, data sources, hierarchy levels (`Table/Hierarchy/Level`), and role members. Their property handlers existed but no path could resolve them.
+- `tx set`/`tx rm` accept container-keyword paths (`tables/Sales/measures/Revenue`, `tables/T/partitions/P`), matching `add`/`ls`/`get`.
+- `--type` accepts `level`, `calculationitem`/`calcitem`, `member`/`rolemember`, and `datasource`.
 - `tx add` path-keyword inference extended to `calcgroups/`, `calcitems/`, `expressions/`, `functions/`, `calendars/`, and `kpis/`. (`datasources/` still requires `-t` — Provider vs Structured is ambiguous.)
 - `TOMIX_ADD_OPTION_UNSUPPORTED` error code: an `add` option supplied for an object type that cannot consume it now hard-errors instead of being silently ignored.
 - `tx replace --in annotations` now works: replaces annotation values across the model, tables, columns, measures, hierarchies, partitions, and roles. Explicit-only — `--in all` deliberately does not touch annotations (values are often tool-generated JSON).
@@ -62,6 +65,13 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `tx set`/`tx rm` DAX bracket paths (`'Table'[Child]`) resolve only to measures and columns, like DAX itself. Previously a same-named partition could be silently picked — `set 'T'[X] -q expression` would replace the partition's M source query instead of the measure's DAX.
+- `tx set`/`tx rm` mutation paths with embedded apostrophes now resolve, in both `'Månedens KPI''er'` (escaped) and raw `Månedens KPI'er` forms, matching the `ls`/`get` selector rules.
+- Same-name collisions across object kinds (e.g. a measure and a partition both named `Budget`) now fail with `TOMIX_OBJECT_AMBIGUOUS` and a `--type` hint instead of silently mutating whichever kind resolved first.
+- `tx set`/`tx rm` not-found errors now emit `TOMIX_OBJECT_NOT_FOUND` with a hint (previously generic `TOMIX_MUTATION_FAILED`); unsupported-property errors name the object type that actually resolved.
+- `tx set --revert` combined with `-q`/`-i` hard-errors (`TOMIX_STAGE_OPTIONS_CONFLICT`, exit 2) instead of silently discarding the assignment.
+- `tx set --force` help text no longer promises validation-error handling that does not exist; it gates `--save-to` overwrite.
+- Values read from stdin (`-i -` or piped) no longer keep the trailing newline that `echo`/heredoc pipes append.
 - `--save` on an existing model directory no longer fails; the directory is cleared and rewritten so deleted objects don't leave orphan files.
 - Empty `--type` on `tx add` now produces an actionable error ("No object type given…") instead of `Adding object type '' is not supported yet.`
 - `tx ls` honors `--error-format json` (it previously always printed the text error while `get`/`find`/`deps` emitted the JSON envelope).

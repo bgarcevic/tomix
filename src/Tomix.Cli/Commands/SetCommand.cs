@@ -34,11 +34,11 @@ internal sealed class SetCommand : ICommandModule
         };
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Save even if this mutation introduces validation errors"
+            Description = "Allow --save-to to overwrite an existing target"
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate when the path matches multiple table-children."
+            Description = "Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name)."
         };
         typeOption.Aliases.Add("-t");
         var saveOption = new Option<bool>("--save")

@@ -21,6 +21,14 @@ public sealed class SetModelPropertyHandler
                 "At least one -q/-i property assignment is required.",
                 exitCode: 2);
 
+        // A -q/-i alongside --revert would be silently discarded with the staged copy; reject it
+        // so the user's intended change is never dropped without notice.
+        if (request.Revert && request.Properties.Count > 0)
+            return TomixResult<SetModelPropertyResult>.Fail(
+                "TOMIX_STAGE_OPTIONS_CONFLICT",
+                "--revert discards the staged mutation; it cannot be combined with -q/-i assignments.",
+                exitCode: 2);
+
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
