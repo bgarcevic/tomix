@@ -167,6 +167,8 @@ public sealed partial class TomModelMutator
             throw new InvalidOperationException($"Object already exists: {path}");
         }
 
+        ThrowIfTableNamespaceCollision(table, parts[1], "measures");
+
         var measure = new Measure
         {
             Name = parts[1],

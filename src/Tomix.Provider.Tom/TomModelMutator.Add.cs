@@ -116,6 +116,7 @@ public sealed partial class TomModelMutator
         var existing = table.Columns.FirstOrDefault(c => NameEquals(c.Name, name));
         if (existing is not null)
             return ExistingOrThrow($"{table.Name}/{existing.Name}", request.IfNotExists, path);
+        ThrowIfTableNamespaceCollision(table, name, "columns");
 
         var column = new CalculatedColumn
         {
@@ -135,6 +136,7 @@ public sealed partial class TomModelMutator
         var existing = table.Columns.FirstOrDefault(c => NameEquals(c.Name, name));
         if (existing is not null)
             return ExistingOrThrow($"{table.Name}/{existing.Name}", request.IfNotExists, path);
+        ThrowIfTableNamespaceCollision(table, name, "columns");
 
         var column = new DataColumn
         {
@@ -155,6 +157,7 @@ public sealed partial class TomModelMutator
         var existing = table.Hierarchies.FirstOrDefault(h => NameEquals(h.Name, name));
         if (existing is not null)
             return ExistingOrThrow($"{table.Name}/{existing.Name}", request.IfNotExists, path);
+        ThrowIfTableNamespaceCollision(table, name, "hierarchies");
 
         var hierarchy = new Hierarchy { Name = name };
         // A hierarchy needs at least one level to serialize; seed it from the first real column.
@@ -647,6 +650,27 @@ public sealed partial class TomModelMutator
         if (ifNotExists)
             return new ModelObjectMutationResult(existingPath, Changed: false);
         throw new InvalidOperationException($"Object already exists: {requestedPath}");
+    }
+
+    /// <summary>
+    /// Measures, columns, and hierarchies share one namespace within a table — the engine
+    /// rejects a model where two of them carry the same name, so adds must fail up front
+    /// instead of writing TMDL a deploy won't accept. The caller checks its own collection
+    /// separately (that duplicate honors <c>--if-not-exists</c>); this guards the cross-kind
+    /// collisions, which are always an error.
+    /// </summary>
+    private static void ThrowIfTableNamespaceCollision(Table table, string name, string ownCollection)
+    {
+        var colliding =
+            ownCollection != "measures" && table.Measures.Any(m => NameEquals(m.Name, name)) ? "measure"
+            : ownCollection != "columns" && table.Columns.Any(c => c.Type != ColumnType.RowNumber && NameEquals(c.Name, name)) ? "column"
+            : ownCollection != "hierarchies" && table.Hierarchies.Any(h => NameEquals(h.Name, name)) ? "hierarchy"
+            : null;
+
+        if (colliding is not null)
+            throw new InvalidOperationException(
+                $"Object already exists: a {colliding} named '{name}' exists in table '{table.Name}' "
+                + "(measures, columns, and hierarchies share a namespace).");
     }
 
     private static void AddColumns(Table table, string? columns)
