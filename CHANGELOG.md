@@ -28,6 +28,11 @@ and the API surface that major versions protect.
 - `tx add` path-keyword inference extended to `calcgroups/`, `calcitems/`, `expressions/`, `functions/`, `calendars/`, and `kpis/`. (`datasources/` still requires `-t` — Provider vs Structured is ambiguous.)
 - `TOMIX_ADD_OPTION_UNSUPPORTED` error code: an `add` option supplied for an object type that cannot consume it now hard-errors instead of being silently ignored.
 - `tx replace --in annotations` now works: replaces annotation values across the model, tables, columns, measures, hierarchies, partitions, and roles. Explicit-only — `--in all` deliberately does not touch annotations (values are often tool-generated JSON).
+- `TOMIX_UNKNOWN_OPTION` error code (exit 2): an unrecognized `--option` that would have been silently bound to a positional argument (e.g. `tx ls --bogusflag`) now hard-errors with a did-you-mean suggestion. Put `--` before positional values that must start with `-`.
+- `tx find --in formatStrings`, `--in displayFolders`, and `--in annotations` now actually search (they previously parsed but matched nothing). `formatStrings`/`displayFolders` are included in the default `all` scope; annotations are searched only when requested explicitly (models carry hundreds of machine-generated `PBI_*` annotations). `--in` values are validated at parse time.
+- Selector quoting supports apostrophes in object names: a bare apostrophe is now an ordinary character (`tx ls "Høreprøver KPI'er"` just works), and inside a quoted segment `''` is a literal apostrophe (`'Høreprøver KPI''er'`). A quote only opens a group at the start of a segment.
+- `tx deps` tracks quoted bare-table references: `COUNTROWS('Udlån')` now reports the table as upstream. Unquoted bare table names remain untracked (indistinguishable from `VAR` names without a DAX parser).
+- `tx ls --output-format json` objects now include a `path` field, so same-named measures/columns in different tables are distinguishable.
 
 ### Changed (breaking)
 
@@ -38,6 +43,10 @@ and the API surface that major versions protect.
 - `tx add -t PolicyRangePartition` requires `--range-start` and `--range-end`.
 - Invalid `--mode`, `--serialization`, and `--range-granularity` values on `tx add` are rejected at parse time (before any model is opened) instead of at apply time. `--serialization` accepts `tmdl`, `bim`, `tmsl`, `auto` (the previously advertised `te-folder`/`pbip` were never implemented).
 - A dangling `-q` with no matching `-i` on `tx add` is now a usage error (exit 2) instead of being silently dropped.
+- Exit codes aligned with the documented contract: `TOMIX_NO_PROVIDER`, `TOMIX_NO_MODEL`, and `TOMIX_DEPLOY_NO_TARGET` exit 2 (previously 1), and command-line parse errors (unknown option, missing argument, invalid option value) exit 2 (previously System.CommandLine's default of 1).
+- Output formats a command cannot render are rejected with exit 2 (`'tx find' does not support --output-format csv. Supported: text, json.`) instead of silently falling back to text. Applies to `ls` (text/json/csv) and `find`/`deps` (text/json).
+- `tx deps --max-depth` must be at least 1; `0` previously acted as unlimited.
+- Invalid `--regex` patterns on `tx find` fail up-front with `TOMIX_FIND_INVALID_REGEX` (exit 2) instead of crashing mid-search.
 - `tx add --revert` prints `Reverted.` and an `--if-not-exists` no-op prints `Already exists: <path>` instead of the misleading `Added: False` + "Changes not saved" warning. JSON output gains optional `reverted`/`existingPath` fields.
 - Mutation spinners now label the actual operation (`Working...`/`Staging...`/`Reverting...`) instead of always `Saving...`.
 - `tx replace --in <unknown-scope>` now errors (`TOMIX_MUTATION_INVALID_VALUE`) instead of exiting 0 with nothing replaced.
@@ -55,6 +64,10 @@ and the API surface that major versions protect.
 
 - `--save` on an existing model directory no longer fails; the directory is cleared and rewritten so deleted objects don't leave orphan files.
 - Empty `--type` on `tx add` now produces an actionable error ("No object type given…") instead of `Adding object type '' is not supported yet.`
+- `tx ls` honors `--error-format json` (it previously always printed the text error while `get`/`find`/`deps` emitted the JSON envelope).
+- `tx deps --quiet` no longer prints "Running semantic analysis...".
+- `TOMIX_OBJECT_AMBIGUOUS` errors (`get`, `deps`) list up to 5 candidate paths with their kinds and hint `-t <type>` disambiguation, instead of only naming the ambiguous path.
+- Help fixes: the `get`/`find`/`deps` examples no longer show nonexistent flags (`-t dax`, `find --type`, `deps --direction`); the `find` zero-match hint no longer suggests a nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format` description typo "tTomix" is `tmdl` again.
 
 ### Added
 

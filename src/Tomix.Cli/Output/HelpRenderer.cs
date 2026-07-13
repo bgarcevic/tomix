@@ -29,16 +29,16 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ],
         ["get"] = [
             "tx get \"Table[Measure]\"",
-            "tx get tables/Sales -t dax",
+            "tx get Revenue -t measure",
             "tx get Sales/Measures/Revenue --output-format json",
         ],
         ["find"] = [
             "tx find CALCULATE",
-            "tx find \"SUM(Sales\" --type measure",
+            "tx find \"SUM(Sales\" --in expressions",
         ],
         ["deps"] = [
             "tx deps \"Table[Measure]\"",
-            "tx deps tables/Sales --direction downstream",
+            "tx deps tables/Sales --downstream",
         ],
         ["add"] = [
             "tx add tables/Sales/measures/Revenue -i \"CALCULATE(SUM(Sales[Amount]))\"",
@@ -181,7 +181,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             ("-h, /h, -?, /?, --help", "Show help and usage information"),
             ("--version", "Show version information"),
             ("-m, --model <model>", "Path to semantic model (TMDL folder, .bim file, or TE folder)"),
-            ("--output-format <output-format>", "Stdout format: text (default), json, csv, tmsl (alias: bim), tTomix. Not all formats are supported by every command."),
+            ("--output-format <output-format>", "Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command."),
             ("--error-format <error-format>", "Stderr format for errors/warnings/hints: text (default) or json. Other values fall back to text."),
             ("-s, --server <server>", "Workspace name or endpoint (e.g., MyWorkspace, powerbi://..., asazure://..., localhost)"),
             ("-d, --database <database>", "Semantic model name on the workspace"),

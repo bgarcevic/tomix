@@ -23,7 +23,7 @@ public sealed class LsModelHandler
             return TomixResult<LsModelResult>.Fail(
                 code: "TOMIX_NO_PROVIDER",
                 message: $"No provider can open model: {request.Model.Value}",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
         try

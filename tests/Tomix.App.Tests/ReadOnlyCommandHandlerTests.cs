@@ -44,6 +44,60 @@ public sealed class ReadOnlyCommandHandlerTests
             result.Data.Matches.Select(m => $"{m.Path}|{m.Property}|{m.MatchedText}|{m.Line}|{m.Position}").ToArray());
     }
 
+    [Theory]
+    [InlineData("formatStrings", "#,0", "FormatString")]
+    [InlineData("displayFolders", "KPIs", "DisplayFolder")]
+    [InlineData("annotations", "isGeneralNumber", "Annotation:PBI_FormatHint")]
+    public async Task Find_PropertyScopes_SearchSnapshotProperties(string scope, string pattern, string expectedField)
+    {
+        var result = await new FindModelHandler([new StubModelProvider()]).HandleAsync(
+            new FindModelRequest(
+                new ModelReference("any"),
+                pattern,
+                Scope: scope,
+                Regex: false,
+                CaseSensitive: false),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var match = Assert.Single(result.Data!.Matches);
+        Assert.Equal("Sales/Total Sales", match.Path);
+        Assert.Equal(expectedField, match.Property);
+    }
+
+    [Fact]
+    public async Task Find_AllScope_ExcludesAnnotations()
+    {
+        var result = await new FindModelHandler([new StubModelProvider()]).HandleAsync(
+            new FindModelRequest(
+                new ModelReference("any"),
+                "isGeneralNumber",
+                Scope: "all",
+                Regex: false,
+                CaseSensitive: false),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Data!.Matches);
+    }
+
+    [Fact]
+    public async Task Find_InvalidRegexPattern_FailsWithDiagnostic()
+    {
+        var result = await new FindModelHandler([new StubModelProvider()]).HandleAsync(
+            new FindModelRequest(
+                new ModelReference("any"),
+                "([unclosed",
+                Scope: "all",
+                Regex: true,
+                CaseSensitive: false),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_FIND_INVALID_REGEX", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+    }
+
     [Fact]
     public async Task Deps_FindsColumnReferencesInMeasureExpression()
     {
@@ -91,7 +145,13 @@ public sealed class ReadOnlyCommandHandlerTests
             var totalSales = new ModelObject(
                 "Total Sales", ModelObjectKind.Measure, "Sales/Total Sales",
                 Detail: null, Expression: "SUM(Sales[Amount])", Description: null, Hidden: false,
-                SourceColumn: null, Children: []);
+                SourceColumn: null, Children: [],
+                Properties: new Dictionary<string, string>
+                {
+                    ["FormatString"] = "#,0",
+                    ["DisplayFolder"] = "KPIs",
+                    ["Annotation:PBI_FormatHint"] = "{\"isGeneralNumber\":true}"
+                });
             var orderCount = new ModelObject(
                 "Order Count", ModelObjectKind.Measure, "Sales/Order Count",
                 Detail: null, Expression: "COUNTROWS(Sales)", Description: null, Hidden: false,

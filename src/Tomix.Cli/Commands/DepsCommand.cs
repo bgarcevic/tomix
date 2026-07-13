@@ -50,6 +50,11 @@ internal sealed class DepsCommand : ICommandModule
             Description = "Maximum depth for --deep traversal (default: 10)",
             DefaultValueFactory = _ => 10
         };
+        maxDepthOption.Validators.Add(result =>
+        {
+            if (result.GetValueOrDefault<int>() < 1)
+                result.AddError("--max-depth must be at least 1.");
+        });
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple table-children."
@@ -80,7 +85,7 @@ internal sealed class DepsCommand : ICommandModule
             var downstreamOnly = downstreamRequested && !upstreamRequested;
             var deep = parseResult.GetValue(deepOption);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "deps", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             ModelObjectKind? type = null;
@@ -94,6 +99,7 @@ internal sealed class DepsCommand : ICommandModule
                 type = parsed;
             }
 
+            var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Analyzing dependencies...",
                 () => new DepsModelHandler(_providers).HandleAsync(
@@ -111,9 +117,9 @@ internal sealed class DepsCommand : ICommandModule
                         parseResult.GetValue(hiddenOption),
                         parseResult.GetValue(maxDepthOption)),
                     cancellationToken),
-                suppress: parseResult.GetValue(GlobalOptions.Quiet) || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
+                suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
-            if (result.Data is null && OutputFormats.IsTextLike(formatValue))
+            if (result.Data is null && OutputFormats.IsTextLike(formatValue) && !quiet)
             {
                 AnsiConsole.MarkupLine(Styling.Value("Running semantic analysis..."));
                 AnsiConsole.WriteLine();
@@ -122,7 +128,7 @@ internal sealed class DepsCommand : ICommandModule
             return CommandOutput.Render(
                 result,
                 formatValue,
-                data => Render(data, showUpstream: !downstreamOnly, showDownstream: !upstreamOnly, deep: deep),
+                data => Render(data, showUpstream: !downstreamOnly, showDownstream: !upstreamOnly, deep: deep, quiet: quiet),
                 data => ToReferenceJson(data, includeUpstream: !downstreamOnly, includeDownstream: !upstreamOnly),
                 errorFormat: errorFormat);
         });
@@ -130,7 +136,7 @@ internal sealed class DepsCommand : ICommandModule
         return command;
     }
 
-    private static void Render(DepsModelResult result, bool showUpstream, bool showDownstream, bool deep)
+    private static void Render(DepsModelResult result, bool showUpstream, bool showDownstream, bool deep, bool quiet)
     {
         if (result.Unused is not null)
         {
@@ -138,8 +144,12 @@ internal sealed class DepsCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Value("Running semantic analysis..."));
-        AnsiConsole.WriteLine();
+        if (!quiet)
+        {
+            AnsiConsole.MarkupLine(Styling.Value("Running semantic analysis..."));
+            AnsiConsole.WriteLine();
+        }
+
         AnsiConsole.MarkupLine(Styling.Title($"Dependencies for {result.Path} ({result.Type})"));
         if (showUpstream)
         {

@@ -94,6 +94,9 @@ internal static class Program
         }
 
         var parseResult = root.Parse(args);
+        if (parseResult.Errors.Count == 0 && UnknownOptionGuard.TryReject(parseResult, args))
+            return 2;
+
         if (parseResult.Errors.Count > 0)
         {
             var commandNames = root.Subcommands.Select(c => c.Name).ToList();
@@ -108,6 +111,11 @@ internal static class Program
                         DidYouMean.WriteSuggestion(firstArg, commandNames);
                 }
             }
+
+            // Invoke prints the parse errors, but returns System.CommandLine's default of 1;
+            // usage errors exit 2 per the documented contract (docs/error-codes.md).
+            parseResult.Invoke();
+            return 2;
         }
 
         return parseResult.Invoke();

@@ -16,13 +16,29 @@ public sealed class FindModelHandler
         FindModelRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.Regex)
+        {
+            try
+            {
+                _ = new Regex(request.Pattern);
+            }
+            catch (ArgumentException ex)
+            {
+                return TomixResult<FindModelResult>.Fail(
+                    code: "TOMIX_FIND_INVALID_REGEX",
+                    message: ex.Message,
+                    exitCode: 2,
+                    hint: "Fix the regex pattern, or remove --regex to search for literal text.");
+            }
+        }
+
         var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
 
         if (provider is null)
             return TomixResult<FindModelResult>.Fail(
                 code: "TOMIX_NO_PROVIDER",
                 message: $"No provider can open model: {request.Model.Value}",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
         await using var session = await provider.OpenAsync(request.Model, cancellationToken);
@@ -71,9 +87,26 @@ public sealed class FindModelHandler
             yield return ("Expression", obj.Expression);
         if (normalized is "all" or "descriptions")
             yield return ("Description", obj.Description);
-        if (normalized is "all" or "formatstrings" or "displayfolders" or "annotations")
-            yield break;
+        if (normalized is "all" or "formatstrings")
+            yield return ("FormatString", NonEmpty(obj.Property("FormatString")));
+        if (normalized is "all" or "displayfolders")
+            yield return ("DisplayFolder", NonEmpty(obj.Property("DisplayFolder")));
+
+        // Annotations are searched only when explicitly requested: models routinely carry
+        // hundreds of machine-generated annotations (PBI_*, TabularEditor_*) that would
+        // drown 'all' searches in noise.
+        if (normalized is "annotations" && obj.Properties is not null)
+        {
+            foreach (var (key, value) in obj.Properties)
+            {
+                if (key.StartsWith("Annotation:", StringComparison.Ordinal))
+                    yield return (key, value);
+            }
+        }
     }
+
+    private static string? NonEmpty(string? value)
+        => string.IsNullOrEmpty(value) ? null : value;
 
     private static bool TryMatch(
         string value,

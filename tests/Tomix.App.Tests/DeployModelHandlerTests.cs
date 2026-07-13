@@ -27,7 +27,7 @@ public sealed class DeployModelHandlerTests
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_NO_MODEL", result.Diagnostics[0].Code);
-        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(2, result.ExitCode);
     }
 
     [Fact]

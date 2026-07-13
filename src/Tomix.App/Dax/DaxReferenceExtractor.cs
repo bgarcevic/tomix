@@ -38,6 +38,20 @@ public static partial class DaxReferenceExtractor
         }
     }
 
+    /// <summary>
+    /// Enumerates table names referenced without a column/measure, e.g. <c>COUNTROWS('Udlån')</c>.
+    /// Only quoted forms are reported: a single-quoted identifier in DAX is always a table,
+    /// whereas a bare word could equally be a VAR or function name.
+    /// </summary>
+    public static IEnumerable<string> ExtractTableReferences(string? expression)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            yield break;
+
+        foreach (Match match in QuotedTableReference().Matches(expression))
+            yield return match.Groups["table"].Value;
+    }
+
     // A qualified reference: a quoted table name ('Order Lines') OR a bare identifier table
     // (Sales) — never just whitespace/punctuation — immediately followed by [Object].
     // (.NET permits the duplicate "table" group name across alternatives.)
@@ -46,4 +60,8 @@ public static partial class DaxReferenceExtractor
 
     [GeneratedRegex("(?<![A-Za-z0-9_'])\\[(?<object>[^\\]]+)\\]")]
     private static partial Regex LoneReference();
+
+    // A quoted table name NOT followed by [Object] — a bare table reference.
+    [GeneratedRegex(@"'(?<table>[^']+)'(?!\[)")]
+    private static partial Regex QuotedTableReference();
 }

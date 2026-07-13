@@ -16,6 +16,7 @@ internal sealed class DependencyGraph
     private readonly IReadOnlyList<ModelObject> _objects;
     private readonly Dictionary<string, ModelObject> _byPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ModelObject> _measureByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ModelObject> _tableByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _columnsByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _forward = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _reverse = new(StringComparer.OrdinalIgnoreCase);
@@ -113,7 +114,9 @@ internal sealed class DependencyGraph
         {
             _byPath[Key(obj)] = obj;
 
-            if (obj.Kind == ModelObjectKind.Measure)
+            if (obj.Kind == ModelObjectKind.Table)
+                _tableByName.TryAdd(obj.Name, obj);
+            else if (obj.Kind == ModelObjectKind.Measure)
                 _measureByName.TryAdd(obj.Name, obj);
             else if (obj.Kind == ModelObjectKind.Column)
             {
@@ -141,6 +144,14 @@ internal sealed class DependencyGraph
                     var resolved = Resolve(reference);
                     if (resolved is not null && !Eq(Key(resolved), Key(obj)))
                         targets.Add(Key(resolved));
+                }
+
+                // Bare table references (COUNTROWS('Udlån')) — quoted forms only; an unquoted
+                // bare word is indistinguishable from a VAR name without a full DAX parser.
+                foreach (var tableName in DaxReferenceExtractor.ExtractTableReferences(expression))
+                {
+                    if (_tableByName.TryGetValue(tableName, out var table) && !Eq(Key(table), Key(obj)))
+                        targets.Add(Key(table));
                 }
             }
 

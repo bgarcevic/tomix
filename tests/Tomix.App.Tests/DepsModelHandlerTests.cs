@@ -61,6 +61,40 @@ public sealed class DepsModelHandlerTests
     }
 
     [Fact]
+    public async Task Upstream_TracksQuotedTableReferences()
+    {
+        // RowCount = "COUNTROWS('Region')" -> upstream edge to the Region table itself.
+        var result = await Run(Request("Sales/RowCount"));
+
+        var dep = Assert.Single(result.Data!.Upstream);
+        Assert.Equal("Region", dep.Path);
+        Assert.Equal("Table", dep.Type);
+    }
+
+    [Fact]
+    public async Task Upstream_DoesNotTrackUnquotedTableReferences()
+    {
+        // An unquoted bare word (COUNTROWS(Region)) could be a VAR name, so it is not tracked.
+        var result = await Run(Request("Sales/RowCountBare"));
+
+        Assert.Empty(result.Data!.Upstream);
+    }
+
+    [Fact]
+    public async Task AmbiguousPath_ListsCandidatesAndHint()
+    {
+        // "Amount" matches Sales/Amount and Region/Amount.
+        var result = await Run(Request("Amount"));
+
+        Assert.False(result.Success);
+        var diagnostic = result.Diagnostics[0];
+        Assert.Equal("TOMIX_OBJECT_AMBIGUOUS", diagnostic.Code);
+        Assert.Contains("Sales/Amount (Column)", diagnostic.Message);
+        Assert.Contains("Region/Amount (Column)", diagnostic.Message);
+        Assert.Contains("-t <type>", diagnostic.Hint);
+    }
+
+    [Fact]
     public async Task Upstream_CoversKpiTargetExpression()
     {
         // KpiMeasure has Expression "1" but KpiTargetExpression "[Total]".
@@ -175,6 +209,8 @@ public sealed class DepsModelHandlerTests
                     Measure("Sales", "A", "[B] + 1"),
                     Measure("Sales", "B", "[A] + 1"),
                     Measure("Sales", "Unused", "1"),
+                    Measure("Sales", "RowCount", "COUNTROWS('Region')"),
+                    Measure("Sales", "RowCountBare", "COUNTROWS(Region)"),
                     Measure("Sales", "HiddenStuff", "2", hidden: true),
                     Measure("Sales", "KpiMeasure", "1", props: new Dictionary<string, string>
                     {
@@ -184,7 +220,7 @@ public sealed class DepsModelHandlerTests
 
             var region = new ModelObject(
                 "Region", ModelObjectKind.Table, "Region", "regular", null, null, false, null,
-                [Column("Region", "RegionKey")]);
+                [Column("Region", "RegionKey"), Column("Region", "Amount")]);
 
             var relationship = new ModelObject(
                 "rel1", ModelObjectKind.Relationship, "Relationships/rel1", null, null, null, false, null, [],

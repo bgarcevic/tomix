@@ -26,14 +26,15 @@ internal sealed class LsCommand : ICommandModule
             Description =
                 "Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container " +
                 "keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard " +
-                "('Sa*', '*/Amount'); quote names with spaces (\"'Net Sales'/'Sales Amount'\").",
+                "('Sa*', '*/Amount'); quote names with spaces (\"'Net Sales'/'Sales Amount'\"); " +
+                "inside quotes, '' is a literal apostrophe.",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Filter by type: table, measure, column, hierarchy, partition, " +
-                          "relationship, role, perspective, culture."
+            Description = "Filter by type: table, measure, column, calculatedcolumn, hierarchy, " +
+                          "partition, relationship, role, perspective, culture."
         };
 
         var pathsOnlyOption = new Option<bool>("--paths-only")
@@ -91,8 +92,9 @@ internal sealed class LsCommand : ICommandModule
             var pathsOnly = parseResult.GetValue(pathsOnlyOption);
             var noMultiline = parseResult.GetValue(noMultilineOption);
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
+            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "ls", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
             ModelObjectKind? type = null;
@@ -120,7 +122,8 @@ internal sealed class LsCommand : ICommandModule
                 formatValue,
                 data => LsRenderer.Render(data, pathsOnly, noMultiline),
                 ToReferenceJson,
-                RenderCsv);
+                RenderCsv,
+                errorFormat: errorFormat);
         });
 
         return command;
@@ -136,6 +139,7 @@ internal sealed class LsCommand : ICommandModule
             return new Dictionary<string, object?>
             {
                 ["name"] = obj.Name,
+                ["path"] = obj.Path,
                 ["description"] = obj.Description ?? "",
                 ["isHidden"] = obj.Hidden,
                 ["dataCategory"] = "",
@@ -154,6 +158,7 @@ internal sealed class LsCommand : ICommandModule
             return new Dictionary<string, object?>
             {
                 ["name"] = obj.Name,
+                ["path"] = obj.Path,
                 ["description"] = obj.Description ?? "",
                 ["sourceColumn"] = obj.SourceColumn ?? "",
                 ["dataType"] = DataTypeProperty(obj, DataTypeName(obj.Detail)),
@@ -171,6 +176,7 @@ internal sealed class LsCommand : ICommandModule
             return new Dictionary<string, object?>
             {
                 ["name"] = obj.Name,
+                ["path"] = obj.Path,
                 ["description"] = obj.Description ?? "",
                 ["expression"] = obj.Expression ?? "",
                 ["formatString"] = Property(obj, "FormatString", ""),

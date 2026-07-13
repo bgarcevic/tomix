@@ -18,7 +18,24 @@ internal static class CommandOutput
         if (OutputFormats.IsValid(format))
             return true;
 
-        Console.Error.WriteLine("Invalid --output-format value. Expected: auto, text, json, csv, tmsl, bim, or tTomix.");
+        Console.Error.WriteLine("Invalid --output-format value. Expected: auto, text, json, csv, tmsl, bim, or tmdl.");
+        return false;
+    }
+
+    /// <summary>
+    /// Like <see cref="TryValidateFormat(string)"/>, but additionally rejects formats the command
+    /// cannot render (instead of silently falling back to text). <c>auto</c> is always accepted.
+    /// </summary>
+    public static bool TryValidateFormat(string format, string commandName, params string[] supported)
+    {
+        if (!TryValidateFormat(format))
+            return false;
+
+        if (format is OutputFormats.Auto || supported.Contains(format, StringComparer.OrdinalIgnoreCase))
+            return true;
+
+        Console.Error.WriteLine(
+            $"'tx {commandName}' does not support --output-format {format}. Supported: {string.Join(", ", supported)}.");
         return false;
     }
 

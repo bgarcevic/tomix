@@ -67,7 +67,7 @@ public sealed class ScriptHandler
             return TomixResult<ScriptRunResult>.Fail(
                 "TOMIX_NO_PROVIDER",
                 $"No provider can open model: {context.EffectiveModel.Value}",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
         var stopwatch = Stopwatch.StartNew();

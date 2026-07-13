@@ -28,8 +28,11 @@ internal sealed class FindCommand : ICommandModule
 
         var inOption = new Option<string?>("--in")
         {
-            Description = "Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all (default: all)"
+            Description = "Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all " +
+                          "(default: all; annotations are only searched when requested explicitly)"
         };
+        inOption.AcceptAmongIgnoreCase(
+            "all", "names", "expressions", "descriptions", "formatStrings", "displayFolders", "annotations");
         var regexOption = new Option<bool>("--regex")
         {
             Description = "Treat pattern as a regular expression"
@@ -65,7 +68,7 @@ internal sealed class FindCommand : ICommandModule
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "find", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var reference = new ActiveModelResolver().ResolveReference(
@@ -86,10 +89,11 @@ internal sealed class FindCommand : ICommandModule
 
             var pathsOnly = parseResult.GetValue(pathsOnlyOption);
             var noMultiline = parseResult.GetValue(noMultilineOption);
+            var caseSensitive = parseResult.GetValue(caseSensitiveOption);
             return CommandOutput.Render(
                 result,
                 formatValue,
-                data => Render(data, pathsOnly, noMultiline),
+                data => Render(data, pathsOnly, noMultiline, caseSensitive),
                 ToReferenceJson,
                 errorFormat: errorFormat);
         });
@@ -97,14 +101,17 @@ internal sealed class FindCommand : ICommandModule
         return command;
     }
 
-    private static void Render(FindModelResult result, bool pathsOnly, bool noMultiline)
+    private static void Render(FindModelResult result, bool pathsOnly, bool noMultiline, bool caseSensitive)
     {
         if (result.Matches.Count == 0)
         {
             if (!pathsOnly)
             {
                 AnsiConsole.MarkupLine(Styling.Muted($"No matches for '{Styling.MarkupEscape(result.Pattern)}'."));
-                AnsiConsole.MarkupLine(Styling.Guidance($"  → Try: tx find \"{Styling.MarkupEscape(result.Pattern)}\" --type measure, or remove --case-sensitive"));
+                var hint = caseSensitive
+                    ? "remove --case-sensitive to match any casing"
+                    : "a shorter or broader pattern, or --regex for pattern matching";
+                AnsiConsole.MarkupLine(Styling.Guidance($"  → Try: {hint}"));
             }
 
             return;

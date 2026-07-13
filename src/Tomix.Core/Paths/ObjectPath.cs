@@ -6,8 +6,11 @@ namespace Tomix.Core.Paths;
 
 /// <summary>
 /// Parses an object-path filter (e.g. <c>Sales/Measures</c>, <c>Roles/Re*/Members</c>,
-/// <c>'Net Sales'/'Sales Amount'</c>) into its segments. Segments are separated by <c>/</c>;
-/// single quotes group a name containing spaces or slashes and force a literal match.
+/// <c>'Net Sales'/'Sales Amount'</c>) into its segments. Segments are separated by <c>/</c>.
+/// A single quote opens a quoted group only at the start of a segment; the group runs to the
+/// next single quote and forces a literal match (names with slashes or keyword names). Inside
+/// a quoted group, a doubled quote (<c>''</c>) is a literal apostrophe. An apostrophe anywhere
+/// else is an ordinary character, so <c>KPI'er</c> needs no quoting at all.
 /// </summary>
 public static class ObjectPath
 {
@@ -24,6 +27,7 @@ public static class ObjectPath
         var text = new StringBuilder();
         var inQuotes = false;
         var hadQuote = false;
+        var atSegmentStart = true;
 
         void Flush()
         {
@@ -31,21 +35,45 @@ public static class ObjectPath
                 segments.Add(new PathSegment(text.ToString(), hadQuote));
             text.Clear();
             hadQuote = false;
+            atSegmentStart = true;
         }
 
-        foreach (var c in path)
+        for (var i = 0; i < path.Length; i++)
         {
+            var c = path[i];
+
+            if (inQuotes)
+            {
+                if (c != '\'')
+                {
+                    text.Append(c);
+                }
+                else if (i + 1 < path.Length && path[i + 1] == '\'')
+                {
+                    text.Append('\'');
+                    i++;
+                }
+                else
+                {
+                    inQuotes = false;
+                }
+
+                continue;
+            }
+
             switch (c)
             {
-                case '\'':
-                    inQuotes = !inQuotes;
+                case '\'' when atSegmentStart:
+                    inQuotes = true;
                     hadQuote = true;
+                    atSegmentStart = false;
                     break;
-                case '/' when !inQuotes:
+                case '/':
                     Flush();
                     break;
                 default:
                     text.Append(c);
+                    atSegmentStart = false;
                     break;
             }
         }

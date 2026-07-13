@@ -36,7 +36,8 @@ Fields:
 | 2    | Usage/argument error, IO failure, or pre-condition violation. |
 
 Handlers override the default via `TomixResult.Fail(..., exitCode: 2)`. If no exit code
-is specified, the default is `1`.
+is specified, the default is `1`. Command-line parse errors (unknown option, missing
+required argument, invalid option value) also exit `2`.
 
 ## Naming Convention
 
@@ -180,6 +181,8 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_CONNECT_INVALID_TARGET` | 1 | `connect` was given a server that is neither a remote endpoint nor a local model path. |
 | `TOMIX_DATABASE_NOT_FOUND` | 1 | The database/model name was not found on the server. |
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
+| `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |
+| `TOMIX_UNKNOWN_OPTION` | 2 | An unrecognized `--option` would have been bound to a positional argument (e.g. a typo'd flag). Put `--` before positional values that must start with `-`. |
 | `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` called for an unsupported object type or operation. |
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |

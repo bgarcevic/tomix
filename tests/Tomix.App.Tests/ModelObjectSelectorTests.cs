@@ -25,6 +25,9 @@ public sealed class ModelObjectSelectorTests
         var literalMeasures = Node("Measures", ModelObjectKind.Table,
             Node("Dummy", ModelObjectKind.Column));
 
+        var apostrophes = Node("Høreprøver KPI'er", ModelObjectKind.Table,
+            Node("PrøveID", ModelObjectKind.Column));
+
         var readers = Node("Admins", ModelObjectKind.Role,
             Node("alice@contoso.com", ModelObjectKind.RoleMember));
         var region = Node("Region", ModelObjectKind.Role,
@@ -35,7 +38,7 @@ public sealed class ModelObjectSelectorTests
         var culture = Node("en-US", ModelObjectKind.Culture);
 
         return new ModelSnapshot("test", 1601,
-            [sales, customers, literalMeasures, readers, region, relationship, perspective, culture]);
+            [sales, customers, literalMeasures, apostrophes, readers, region, relationship, perspective, culture]);
     }
 
     private static ModelObject Node(string name, ModelObjectKind kind, params ModelObject[] children)
@@ -46,11 +49,11 @@ public sealed class ModelObjectSelectorTests
 
     [Fact]
     public void EmptyPath_ListsTables()
-        => Assert.Equal(["Sales", "Customers", "Measures"], Names(""));
+        => Assert.Equal(["Sales", "Customers", "Measures", "Høreprøver KPI'er"], Names(""));
 
     [Fact]
     public void TablesKeyword_ListsTables()
-        => Assert.Equal(["Sales", "Customers", "Measures"], Names("Tables"));
+        => Assert.Equal(["Sales", "Customers", "Measures", "Høreprøver KPI'er"], Names("Tables"));
 
     [Fact]
     public void MeasuresKeyword_ListsAllMeasuresAcrossTables()
@@ -91,6 +94,14 @@ public sealed class ModelObjectSelectorTests
     [Fact]
     public void Quoting_ForcesLiteralNameOverKeyword()
         => Assert.Equal(["Dummy"], Names("'Measures'")); // the table named "Measures", expanded
+
+    [Fact]
+    public void ApostropheInName_MatchesBare()
+        => Assert.Equal(["PrøveID"], Names("Høreprøver KPI'er"));
+
+    [Fact]
+    public void ApostropheInName_MatchesQuotedWithDoubledQuote()
+        => Assert.Equal(["PrøveID"], Names("'Høreprøver KPI''er'"));
 
     [Fact]
     public void TypeFilter_WithNoPath_ListsAllOfThatKind()

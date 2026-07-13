@@ -27,7 +27,7 @@ public sealed class DepsModelHandler
             return TomixResult<DepsModelResult>.Fail(
                 code: "TOMIX_NO_PROVIDER",
                 message: $"No provider can open model: {request.Model.Value}",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
         await using var session = await provider.OpenAsync(request.Model, cancellationToken);
@@ -54,8 +54,9 @@ public sealed class DepsModelHandler
         if (targetMatches.Count > 1)
             return TomixResult<DepsModelResult>.Fail(
                 code: "TOMIX_OBJECT_AMBIGUOUS",
-                message: $"Object path matched more than one object: {request.Path}",
-                exitCode: 1);
+                message: AmbiguousMatchMessage.For(request.Path!, targetMatches),
+                exitCode: 1,
+                hint: AmbiguousMatchMessage.Hint);
 
         var target = targetMatches[0];
         var maxDepth = request.MaxDepth > 0 ? request.MaxDepth : int.MaxValue;

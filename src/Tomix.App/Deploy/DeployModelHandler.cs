@@ -30,7 +30,7 @@ public sealed class DeployModelHandler
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_MODEL",
                 "No model specified. Use --model <path>, --server <url> --database <name>, --local, or set an active connection with 'tx connect'.",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Specify a model path or use --recent.");
 
         var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
@@ -38,7 +38,7 @@ public sealed class DeployModelHandler
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",
                 $"No provider can open model: {request.Model.Value}",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
         await using var session = await provider.OpenAsync(request.Model, cancellationToken);
@@ -62,7 +62,7 @@ public sealed class DeployModelHandler
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_DEPLOY_NO_TARGET",
                 "No target workspace specified. Use -s/--server or set an active connection with 'tx connect'.",
-                exitCode: 1,
+                exitCode: 2,
                 hint: "Specify --workspace or --server and --database.");
 
         var deployRequest = new ModelDeployRequest(
