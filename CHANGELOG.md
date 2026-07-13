@@ -65,6 +65,7 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- TMDL saves no longer rewrite every table file of a Power BI Desktop-authored model. `TmdlSerializer` indents M partition `source =` bodies two levels below the property while Desktop writes them one level deep (they agree on measures, calc items, and DAX/calculated partition sources), so any `--save` re-indented every M partition in the folder. The exporter now post-processes M-partition source blocks to Desktop's depth — a save of an untouched Desktop model is byte-identical, and a mutation diffs only the lines it changed. The transform is lossless (TMDL strips common leading whitespace of delimited expressions on parse) and idempotent.
 - `tx set`/`tx rm` DAX bracket paths (`'Table'[Child]`) resolve only to measures and columns, like DAX itself. Previously a same-named partition could be silently picked — `set 'T'[X] -q expression` would replace the partition's M source query instead of the measure's DAX.
 - `tx set`/`tx rm` mutation paths with embedded apostrophes now resolve, in both `'Månedens KPI''er'` (escaped) and raw `Månedens KPI'er` forms, matching the `ls`/`get` selector rules.
 - Same-name collisions across object kinds (e.g. a measure and a partition both named `Budget`) now fail with `TOMIX_OBJECT_AMBIGUOUS` and a `--type` hint instead of silently mutating whichever kind resolved first.
