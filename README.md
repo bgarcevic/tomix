@@ -10,19 +10,28 @@ in a terminal, in scripts, in CI, in a diff.
 
 ```
 $ tx connect ./samples/basic-tmdl
-Connected: basic-tmdl (TMDL folder)
+Model: (unnamed)
+  CL: 1601
+  tables: 3  measures: 4  relationships: 2  roles: 0
 
-$ tx ls --type table
+Active: ./samples/basic-tmdl
+
+$ tx ls --type table --paths-only
 Customers
 Products
 Sales
 
-$ tx find "SUM(" --type measure
-Sales/Total Amount      SUM(Sales[Amount])
+$ tx find "SUM" --in expressions
+╭───────────────────┬─────────┬────────────┬───────┬──────╮
+│ Path              │ Type    │ Property   │ Match │ Line │
+├───────────────────┼─────────┼────────────┼───────┼──────┤
+│ Sales/Total Sales │ Measure │ Expression │ SUM   │ 1    │
+╰───────────────────┴─────────┴────────────┴───────┴──────╯
+1 match(es)
 
 $ tx bpa run
-Warning  AVOID_FLOATING_POINT  Sales[Amount] uses double
-1 warning, 0 errors. Run 'tx bpa run --fix' to apply auto-fixes.
+45 findings · 11 errors · 11 warnings · 23 info · 9 rules
+19 of 45 can be auto-fixed — run  bpa run --fix
 
 $ tx deploy --server MyWorkspace --database basic-tmdl
 OK Deployed basic-tmdl to MyWorkspace (4.1s)
@@ -30,6 +39,8 @@ OK Deployed basic-tmdl to MyWorkspace (4.1s)
 
 Everything that prints a table also prints JSON or CSV (`--output-format
 json`), so the output of any command can become the input of your next script.
+The [samples](samples/) folder also contains a full PBIP model if you want
+something more realistic than `basic-tmdl` to explore.
 
 ## Install
 
@@ -52,13 +63,14 @@ Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 
 ## Commands
 
-Explore: `ls`, `get`, `find`, `deps`
-Edit: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
-formatter APIs)
-Quality: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `diff`
-Remote: `connect`, `auth`, `deploy`, `load`, `save`, `profile`
-Workflow: `stage` (mutations are staged, then committed or discarded),
-`session`, `macro`, `interactive`, `config`, `doctor`, `completion`
+Discover: `ls`, `get`, `find`, `deps`
+Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
+formatter APIs), `script` (run C# scripts against a model), `macro`
+Connect: `connect`, `deploy`, `refresh`, `load`, `save`, `auth`, `session`
+Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `diff`,
+`doctor`
+Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
+staged, then committed or discarded), `interactive`
 
 `tx <command> --help` shows options and examples. `tx doctor` checks your
 environment when something seems off.
@@ -69,22 +81,24 @@ Object paths are the pipeline currency. `ls --paths-only` emits one path per
 line; most commands accept paths as input:
 
 ```sh
-# Format every measure that mentions CALCULATE
-tx find "CALCULATE" --type measure --paths-only | xargs -I{} tx format -p "{}"
+# Format every object whose expression mentions CALCULATE
+tx find "CALCULATE" --in expressions --paths-only | xargs -I{} tx format -p "{}"
 
 # Count columns per table
-tx ls --type column --output-format json | jq 'group_by(.table) | map({(.[0].table): length})'
+tx ls --type column --output-format json |
+  jq 'group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
 ```
 
-Exit codes are documented and stable. Errors go to stderr (as JSON if you
-pass `--error-format json`), data goes to stdout.
+Exit codes are documented in [docs/error-codes.md](docs/error-codes.md).
+Errors go to stderr (as JSON if you pass `--error-format json`), data goes
+to stdout.
 
 ## Status
 
 This is a proof of concept under active development. The command surface is
 settling but not settled; JSON field names and exit codes may still change
-before 1.0. `query`, `refresh`, `test`, `vertipaq`, and `incremental-refresh`
-exist as placeholders and are not implemented yet.
+before 1.0. `query`, `test`, `vertipaq`, and `incremental-refresh` exist as
+placeholders and are not implemented yet.
 
 If you try it and something breaks or reads wrong, an issue with the output
 of `tx doctor` attached is genuinely useful at this stage.
