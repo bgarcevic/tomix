@@ -23,8 +23,15 @@ public sealed class MoveModelObjectHandler
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "mv",
-            async (mutator, _, _) =>
+            async (mutator, session, _) =>
             {
+                // A rename doesn't rewrite DAX that references the old name; find those references
+                // while the model is still intact so the result can warn (or --strict-refs fail).
+                var brokenRefs = await RenameReferenceCheck.FindReferencingPathsAsync(
+                    session, request.Source, request.Type, cancellationToken);
+                if (brokenRefs.Count > 0 && request.StrictRefs)
+                    throw new RenameBrokenReferencesException(RenameReferenceCheck.Warning(brokenRefs));
+
                 mutator.SetProperty(new ModelObjectSetRequest(
                     request.Source,
                     [new ModelPropertyAssignment("name", newName)],
@@ -34,7 +41,8 @@ public sealed class MoveModelObjectHandler
                     outcome => new MoveModelObjectResult(
                         NormalizePath(request.Source), NormalizePath(request.Destination),
                         outcome.Saved, outcome.Staged,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
+                        BrokenReferences: brokenRefs.Count > 0 ? brokenRefs : null));
             },
             new MoveModelObjectResult(NormalizePath(request.Source), NormalizePath(request.Destination), false, null, Reverted: true),
             cancellationToken);

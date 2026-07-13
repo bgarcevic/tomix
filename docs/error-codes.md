@@ -55,6 +55,7 @@ Emitted by `MutationRunner` and handlers that participate in the mutation lifecy
 | `TOMIX_MUTATION_UNSUPPORTED_PROVIDER` | 1 | The model provider does not implement `IModelMutationSession`. |
 | `TOMIX_MUTATION_UNSUPPORTED` | 1 | A `NotSupportedException` was thrown during mutation. |
 | `TOMIX_ADD_OPTION_UNSUPPORTED` | 1 | An `add` option was supplied for an object type that cannot consume it (e.g. `--columns` on a CalcGroup). |
+| `TOMIX_RENAME_BREAKS_REFS` | 1 | `--strict-refs` was set and the rename (`set -q name`, `mv`) would leave DAX expressions referencing the old name. Without the flag the rename proceeds with a warning listing the referencing objects. |
 | `TOMIX_MUTATION_INVALID_VALUE` | 1 | An `ArgumentException` was thrown — invalid argument value. |
 | `TOMIX_MUTATION_FAILED` | 1 | An `InvalidOperationException` was thrown — generic mutation failure. |
 | `TOMIX_MUTATION_SAVE_FAILED` | 2 | An `IOException` occurred while saving the model. |

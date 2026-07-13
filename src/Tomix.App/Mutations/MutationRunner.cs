@@ -60,6 +60,12 @@ public static class MutationRunner
         {
             return TomixResult<TResult>.Fail("TOMIX_ADD_OPTION_UNSUPPORTED", ex.Message);
         }
+        catch (RenameBrokenReferencesException ex)
+        {
+            return TomixResult<TResult>.Fail(
+                "TOMIX_RENAME_BREAKS_REFS", ex.Message,
+                hint: "Update the references first, or re-run without --strict-refs to rename anyway.");
+        }
         catch (NotSupportedException ex)
         {
             return TomixResult<TResult>.Fail("TOMIX_MUTATION_UNSUPPORTED", ex.Message);

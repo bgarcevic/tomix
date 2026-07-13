@@ -16,6 +16,7 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx set -q name` and `tx mv` warn when a rename leaves DAX expressions referencing the old name, listing the referencing objects (renames never rewrite dependent DAX, so the breakage was previously silent until a deploy). JSON output gains an optional `brokenReferences` field. New `--strict-refs` flag fails the rename instead (`TOMIX_RENAME_BREAKS_REFS`, exit 1) so CI can gate on it.
 - `tx refresh` — triggers data refresh on deployed models via XMLA. Supports `--type`, `--table`, `--partition`, `--apply-refresh-policy`/`--skip-refresh-policy`, `--effective-date`, `--max-parallelism`, `--dry-run`, `--no-progress`, `--trace`. Live per-table progress from XMLA `SessionTrace` with summary table (`Rows`, `Query`, `Read`, `Total`, `Rows/s`). JSON/CSV output support.
 - `TOMIX_REFRESH_*` diagnostic codes.
 - `Styling.Number(long)` and `Styling.DurationSeconds(double)` helpers.

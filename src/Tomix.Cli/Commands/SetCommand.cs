@@ -66,6 +66,10 @@ internal sealed class SetCommand : ICommandModule
         {
             Description = "Skip workspace sync when workspace mode is active."
         };
+        var strictRefsOption = new Option<bool>("--strict-refs")
+        {
+            Description = "Fail instead of warn when renaming an object other DAX expressions reference."
+        };
 
         var command = new Command("set", "Set a property on a model object")
         {
@@ -80,7 +84,8 @@ internal sealed class SetCommand : ICommandModule
             serializationOption,
             stageOption,
             revertOption,
-            noSyncOption
+            noSyncOption,
+            strictRefsOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -130,7 +135,8 @@ internal sealed class SetCommand : ICommandModule
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        parseResult.GetValue(strictRefsOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -160,5 +166,17 @@ internal sealed class SetCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
         else if (result.SyncWarning is not null)
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+
+        RenderBrokenReferences(result.BrokenReferences);
+    }
+
+    internal static void RenderBrokenReferences(IReadOnlyList<string>? references)
+    {
+        if (references is not { Count: > 0 })
+            return;
+
+        AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(
+            $"Warning: {references.Count} DAX reference(s) to the old name are now broken: {string.Join(", ", references)}. "
+            + "Update them with 'tx replace' or inspect with 'tx deps'.")));
     }
 }

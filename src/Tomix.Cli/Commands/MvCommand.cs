@@ -62,6 +62,10 @@ internal sealed class MvCommand : ICommandModule
             Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
         };
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
+        var strictRefsOption = new Option<bool>("--strict-refs")
+        {
+            Description = "Fail instead of warn when renaming an object other DAX expressions reference."
+        };
 
         var command = new Command("mv", "Move or rename a model object")
         {
@@ -75,7 +79,8 @@ internal sealed class MvCommand : ICommandModule
             noSyncOption,
             saveOption,
             saveToOption,
-            serializationOption
+            serializationOption,
+            strictRefsOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -120,7 +125,8 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        parseResult.GetValue(strictRefsOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -148,5 +154,7 @@ internal sealed class MvCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
         else if (result.SyncWarning is not null)
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+
+        SetCommand.RenderBrokenReferences(result.BrokenReferences);
     }
 }

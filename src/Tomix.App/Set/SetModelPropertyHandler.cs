@@ -34,8 +34,19 @@ public sealed class SetModelPropertyHandler
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "set",
-            async (mutator, _, _) =>
+            async (mutator, session, _) =>
             {
+                // Renames don't rewrite DAX that references the old name; find those references
+                // while the model is still intact so the result can warn (or --strict-refs fail).
+                IReadOnlyList<string> brokenRefs = [];
+                if (request.Properties.Any(IsNameAssignment))
+                {
+                    brokenRefs = await RenameReferenceCheck.FindReferencingPathsAsync(
+                        session, request.Path, request.Type, cancellationToken);
+                    if (brokenRefs.Count > 0 && request.StrictRefs)
+                        throw new RenameBrokenReferencesException(RenameReferenceCheck.Warning(brokenRefs));
+                }
+
                 var mutation = mutator.SetProperty(new ModelObjectSetRequest(
                     request.Path,
                     request.Properties,
@@ -52,9 +63,16 @@ public sealed class SetModelPropertyHandler
                         outcome.Staged == true ? true : null,
                         Synced: outcome.Synced,
                         SyncTarget: outcome.SyncTarget,
-                        SyncWarning: outcome.SyncWarning));
+                        SyncWarning: outcome.SyncWarning,
+                        BrokenReferences: brokenRefs.Count > 0 ? brokenRefs : null));
             },
             new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: 0),
             cancellationToken);
     }
+
+    private static bool IsNameAssignment(ModelPropertyAssignment assignment)
+        => string.Equals(
+            assignment.Property.Trim().Replace(" ", "", StringComparison.Ordinal),
+            "name",
+            StringComparison.OrdinalIgnoreCase);
 }
