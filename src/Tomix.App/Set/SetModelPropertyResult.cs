@@ -16,4 +16,6 @@ public sealed record SetModelPropertyResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? SyncWarning = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? BrokenReferences = null);
+    IReadOnlyList<string>? BrokenReferences = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? FixedReferences = null);

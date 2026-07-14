@@ -36,16 +36,15 @@ public sealed class SetModelPropertyHandler
             _providers, request.Model, options, "set",
             async (mutator, session, _) =>
             {
-                // Renames don't rewrite DAX that references the old name; find those references
-                // while the model is still intact so the result can warn (or --strict-refs fail).
-                IReadOnlyList<string> brokenRefs = [];
-                if (request.Properties.Any(IsNameAssignment))
-                {
-                    brokenRefs = await RenameReferenceCheck.FindReferencingPathsAsync(
-                        session, request.Path, request.Type, cancellationToken);
-                    if (brokenRefs.Count > 0 && request.StrictRefs)
-                        throw new RenameBrokenReferencesException(RenameReferenceCheck.Warning(brokenRefs));
-                }
+                // A rename alone doesn't rewrite DAX that references the old name. Plan the
+                // rewrites while the model is intact; by default apply them (before the rename,
+                // so every path in the plan still resolves), otherwise warn — or fail under
+                // --strict-refs. The plan is empty for case-only renames.
+                var fixup = RenameFixupPlan.Empty;
+                if (request.Properties.LastOrDefault(IsNameAssignment) is { } rename)
+                    fixup = await RenameFixup.PlanAsync(
+                        session, request.Path, request.Type, rename.Value, cancellationToken);
+                var broken = RenameReferences.Apply(mutator, fixup, request.FixRefs, request.StrictRefs);
 
                 var mutation = mutator.SetProperty(new ModelObjectSetRequest(
                     request.Path,
@@ -64,7 +63,8 @@ public sealed class SetModelPropertyHandler
                         Synced: outcome.Synced,
                         SyncTarget: outcome.SyncTarget,
                         SyncWarning: outcome.SyncWarning,
-                        BrokenReferences: brokenRefs.Count > 0 ? brokenRefs : null));
+                        BrokenReferences: broken.Count > 0 ? broken : null,
+                        FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null));
             },
             new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: 0),
             cancellationToken);

@@ -82,6 +82,69 @@ public sealed partial class TomModelMutator
             Value: last.Value);
     }
 
+    public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
+    {
+        foreach (var edit in edits)
+        {
+            var resolved = TryResolveForMutation(edit.Path, edit.Kind)
+                           ?? throw NotFound(edit.Path);
+            ApplyExpressionEdit(resolved.Target, edit);
+        }
+
+        return new ModelExpressionRewriteResult(edits.Count);
+    }
+
+    private static void ApplyExpressionEdit(object target, ModelExpressionEdit edit)
+    {
+        var isMainExpression = edit.Property == "Expression";
+        switch (target)
+        {
+            case Measure measure:
+                ApplyMeasureExpressionEdit(measure, edit);
+                break;
+            case CalculatedColumn column when isMainExpression:
+                column.Expression = edit.Value;
+                break;
+            case CalculationItem item when isMainExpression:
+                item.Expression = edit.Value;
+                break;
+            case Partition { Source: CalculatedPartitionSource source } when isMainExpression:
+                source.Expression = edit.Value;
+                break;
+            default:
+                throw new NotSupportedException(
+                    $"Cannot rewrite '{edit.Property}' on {target.GetType().Name} ({edit.Path}).");
+        }
+    }
+
+    private static void ApplyMeasureExpressionEdit(Measure measure, ModelExpressionEdit edit)
+    {
+        switch (edit.Property)
+        {
+            case "Expression":
+                measure.Expression = edit.Value;
+                break;
+            case "DetailRowsExpression" when measure.DetailRowsDefinition is { } detailRows:
+                detailRows.Expression = edit.Value;
+                break;
+            case "FormatStringExpression" when measure.FormatStringDefinition is { } formatString:
+                formatString.Expression = edit.Value;
+                break;
+            case "KpiTargetExpression" when measure.KPI is { } kpi:
+                kpi.TargetExpression = edit.Value;
+                break;
+            case "KpiStatusExpression" when measure.KPI is { } kpi:
+                kpi.StatusExpression = edit.Value;
+                break;
+            case "KpiTrendExpression" when measure.KPI is { } kpi:
+                kpi.TrendExpression = edit.Value;
+                break;
+            default:
+                throw new NotSupportedException(
+                    $"Cannot rewrite '{edit.Property}' on measure {edit.Path}.");
+        }
+    }
+
     public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
     {
         var target = TryResolveForMutation(request.Path, request.Type);

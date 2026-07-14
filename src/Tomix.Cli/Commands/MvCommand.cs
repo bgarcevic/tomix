@@ -64,7 +64,11 @@ internal sealed class MvCommand : ICommandModule
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var strictRefsOption = new Option<bool>("--strict-refs")
         {
-            Description = "Fail instead of warn when renaming an object other DAX expressions reference."
+            Description = "Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)."
+        };
+        var noFixRefsOption = new Option<bool>("--no-fix-refs")
+        {
+            Description = "Do not rewrite DAX references to the renamed object; warn instead."
         };
 
         var command = new Command("mv", "Move or rename a model object")
@@ -80,7 +84,8 @@ internal sealed class MvCommand : ICommandModule
             saveOption,
             saveToOption,
             serializationOption,
-            strictRefsOption
+            strictRefsOption,
+            noFixRefsOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -128,7 +133,8 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         parseResult.GetValue(noSyncOption),
-                        parseResult.GetValue(strictRefsOption)),
+                        parseResult.GetValue(strictRefsOption),
+                        FixRefs: !parseResult.GetValue(noFixRefsOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -159,6 +165,7 @@ internal sealed class MvCommand : ICommandModule
         else if (result.SyncWarning is not null)
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
 
+        SetCommand.RenderFixedReferences(result.FixedReferences);
         SetCommand.RenderBrokenReferences(result.BrokenReferences);
     }
 }

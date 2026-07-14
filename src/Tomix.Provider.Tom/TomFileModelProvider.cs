@@ -88,6 +88,9 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
         => new TomModelMutator(GetDatabase()).ReplaceText(request);
 
+    public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
+        => new TomModelMutator(GetDatabase()).RewriteExpressions(edits);
+
     public Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,

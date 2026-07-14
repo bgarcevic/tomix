@@ -10,6 +10,14 @@ public interface IModelMutationSession
 
     ModelReplaceResult ReplaceText(ModelReplaceRequest request);
 
+    /// <summary>
+    /// Applies pre-computed DAX rewrites to expression-bearing properties (rename reference
+    /// fixup). Each edit replaces one property's full text; the caller computed the new text
+    /// from exact reference spans, so the provider only routes it to the right object property.
+    /// </summary>
+    ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
+        => throw new NotSupportedException("This provider does not support expression rewriting.");
+
     Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,
@@ -69,6 +77,17 @@ public sealed record ModelObjectMutationResult(
 public sealed record ModelReplaceResult(
     int ChangeCount,
     IReadOnlyList<ModelReplacePreview> Previews);
+
+/// <summary>One expression rewrite: set <paramref name="Property"/> of the object at
+/// <paramref name="Path"/> to <paramref name="Value"/>. Property keys match the snapshot
+/// contract ("Expression", "DetailRowsExpression", "KpiTargetExpression", ...).</summary>
+public sealed record ModelExpressionEdit(
+    string Path,
+    ModelObjectKind Kind,
+    string Property,
+    string Value);
+
+public sealed record ModelExpressionRewriteResult(int Updated);
 
 public sealed record ModelReplacePreview(
     string ObjectPath,

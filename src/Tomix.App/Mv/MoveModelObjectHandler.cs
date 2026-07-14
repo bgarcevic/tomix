@@ -27,15 +27,15 @@ public sealed class MoveModelObjectHandler
             _providers, request.Model, options, "mv",
             async (mutator, session, _) =>
             {
-                // A rename doesn't rewrite DAX that references the old name; find those references
-                // while the model is still intact so the result can warn (or --strict-refs fail).
-                // Case-only renames are exempt: DAX resolves names case-insensitively.
-                IReadOnlyList<string> brokenRefs = plan.CaseOnly
-                    ? []
-                    : await RenameReferenceCheck.FindReferencingPathsAsync(
-                        session, request.Source, request.Type, cancellationToken);
-                if (brokenRefs.Count > 0 && request.StrictRefs)
-                    throw new RenameBrokenReferencesException(RenameReferenceCheck.Warning(brokenRefs));
+                // A rename alone doesn't rewrite DAX that references the old name. Plan the
+                // rewrites while the model is intact; by default apply them (before the rename,
+                // so every path in the plan still resolves), otherwise warn — or fail under
+                // --strict-refs. Case-only renames break nothing and plan empty.
+                var fixup = plan.CaseOnly
+                    ? RenameFixupPlan.Empty
+                    : await RenameFixup.PlanAsync(
+                        session, request.Source, request.Type, plan.NewName, cancellationToken);
+                var broken = RenameReferences.Apply(mutator, fixup, request.FixRefs, request.StrictRefs);
 
                 mutator.SetProperty(new ModelObjectSetRequest(
                     request.Source,
@@ -47,7 +47,8 @@ public sealed class MoveModelObjectHandler
                         plan.SourceDisplay, plan.DestinationDisplay,
                         outcome.Saved, outcome.Staged,
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                        BrokenReferences: brokenRefs.Count > 0 ? brokenRefs : null));
+                        BrokenReferences: broken.Count > 0 ? broken : null,
+                        FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null));
             },
             new MoveModelObjectResult(plan.SourceDisplay, plan.DestinationDisplay, false, null, Reverted: true),
             cancellationToken);

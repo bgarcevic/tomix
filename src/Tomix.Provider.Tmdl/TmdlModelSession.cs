@@ -62,6 +62,9 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
         => new TomModelMutator(GetDatabase()).ReplaceText(request);
 
+    public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
+        => new TomModelMutator(GetDatabase()).RewriteExpressions(edits);
+
     public Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,

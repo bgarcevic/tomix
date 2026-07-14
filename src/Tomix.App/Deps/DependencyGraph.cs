@@ -41,6 +41,49 @@ internal sealed class DependencyGraph
         => Neighbors(_reverse, target).Select(o => ToDependency(o, [])).ToList();
 
     /// <summary>
+    /// Every DAX property text that references <paramref name="target"/>, with the exact
+    /// reference spans — the input to a rename rewrite. Unlike <see cref="DirectDownstream"/>,
+    /// relationship participation is excluded: relationships bind to objects, not names, so a
+    /// rename cannot break them.
+    /// </summary>
+    public IReadOnlyList<ReferenceSite> SitesReferencing(ModelObject target)
+    {
+        var targetKey = Key(target);
+        var sites = new List<ReferenceSite>();
+
+        foreach (var obj in _objects)
+        {
+            if (Eq(Key(obj), targetKey))
+                continue;
+
+            foreach (var site in DaxExpressions.Sites(obj))
+            {
+                var references = DaxReferenceExtractor.Extract(site.Expression)
+                    .Where(r => ReferencesTarget(r, target, targetKey))
+                    .ToList();
+
+                if (references.Count > 0)
+                    sites.Add(new ReferenceSite(obj, site.Property, site.Expression, references));
+            }
+        }
+
+        return sites;
+    }
+
+    private bool ReferencesTarget(
+        DaxReferenceExtractor.DaxReference reference, ModelObject target, string targetKey)
+    {
+        // A qualified reference ('Region'[Amount]) resolves to the child object, but its table
+        // part references the table by name too — a table rename must rewrite it even when the
+        // child itself doesn't resolve.
+        if (target.Kind == ModelObjectKind.Table && reference.Table is { } table
+            && string.Equals(table, target.Name, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return Resolve(reference) is { } resolved && Eq(Key(resolved), targetKey);
+    }
+
+    /// <summary>
     /// Recursive dependency tree. <paramref name="upstream"/> follows "depends on"; otherwise
     /// "referenced by". Each object is expanded once: a node already seen on this traversal (a
     /// cycle, or a shared diamond branch) appears as a childless leaf, mirroring the set-based
@@ -244,3 +287,10 @@ internal sealed class DependencyGraph
 
     private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 }
+
+/// <summary>One DAX property whose text references a target object, with the exact spans.</summary>
+internal sealed record ReferenceSite(
+    ModelObject Source,
+    string Property,
+    string Expression,
+    IReadOnlyList<DaxReferenceExtractor.DaxReference> References);

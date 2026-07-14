@@ -209,6 +209,9 @@ public sealed class MoveModelObjectHandlerTests
         public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
             => new(0, []);
 
+        public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
+            => new(edits.Count);
+
         public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
             => Task.FromResult(new ModelExportResult(outputPath ?? "/local/model", serialization));
     }

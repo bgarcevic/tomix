@@ -14,4 +14,5 @@ public sealed record MoveModelObjectRequest(
     bool Stage = false,
     bool Revert = false,
     bool NoSync = false,
-    bool StrictRefs = false);
+    bool StrictRefs = false,
+    bool FixRefs = true);

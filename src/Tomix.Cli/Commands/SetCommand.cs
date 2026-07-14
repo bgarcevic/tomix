@@ -68,7 +68,11 @@ internal sealed class SetCommand : ICommandModule
         };
         var strictRefsOption = new Option<bool>("--strict-refs")
         {
-            Description = "Fail instead of warn when renaming an object other DAX expressions reference."
+            Description = "Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)."
+        };
+        var noFixRefsOption = new Option<bool>("--no-fix-refs")
+        {
+            Description = "Do not rewrite DAX references to the renamed object; warn instead."
         };
 
         var command = new Command("set", "Set a property on a model object")
@@ -85,7 +89,8 @@ internal sealed class SetCommand : ICommandModule
             stageOption,
             revertOption,
             noSyncOption,
-            strictRefsOption
+            strictRefsOption,
+            noFixRefsOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -136,7 +141,8 @@ internal sealed class SetCommand : ICommandModule
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         parseResult.GetValue(noSyncOption),
-                        parseResult.GetValue(strictRefsOption)),
+                        parseResult.GetValue(strictRefsOption),
+                        FixRefs: !parseResult.GetValue(noFixRefsOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -167,7 +173,17 @@ internal sealed class SetCommand : ICommandModule
         else if (result.SyncWarning is not null)
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
 
+        RenderFixedReferences(result.FixedReferences);
         RenderBrokenReferences(result.BrokenReferences);
+    }
+
+    internal static void RenderFixedReferences(IReadOnlyList<string>? references)
+    {
+        if (references is not { Count: > 0 })
+            return;
+
+        AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape(
+            $"Updated {references.Count} DAX reference(s) in: {string.Join(", ", references)}")));
     }
 
     internal static void RenderBrokenReferences(IReadOnlyList<string>? references)

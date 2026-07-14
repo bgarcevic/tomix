@@ -16,4 +16,6 @@ public sealed record MoveModelObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     bool Reverted = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? BrokenReferences = null);
+    IReadOnlyList<string>? BrokenReferences = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? FixedReferences = null);
