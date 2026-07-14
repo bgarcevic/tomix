@@ -69,8 +69,11 @@ public sealed class SaveModelHandler
             var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
                 session, request.SyncTarget, request.Force, cancellationToken);
 
-            return TomixResult<SaveModelResult>.Ok(new SaveModelResult(
-                export.SavedPath, export.Format, synced, syncTarget, syncWarning));
+            // A failed workspace sync leaves the mirror behind the source; render the saved
+            // result but exit non-zero so CI catches the drift.
+            return TomixResult<SaveModelResult>.Ok(
+                new SaveModelResult(export.SavedPath, export.Format, synced, syncTarget, syncWarning),
+                syncWarning is not null ? 1 : 0);
         }
         catch (NotSupportedException ex)
         {

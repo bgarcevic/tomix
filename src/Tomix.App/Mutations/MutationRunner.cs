@@ -59,7 +59,9 @@ public static class MutationRunner
             var outcome = await MutationLifecycle.CompleteAsync(
                 mutator, context, command, summary, cancellationToken);
 
-            return TomixResult<TResult>.Ok(buildResult(outcome));
+            // A failed workspace sync leaves the mirror behind the source; render the saved
+            // result but exit non-zero so CI catches the drift.
+            return TomixResult<TResult>.Ok(buildResult(outcome), outcome.SyncFailed ? 1 : 0);
         }
         catch (UnsupportedAddOptionException ex)
         {

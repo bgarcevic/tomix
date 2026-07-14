@@ -26,6 +26,8 @@ internal static class WorkspaceSync
             ? $"{syncTarget.Value} / {syncTarget.Database}"
             : syncTarget.Value;
 
+        MutationProgress.Report($"Syncing to {targetLabel}...");
+
         try
         {
             await deployer.DeployAsync(
@@ -36,7 +38,9 @@ internal static class WorkspaceSync
         }
         catch (Exception ex)
         {
-            return (false, targetLabel, $"Workspace sync failed: {ex.Message}");
+            return (false, targetLabel,
+                $"Workspace sync failed: {ex.Message} "
+                + "The local save succeeded — run 'tx save' after fixing this to push the mirror, or use --no-sync to skip it.");
         }
     }
 }

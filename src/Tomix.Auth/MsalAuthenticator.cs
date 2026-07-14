@@ -136,18 +136,56 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
         return hadState || removedAccounts;
     }
 
+    /// <summary>
+    /// Silent token acquisition never legitimately takes minutes, but the OS keystore (or the
+    /// managed-identity endpoint) can block indefinitely — observed as a ~4.5-minute silent stall
+    /// during workspace sync. Cap it so the failure surfaces fast with an actionable message.
+    /// </summary>
+    internal static readonly TimeSpan TokenAcquisitionTimeout = TimeSpan.FromSeconds(30);
+
     public async Task<AccessToken> GetTokenAsync(string endpoint, CancellationToken cancellationToken)
     {
+        // Gate on the sidecar state before touching MSAL: with no recorded login there is no
+        // token to acquire silently, and opening the keystore-backed cache just to discover
+        // that can hang (macOS Keychain authorization prompts block non-interactive processes).
+        var state = _stateStore.Load()
+            ?? throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
+
+        return await WithTimeoutAsync(
+            AcquireTokenSilentlyAsync(endpoint, state, cancellationToken),
+            TokenAcquisitionTimeout,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task<AccessToken> WithTimeoutAsync(
+        Task<AccessToken> acquisition,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var completed = await Task.WhenAny(acquisition, Task.Delay(timeout, cancellationToken)).ConfigureAwait(false);
+        if (completed != acquisition)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new AuthenticationRequiredException(
+                $"Timed out acquiring an access token after {timeout.TotalSeconds:0}s "
+                + "(the OS keystore or identity endpoint did not respond). Run 'tx auth login' to refresh credentials.");
+        }
+
+        return await acquisition.ConfigureAwait(false);
+    }
+
+    private async Task<AccessToken> AcquireTokenSilentlyAsync(
+        string endpoint, AuthState state, CancellationToken cancellationToken)
+    {
         var scopes = AuthScopes.ForEndpoint(endpoint);
-        var state = _stateStore.Load();
-        var method = state?.Method ?? AuthMethod.Interactive;
+        var method = state.Method;
 
         switch (method)
         {
             case AuthMethod.Interactive:
             case AuthMethod.DeviceCode:
             {
-                var app = await EnsurePublicAppAsync(state?.TenantId).ConfigureAwait(false);
+                var app = await EnsurePublicAppAsync(state.TenantId).ConfigureAwait(false);
                 var account = (await app.GetAccountsAsync().ConfigureAwait(false)).FirstOrDefault()
                     ?? throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
                 try
@@ -184,7 +222,7 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
 
             case AuthMethod.ManagedIdentity:
             {
-                var result = await ManagedIdentityAsync(endpoint, state?.ClientId, cancellationToken).ConfigureAwait(false);
+                var result = await ManagedIdentityAsync(endpoint, state.ClientId, cancellationToken).ConfigureAwait(false);
                 return new AccessToken(result.AccessToken, result.ExpiresOn);
             }
 

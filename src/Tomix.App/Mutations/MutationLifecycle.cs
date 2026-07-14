@@ -38,7 +38,14 @@ public sealed record MutationOutcome(
     bool? Staged,
     bool Synced = false,
     string? SyncTarget = null,
-    string? SyncWarning = null);
+    string? SyncWarning = null)
+{
+    /// <summary>
+    /// True when a workspace sync was attempted (or required) and did not happen. The command
+    /// should exit non-zero so CI catches mirror drift, while still rendering the saved result.
+    /// </summary>
+    public bool SyncFailed => SyncWarning is not null;
+}
 
 /// <summary>
 /// The shared open/mutate/persist lifecycle for mutation handlers. It owns BOTH "which reference to

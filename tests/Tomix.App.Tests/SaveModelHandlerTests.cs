@@ -27,6 +27,7 @@ public sealed class SaveModelHandlerTests
             Assert.True(result.Data!.Synced);
             Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws / MyModel", result.Data.SyncTarget);
             Assert.Null(result.Data.SyncWarning);
+            Assert.Equal(0, result.ExitCode);
         }
         finally
         {
@@ -56,6 +57,8 @@ public sealed class SaveModelHandlerTests
             Assert.False(result.Data!.Synced);
             Assert.NotNull(result.Data.SyncWarning);
             Assert.Contains("sync failed", result.Data.SyncWarning, StringComparison.OrdinalIgnoreCase);
+            // The result still renders, but the exit code flags the mirror drift for CI.
+            Assert.Equal(1, result.ExitCode);
         }
         finally
         {

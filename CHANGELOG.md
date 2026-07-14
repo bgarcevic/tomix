@@ -40,6 +40,7 @@ and the API surface that major versions protect.
 
 ### Changed (breaking)
 
+- A failed workspace sync now exits 1 instead of 0. Mutation commands with `--save` (and `tx save`) still perform the local save and render the result — including the `syncWarning` in JSON — but the exit code flags that the mirror was left behind the source, so CI can catch the drift. Use `--no-sync` to intentionally skip the mirror (exit 0).
 - Global `--quiet` no longer has a `-q` alias: `-q` was silently shadowed by the local property/query option on `add`/`set`/`get`/`bpa`/`macro`. Use `--quiet`.
 - `tx add --revert` combined with `--save-to` now errors (`TOMIX_STAGE_OPTIONS_CONFLICT`, exit 2) instead of silently dropping the save target. Applies to all mutation commands.
 - `tx add` options supplied to a type that ignores them (`--columns` on CalcTable/CalcGroup, `--partition-expression` on Entity/PolicyRange partitions, `--connection-string`/`--source` on StructuredDataSource, etc.) now fail with `TOMIX_ADD_OPTION_UNSUPPORTED` (exit 1) instead of exit 0 with the option discarded.
@@ -66,6 +67,8 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- Workspace sync with no cached login no longer stalls silently for minutes before warning (observed: 4m37s). Token acquisition now gates on the recorded login state and fails immediately with "Not authenticated. Run 'tx auth login'." — without opening the OS-keystore-backed MSAL cache, whose authorization prompt can block a non-interactive process — and silent acquisition is capped at 30s with an actionable timeout error as a backstop.
+- The live spinner now shows `Syncing to <workspace>...` during the workspace-sync phase instead of sitting on `Saving...`, and the sync-failure warning explains how to recover (re-push with `tx save`, or skip with `--no-sync`).
 - `tx mv` destinations are parsed with the same quote- and DAX-aware rules as sources. A DAX-form destination (`'Sales'[New]`) previously became the *literal* object name — `mv "Sales[a]" "Sales[b]" --save` persisted a column named `Sales[b]` that mv could no longer address — and apostrophes in destination names were silently stripped (`QA's Measure` → `QAs Measure`). Result paths also keep their apostrophes now.
 - `tx mv` with a missing object name (empty source/destination, trailing `/`) errors with `TOMIX_MOVE_INVALID_PATH` (exit 2) instead of the misleading "Moving objects between parents is not supported yet." Identical source and destination error with `TOMIX_MOVE_NOOP` instead of reporting a rename that never happened — previously this also emitted a false broken-references warning. Case-only renames proceed but skip the broken-references warning (DAX resolves names case-insensitively).
 - Mutation saves can no longer silently change serialization in place: `mv/set/add/rm --save --serialization bim` on a TMDL model wrote a stray `definition.bim` inside the PBIP folder, left the real model untouched, and reported "Saved" — now a hard error directing to `--save-to`.
