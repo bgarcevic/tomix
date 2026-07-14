@@ -29,10 +29,6 @@ internal static class Program
         if (noColorEnv || noColorCfg)
             AnsiConsole.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
 
-        var root = new RootCommand("tx - CLI for semantic models");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
-
         var tokenProvider = new MsalAuthenticator(
             App.Auth.AuthSettingsFactory.Resolve(),
             messageWriter: Console.Error.WriteLine);
@@ -43,49 +39,8 @@ internal static class Program
                 new DaxFormatterApiClient(),
                 new PowerQueryFormatterApiClient(new HttpClient())
             ]);
-        var stubs = CompatibilityStubCommand.All().ToDictionary(command => command.Name);
 
-        var modules = new ICommandModule[]
-        {
-            new AddCommand(providers),
-            new AuthCommand(),
-            new BpaCommand(providers),
-            new CompletionCommand(() => root.Subcommands.Select(command => command.Name).ToList()),
-            new ConfigCommand(),
-            new ConnectCommand(providers),
-            new DeployCommand(providers),
-            new DepsCommand(providers),
-            new DiffCommand(providers),
-            new DoctorCommand(ResolveVersion()),
-            new FindCommand(providers),
-            new FormatCommand(providers, formatter),
-            new GetCommand(providers),
-            stubs["incremental-refresh"],
-            new InitCommand(),
-            new InteractiveCommand(),
-            new LoadCommand(providers),
-            new LsCommand(providers),
-            new MacroCommand(),
-            new MvCommand(providers),
-            new ProfileCommand(),
-            stubs["query"],
-            new RefreshCommand(providers),
-            new ReplaceCommand(providers),
-            new RmCommand(providers),
-            new SaveCommand(providers),
-            new ScriptCommand(providers),
-            new SessionCommand(),
-            new SetCommand(providers),
-            new StageCommand(providers),
-            stubs["test"],
-            new ValidateCommand(providers),
-            stubs["vertipaq"]
-        };
-
-        foreach (var module in modules)
-            root.Subcommands.Add(module.Build());
-
-        ApplySpectreHelp(root);
+        var root = BuildRootCommand(providers, formatter, ResolveVersion());
 
         if (args.Length == 0)
         {
@@ -119,6 +74,61 @@ internal static class Program
         }
 
         return parseResult.Invoke();
+    }
+
+    internal static RootCommand BuildRootCommand(
+        IReadOnlyList<IModelProvider> providers,
+        IExpressionFormatterClient formatter,
+        string version)
+    {
+        var root = new RootCommand("tx - CLI for semantic models");
+        foreach (var option in GlobalOptions.All())
+            root.Options.Add(option);
+
+        var stubs = CompatibilityStubCommand.All().ToDictionary(command => command.Name);
+
+        var modules = new ICommandModule[]
+        {
+            new AddCommand(providers),
+            new AuthCommand(),
+            new BpaCommand(providers),
+            new CompletionCommand(() => root.Subcommands.Select(command => command.Name).ToList()),
+            new ConfigCommand(),
+            new ConnectCommand(providers),
+            new DeployCommand(providers),
+            new DepsCommand(providers),
+            new DiffCommand(providers),
+            new DoctorCommand(version),
+            new FindCommand(providers),
+            new FormatCommand(providers, formatter),
+            new GetCommand(providers),
+            stubs["incremental-refresh"],
+            new InitCommand(),
+            new InteractiveCommand(),
+            new LoadCommand(providers),
+            new LsCommand(providers),
+            new MacroCommand(),
+            new MvCommand(providers),
+            new ProfileCommand(),
+            stubs["query"],
+            new RefreshCommand(providers),
+            new ReplaceCommand(providers),
+            new RmCommand(providers),
+            new SaveCommand(providers),
+            new ScriptCommand(providers),
+            new SessionCommand(),
+            new SetCommand(providers),
+            new StageCommand(providers),
+            stubs["test"],
+            new ValidateCommand(providers),
+            stubs["vertipaq"]
+        };
+
+        foreach (var module in modules)
+            root.Subcommands.Add(module.Build());
+
+        ApplySpectreHelp(root);
+        return root;
     }
 
     private static void ApplySpectreHelp(Command command)

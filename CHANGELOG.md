@@ -67,6 +67,7 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `--help` exits 0 on every command. Commands with required positional arguments (`mv`, `add`, `rm`, `set`, `get`, `find`, ...) printed help but exited 2, because the missing arguments still counted as a usage error — breaking `tx <cmd> --help && ...` scripting. The Spectre help action now clears parse errors the way the built-in one does; genuinely missing arguments (without `--help`) still exit 2.
 - Workspace sync with no cached login no longer stalls silently for minutes before warning (observed: 4m37s). Token acquisition now gates on the recorded login state and fails immediately with "Not authenticated. Run 'tx auth login'." — without opening the OS-keystore-backed MSAL cache, whose authorization prompt can block a non-interactive process — and silent acquisition is capped at 30s with an actionable timeout error as a backstop.
 - The live spinner now shows `Syncing to <workspace>...` during the workspace-sync phase instead of sitting on `Saving...`, and the sync-failure warning explains how to recover (re-push with `tx save`, or skip with `--no-sync`).
 - `tx mv` destinations are parsed with the same quote- and DAX-aware rules as sources. A DAX-form destination (`'Sales'[New]`) previously became the *literal* object name — `mv "Sales[a]" "Sales[b]" --save` persisted a column named `Sales[b]` that mv could no longer address — and apostrophes in destination names were silently stripped (`QA's Measure` → `QAs Measure`). Result paths also keep their apostrophes now.

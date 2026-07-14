@@ -7,6 +7,13 @@ namespace Tomix.Cli.Output;
 
 internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 {
+    /// <summary>
+    /// The built-in <see cref="HelpAction"/> clears parse errors so that <c>cmd --help</c>
+    /// succeeds even when required arguments are missing. This replacement must do the same,
+    /// or every command with a required positional exits 2 on <c>--help</c>.
+    /// </summary>
+    public override bool ClearsParseErrors => true;
+
     private static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["ls", "get", "find", "deps"]),
