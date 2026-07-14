@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Tomix.App.Deps;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
@@ -24,7 +23,7 @@ public sealed class RenameBrokenReferencesException : Exception
 /// This finds the referencing objects before the rename so handlers can warn — or fail under
 /// <c>--strict-refs</c> — while the model is still intact.
 /// </summary>
-internal static partial class RenameReferenceCheck
+internal static class RenameReferenceCheck
 {
     public static async Task<IReadOnlyList<string>> FindReferencingPathsAsync(
         IModelSession session,
@@ -38,7 +37,7 @@ internal static partial class RenameReferenceCheck
         // Only DAX-named kinds can leave text references behind, so filter to them BEFORE the
         // uniqueness test: a partition sharing its table's name (the Desktop default) would
         // otherwise make every measure path look ambiguous and silently skip the check.
-        var matches = ModelObjectLookup.Find(snapshot, NormalizeDaxForm(path), type)
+        var matches = ModelObjectLookup.Find(snapshot, DaxObjectForm.Normalize(path), type)
             .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column)
             .ToList();
         if (matches.Count != 1)
@@ -55,20 +54,4 @@ internal static partial class RenameReferenceCheck
     public static string Warning(IReadOnlyList<string> references)
         => $"Rename leaves {references.Count} broken DAX reference(s) in: {string.Join(", ", references)}. "
            + "Update them with 'tx replace' or inspect with 'tx deps'.";
-
-    /// <summary>Converts <c>'Table'[Child]</c> (doubled <c>''</c> = literal apostrophe) to <c>Table/Child</c>.</summary>
-    private static string NormalizeDaxForm(string path)
-    {
-        var match = DaxObjectPath().Match(path.Trim());
-        if (!match.Success)
-            return path;
-
-        var table = match.Groups["qtable"].Success
-            ? match.Groups["qtable"].Value.Replace("''", "'", StringComparison.Ordinal)
-            : match.Groups["table"].Value;
-        return $"{table.Trim()}/{match.Groups["object"].Value.Trim()}";
-    }
-
-    [GeneratedRegex("^(?:'(?<qtable>(?:[^']|'')+)'|(?<table>[^'\\[\\]]+))\\[(?<object>[^\\]]+)\\]$")]
-    private static partial Regex DaxObjectPath();
 }

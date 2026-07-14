@@ -32,16 +32,21 @@ public sealed class RemoveModelObjectHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Revert_ReportsReverted()
+    public async Task HandleAsync_RevertWithNothingStaged_Fails()
     {
         var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))]);
 
         var result = await handler.HandleAsync(
-            Request("Sales/Old", ifExists: false) with { Revert = true }, CancellationToken.None);
+            Request("Sales/Old", ifExists: false) with
+            {
+                Model = new ModelReference($"/nonexistent/{Guid.NewGuid():N}.bim"),
+                Revert = true
+            },
+            CancellationToken.None);
 
-        Assert.True(result.Success);
-        Assert.True(result.Data!.Reverted);
-        Assert.Equal(false, result.Data.Removed);
+        // Revert used to report success unconditionally — even with nothing staged (live QA finding).
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_STAGE_NOTHING_STAGED", result.Diagnostics[0].Code);
     }
 
     private static RemoveModelObjectRequest Request(string path, bool ifExists)

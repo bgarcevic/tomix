@@ -89,6 +89,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_STAGE_MATERIALIZE_FAILED` | 1 | Failed to materialize the working copy. |
 | `TOMIX_STAGE_OPTIONS_CONFLICT` | 2 | Conflicting stage options (`--revert` combined with `--save`, `--save-to`, or `--stage`). |
 | `TOMIX_STAGE_SAVE_CONFLICT` | 2 | Conflicting save options (e.g. `--save` and `--stage` together). |
+| `TOMIX_STAGE_NOTHING_STAGED` | 1 | `--revert` called with no staged mutation for the model. |
 
 ## Save Codes (`TOMIX_SAVE_*`)
 
@@ -184,7 +185,9 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
 | `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |
 | `TOMIX_UNKNOWN_OPTION` | 2 | An unrecognized `--option` would have been bound to a positional argument (e.g. a typo'd flag). Put `--` before positional values that must start with `-`. |
-| `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` called for an unsupported object type or operation. |
+| `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` called for an unsupported object type or operation (e.g. moving between parents). |
+| `TOMIX_MOVE_INVALID_PATH` | 2 | `mv` source or destination is missing an object name (empty path, trailing `/`). |
+| `TOMIX_MOVE_NOOP` | 1 | `mv` source and destination are identical; nothing to rename. |
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |

@@ -84,8 +84,12 @@ public static class MutationLifecycle
             return new MutationBegin(null, error);
 
         // Workspace mirror sync target, resolved from the active connection (suppressed by --no-sync).
-        // Only consumed by the Save branch of CompleteAsync; harmless on other modes.
-        var syncTarget = options.NoSync ? null : ResolveSyncTarget(connection);
+        // --save-to writes a copy to a side location and leaves the connected source untouched, so
+        // it must not deploy the mutation to the mirror either. Only consumed by the Save branch
+        // of CompleteAsync; harmless on other modes.
+        var syncTarget = options.NoSync || !string.IsNullOrWhiteSpace(options.SaveTo)
+            ? null
+            : ResolveSyncTarget(connection);
 
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(

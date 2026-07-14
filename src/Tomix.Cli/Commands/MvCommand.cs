@@ -30,7 +30,7 @@ internal sealed class MvCommand : ICommandModule
         };
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Overwrite destination when supported"
+            Description = "Allow --save-to to overwrite an existing target"
         };
         var typeOption = new Option<string?>("--type")
         {
@@ -86,8 +86,10 @@ internal sealed class MvCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "mv", OutputFormats.Text, OutputFormats.Json))
                 return 2;
+
+            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 
             var typeValue = parseResult.GetValue(typeOption);
             ModelObjectKind? type = null;
@@ -130,7 +132,7 @@ internal sealed class MvCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, Render);
+            return CommandOutput.Render(result, formatValue, errorFormat, Render);
         });
 
         return command;
@@ -144,11 +146,13 @@ internal sealed class MvCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Success($"Renamed: {result.Moved} -> {result.To}"));
-        if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist."));
+        AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Renamed: {result.Moved} -> {result.To}")));
+        if (result.Staged == true)
+            AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
+        else if (result.Saved is false)
+            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
         else
-            AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
+            AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Saved: {result.Saved}")));
 
         if (result.Synced)
             AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));

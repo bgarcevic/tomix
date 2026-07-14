@@ -193,14 +193,14 @@ public sealed class AddModelObjectHandlerTests
     // process-isolated StageCommandTests (which set TOMIX_CONFIG_DIR), not here.
 
     [Fact]
-    public async Task HandleAsync_Revert_DiscardsAndSucceeds()
+    public async Task HandleAsync_RevertWithNothingStaged_Fails()
     {
         var session = new StubMutationSession();
         var handler = new AddModelObjectHandler([new StubProvider(session)]);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
-                new ModelReference("any"),
+                new ModelReference($"/nonexistent/{Guid.NewGuid():N}.bim"),
                 "Sales/Revenue",
                 "Measure",
                 "1",
@@ -214,11 +214,9 @@ public sealed class AddModelObjectHandlerTests
                 Revert: true),
             CancellationToken.None);
 
-        // Revert no longer hard-rejects; it discards any staged working copy and reports success.
-        Assert.True(result.Success);
-        Assert.Equal(false, result.Data!.Added);
-        Assert.Null(result.Data.Staged);
-        Assert.True(result.Data.Reverted);
+        // Revert used to report success unconditionally — even with nothing staged (live QA finding).
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_STAGE_NOTHING_STAGED", result.Diagnostics[0].Code);
     }
 
     [Fact]

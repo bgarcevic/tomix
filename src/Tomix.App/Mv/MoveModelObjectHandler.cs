@@ -1,5 +1,6 @@
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
+using Tomix.Core.Paths;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Mv;
@@ -15,8 +16,9 @@ public sealed class MoveModelObjectHandler
         MoveModelObjectRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetRename(request.Source, request.Destination, out var newName, out var error))
-            return TomixResult<MoveModelObjectResult>.Fail("TOMIX_MOVE_UNSUPPORTED", error);
+        var plan = RenamePlan.Create(request.Source, request.Destination);
+        if (!request.Revert && plan.Error is { } error)
+            return TomixResult<MoveModelObjectResult>.Fail(error.Code, error.Message, error.ExitCode, error.Hint);
 
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
@@ -27,62 +29,99 @@ public sealed class MoveModelObjectHandler
             {
                 // A rename doesn't rewrite DAX that references the old name; find those references
                 // while the model is still intact so the result can warn (or --strict-refs fail).
-                var brokenRefs = await RenameReferenceCheck.FindReferencingPathsAsync(
-                    session, request.Source, request.Type, cancellationToken);
+                // Case-only renames are exempt: DAX resolves names case-insensitively.
+                IReadOnlyList<string> brokenRefs = plan.CaseOnly
+                    ? []
+                    : await RenameReferenceCheck.FindReferencingPathsAsync(
+                        session, request.Source, request.Type, cancellationToken);
                 if (brokenRefs.Count > 0 && request.StrictRefs)
                     throw new RenameBrokenReferencesException(RenameReferenceCheck.Warning(brokenRefs));
 
                 mutator.SetProperty(new ModelObjectSetRequest(
                     request.Source,
-                    [new ModelPropertyAssignment("name", newName)],
+                    [new ModelPropertyAssignment("name", plan.NewName)],
                     request.Type));
 
                 return (true, $"mv {request.Source} -> {request.Destination}",
                     outcome => new MoveModelObjectResult(
-                        NormalizePath(request.Source), NormalizePath(request.Destination),
+                        plan.SourceDisplay, plan.DestinationDisplay,
                         outcome.Saved, outcome.Staged,
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
                         BrokenReferences: brokenRefs.Count > 0 ? brokenRefs : null));
             },
-            new MoveModelObjectResult(NormalizePath(request.Source), NormalizePath(request.Destination), false, null, Reverted: true),
+            new MoveModelObjectResult(plan.SourceDisplay, plan.DestinationDisplay, false, null, Reverted: true),
             cancellationToken);
     }
+}
 
-    private static bool TryGetRename(
-        string source,
-        string destination,
-        out string newName,
-        out string error)
+internal sealed record RenamePlanError(string Code, string Message, int ExitCode, string? Hint = null);
+
+/// <summary>
+/// The rename derived from mv's source/destination arguments. Both paths go through the same
+/// quote- and DAX-aware parsing the mutation resolver uses, so a leaf name keeps its apostrophes
+/// and a <c>'Table'[Child]</c> destination yields <c>Child</c> — not the whole bracket string.
+/// </summary>
+internal sealed record RenamePlan(
+    string NewName,
+    bool CaseOnly,
+    string SourceDisplay,
+    string DestinationDisplay,
+    RenamePlanError? Error)
+{
+    public static RenamePlan Create(string source, string destination)
     {
-        var sourcePath = NormalizePath(source);
-        var destinationPath = NormalizePath(destination);
-        var sourceParent = ParentPath(sourcePath);
-        var destinationParent = ParentPath(destinationPath);
+        var sourceParts = Parts(source);
+        var destinationParts = Parts(destination);
+        var sourceDisplay = sourceParts.Count == 0 ? source.Trim() : string.Join('/', sourceParts);
+        var destinationDisplay = destinationParts.Count == 0 ? destination.Trim() : string.Join('/', destinationParts);
 
-        if (!string.Equals(sourceParent, destinationParent, StringComparison.OrdinalIgnoreCase))
-        {
-            newName = "";
-            error = "Moving objects between parents is not supported yet.";
-            return false;
-        }
+        RenamePlan Fail(string code, string message, int exitCode, string? hint = null)
+            => new("", false, sourceDisplay, destinationDisplay, new RenamePlanError(code, message, exitCode, hint));
 
-        newName = LeafName(destinationPath);
-        error = "";
-        return true;
+        if (sourceParts.Count == 0 || sourceParts[^1].Length == 0)
+            return Fail("TOMIX_MOVE_INVALID_PATH", "Source path is missing an object name.", 2);
+        if (destinationParts.Count == 0 || destinationParts[^1].Length == 0)
+            return Fail("TOMIX_MOVE_INVALID_PATH", "Destination path is missing an object name.", 2);
+
+        if (!sourceParts.SkipLast(1).SequenceEqual(destinationParts.SkipLast(1), StringComparer.OrdinalIgnoreCase))
+            return Fail(
+                "TOMIX_MOVE_UNSUPPORTED",
+                "Moving objects between parents is not supported yet.",
+                1,
+                "mv renames in place, so source and destination must share the same parent, "
+                + "written in the same form (e.g. 'Sales/Old Name' 'Sales/New Name').");
+
+        var newName = destinationParts[^1];
+        var oldName = sourceParts[^1];
+        if (string.Equals(newName, oldName, StringComparison.Ordinal))
+            return Fail(
+                "TOMIX_MOVE_NOOP",
+                $"Source and destination are the same ('{destinationDisplay}'); nothing to rename.",
+                1);
+
+        return new RenamePlan(
+            newName,
+            CaseOnly: string.Equals(newName, oldName, StringComparison.OrdinalIgnoreCase),
+            sourceDisplay,
+            destinationDisplay,
+            Error: null);
     }
 
-    private static string ParentPath(string path)
+    private static List<string> Parts(string path)
     {
-        var index = path.LastIndexOf('/');
-        return index < 0 ? "" : path[..index];
-    }
+        if (DaxObjectForm.TryParse(path, out var table, out var child))
+            return [table, child];
 
-    private static string LeafName(string path)
-    {
-        var index = path.LastIndexOf('/');
-        return index < 0 ? path : path[(index + 1)..];
-    }
+        var trimmed = path.Trim();
+        var parts = ObjectPath.Parse(trimmed.Trim('/'))
+            .Select(s => s.IsQuoted ? s.Text : s.Text.Trim())
+            .ToList();
 
-    private static string NormalizePath(string path)
-        => path.Trim().Trim('/').Replace("'", "", StringComparison.Ordinal);
+        // ObjectPath drops a trailing empty segment, but 'Sales/' means "no object name",
+        // not "rename to Sales" — keep the emptiness visible for validation.
+        if (trimmed.EndsWith('/') && parts.Count > 0)
+            parts.Add("");
+
+        return parts;
+    }
 }

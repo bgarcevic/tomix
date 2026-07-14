@@ -62,6 +62,37 @@ public sealed class MutationLifecycleSyncTests
         Assert.Contains("does not support deploy", outcome.SyncWarning, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task BeginAsync_ResolvesSyncTarget_ForInPlaceSave()
+    {
+        var begin = await MutationLifecycle.BeginAsync(
+            [], new ModelReference("/local/model"),
+            new MutationOptions(Save: true, SaveTo: null, Stage: false, Revert: false, Serialization: "", Force: false),
+            new Tomix.App.State.StagingStore(), WorkspaceConnection(), CancellationToken.None);
+
+        Assert.NotNull(begin.Context!.SyncTarget);
+    }
+
+    [Fact]
+    public async Task BeginAsync_SkipsSyncTarget_WhenSavingToASideLocation()
+    {
+        // --save-to writes a copy elsewhere; the connected source is untouched, so the
+        // mutation must not be deployed to the workspace mirror.
+        var begin = await MutationLifecycle.BeginAsync(
+            [], new ModelReference("/local/model"),
+            new MutationOptions(Save: false, SaveTo: "/elsewhere/copy", Stage: false, Revert: false, Serialization: "", Force: false),
+            new Tomix.App.State.StagingStore(), WorkspaceConnection(), CancellationToken.None);
+
+        Assert.Equal(MutationMode.Save, begin.Mode);
+        Assert.Null(begin.Context!.SyncTarget);
+    }
+
+    private static Tomix.App.State.CliConnectionState WorkspaceConnection()
+        => new(
+            Server: null, Database: "MyModel", Model: "/local/model", Auth: null,
+            Local: true, Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws");
+
     private static MutationContext NewSaveContext(ModelReference? syncTarget)
         => new(MutationMode.Save, new ModelReference("/local/model"), null, "tmdl", true, null, syncTarget);
 

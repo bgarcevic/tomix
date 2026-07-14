@@ -95,11 +95,12 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
         CancellationToken cancellationToken)
     {
         var inPlace = string.IsNullOrWhiteSpace(outputPath) || SamePath(outputPath, _path);
+        var format = InPlaceSerializationGuard.Resolve(inPlace, serialization, InferSerialization(_path));
         return TomModelExporter.ExportAsync(
             GetDatabase(),
             new ModelExportRequest(
                 string.IsNullOrWhiteSpace(outputPath) ? _path : outputPath,
-                string.IsNullOrWhiteSpace(serialization) ? InferSerialization(_path) : serialization,
+                format,
                 Force: force || inPlace,
                 SupportingFiles: false),
             cancellationToken);
