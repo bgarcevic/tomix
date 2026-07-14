@@ -155,48 +155,6 @@ internal sealed class CompatibilityStubCommand : ICommandModule
         New("init", "Create a new empty semantic model", args: [Optional("output-path")]),
         New("interactive", "Start an interactive REPL session for running multiple commands against a model",
             args: [Optional("model")]),
-        New("macro", "Manage and run macros against a model",
-            options: [Value("--macros")],
-            subcommands:
-            [
-                New("add", "Add a macro",
-                    args: [Required("name")],
-                    options:
-                    [
-                        Value("--expression", "-e"),
-                        Value("--tooltip"),
-                        Value("--contexts"),
-                        Flag("--enabled")
-                    ]),
-                New("init", "Initialize macro storage",
-                    options:
-                    [
-                        Flag("--force")
-                    ]),
-                New("list", "List macros"),
-                New("rm", "Remove a macro",
-                    args: [Required("name-or-id")]),
-                New("run", "Run a macro",
-                    args: [Required("name-or-id"), Optional("model")],
-                    options:
-                    [
-                        Value("--on"),
-                        Flag("--force"),
-                        Flag("--stage"),
-                        Flag("--revert"),
-                        Flag("--save"),
-                        Value("--save-to"),
-                        Value("--serialization")
-                    ]),
-                New("set", "Set a macro property",
-                    args: [Required("name-or-id")],
-                    options:
-                    [
-                        Value("-q"),
-                        Value("-i")
-                    ]),
-                New("sort", "Sort macros")
-            ]),
         New("mv", "Move or rename a model object",
             args: [Required("source"), Required("destination"), Optional("model")],
             options:

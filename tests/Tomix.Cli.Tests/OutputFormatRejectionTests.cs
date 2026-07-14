@@ -32,7 +32,6 @@ public sealed class OutputFormatRejectionTests
             "init" => new InitCommand(),
             "interactive" => new InteractiveCommand(),
             "load" => new LoadCommand(NoProviders),
-            "macro" => new MacroCommand(),
             "profile" => new ProfileCommand(),
             "refresh" => new RefreshCommand(NoProviders),
             "replace" => new ReplaceCommand(NoProviders),
@@ -83,7 +82,6 @@ public sealed class OutputFormatRejectionTests
     [InlineData("csv", "init")]
     [InlineData("csv", "interactive")]
     [InlineData("csv", "load")]
-    [InlineData("csv", "macro", "list")]
     [InlineData("csv", "profile", "list")]
     [InlineData("csv", "replace", "old", "new")]
     [InlineData("csv", "rm", "tables/T/measures/M")]

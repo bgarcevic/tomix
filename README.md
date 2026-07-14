@@ -65,7 +65,7 @@ Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 
 Discover: `ls`, `get`, `find`, `deps`
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
-formatter APIs), `script` (run C# scripts against a model), `macro`
+formatter APIs), `script` (run C# scripts against a model)
 Connect: `connect`, `deploy`, `refresh`, `load`, `save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `diff`,
 `doctor`

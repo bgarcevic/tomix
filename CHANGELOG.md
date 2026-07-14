@@ -41,7 +41,7 @@ and the API surface that major versions protect.
 ### Changed (breaking)
 
 - A failed workspace sync now exits 1 instead of 0. Mutation commands with `--save` (and `tx save`) still perform the local save and render the result — including the `syncWarning` in JSON — but the exit code flags that the mirror was left behind the source, so CI can catch the drift. Use `--no-sync` to intentionally skip the mirror (exit 0).
-- Global `--quiet` no longer has a `-q` alias: `-q` was silently shadowed by the local property/query option on `add`/`set`/`get`/`bpa`/`macro`. Use `--quiet`.
+- Global `--quiet` no longer has a `-q` alias: `-q` was silently shadowed by the local property/query option on `add`/`set`/`get`/`bpa`. Use `--quiet`.
 - `tx add --revert` combined with `--save-to` now errors (`TOMIX_STAGE_OPTIONS_CONFLICT`, exit 2) instead of silently dropping the save target. Applies to all mutation commands.
 - `tx add` options supplied to a type that ignores them (`--columns` on CalcTable/CalcGroup, `--partition-expression` on Entity/PolicyRange partitions, `--connection-string`/`--source` on StructuredDataSource, etc.) now fail with `TOMIX_ADD_OPTION_UNSUPPORTED` (exit 1) instead of exit 0 with the option discarded.
 - `tx add --source-database` no longer applies to EntityPartition; use `--source-schema` for the schema name.
@@ -56,7 +56,7 @@ and the API surface that major versions protect.
 - Mutation spinners now label the actual operation (`Working...`/`Staging...`/`Reverting...`) instead of always `Saving...`.
 - `tx replace --in <unknown-scope>` now errors (`TOMIX_MUTATION_INVALID_VALUE`) instead of exiting 0 with nothing replaced.
 - `tx mv --revert` prints `Reverted.` instead of falsely claiming `Renamed: A -> B`; `tx rm --revert` prints `Reverted.` and `rm --if-exists` on a missing object prints `Not found: <path> (nothing removed)` instead of exiting silently. JSON output gains an optional `reverted` field on both.
-- Invalid `--serialization` values on `set`/`mv`/`rm`/`replace`/`save`/`init`/`script`/`bpa`/`macro` are rejected at parse time, matching `add`. Help text no longer advertises the unimplemented `te-folder`/`pbip`/`database.json` formats (`init` genuinely supports `pbip`).
+- Invalid `--serialization` values on `set`/`mv`/`rm`/`replace`/`save`/`init`/`script`/`bpa` are rejected at parse time, matching `add`. Help text no longer advertises the unimplemented `te-folder`/`pbip`/`database.json` formats (`init` genuinely supports `pbip`).
 
 ### Changed
 
@@ -116,6 +116,7 @@ and the API surface that major versions protect.
 
 ### Removed
 
+- `tx macro` command and everything around it: the `TOMIX_MACRO_*` error codes, the `TOMIX_MACROS_PATH`/`TE_MACROS_PATH` environment variables, and the `macros` config key. `macro run` was never implemented, so the catalog could be edited but never executed; `tx script` covers running C# against a model.
 - `tx info` command (use `tx load` or `tx connect` instead).
 
 ### Fixed

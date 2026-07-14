@@ -107,7 +107,6 @@ internal static class Program
             new InteractiveCommand(),
             new LoadCommand(providers),
             new LsCommand(providers),
-            new MacroCommand(),
             new MvCommand(providers),
             new ProfileCommand(),
             stubs["query"],

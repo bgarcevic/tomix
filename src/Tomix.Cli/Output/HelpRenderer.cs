@@ -17,7 +17,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     private static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["ls", "get", "find", "deps"]),
-        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "macro"]),
+        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script"]),
         ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "interactive"]),

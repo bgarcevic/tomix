@@ -148,16 +148,6 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_SCRIPT_FILE_NOT_FOUND` | 1 | The script file was not found. |
 | `TOMIX_SCRIPT_REQUIRED` | 2 | `script` called without a script file or inline script. |
 
-## Macro Codes (`TOMIX_MACRO_*`)
-
-| Code | Exit | Trigger |
-|------|------|---------|
-| `TOMIX_MACRO_FILE_EXISTS` | 2 | A macro file already exists at the target path. |
-| `TOMIX_MACRO_FILE_NOT_FOUND` | 1 | The macro file was not found. |
-| `TOMIX_MACRO_NOT_FOUND` | 1 | The macro name was not found in the catalog. |
-| `TOMIX_MACRO_SCRIPT_NOT_FOUND` | 1 | The macro's script template was not found. |
-| `TOMIX_MACRO_UNKNOWN_PROPERTY` | 2 | The macro uses an unknown property. |
-
 ## Config Codes (`TOMIX_CONFIG_*`)
 
 > **Note:** `TOMIX_CONFIG_DIR` is an environment variable, not a diagnostic code. See below.
@@ -205,7 +195,6 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 | `TOMIX_AUTH_CLIENT_SECRET` | Azure AD client secret for service principal auth. |
 | `TOMIX_AUTH_CERTIFICATE` | Path to a certificate for service principal auth. |
 | `TOMIX_AUTH_CERTIFICATE_PASSWORD` | Password for the auth certificate. |
-| `TOMIX_MACROS_PATH` | Custom path to the macro catalog directory. |
 | `TOMIX_SESSION` | Session id for persisting the active model connection. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
 | `TOMIX_POWERQUERY_FORMATTER_API` | Custom Power Query Formatter API endpoint URL. |

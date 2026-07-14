@@ -9,7 +9,6 @@ public static class ConfigKeys
     public const string NoColor = "noColor";
     public const string Telemetry = "telemetry";
     public const string ActiveProfile = "activeProfile";
-    public const string Macros = "macros";
     public const string HideWarnings = "hideWarnings";
 
     /// <summary>Azure AD application (client) id used for interactive/device-code sign-in. Not a secret.</summary>
@@ -27,7 +26,6 @@ public static class ConfigKeys
         NoColor,
         Telemetry,
         ActiveProfile,
-        Macros,
         HideWarnings,
         AuthClientId,
         AuthTenant,
