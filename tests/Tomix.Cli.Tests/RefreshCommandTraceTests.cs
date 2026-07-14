@@ -2,6 +2,9 @@ using Tomix.Cli.Commands;
 
 namespace Tomix.Cli.Tests;
 
+// Asserts Console.Error identity, so it must not run concurrently with tests that swap the
+// process-global writer via Console.SetError (see ConsoleStateCollection).
+[Collection(ConsoleStateCollection.Name)]
 public class RefreshCommandTraceTests
 {
     [Theory]

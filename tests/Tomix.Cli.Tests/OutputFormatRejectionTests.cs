@@ -11,6 +11,7 @@ namespace Tomix.Cli.Tests;
 /// command must declare its supported formats and reject the rest with exit 2 before touching
 /// any model or state.
 /// </summary>
+[Collection(ConsoleStateCollection.Name)]
 public sealed class OutputFormatRejectionTests
 {
     private static readonly IReadOnlyList<IModelProvider> NoProviders = [];
