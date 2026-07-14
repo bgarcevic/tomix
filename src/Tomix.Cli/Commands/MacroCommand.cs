@@ -44,7 +44,7 @@ internal sealed class MacroCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "macro init", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new MacroHandler().Init(
@@ -71,7 +71,7 @@ internal sealed class MacroCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "macro list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new MacroHandler().List(MacroPath(parseResult, parentMacrosOption, macrosOption));
@@ -123,7 +123,7 @@ internal sealed class MacroCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "macro add", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new MacroHandler().Add(new MacroAddRequest(
@@ -158,7 +158,7 @@ internal sealed class MacroCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "macro rm", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new MacroHandler().Remove(
@@ -202,7 +202,7 @@ internal sealed class MacroCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "macro set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var property = parseResult.GetValue(propertyOption);
@@ -240,7 +240,7 @@ internal sealed class MacroCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "macro sort", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new MacroHandler().Sort(MacroPath(parseResult, parentMacrosOption, macrosOption));

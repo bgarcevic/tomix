@@ -61,7 +61,7 @@ internal sealed class ValidateCommand : ICommandModule
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "validate", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var errorsOnly = parseResult.GetValue(errorsOnlyOption);

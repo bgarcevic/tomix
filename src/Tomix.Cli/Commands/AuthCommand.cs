@@ -54,7 +54,7 @@ internal sealed class AuthCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "auth login", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var username = parseResult.GetValue(usernameOption);
@@ -105,7 +105,7 @@ internal sealed class AuthCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "auth status", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var handler = new AuthHandler(CreateAuthenticator(clientIdOverride: null, tenant: null));
@@ -121,7 +121,7 @@ internal sealed class AuthCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "auth logout", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var handler = new AuthHandler(CreateAuthenticator(clientIdOverride: null, tenant: null));

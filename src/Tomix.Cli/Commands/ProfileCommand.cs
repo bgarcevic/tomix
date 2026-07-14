@@ -24,7 +24,7 @@ internal sealed class ProfileCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "profile list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(new ProfileHandler().List(), format, RenderList);
@@ -43,7 +43,7 @@ internal sealed class ProfileCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "profile show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(
@@ -65,7 +65,7 @@ internal sealed class ProfileCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "profile remove", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(
@@ -105,7 +105,7 @@ internal sealed class ProfileCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "profile set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new ProfileHandler().Set(new ProfileSetRequest(

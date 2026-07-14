@@ -25,7 +25,7 @@ internal sealed class DoctorCommand : ICommandModule
         {
             var formatValue = parseResult.GetValue(format) ?? OutputFormats.Text;
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "doctor", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new DoctorHandler().Handle(_version);

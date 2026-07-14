@@ -96,7 +96,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ],
         ["save"] = [
             "tx save ./model.tmdl --serialization bim",
-            "tx save --output-format tmdl",
+            "tx save --output-format json",
         ],
         ["auth"] = [
             "tx auth login",

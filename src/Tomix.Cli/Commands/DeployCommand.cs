@@ -115,7 +115,7 @@ internal sealed class DeployCommand : ICommandModule
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "deploy", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var reference = new ActiveModelResolver().ResolveReference(

@@ -69,7 +69,7 @@ internal sealed class ConnectCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "connect", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var handler = new ConnectHandler();

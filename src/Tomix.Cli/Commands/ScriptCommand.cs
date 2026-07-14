@@ -98,7 +98,7 @@ internal sealed class ScriptCommand : ICommandModule
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "script", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
             var scriptValues = CollectRepeatedValues(parseResult, "-S", "--script");

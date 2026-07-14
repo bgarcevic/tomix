@@ -57,7 +57,7 @@ internal sealed class ConfigCommand : ICommandModule
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "config set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var key = parseResult.GetValue(keyArgument) ?? "";
@@ -91,7 +91,7 @@ internal sealed class ConfigCommand : ICommandModule
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "config show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new ConfigHandler().List();

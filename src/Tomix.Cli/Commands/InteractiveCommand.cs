@@ -24,7 +24,7 @@ internal sealed class InteractiveCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format))
+            if (!CommandOutput.TryValidateFormat(format, "interactive", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new InteractiveHandler().Start(new InteractiveStartRequest(

@@ -36,7 +36,7 @@ internal sealed class LoadCommand : ICommandModule
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 
-            if (!CommandOutput.TryValidateFormat(formatValue))
+            if (!CommandOutput.TryValidateFormat(formatValue, "load", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var handler = new InfoModelHandler(_providers);
