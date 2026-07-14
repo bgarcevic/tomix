@@ -156,8 +156,10 @@ public sealed partial class TomModelMutator
             throw NotFound(request.Path);
         }
 
-        RemoveResolvedObject(target);
-        return new ModelObjectMutationResult(target.Display, Changed: true);
+        var cascade = RemoveResolvedObject(target);
+        return new ModelObjectMutationResult(
+            target.Display, Changed: true,
+            CascadeRemoved: cascade.Count > 0 ? cascade : null);
     }
 
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
@@ -736,28 +738,50 @@ public sealed partial class TomModelMutator
             ["DataSources"] = MutationTargetKind.DataSource
         };
 
-    private void RemoveResolvedObject(ResolvedObject resolved)
+    private IReadOnlyList<string> RemoveResolvedObject(ResolvedObject resolved)
     {
         switch (resolved.Target)
         {
             case Table table:
+            {
+                var cascade = TomRemoveCascade.ForTable(table);
                 _database.Model.Tables.Remove(table);
-                break;
+                return cascade;
+            }
+
             case Measure measure when resolved.Parent is Table table:
+            {
+                var cascade = TomRemoveCascade.ForMeasure(measure);
                 table.Measures.Remove(measure);
-                break;
+                return cascade;
+            }
+
             case Column column when resolved.Parent is Table table:
+            {
+                var cascade = TomRemoveCascade.ForColumn(column);
                 table.Columns.Remove(column);
-                break;
+                return cascade;
+            }
+
             case Hierarchy hierarchy when resolved.Parent is Table table:
+            {
+                var cascade = TomRemoveCascade.ForHierarchy(hierarchy);
                 table.Hierarchies.Remove(hierarchy);
-                break;
+                return cascade;
+            }
+
             case Partition partition when resolved.Parent is Table table:
+                if (table.Partitions.Count == 1)
+                    throw new InvalidOperationException(
+                        $"Cannot remove the last partition of table '{table.Name}'; a table must have at least one partition.");
+
                 table.Partitions.Remove(partition);
-                break;
+                return [];
+
             case ModelRole role:
                 _database.Model.Roles.Remove(role);
-                break;
+                return [];
+
             default:
                 throw new NotSupportedException("Removing this object type is not supported yet.");
         }

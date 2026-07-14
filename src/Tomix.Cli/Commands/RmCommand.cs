@@ -164,6 +164,15 @@ internal sealed class RmCommand : ICommandModule
         }
 
         AnsiConsole.MarkupLine(Styling.Success($"Removed: {result.Removed}"));
+        if (result.CascadeRemoved is { Count: > 0 } cascade)
+            foreach (var item in cascade)
+                AnsiConsole.MarkupLine(Styling.Muted($"Also removed: {item}"));
+
+        if (result.BrokenReferences is { Count: > 0 } broken)
+            AnsiConsole.MarkupLine(Styling.Warning(
+                $"Warning: {broken.Count} DAX reference(s) to the removed object are now broken: "
+                + $"{string.Join(", ", broken)}. Update them with 'tx replace' or inspect with 'tx deps'."));
+
         if (result.Saved is false)
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist."));
         else if (result.Saved is not null)

@@ -47,19 +47,27 @@ internal sealed class DependencyGraph
     /// rename cannot break them.
     /// </summary>
     public IReadOnlyList<ReferenceSite> SitesReferencing(ModelObject target)
+        => SitesReferencingAny([target]);
+
+    /// <summary>
+    /// Sites referencing any of <paramref name="targets"/> in one pass — a removal impact check
+    /// covers a table plus its measures and columns. Targets themselves are never sources.
+    /// </summary>
+    public IReadOnlyList<ReferenceSite> SitesReferencingAny(IReadOnlyList<ModelObject> targets)
     {
-        var targetKey = Key(target);
+        var keyed = targets.Select(t => (Target: t, Key: Key(t))).ToList();
         var sites = new List<ReferenceSite>();
 
         foreach (var obj in _objects)
         {
-            if (Eq(Key(obj), targetKey))
+            var objKey = Key(obj);
+            if (keyed.Any(t => Eq(objKey, t.Key)))
                 continue;
 
             foreach (var site in DaxExpressions.Sites(obj))
             {
                 var references = DaxReferenceExtractor.Extract(site.Expression)
-                    .Where(r => ReferencesTarget(r, target, targetKey))
+                    .Where(r => keyed.Any(t => ReferencesTarget(r, t.Target, t.Key)))
                     .ToList();
 
                 if (references.Count > 0)

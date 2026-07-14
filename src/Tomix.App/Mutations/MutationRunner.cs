@@ -73,6 +73,12 @@ public static class MutationRunner
                 "TOMIX_RENAME_BREAKS_REFS", ex.Message,
                 hint: "Update the references first, or re-run without --strict-refs to rename anyway.");
         }
+        catch (RemoveBrokenReferencesException ex)
+        {
+            return TomixResult<TResult>.Fail(
+                "TOMIX_RM_BREAKS_REFS", ex.Message,
+                hint: "Inspect with 'tx deps', update with 'tx replace', or re-run with --force to remove anyway.");
+        }
         catch (NotSupportedException ex)
         {
             return TomixResult<TResult>.Fail("TOMIX_MUTATION_UNSUPPORTED", ex.Message);

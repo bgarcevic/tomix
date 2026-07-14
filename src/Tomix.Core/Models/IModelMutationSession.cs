@@ -67,12 +67,16 @@ public sealed record ModelPropertyAssignment(
     string Property,
     string Value);
 
+/// <summary><paramref name="CascadeRemoved"/> describes structural artifacts a removal took
+/// with it (relationships, hierarchy levels, perspective and translation entries, ...) so the
+/// CLI can report them.</summary>
 public sealed record ModelObjectMutationResult(
     string Path,
     bool Changed,
     string? Property = null,
     string? Value = null,
-    string? Reason = null);
+    string? Reason = null,
+    IReadOnlyList<string>? CascadeRemoved = null);
 
 public sealed record ModelReplaceResult(
     int ChangeCount,

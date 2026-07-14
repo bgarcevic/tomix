@@ -17,5 +17,9 @@ public sealed record RemoveModelObjectResult(
     string? SyncTarget = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? SyncWarning = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? BrokenReferences = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? CascadeRemoved = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     bool Reverted = false);

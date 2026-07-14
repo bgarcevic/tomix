@@ -26,8 +26,16 @@ public sealed class RemoveModelObjectHandler
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "rm",
-            async (mutator, _, _) =>
+            async (mutator, session, _) =>
             {
+                // A removal cannot be fixed up like a rename — the referenced object is gone.
+                // DAX still referencing it blocks the removal; --force removes anyway and
+                // reports the referencing objects as broken.
+                var referencing = await RemoveGuard.ReferencingPathsAsync(
+                    session, request.Path, request.Type, cancellationToken);
+                if (referencing.Count > 0 && !request.Force)
+                    throw new RemoveBrokenReferencesException(RemoveGuard.BlockedMessage(referencing));
+
                 var mutation = mutator.RemoveObject(new ModelObjectRemoveRequest(
                     request.Path,
                     request.Type,
@@ -39,7 +47,9 @@ public sealed class RemoveModelObjectHandler
                         outcome.Saved, outcome.Staged,
                         mutation.Changed ? null : mutation.Reason,
                         mutation.Changed ? null : mutation.Path,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
+                        BrokenReferences: mutation.Changed && referencing.Count > 0 ? referencing : null,
+                        CascadeRemoved: mutation.CascadeRemoved));
             },
             new RemoveModelObjectResult(false, null, null, null, null, Reverted: true),
             cancellationToken);
