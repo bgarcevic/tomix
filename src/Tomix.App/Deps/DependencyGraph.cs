@@ -145,14 +145,6 @@ internal sealed class DependencyGraph
                     if (resolved is not null && !Eq(Key(resolved), Key(obj)))
                         targets.Add(Key(resolved));
                 }
-
-                // Bare table references (COUNTROWS('Udlån')) — quoted forms only; an unquoted
-                // bare word is indistinguishable from a VAR name without a full DAX parser.
-                foreach (var tableName in DaxReferenceExtractor.ExtractTableReferences(expression))
-                {
-                    if (_tableByName.TryGetValue(tableName, out var table) && !Eq(Key(table), Key(obj)))
-                        targets.Add(Key(table));
-                }
             }
 
             if (obj.Kind == ModelObjectKind.Relationship)
@@ -184,19 +176,27 @@ internal sealed class DependencyGraph
 
     private ModelObject? Resolve(DaxReferenceExtractor.DaxReference reference)
     {
-        if (reference.FullyQualified)
+        switch (reference.Shape)
         {
-            var path = ModelObjectLookup.NormalizePath($"{reference.Table}/{reference.Object}");
-            return _byPath.GetValueOrDefault(path);
+            case DaxReferenceShape.Qualified:
+                var path = ModelObjectLookup.NormalizePath($"{reference.Table}/{reference.Object}");
+                return _byPath.GetValueOrDefault(path);
+
+            // 'Table' is always a table; a bare word only counts when a table by that name
+            // exists (the extractor already dropped VAR names, keywords, and function calls).
+            case DaxReferenceShape.Table:
+            case DaxReferenceShape.TableCandidate:
+                return _tableByName.GetValueOrDefault(reference.Table!);
+
+            default:
+                // A lone [X] is a measure first (measures are referenced unqualified), else a column.
+                if (_measureByName.TryGetValue(reference.Object!, out var measure))
+                    return measure;
+                if (_columnsByName.TryGetValue(reference.Object!, out var columns) && columns.Count > 0)
+                    return columns[0];
+
+                return null;
         }
-
-        // A lone [X] is a measure first (measures are referenced unqualified), else a column.
-        if (_measureByName.TryGetValue(reference.Object, out var measure))
-            return measure;
-        if (_columnsByName.TryGetValue(reference.Object, out var columns) && columns.Count > 0)
-            return columns[0];
-
-        return null;
     }
 
     private void AddColumnTarget(string? columnReference, HashSet<string> targets)

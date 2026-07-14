@@ -72,12 +72,15 @@ public sealed class DepsModelHandlerTests
     }
 
     [Fact]
-    public async Task Upstream_DoesNotTrackUnquotedTableReferences()
+    public async Task Upstream_TracksUnquotedTableReferences()
     {
-        // An unquoted bare word (COUNTROWS(Region)) could be a VAR name, so it is not tracked.
+        // An unquoted bare word (COUNTROWS(Region)) counts when a table by that name exists;
+        // the extractor drops VAR names, keywords, and function calls before it gets here.
         var result = await Run(Request("Sales/RowCountBare"));
 
-        Assert.Empty(result.Data!.Upstream);
+        var dep = Assert.Single(result.Data!.Upstream);
+        Assert.Equal("Region", dep.Path);
+        Assert.Equal("Table", dep.Type);
     }
 
     [Fact]

@@ -293,11 +293,15 @@ public static class BpaModelBuilder
 
         foreach (var reference in DaxReferenceExtractor.Extract(expression))
         {
+            // Table-only shapes carry no bracketed name; BPA's DependsOn tracks columns/measures.
+            if (reference.Object is not { } name)
+                continue;
+
             string? objectType = reference.FullyQualified
-                ? (columnNames.Contains(reference.Object) ? "Column"
-                    : measureNames.Contains(reference.Object) ? "Measure" : null)
-                : (measureNames.Contains(reference.Object) ? "Measure"
-                    : columnNames.Contains(reference.Object) ? "Column" : null);
+                ? (columnNames.Contains(name) ? "Column"
+                    : measureNames.Contains(name) ? "Measure" : null)
+                : (measureNames.Contains(name) ? "Measure"
+                    : columnNames.Contains(name) ? "Column" : null);
 
             if (objectType is null)
                 continue;
