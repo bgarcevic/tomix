@@ -112,7 +112,8 @@ internal sealed class ValidateCommand : ICommandModule
         if (result.Valid)
         {
             AnsiConsole.MarkupLine(Styling.Success("No validation errors found."));
-            return;
+            if (errorsOnly || result.Warnings.Count == 0)
+                return;
         }
 
         var allRows = new List<(string Kind, string Message, string Object, string Line)>();

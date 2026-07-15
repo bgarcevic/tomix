@@ -164,6 +164,22 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_PROFILE_NOT_FOUND` | 1 | The named profile was not found. |
 | `TOMIX_PROFILE_NAME_REQUIRED` | 2 | `profile set` called without a profile name. |
 
+## Validate Issue Codes
+
+Codes carried on the issues inside a `validate` result (not top-level diagnostics; the
+command exits `1` when any error-severity issue is present). `DAX*` codes come from the
+offline DAX reference scan; `TOMIX_*` codes come from structural integrity checks.
+
+| Code | Severity | Trigger |
+|------|----------|---------|
+| `DAX0001` | Error | A DAX expression references a table that does not exist in the model. |
+| `DAX0002` | Error | A DAX expression references a column that does not exist on the named table (and no measure by that name exists). |
+| `DAX0003` | Warning | An unqualified `[X]` reference resolves to no measure or column anywhere in the model. Warning-severity because it may be a query-scoped extension column (`ADDCOLUMNS`/`SUMMARIZE`), which offline analysis cannot see. |
+| `TOMIX_BROKEN_RELATIONSHIP` | Error | A relationship endpoint refers to a missing column. |
+| `TOMIX_BROKEN_SORT_BY` | Error | A column's sort-by column does not exist on its table. |
+| `TOMIX_BROKEN_LEVEL` | Error | A hierarchy level is bound to a column that does not exist on its table. |
+| `TOMIX_MODEL_LOAD_FAILED` | Error | The model could not be opened or snapshotted at all (e.g. TMDL with unresolvable references); the provider's message is passed through. |
+
 ## General Codes
 
 | Code | Exit | Trigger |
