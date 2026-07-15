@@ -42,8 +42,9 @@ public sealed class ActiveModelResolver
     /// Resolves the model to open as a <see cref="ModelReference"/>. Precedence:
     /// <list type="number">
     ///   <item>An explicit <paramref name="explicitModel"/> (local path or remote endpoint).</item>
-    ///   <item>An explicit <paramref name="server"/> (workspace name or endpoint), paired with
-    ///         <paramref name="database"/>. This overrides the active session.</item>
+    ///   <item>An explicit <paramref name="server"/> (workspace name or endpoint; bare names are
+    ///         expanded to their XMLA endpoint), paired with <paramref name="database"/>.
+    ///         This overrides the active session.</item>
     ///   <item>The active session: a local workspace/model path, else a remote endpoint built
     ///         from the session server + database.</item>
     /// </list>
@@ -61,9 +62,13 @@ public sealed class ActiveModelResolver
 
         // An explicit --server targets a model (endpoint or workspace name) directly and
         // overrides the active session. --database names the dataset/catalog on that server,
-        // falling back to the session database when omitted.
+        // falling back to the session database when omitted. Bare workspace names are expanded
+        // to a fully-qualified XMLA endpoint (matching connect); without this, no remote
+        // provider can open the reference and the command fails with TOMIX_NO_PROVIDER.
         if (!string.IsNullOrWhiteSpace(server))
-            return new ModelReference(server, NullIfBlank(database) ?? session?.Database);
+            return new ModelReference(
+                ModelReference.NormalizeEndpoint(server),
+                NullIfBlank(database) ?? session?.Database);
 
         if (session is null)
             return new ModelReference("");

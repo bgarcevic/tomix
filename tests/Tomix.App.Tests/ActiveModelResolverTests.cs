@@ -210,6 +210,57 @@ public sealed class ActiveModelResolverTests
     }
 
     [Fact]
+    public void ResolveReference_ExpandsBareWorkspaceName_ToXmlaEndpoint()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var store = new CliStateStore(dir);
+            var resolver = new ActiveModelResolver(store);
+            var result = resolver.ResolveReference(
+                explicitModel: null,
+                database: "Contoso_core",
+                server: "MyWorkspace");
+
+            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/MyWorkspace", result.Value);
+            Assert.Equal("Contoso_core", result.Database);
+            Assert.True(result.IsRemote);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("localhost:1234")]
+    [InlineData("127.0.0.1:1234")]
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/Sales%20Archive")]
+    [InlineData("asazure://aspaaseastus2.asazure.windows.net/myserver")]
+    public void ResolveReference_LeavesFormedEndpoints_Unchanged(string server)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var store = new CliStateStore(dir);
+            var resolver = new ActiveModelResolver(store);
+            var result = resolver.ResolveReference(
+                explicitModel: null,
+                database: "MyModel",
+                server: server);
+
+            Assert.Equal(server, result.Value);
+            Assert.True(result.IsRemote);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
     public void ResolveReference_ExplicitModelWinsOverServer()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
