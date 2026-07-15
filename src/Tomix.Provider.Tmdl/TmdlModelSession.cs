@@ -65,6 +65,15 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
     public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
         => new TomModelMutator(GetDatabase()).RewriteExpressions(edits);
 
+    public RefreshPolicyInfo? GetRefreshPolicy(string table)
+        => new TomRefreshPolicyManager(GetDatabase()).Get(table);
+
+    public RefreshPolicySetResult SetRefreshPolicy(RefreshPolicySetRequest request)
+        => new TomRefreshPolicyManager(GetDatabase()).Set(request);
+
+    public ModelObjectMutationResult RemoveRefreshPolicy(string table, bool ifExists = false)
+        => new TomRefreshPolicyManager(GetDatabase()).Remove(table, ifExists);
+
     public Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,

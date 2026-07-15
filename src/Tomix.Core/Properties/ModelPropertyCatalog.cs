@@ -28,7 +28,7 @@ public static class ModelPropertyCatalog
         new("measures", "Measures", o => Count(o, ModelObjectKind.Measure)),
         new("hierarchies", "Hierarchies", o => Count(o, ModelObjectKind.Hierarchy)),
         new("partitions", "Partitions", o => Count(o, ModelObjectKind.Partition)),
-        new("refreshPolicy", "RefreshPolicy", _ => ""),
+        new("refreshPolicy", "RefreshPolicy", o => Bag(o, PropertyBagKeys.RefreshPolicy)),
         new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", _ => "")
     ];
 

@@ -17,14 +17,14 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     private static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["ls", "get", "find", "deps"]),
-        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script"]),
+        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "incremental-refresh"]),
         ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "interactive"]),
     ];
 
     private static readonly string[] NotImplementedCommands =
-        ["incremental-refresh", "query"];
+        ["query"];
 
     private static readonly Dictionary<string, string[]> CommandExamples = new(StringComparer.Ordinal)
     {
@@ -77,6 +77,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx script -e \"Model.Tables.Count\"",
             "tx script transform.csx --save",
             "tx script -e \"Model.Tables[\\\"Sales\\\"].Name\" --output-format json",
+        ],
+        ["incremental-refresh"] = [
+            "tx incremental-refresh show Sales",
+            "tx incremental-refresh set Sales --rolling-window-periods 10 --rolling-window-granularity year --incremental-periods 3 --incremental-granularity day --source-expression-file source.m --save",
+            "tx incremental-refresh apply Sales --no-refresh",
         ],
         ["connect"] = [
             "tx connect",

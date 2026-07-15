@@ -150,7 +150,7 @@ internal static class Program
             new FindCommand(providers),
             new FormatCommand(providers, formatter),
             new GetCommand(providers),
-            stubs["incremental-refresh"],
+            new IncrementalRefreshCommand(providers),
             new InitCommand(),
             new InteractiveCommand(),
             new LoadCommand(providers),

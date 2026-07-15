@@ -16,6 +16,16 @@ public interface IModelRefreshSession
         CancellationToken cancellationToken);
 
     string GenerateRefreshScript(ModelRefreshRequest request);
+
+    /// <summary>
+    /// Applies a table's incremental refresh policy on the server: diffs the expected partition
+    /// scheme for the effective date against the existing partitions and creates/merges/drops
+    /// as needed. Request.Refresh=false bootstraps partition definitions without loading data.
+    /// </summary>
+    Task<RefreshPolicyApplyResult> ApplyRefreshPolicyAsync(
+        RefreshPolicyApplyRequest request,
+        CancellationToken cancellationToken)
+        => throw new NotSupportedException("Applying refresh policies requires an XMLA session.");
 }
 
 /// <param name="Database">Dataset/catalog name. When null, the session's already-resolved database is used.</param>

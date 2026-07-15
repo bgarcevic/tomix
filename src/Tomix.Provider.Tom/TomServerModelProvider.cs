@@ -161,6 +161,15 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
     public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
         => new TomModelMutator(_database).RewriteExpressions(edits);
 
+    public RefreshPolicyInfo? GetRefreshPolicy(string table)
+        => new TomRefreshPolicyManager(_database).Get(table);
+
+    public RefreshPolicySetResult SetRefreshPolicy(RefreshPolicySetRequest request)
+        => new TomRefreshPolicyManager(_database).Set(request);
+
+    public ModelObjectMutationResult RemoveRefreshPolicy(string table, bool ifExists = false)
+        => new TomRefreshPolicyManager(_database).Remove(table, ifExists);
+
     public Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,
@@ -208,6 +217,11 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
 
     public string GenerateRefreshScript(ModelRefreshRequest request)
         => TomModelRefresher.GenerateRefreshScript(_database, request);
+
+    public Task<RefreshPolicyApplyResult> ApplyRefreshPolicyAsync(
+        RefreshPolicyApplyRequest request,
+        CancellationToken cancellationToken)
+        => TomRefreshPolicyApplier.ApplyAsync(_server, _database, request, cancellationToken);
 
     private string ModelName()
         => string.IsNullOrWhiteSpace(_database.Name) ? _database.ID : _database.Name;

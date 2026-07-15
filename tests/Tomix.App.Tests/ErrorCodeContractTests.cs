@@ -102,6 +102,31 @@ public sealed class ErrorCodeContractTests
         Assert.Equal(2, result.ExitCode);
     }
 
+    // ── Incremental-refresh error codes ─────────────────────────────────────
+
+    [Theory]
+    [InlineData("TOMIX_REFRESH_POLICY_NOT_FOUND")]
+    [InlineData("TOMIX_REFRESH_POLICY_INVALID")]
+    [InlineData("TOMIX_REFRESH_POLICY_UNSUPPORTED")]
+    [InlineData("TOMIX_REFRESH_POLICY_APPLY_FAILED")]
+    public void RefreshPolicyCodes_AreValidUppercaseSnakeCase(string code)
+    {
+        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
+        Assert.StartsWith("TOMIX_REFRESH_POLICY_", code);
+    }
+
+    [Fact]
+    public void RefreshPolicyInvalid_IncludesForceHint()
+    {
+        var result = TomixResult<object>.Fail(
+            "TOMIX_REFRESH_POLICY_INVALID",
+            "Refresh policy for 'Sales' has validation errors: ...",
+            hint: "Fix the reported issues or re-run with --force to save anyway.");
+        var json = JsonDocument.Parse(JsonFromResult(result));
+
+        Assert.Contains("--force", json.RootElement.GetProperty("hint").GetString());
+    }
+
     // ── Object lookup error codes ───────────────────────────────────────────
 
     [Theory]

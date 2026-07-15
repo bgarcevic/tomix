@@ -18,6 +18,25 @@ public interface IModelMutationSession
     ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
         => throw new NotSupportedException("This provider does not support expression rewriting.");
 
+    /// <summary>
+    /// Returns the table's incremental refresh policy with validation issues attached, or null
+    /// when the table exists but has no policy. Throws <see cref="ObjectNotFoundException"/>
+    /// when the table is missing.
+    /// </summary>
+    RefreshPolicyInfo? GetRefreshPolicy(string table)
+        => throw new NotSupportedException("This provider does not support refresh policies.");
+
+    /// <summary>
+    /// Creates or edits the table's incremental refresh policy. Throws
+    /// <see cref="RefreshPolicyValidationException"/> when validation errors exist and the
+    /// request did not pass Force.
+    /// </summary>
+    RefreshPolicySetResult SetRefreshPolicy(RefreshPolicySetRequest request)
+        => throw new NotSupportedException("This provider does not support refresh policies.");
+
+    ModelObjectMutationResult RemoveRefreshPolicy(string table, bool ifExists = false)
+        => throw new NotSupportedException("This provider does not support refresh policies.");
+
     Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,

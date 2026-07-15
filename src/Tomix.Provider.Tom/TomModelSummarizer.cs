@@ -45,6 +45,7 @@ public static class TomModelSummarizer
     private const string PropRowLevelSecurity = "RowLevelSecurity";
     private const string PropPerspectives = "Perspectives";
     private const string PropTableObjectType = "TableObjectType";
+    private const string PropRefreshPolicy = "RefreshPolicy";
     private const string PropDataSourceName = "DataSourceName";
     private const string PropDataSourceType = "DataSourceType";
     private const string PropDefaultPowerBIDataSourceVersion = "DefaultPowerBIDataSourceVersion";
@@ -113,6 +114,7 @@ public static class TomModelSummarizer
             [PropTableObjectType] = isCalcGroup ? "CalculationGroup" : "Table",
             [PropRowLevelSecurity] = rlsIndex.TryGetValue(table.Name, out var rls) ? string.Join("\n", rls) : "",
             [PropPerspectives] = perspectiveMembership.TryGetValue(table.Name, out var persp) ? string.Join("\n", persp) : "",
+            [PropRefreshPolicy] = TomRefreshPolicyManager.Summarize(table),
             [PropObjectType] = "Table"
         };
         AddAnnotations(tableProps, table.Annotations);

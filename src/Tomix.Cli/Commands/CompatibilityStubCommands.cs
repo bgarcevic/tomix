@@ -50,47 +50,6 @@ internal sealed class CompatibilityStubCommand : ICommandModule
 
     public static IReadOnlyList<CompatibilityStubCommand> All() =>
     [
-        New("incremental-refresh", "Configure incremental refresh policy on a table",
-            subcommands:
-            [
-                New("apply", "Apply incremental refresh policy",
-                    args: [Required("table")],
-                    options:
-                    [
-                        Value("--effective-date")
-                    ]),
-                New("rm", "Remove incremental refresh policy",
-                    args: [Required("table")],
-                    options:
-                    [
-                        Flag("--force"),
-                        Flag("--stage"),
-                        Flag("--revert"),
-                        Flag("--save")
-                    ]),
-                New("set", "Set incremental refresh policy",
-                    args: [Required("table")],
-                    options:
-                    [
-                        Value("--mode"),
-                        Value("--rolling-window-periods"),
-                        Value("--rolling-window-granularity"),
-                        Value("--incremental-periods"),
-                        Value("--incremental-granularity"),
-                        Value("--incremental-offset"),
-                        Value("--polling-expression"),
-                        Value("--polling-expression-file"),
-                        Value("--source-expression"),
-                        Value("--source-expression-file"),
-                        Flag("--force"),
-                        Flag("--stage"),
-                        Flag("--revert"),
-                        Flag("--save"),
-                        Value("--save-to")
-                    ]),
-                New("show", "Show incremental refresh policy",
-                    args: [Required("table")])
-            ]),
         New("query", "Execute a DAX query against a deployed model (-q inline, -f file, or stdin)",
             options:
             [

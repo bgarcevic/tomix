@@ -19,5 +19,6 @@ public static class PropertyBagKeys
     public const string Kpi = "KPI";
     public const string DataView = "DataView";
     public const string QueryGroup = "QueryGroup";
+    public const string RefreshPolicy = "RefreshPolicy";
     public const string AnnotationPrefix = "Annotation:";
 }

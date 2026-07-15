@@ -122,6 +122,19 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_REFRESH_BAD_PARTITION` | 2 | A `--partition` value was not formatted as `TableName.PartitionName`. |
 | `TOMIX_REFRESH_FAILED` | 1 | The refresh command was rejected by the server (table not found, no permissions, etc.). |
 
+## Incremental Refresh Codes (`TOMIX_REFRESH_POLICY_*`)
+
+Emitted by `incremental-refresh` (show/set/rm/apply).
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_REFRESH_POLICY_NOT_FOUND` | 1 | `show`/`rm`/`apply` targeted a table that has no incremental refresh policy. |
+| `TOMIX_REFRESH_POLICY_INVALID` | 1 | `set` produced validation errors (missing range parameters, source expression not referencing RangeStart/RangeEnd, incoherent granularity/periods, incompatible compatibility level) and `--force` was not passed. |
+| `TOMIX_REFRESH_POLICY_UNSUPPORTED` | 2 | `apply` targeted a session that is not XMLA-backed (partition generation runs on the server). |
+| `TOMIX_REFRESH_POLICY_APPLY_FAILED` | 1 | The server rejected the `apply` operation. |
+
+`incremental-refresh` also reuses `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFRESH_NO_REMOTE_TARGET` (`apply` with no remote endpoint), `TOMIX_NO_PROVIDER`, `TOMIX_AUTH_REQUIRED`, and the `TOMIX_MUTATION_*` / `TOMIX_STAGE_*` families via the shared mutation runner. Validation findings surfaced in the result payload (e.g. `range_parameter_missing`, `granularity_order`, `no_polling_expression`) are lowercase snake tokens, not `TOMIX_` diagnostic codes.
+
 ## VertiPaq Codes (`TOMIX_VERTIPAQ_*` / `TOMIX_VPAX_*`)
 
 | Code | Exit | Trigger |
