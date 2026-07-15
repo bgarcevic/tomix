@@ -124,10 +124,17 @@ internal sealed class RefreshCommand : ICommandModule
                 ? null
                 : ResolveTracePath(parseResult.GetValue(traceOption));
 
+            if (!RecentConnections.TryGetSource(
+                    parseResult,
+                    GlobalOptions.ModelValue(parseResult),
+                    out var source,
+                    out var recentExit))
+                return recentExit;
+
             var request = new RefreshModelRequest(
-                Model: GlobalOptions.ModelValue(parseResult),
-                Server: parseResult.GetValue(GlobalOptions.Server),
-                Database: parseResult.GetValue(GlobalOptions.Database),
+                Model: source.Model,
+                Server: source.Server,
+                Database: source.Database,
                 Auth: GlobalOptions.AuthValue(parseResult),
                 RefreshType: type,
                 Tables: tables is { Length: > 0 } ? tables : null,
@@ -139,6 +146,13 @@ internal sealed class RefreshCommand : ICommandModule
                 NoProgress: noProgress,
                 TracePath: tracePath);
 
+            // When --recent picked the target, resolve against that entry (not the active session)
+            // so the refresh target and its workspace mirror come from the recent connection.
+            var recentSession = RecentConnections.SessionSource(source);
+            RefreshModelHandler CreateHandler() => recentSession is null
+                ? new RefreshModelHandler(_providers)
+                : new RefreshModelHandler(_providers, recentSession);
+
             // Progress + trace sinks: live spinner display via AnsiConsole.Status, plus optional --trace file/stderr.
             var suppressProgress = noProgress || quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || CliSpinner.ShouldSuppress();
             using var traceWriter = OpenTraceWriter(tracePath, quiet);
@@ -147,7 +161,7 @@ internal sealed class RefreshCommand : ICommandModule
                 // --dry-run never executes; no live display, just emit the script.
                 if (dryRun)
                 {
-                    var dryResult = await new RefreshModelHandler(_providers)
+                    var dryResult = await CreateHandler()
                         .HandleAsync(request, progress: null, traceWriter, cancellationToken)
                         .ConfigureAwait(false);
 
@@ -168,7 +182,7 @@ internal sealed class RefreshCommand : ICommandModule
                 TomixResult<RefreshModelResult> result;
                 if (suppressProgress)
                 {
-                    result = await new RefreshModelHandler(_providers)
+                    result = await CreateHandler()
                         .HandleAsync(request, progress: null, traceWriter, cancellationToken)
                         .ConfigureAwait(false);
                 }
@@ -177,7 +191,7 @@ internal sealed class RefreshCommand : ICommandModule
                     var display = new RefreshLiveDisplay();
                     result = await display.RunAsync(
                         BuildSpinnerLabel(request),
-                        () => new RefreshModelHandler(_providers).HandleAsync(request, display.Progress, traceWriter, cancellationToken))
+                        () => CreateHandler().HandleAsync(request, display.Progress, traceWriter, cancellationToken))
                         .ConfigureAwait(false);
                 }
 

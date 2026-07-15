@@ -135,18 +135,25 @@ internal sealed class VertipaqCommand : ICommandModule
             ModelReference? syncTarget;
             if (string.IsNullOrWhiteSpace(importPath))
             {
+                if (!RecentConnections.TryGetSource(
+                        parseResult,
+                        GlobalOptions.ModelValue(parseResult),
+                        out var source,
+                        out var recentExit))
+                    return recentExit;
+
                 // --server never names a local path, so a bare workspace name is expanded to its
                 // XMLA endpoint here (as connect does); otherwise it would be mistaken for a
-                // local model definition and rejected as unsupported.
-                var server = parseResult.GetValue(GlobalOptions.Server);
+                // local model definition and rejected as unsupported. Recent entries already store
+                // a normalized endpoint, and NormalizeEndpoint is idempotent for those.
+                var server = source.Server;
                 if (!string.IsNullOrWhiteSpace(server))
                     server = ModelReference.NormalizeEndpoint(server);
 
-                var resolver = new ActiveModelResolver();
-                reference = resolver.ResolveReference(
-                    GlobalOptions.ModelValue(parseResult),
-                    parseResult.GetValue(GlobalOptions.Database),
-                    server);
+                // Seed with the picked --recent entry (if any) so the workspace-primary read side
+                // (syncTarget) comes from that entry's mirror, not the active session's.
+                var resolver = RecentConnections.CreateResolver(source);
+                reference = resolver.ResolveReference(source.Model, source.Database, server);
                 syncTarget = resolver.ResolveSyncTarget();
             }
             else

@@ -66,14 +66,18 @@ internal sealed class ValidateCommand : ICommandModule
 
             var errorsOnly = parseResult.GetValue(errorsOnlyOption);
 
+            if (!RecentConnections.TryGetSource(
+                    parseResult,
+                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    out var source,
+                    out var recentExit))
+                return recentExit;
+
             var result = await CliSpinner.RunAsync(
                 "Validating model...",
                 () => new ValidateModelHandler(_providers).HandleAsync(
                     new ValidateModelRequest(
-                        new ActiveModelResolver().ResolveReference(
-                            GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database),
-                            parseResult.GetValue(GlobalOptions.Server)),
+                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
                         errorsOnly,
                         parseResult.GetValue(noWarningsOption) || errorsOnly,
                         parseResult.GetValue(serverOnlyOption)),

@@ -13,3 +13,5 @@ public sealed record ConnectSetResult(
     CliConnectionState Connection);
 
 public sealed record ConnectClearResult(bool Cleared);
+
+public sealed record ConnectRecentListResult(IReadOnlyList<RecentConnection> Connections);

@@ -46,10 +46,13 @@ internal sealed class StageCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(format, "stage commit", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            if (!TryResolveModel(parseResult, out var reference, out var recentExit))
+                return recentExit;
+
             var result = await CliSpinner.RunAsync(
                 "Committing staged changes...",
                 () => new StageHandler().CommitAsync(
-                    ResolveModel(parseResult), _providers, parseResult.GetValue(forceOption), cancellationToken),
+                    reference, _providers, parseResult.GetValue(forceOption), cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
             return CommandOutput.Render(result, format, RenderCommit);
         });
@@ -95,8 +98,10 @@ internal sealed class StageCommand : ICommandModule
                 return 2;
 
             var all = parseResult.GetValue(allOption);
+            if (!TryResolveModel(parseResult, out var reference, out var recentExit))
+                return recentExit;
             return CommandOutput.Render(
-                new StageHandler().Discard(ResolveModel(parseResult), all),
+                new StageHandler().Discard(reference, all),
                 format,
                 result => AnsiConsole.MarkupLine(Styling.Success($"Discarded {result.Discarded} staged change set(s).")));
         });
@@ -109,7 +114,9 @@ internal sealed class StageCommand : ICommandModule
         if (!CommandOutput.TryValidateFormat(format, "stage", OutputFormats.Text, OutputFormats.Json))
             return 2;
 
-        return CommandOutput.Render(new StageHandler().Status(ResolveModel(parseResult)), format, RenderStatusResult);
+        if (!TryResolveModel(parseResult, out var reference, out var recentExit))
+            return recentExit;
+        return CommandOutput.Render(new StageHandler().Status(reference), format, RenderStatusResult);
     }
 
     private static void RenderStatusResult(StageStatusResult result)
@@ -152,8 +159,19 @@ internal sealed class StageCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.KeyValue("Remote:", $" {result.Server}{(string.IsNullOrEmpty(result.Database) ? "" : $" / {result.Database}")}"));
     }
 
-    private static ModelReference ResolveModel(ParseResult parseResult)
-        => new ActiveModelResolver().ResolveReference(
-            GlobalOptions.ModelValue(parseResult),
-            parseResult.GetValue(GlobalOptions.Database));
+    private static bool TryResolveModel(ParseResult parseResult, out ModelReference reference, out int exitCode)
+    {
+        if (!RecentConnections.TryGetSource(parseResult, GlobalOptions.ModelValue(parseResult), out var source, out exitCode))
+        {
+            reference = new ModelReference("");
+            return false;
+        }
+
+        // Stage resolution deliberately ignores --server today; a server only takes part
+        // when it comes from the --recent override.
+        reference = GlobalOptions.RecentSpecified(parseResult)
+            ? RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server)
+            : new ActiveModelResolver().ResolveReference(source.Model, source.Database);
+        return true;
+    }
 }

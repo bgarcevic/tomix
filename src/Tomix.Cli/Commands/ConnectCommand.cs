@@ -70,7 +70,7 @@ internal sealed class ConnectCommand : ICommandModule
             Description = "Auth method for a remote workspace (local primary). Defaults to --auth if set, else auto."
         };
 
-        var command = new Command("connect", "Set active connection (workspace, local path, or PBI Desktop). No args = show current.")
+        var command = new Command("connect", "Set active connection (workspace, local path, or PBI Desktop). No args = show current. --recent = reconnect to a recently used model.")
         {
             serverArgument,
             databaseArgument,
@@ -90,6 +90,22 @@ internal sealed class ConnectCommand : ICommandModule
                 return 2;
 
             var handler = new ConnectHandler();
+            if (GlobalOptions.RecentSpecified(parseResult))
+            {
+                if (parseResult.GetValue(clearOption))
+                    return RenderRecentOptionError("--recent cannot be combined with --clear.");
+
+                if (!string.IsNullOrWhiteSpace(parseResult.GetValue(serverArgument)) ||
+                    !string.IsNullOrWhiteSpace(parseResult.GetValue(databaseArgument)) ||
+                    !string.IsNullOrWhiteSpace(parseResult.GetValue(profileOption)) ||
+                    parseResult.GetResult(workspaceOption) is not null ||
+                    parseResult.GetValue(remoteOption) ||
+                    parseResult.GetValue(GlobalOptions.Local))
+                    return RenderRecentOptionError("--recent cannot be combined with a server/database, --profile, --workspace, --remote, or --local.");
+
+                return await ConnectRecentAsync(handler, parseResult, format, cancellationToken);
+            }
+
             if (parseResult.GetValue(clearOption))
                 return CommandOutput.Render(
                     handler.Clear(),
@@ -491,6 +507,125 @@ internal sealed class ConnectCommand : ICommandModule
         });
 
         return command;
+    }
+
+    private async Task<int> ConnectRecentAsync(
+        ConnectHandler handler,
+        ParseResult parseResult,
+        string format,
+        CancellationToken cancellationToken)
+    {
+        var recents = handler.Recents();
+        var connections = recents.Data!.Connections;
+
+        // Bare --recent when a prompt is unavailable (or there is nothing to pick from)
+        // lists the recents instead of prompting, so scripts and JSON callers never block.
+        var bare = GlobalOptions.RecentValue(parseResult) is null;
+        if (bare && (!InteractionGate.CanPrompt(parseResult, format) || connections.Count == 0))
+            return CommandOutput.Render(recents, format, RenderRecentList, ProjectRecentListJson);
+
+        if (!RecentConnections.TryResolve(parseResult, new CliStateStore(), out var entry, out var exitCode))
+            return exitCode;
+
+        var connection = entry!.Connection;
+        ModelReference? validation = null;
+        if (!string.IsNullOrWhiteSpace(connection.Model))
+            validation = new ModelReference(connection.Model);
+        else if (!string.IsNullOrWhiteSpace(connection.Server) && !string.IsNullOrWhiteSpace(connection.Database))
+            validation = ModelReference.Remote(connection.Server, connection.Database);
+
+        InfoModelResult? info = null;
+        if (validation is not null)
+        {
+            var infoHandler = new InfoModelHandler(_providers);
+            var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+            var infoResult = await CliSpinner.RunAsync(
+                "Connecting...",
+                () => infoHandler.HandleAsync(
+                    new InfoModelRequest(validation),
+                    cancellationToken),
+                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
+
+            if (!infoResult.Success)
+            {
+                ErrorOutput.Write(infoResult.Diagnostics, null);
+                return infoResult.ExitCode == 0 ? 1 : infoResult.ExitCode;
+            }
+
+            info = infoResult.Data;
+        }
+
+        // Replay the snapshot's raw fields rather than its profile name: the recent entry
+        // must keep working even if the profile was renamed or deleted since it was recorded.
+        var setResult = handler.Set(new ConnectSetRequest(
+            connection.Server,
+            connection.Database,
+            connection.Model,
+            connection.Auth,
+            connection.Local,
+            Profile: null,
+            connection.Workspace,
+            connection.WorkspaceFormat,
+            connection.WorkspaceAuth));
+
+        if (!setResult.Success)
+            return CommandOutput.Render(setResult, format, _ => { });
+
+        if (info is not null)
+        {
+            RenderConnectedModel(info, format, connection.Model, connection.Server, connection.Database, connection.Workspace);
+            return 0;
+        }
+
+        if (format != OutputFormats.Text)
+            return CommandOutput.Render(setResult, format, _ => { });
+
+        RenderConnection(setResult.Data!.Connection);
+        return setResult.ExitCode;
+    }
+
+    private static void RenderRecentList(ConnectRecentListResult result)
+    {
+        var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+        if (result.Connections.Count == 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Warning("No recent connections yet."));
+            err.MarkupLine(Styling.Guidance("Connect once: tx connect <server> <database>"));
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        for (var i = 0; i < result.Connections.Count; i++)
+        {
+            var entry = result.Connections[i];
+            AnsiConsole.MarkupLine(
+                $"{Styling.Bold($"{i + 1}.")} {Styling.MarkupEscape(RecentConnections.FormatRecentLabel(entry.Connection))}  {Styling.Muted(RecentConnections.FormatRecentAge(entry.LastUsed, now))}");
+        }
+
+        err.MarkupLine(Styling.Guidance("Connect: tx connect --recent <n>"));
+    }
+
+    private static object ProjectRecentListJson(ConnectRecentListResult result)
+        => new
+        {
+            connections = result.Connections.Select((entry, i) => new
+            {
+                index = i + 1,
+                lastUsed = entry.LastUsed,
+                server = entry.Connection.Server,
+                database = entry.Connection.Database,
+                model = entry.Connection.Model,
+                local = entry.Connection.Local,
+                profile = entry.Connection.Profile,
+                workspace = entry.Connection.Workspace
+            }).ToArray()
+        };
+
+    private static int RenderRecentOptionError(string message)
+    {
+        var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+        err.MarkupLine(Styling.Error(message));
+        return 2;
     }
 
     private static int RenderWorkspaceOptionError(string message)

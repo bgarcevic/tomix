@@ -121,14 +121,18 @@ internal sealed class FormatCommand : ICommandModule
 
             var expression = InputValueResolver.Resolve(parseResult.GetValue(expressionOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+            if (!RecentConnections.TryGetSource(
+                    parseResult,
+                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    out var source,
+                    out var recentExit))
+                return recentExit;
+
             var result = await CliSpinner.RunAsync(
                 "Formatting...",
                 () => new FormatModelHandler(_providers, _formatter).HandleAsync(
                     new FormatModelRequest(
-                        new ActiveModelResolver().ResolveReference(
-                            GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database),
-                            parseResult.GetValue(GlobalOptions.Server)),
+                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
                         expression,
                         parseResult.GetValue(pathOption),
                         parseResult.GetValue(langOption) ?? "",

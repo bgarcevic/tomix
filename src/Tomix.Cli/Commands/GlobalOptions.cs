@@ -77,6 +77,7 @@ internal static class GlobalOptions
     static GlobalOptions()
     {
         Model.Aliases.Add("-m");
+        Recent.Aliases.Add("--recents");
         Server.Aliases.Add("-s");
         Database.Aliases.Add("-d");
         Yes.Aliases.Add("-y");
@@ -109,4 +110,11 @@ internal static class GlobalOptions
 
     public static string? AuthValue(ParseResult parseResult)
         => parseResult.GetValue(Auth);
+
+    /// <summary>True when --recent was passed, with or without a value (arity is ZeroOrOne).</summary>
+    public static bool RecentSpecified(ParseResult parseResult)
+        => parseResult.GetResult(Recent) is not null;
+
+    public static string? RecentValue(ParseResult parseResult)
+        => parseResult.GetValue(Recent);
 }

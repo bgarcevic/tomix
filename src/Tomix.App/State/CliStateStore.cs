@@ -16,7 +16,11 @@ public sealed class CliStateStore
 
     public CliStateStore(string configDirectory) => _configDirectory = configDirectory;
 
+    public const int MaxRecentConnections = 20;
+
     public string ProfilesFile => Path.Combine(_configDirectory, "profiles.json");
+
+    public string RecentConnectionsFile => Path.Combine(_configDirectory, "recent-connections.json");
 
     public string SessionsDirectory => Path.Combine(_configDirectory, "sessions");
 
@@ -60,6 +64,58 @@ public sealed class CliStateStore
         Directory.CreateDirectory(_configDirectory);
         File.WriteAllText(ProfilesFile, JsonSerializer.Serialize(profiles, SerializerOptions));
     }
+
+    public IReadOnlyList<RecentConnection> LoadRecentConnections()
+    {
+        if (!File.Exists(RecentConnectionsFile))
+            return [];
+
+        var json = File.ReadAllText(RecentConnectionsFile);
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+
+        List<RecentConnection>? entries;
+        try
+        {
+            entries = JsonSerializer.Deserialize<List<RecentConnection>>(json);
+        }
+        catch (JsonException)
+        {
+            // The recents file is a convenience cache, not user data: a corrupt file
+            // self-heals on the next AddRecentConnection instead of failing commands.
+            return [];
+        }
+
+        return entries is null
+            ? []
+            : entries.Where(entry => entry?.Connection is not null && HasTarget(entry.Connection)).ToList();
+    }
+
+    public void AddRecentConnection(CliConnectionState state)
+    {
+        if (!HasTarget(state))
+            return;
+
+        var key = RecentKey(state);
+        var entries = LoadRecentConnections()
+            .Where(entry => !string.Equals(RecentKey(entry.Connection), key, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        entries.Insert(0, new RecentConnection(state, DateTimeOffset.UtcNow));
+        if (entries.Count > MaxRecentConnections)
+            entries.RemoveRange(MaxRecentConnections, entries.Count - MaxRecentConnections);
+
+        Directory.CreateDirectory(_configDirectory);
+        File.WriteAllText(RecentConnectionsFile, JsonSerializer.Serialize(entries, SerializerOptions));
+    }
+
+    internal static string RecentKey(CliConnectionState state)
+        => !string.IsNullOrWhiteSpace(state.Model)
+            ? $"model:{state.Model}"
+            : $"remote:{state.Server}\0{state.Database}";
+
+    private static bool HasTarget(CliConnectionState state)
+        => !string.IsNullOrWhiteSpace(state.Model) || !string.IsNullOrWhiteSpace(state.Server);
 
     public CliConnectionState? LoadCurrentSession()
     {

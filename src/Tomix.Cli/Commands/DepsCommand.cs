@@ -99,15 +99,19 @@ internal sealed class DepsCommand : ICommandModule
                 type = parsed;
             }
 
+            if (!RecentConnections.TryGetSource(
+                    parseResult,
+                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    out var source,
+                    out var recentExit))
+                return recentExit;
+
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Analyzing dependencies...",
                 () => new DepsModelHandler(_providers).HandleAsync(
                     new DepsModelRequest(
-                        new ActiveModelResolver().ResolveReference(
-                            GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database),
-                            parseResult.GetValue(GlobalOptions.Server)),
+                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
                         parseResult.GetValue(pathArgument),
                         type,
                         upstreamOnly,

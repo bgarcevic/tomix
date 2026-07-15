@@ -118,9 +118,32 @@ internal sealed class DeployCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(format, "deploy", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var reference = new ActiveModelResolver().ResolveReference(
-                GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database));
+            var explicitModel = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
+            ModelReference reference;
+            if (GlobalOptions.RecentSpecified(parseResult))
+            {
+                // --recent picks the deploy *source*; --server/--database keep addressing the target.
+                if (!string.IsNullOrWhiteSpace(explicitModel))
+                {
+                    var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+                    err.MarkupLine(Styling.Error("--recent cannot be combined with a model path."));
+                    return 2;
+                }
+
+                if (!RecentConnections.TryResolve(parseResult, new CliStateStore(), out var entry, out var recentExit))
+                    return recentExit;
+
+                // Resolve against the picked entry (not the active session) so a server-only
+                // recent source does not inherit the active connection's database.
+                var recent = entry!.Connection;
+                reference = new ActiveModelResolver(() => recent).ResolveReference(recent.Model, recent.Database, recent.Server);
+            }
+            else
+            {
+                reference = new ActiveModelResolver().ResolveReference(
+                    explicitModel,
+                    parseResult.GetValue(GlobalOptions.Database));
+            }
 
             var server = parseResult.GetValue(GlobalOptions.Server);
             var database = parseResult.GetValue(GlobalOptions.Database);

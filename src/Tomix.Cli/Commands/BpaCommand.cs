@@ -198,14 +198,18 @@ internal sealed class BpaCommand : ICommandModule
             var ruleFiles = parseResult.GetValue(rulesOption);
             var ruleIds = parseResult.GetValue(ruleOption);
 
+            if (!RecentConnections.TryGetSource(
+                    parseResult,
+                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    out var source,
+                    out var recentExit))
+                return recentExit;
+
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
                 () => new BpaRunHandler(_providers).HandleAsync(
                     new BpaRunRequest(
-                        new ActiveModelResolver().ResolveReference(
-                            GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                            parseResult.GetValue(GlobalOptions.Database),
-                            parseResult.GetValue(GlobalOptions.Server)),
+                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
                         ruleFiles,
                         parseResult.GetValue(noDefaultsOption),
                         parseResult.GetValue(pathOption),
@@ -325,12 +329,20 @@ internal sealed class BpaCommand : ICommandModule
                 return 2;
 
             var modelPath = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
-            var model = string.IsNullOrWhiteSpace(modelPath)
-                ? null
-                : new ActiveModelResolver().ResolveReference(
+            ModelReference? model = null;
+            if (GlobalOptions.RecentSpecified(parseResult))
+            {
+                if (!RecentConnections.TryGetSource(parseResult, modelPath, out var source, out var recentExit))
+                    return recentExit;
+                model = RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server);
+            }
+            else if (!string.IsNullOrWhiteSpace(modelPath))
+            {
+                model = new ActiveModelResolver().ResolveReference(
                     modelPath,
                     parseResult.GetValue(GlobalOptions.Database),
                     parseResult.GetValue(GlobalOptions.Server));
+            }
 
             var result = await new BpaRulesListHandler(_providers).HandleAsync(
                 new BpaRulesListRequest(
@@ -509,10 +521,13 @@ internal sealed class BpaCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var model = new ActiveModelResolver().ResolveReference(
-                GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                parseResult.GetValue(GlobalOptions.Database),
-                parseResult.GetValue(GlobalOptions.Server));
+            if (!RecentConnections.TryGetSource(
+                    parseResult,
+                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    out var source,
+                    out var recentExit))
+                return recentExit;
+            var model = RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server);
 
             var result = await new BpaRulesIgnoreHandler(_providers).HandleAsync(
                 new BpaRulesIgnoreRequest(

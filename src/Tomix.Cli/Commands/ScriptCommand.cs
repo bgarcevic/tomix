@@ -112,15 +112,14 @@ internal sealed class ScriptCommand : ICommandModule
             var explicitModel = GlobalOptions.ModelValue(parseResult)
                 ?? parseResult.GetValue(modelArgument)
                 ?? CollectModelArgument("script");
+            if (!RecentConnections.TryGetSource(parseResult, explicitModel, out var source, out var recentExit))
+                return recentExit;
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Running script...",
                 () => new ScriptHandler(_providers).HandleAsync(
                     new ScriptRunRequest(
-                        new ActiveModelResolver().ResolveReference(
-                            explicitModel,
-                            parseResult.GetValue(GlobalOptions.Database),
-                            parseResult.GetValue(GlobalOptions.Server)),
+                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
                         scriptFiles,
                         expressions,
                         parseResult.GetValue(dryRunOption),
@@ -168,6 +167,15 @@ internal sealed class ScriptCommand : ICommandModule
         for (var i = commandIndex + 1; i < args.Length; i++)
         {
             var arg = args[i];
+            if (arg is "--recent" or "--recents")
+            {
+                // --recent has optional-value arity: only skip the next token when it is
+                // the numeric index, not the positional model argument.
+                if (i + 1 < args.Length && int.TryParse(args[i + 1], out _))
+                    i++;
+                continue;
+            }
+
             if (ValueOptions.Contains(arg))
             {
                 i++;
@@ -202,8 +210,7 @@ internal sealed class ScriptCommand : ICommandModule
         "--server",
         "-d",
         "--database",
-        "--auth",
-        "--recent"
+        "--auth"
     };
 
     private static readonly HashSet<string> FlagOptions = new(StringComparer.Ordinal)

@@ -89,8 +89,13 @@ public sealed class ConnectHandler
         }
 
         _store.SaveCurrentSession(state);
+        _store.AddRecentConnection(state);
         return TomixResult<ConnectSetResult>.Ok(new ConnectSetResult(Active: true, state));
     }
+
+    public TomixResult<ConnectRecentListResult> Recents()
+        => TomixResult<ConnectRecentListResult>.Ok(
+            new ConnectRecentListResult(_store.LoadRecentConnections()));
 
     private static string? NormalizeLocalPath(string? path)
     {
