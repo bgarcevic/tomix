@@ -5,6 +5,7 @@
     <ProjectReference Include="..\Tomix.Auth\Tomix.Auth.csproj" />
     <ProjectReference Include="..\Tomix.Core\Tomix.Core.csproj" />
     <ProjectReference Include="..\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
+    <ProjectReference Include="..\Tomix.Provider.Vpax\Tomix.Provider.Vpax.csproj" />
     <ProjectReference Include="..\Tomix.Provider.Tmdl\Tomix.Provider.Tmdl.csproj" />
   </ItemGroup>
 

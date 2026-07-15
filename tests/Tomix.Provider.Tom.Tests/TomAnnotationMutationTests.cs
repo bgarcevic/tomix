@@ -82,6 +82,35 @@ public sealed class TomAnnotationMutationTests
         Assert.False(props.ContainsKey($"Annotation:{Key}"));
     }
 
+    [Fact]
+    public void SetProperty_WritesAnnotation_OnRelationshipEndpointPath()
+    {
+        var db = NewDatabase();
+        var sales = new Table { Name = "Sales" };
+        sales.Columns.Add(new DataColumn { Name = "CustomerId", DataType = DataType.Int64 });
+        var customer = new Table { Name = "Customer" };
+        customer.Columns.Add(new DataColumn { Name = "Id", DataType = DataType.Int64 });
+        db.Model.Tables.Add(sales);
+        db.Model.Tables.Add(customer);
+        db.Model.Relationships.Add(new SingleColumnRelationship
+        {
+            Name = "SalesToCustomer",
+            FromColumn = sales.Columns["CustomerId"],
+            ToColumn = customer.Columns["Id"]
+        });
+        var mutator = new TomModelMutator(db);
+
+        // The vertipaq --annotate flow addresses relationships by their endpoint path.
+        var result = mutator.SetProperty(new ModelObjectSetRequest(
+            "'Sales'[CustomerId]->'Customer'[Id]",
+            [new ModelPropertyAssignment("Annotation:Vertipaq_RIViolationInvalidRows", "3")],
+            ModelObjectKind.Relationship));
+
+        Assert.True(result.Changed);
+        var annotation = db.Model.Relationships["SalesToCustomer"].Annotations["Vertipaq_RIViolationInvalidRows"];
+        Assert.Equal("3", annotation.Value);
+    }
+
     private static Database NewDatabase()
         => new() { Name = "M", Model = new Model { Name = "Model" } };
 }

@@ -42,6 +42,8 @@ public sealed class OutputFormatRejectionTests
             "set" => new SetCommand(NoProviders),
             "stage" => new StageCommand(NoProviders),
             "validate" => new ValidateCommand(NoProviders),
+            "vertipaq" => new VertipaqCommand(
+                NoProviders, new Tomix.Provider.Vpax.VpaxVertipaqAnalyzer(tokenProvider: null, "0.0.0-test")),
             _ => (ICommandModule?)null,
         })?.Build() ?? throw new ArgumentException($"Unknown module '{name}'.");
 
@@ -92,6 +94,7 @@ public sealed class OutputFormatRejectionTests
     [InlineData("tmdl", "refresh")]
     [InlineData("tmdl", "save")]
     [InlineData("tmdl", "script", "-e", "1")]
+    [InlineData("tmdl", "vertipaq")]
     public void UnsupportedFormat_ExitsTwoWithMessage(string format, params string[] commandArgs)
     {
         var (exitCode, stderr, result) = Invoke([.. commandArgs, "--output-format", format]);

@@ -378,6 +378,7 @@ public sealed partial class TomModelMutator
         Partition partition => partition.Annotations,
         ModelRole role => role.Annotations,
         Hierarchy hierarchy => hierarchy.Annotations,
+        Relationship relationship => relationship.Annotations,
         _ => throw new NotSupportedException($"Setting annotations is not supported for {target.GetType().Name}.")
     };
 

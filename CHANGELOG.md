@@ -16,6 +16,18 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx vertipaq` — VertiPaq storage statistics for deployed models, built on the MIT-licensed
+  sql-bi VertiPaq-Analyzer libraries. Views: columns by size (default), `--tables`, `--columns`,
+  `--relationships`, `--partitions`, `--all`; `--stats` model summary; `--detail` size breakdown;
+  `--fields <list>` per-view field selection (with a relative-size `bar`); `--top <N>`.
+  A positional table name filters to one table. `--export <file.vpax>` / `--import <file.vpax>`
+  for offline analysis, `--obfuscate` (writes a private `.dict` dictionary). `--annotate` writes
+  `Vertipaq_*` annotations onto the model/tables/columns/relationships via the mutation lifecycle
+  (`--save` to persist, workspace mirroring included), using the community keys the bundled BPA
+  rules read (`Vertipaq_RowCount`, `Vertipaq_Cardinality`, `Vertipaq_RIViolationInvalidRows`).
+  In workspace sessions with a local primary, statistics
+  are read from the remote side automatically. JSON (stable contract) and single-view CSV output.
+  New `TOMIX_VERTIPAQ_*` / `TOMIX_VPAX_*` diagnostic codes.
 - `tx set -q name` and `tx mv` warn when a rename leaves DAX expressions referencing the old name, listing the referencing objects (renames never rewrite dependent DAX, so the breakage was previously silent until a deploy). JSON output gains an optional `brokenReferences` field. New `--strict-refs` flag fails the rename instead (`TOMIX_RENAME_BREAKS_REFS`, exit 1) so CI can gate on it.
 - `tx refresh` — triggers data refresh on deployed models via XMLA. Supports `--type`, `--table`, `--partition`, `--apply-refresh-policy`/`--skip-refresh-policy`, `--effective-date`, `--max-parallelism`, `--dry-run`, `--no-progress`, `--trace`. Live per-table progress from XMLA `SessionTrace` with summary table (`Rows`, `Query`, `Read`, `Total`, `Rows/s`). JSON/CSV output support.
 - `TOMIX_REFRESH_*` diagnostic codes.
@@ -67,6 +79,14 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- In-place `--save` against a remote model (`powerbi://`/`asazure://`) actually persists now.
+  The remote session saved via parameterless `Database.Update()`, which alters only the database
+  object itself — model-tree changes (measures, properties, annotations) were silently dropped
+  while the command reported "Saved" (verified live: an annotation write survived a fresh
+  connection only after the fix). Remote saves now use `Model.SaveChanges()` and surface XMLA
+  errors returned in its result instead of assuming success. Affected every mutation command
+  (`set`, `mv`, `rm`, `replace`, `vertipaq --annotate`) when connected directly to a workspace;
+  workspace-mirror sync (deploy-based) was not affected.
 - `--help` exits 0 on every command. Commands with required positional arguments (`mv`, `add`, `rm`, `set`, `get`, `find`, ...) printed help but exited 2, because the missing arguments still counted as a usage error — breaking `tx <cmd> --help && ...` scripting. The Spectre help action now clears parse errors the way the built-in one does; genuinely missing arguments (without `--help`) still exit 2.
 - Workspace sync with no cached login no longer stalls silently for minutes before warning (observed: 4m37s). Token acquisition now gates on the recorded login state and fails immediately with "Not authenticated. Run 'tx auth login'." — without opening the OS-keystore-backed MSAL cache, whose authorization prompt can block a non-interactive process — and silent acquisition is capped at 30s with an actionable timeout error as a backstop.
 - The live spinner now shows `Syncing to <workspace>...` during the workspace-sync phase instead of sitting on `Saving...`, and the sync-failure warning explains how to recover (re-push with `tx save`, or skip with `--no-sync`).

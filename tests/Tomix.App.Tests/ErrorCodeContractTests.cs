@@ -69,6 +69,22 @@ public sealed class ErrorCodeContractTests
         Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
     }
 
+    // ── VertiPaq / VPAX error codes ─────────────────────────────────────────
+
+    [Theory]
+    [InlineData("TOMIX_VERTIPAQ_UNSUPPORTED_SOURCE")]
+    [InlineData("TOMIX_VERTIPAQ_FAILED")]
+    [InlineData("TOMIX_VERTIPAQ_TABLE_NOT_FOUND")]
+    [InlineData("TOMIX_VERTIPAQ_OPTIONS_CONFLICT")]
+    [InlineData("TOMIX_VERTIPAQ_INVALID_FIELDS")]
+    [InlineData("TOMIX_VERTIPAQ_INVALID_TOP")]
+    [InlineData("TOMIX_VPAX_READ_FAILED")]
+    [InlineData("TOMIX_VPAX_WRITE_FAILED")]
+    public void VertipaqErrorCodes_AreValidUppercaseSnakeCase(string code)
+    {
+        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
+    }
+
     [Fact]
     public void MutationErrorCode_Failed_UsedForInvalidOperationException()
     {

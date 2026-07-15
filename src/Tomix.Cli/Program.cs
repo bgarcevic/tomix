@@ -10,8 +10,10 @@ using Tomix.Cli.Commands;
 using Tomix.Cli.Output;
 using Tomix.Core.Configuration;
 using Tomix.Core.Models;
+using Tomix.Core.Vertipaq;
 using Tomix.Provider.Tom;
 using Tomix.Provider.Tmdl;
+using Tomix.Provider.Vpax;
 using Spectre.Console;
 
 namespace Tomix.Cli;
@@ -40,7 +42,9 @@ internal static class Program
                 new PowerQueryFormatterApiClient(new HttpClient())
             ]);
 
-        var root = BuildRootCommand(providers, formatter, ResolveVersion());
+        var version = ResolveVersion();
+        var root = BuildRootCommand(
+            providers, formatter, version, new VpaxVertipaqAnalyzer(tokenProvider, version));
 
         if (args.Length == 0)
         {
@@ -79,8 +83,10 @@ internal static class Program
     internal static RootCommand BuildRootCommand(
         IReadOnlyList<IModelProvider> providers,
         IExpressionFormatterClient formatter,
-        string version)
+        string version,
+        IVertipaqAnalyzer? analyzer = null)
     {
+        analyzer ??= new VpaxVertipaqAnalyzer(tokenProvider: null, version);
         var root = new RootCommand("tx - CLI for semantic models");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
@@ -119,7 +125,7 @@ internal static class Program
             new SetCommand(providers),
             new StageCommand(providers),
             new ValidateCommand(providers),
-            stubs["vertipaq"]
+            new VertipaqCommand(providers, analyzer)
         };
 
         foreach (var module in modules)

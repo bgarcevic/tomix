@@ -122,6 +122,19 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_REFRESH_BAD_PARTITION` | 2 | A `--partition` value was not formatted as `TableName.PartitionName`. |
 | `TOMIX_REFRESH_FAILED` | 1 | The refresh command was rejected by the server (table not found, no permissions, etc.). |
 
+## VertiPaq Codes (`TOMIX_VERTIPAQ_*` / `TOMIX_VPAX_*`)
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_VERTIPAQ_UNSUPPORTED_SOURCE` | 2 | The source is a local model definition (TMDL/BIM) with no live storage engine; connect to a deployed model or use `--import`. |
+| `TOMIX_VERTIPAQ_OPTIONS_CONFLICT` | 2 | Conflicting options: `--import` with `--export` or `--annotate`, `--obfuscate` without `--export`, or `--save` without `--annotate`. |
+| `TOMIX_VERTIPAQ_INVALID_FIELDS` | 2 | An unknown `--fields` token for the selected view, or `--fields` used with multiple views. |
+| `TOMIX_VERTIPAQ_INVALID_TOP` | 2 | `--top` was not a positive integer. |
+| `TOMIX_VERTIPAQ_TABLE_NOT_FOUND` | 1 | The positional table filter matched no table in the statistics. |
+| `TOMIX_VERTIPAQ_FAILED` | 1 | Statistics extraction against the live engine failed. |
+| `TOMIX_VPAX_READ_FAILED` | 2 | The `--import` file is missing, unreadable, or not a valid statistics package. |
+| `TOMIX_VPAX_WRITE_FAILED` | 2 | The `--export` target (or its obfuscation dictionary) could not be written. |
+
 ## Init Codes (`TOMIX_INIT_*`)
 
 | Code | Exit | Trigger |

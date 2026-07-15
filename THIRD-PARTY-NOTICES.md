@@ -25,7 +25,10 @@ itself MIT-licensed (Copyright (c) Tabular Editor ApS).
 |---------|---------|---------|---------------------|
 | System.Linq.Dynamic.Core | 1.7.2 | Apache-2.0 | Copyright (c) ZZZ Projects / Stef Heyenrath — <https://github.com/zzzprojects/System.Linq.Dynamic.Core> |
 | Dax.Formatter | 1.2.0 | MIT | SQLBI — <https://github.com/sql-bi/DaxFormatter> |
+| Dax.Metadata / Dax.Model.Extractor / Dax.ViewModel / Dax.Vpax (VertiPaq-Analyzer) | 1.12.1 | MIT | SQLBI, Copyright (c) Marco Russo — <https://github.com/sql-bi/VertiPaq-Analyzer> |
+| Dax.Vpax.Obfuscator | 1.2.1 | MIT | SQLBI — <https://github.com/sql-bi/Vpax-Obfuscator> |
 | Microsoft.AnalysisServices (TOM) | 19.114.0 | Microsoft Software License Terms (redistributable client libraries) | Copyright (c) Microsoft Corporation — <https://www.nuget.org/packages/Microsoft.AnalysisServices> |
+| Microsoft.AnalysisServices.AdomdClient | 19.114.0 | Microsoft Software License Terms (redistributable client libraries) | Copyright (c) Microsoft Corporation — <https://www.nuget.org/packages/Microsoft.AnalysisServices.AdomdClient> |
 | Spectre.Console | 0.55.2 | MIT | Copyright (c) Patrik Svensson, Phil Scott, Nils Andresen — <https://github.com/spectreconsole/spectre.console> |
 | System.CommandLine | 2.0.8 | MIT | Copyright (c) .NET Foundation — <https://github.com/dotnet/command-line-api> |
 | Microsoft.Identity.Client (MSAL) | 4.66.2 | MIT | Copyright (c) Microsoft Corporation — <https://github.com/AzureAD/microsoft-authentication-library-for-dotnet> |

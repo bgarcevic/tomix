@@ -11,7 +11,7 @@ namespace Tomix.Provider.Tom;
 /// <c>localhost:&lt;port&gt;</c> Power BI Desktop instance). Remote endpoints acquire a token
 /// from the injected <see cref="IAccessTokenProvider"/>; local instances connect without one.
 /// Supports read operations (summary, snapshot), mutation (add/set/rm/replace), deploy, and export.
-/// Mutations are persisted to the server via <c>Database.Update()</c> on save.
+/// Mutations are persisted to the server via <c>Model.SaveChanges()</c> on save.
 /// </summary>
 public sealed class TomServerModelProvider : IModelProvider
 {
@@ -132,7 +132,19 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _database.Update();
+
+        // Database.Update() without options alters only the database object itself; model-tree
+        // changes (measures, properties, annotations) silently vanish. SaveChanges() sends the
+        // incremental model edits, and its result can carry XMLA errors without throwing.
+        var result = _database.Model.SaveChanges();
+        if (result.XmlaResults is { } xmlaResults)
+        {
+            var serverErrors = new List<string>();
+            XmlaResultHelper.ExtractMessages(xmlaResults, serverErrors);
+            if (serverErrors.Count > 0)
+                throw new InvalidOperationException(
+                    $"The server rejected the save: {string.Join("; ", serverErrors)}");
+        }
 
         if (string.IsNullOrWhiteSpace(outputPath))
             return Task.FromResult(new ModelExportResult(ModelName(), "remote"));

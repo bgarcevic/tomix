@@ -19,12 +19,12 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ("Discover", ["ls", "get", "find", "deps"]),
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script"]),
         ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
-        ("Validate", ["bpa", "validate", "diff", "doctor"]),
+        ("Validate", ["bpa", "validate", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "interactive"]),
     ];
 
     private static readonly string[] NotImplementedCommands =
-        ["incremental-refresh", "query", "vertipaq"];
+        ["incremental-refresh", "query"];
 
     private static readonly Dictionary<string, string[]> CommandExamples = new(StringComparer.Ordinal)
     {
@@ -117,6 +117,13 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx validate",
             "tx validate --ci",
             "tx validate --trx",
+        ],
+        ["vertipaq"] = [
+            "tx vertipaq",
+            "tx vertipaq Sales --detail",
+            "tx vertipaq --stats --all --top 10",
+            "tx vertipaq --export stats.vpax",
+            "tx vertipaq --import stats.vpax --relationships",
         ],
         ["diff"] = [
             "tx diff ./v1.tmdl ./v2.tmdl",

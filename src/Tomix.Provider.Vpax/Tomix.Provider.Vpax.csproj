@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tomix.Core\Tomix.Core.csproj" />
+    <ProjectReference Include="..\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dax.Model.Extractor" Version="1.12.1" />
+    <PackageReference Include="Dax.ViewModel" Version="1.12.1" />
+    <PackageReference Include="Dax.Vpax" Version="1.12.1" />
+    <PackageReference Include="Dax.Vpax.Obfuscator" Version="1.2.1" />
+    <!-- Keep ADOMD in lockstep with the Microsoft.AnalysisServices version pinned in Tomix.Provider.Tom. -->
+    <PackageReference Include="Microsoft.AnalysisServices.AdomdClient" Version="19.114.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tomix.Provider.Vpax.Tests" />
+  </ItemGroup>
+
+</Project>
