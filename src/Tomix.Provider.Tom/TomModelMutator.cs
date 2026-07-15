@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
+using Tomix.Core.Properties;
 
 namespace Tomix.Provider.Tom;
 
@@ -397,7 +398,7 @@ public sealed partial class TomModelMutator
                 table.DataCategory = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for tables.");
+                throw UnsupportedProperty(displayName, "tables", ModelObjectKind.Table);
         }
     }
 
@@ -424,7 +425,7 @@ public sealed partial class TomModelMutator
                 measure.IsHidden = ParseBool(value, displayName);
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for measures.");
+                throw UnsupportedProperty(displayName, "measures", ModelObjectKind.Measure);
         }
     }
 
@@ -448,7 +449,7 @@ public sealed partial class TomModelMutator
                 column.IsHidden = ParseBool(value, displayName);
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for columns.");
+                throw UnsupportedProperty(displayName, "columns", ModelObjectKind.Column);
         }
     }
 
@@ -462,9 +463,26 @@ public sealed partial class TomModelMutator
             case "expression" when partition.Source is MPartitionSource m:
                 m.Expression = value;
                 break;
+            case "expression":
+                throw new NotSupportedException(
+                    "Setting 'expression' is only supported for partitions with an M source; " +
+                    $"this partition's source is {partition.SourceType}.");
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for partitions.");
+                // 'expression' is only settable on M-source partitions, so keep it out of the
+                // hint for Entity/PolicyRange/Calculated partitions.
+                throw UnsupportedProperty(displayName, "partitions", ModelObjectKind.Partition,
+                    exclude: partition.Source is MPartitionSource ? null : "expression");
         }
+    }
+
+    private static NotSupportedException UnsupportedProperty(
+        string displayName, string kindPlural, ModelObjectKind kind, string? exclude = null)
+    {
+        var writable = ModelPropertyCatalog.WritableTokens(kind).Where(t => t != exclude).ToList();
+        var hint = writable.Count > 0
+            ? $" Writable properties: {string.Join(", ", writable)}, {PropertyBagKeys.AnnotationPrefix}<name>."
+            : "";
+        return new NotSupportedException($"Setting '{displayName}' is not supported for {kindPlural}.{hint}");
     }
 
     private static void ApplyRoleProperty(ModelRole role, string property, string value, string displayName)

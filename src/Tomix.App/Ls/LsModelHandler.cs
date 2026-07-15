@@ -2,6 +2,7 @@ using Tomix.App.Diagnostics;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
+using Tomix.Core.Properties;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Ls;
@@ -37,7 +38,7 @@ public sealed class LsModelHandler
                     o.Path, o.Name, o.Kind, o.Detail, o.Expression, o.Description, o.Hidden,
                     o.SourceColumn,
                     o.Children.GroupBy(c => c.Kind).ToDictionary(g => g.Key, g => g.Count()),
-                    o.Properties))
+                    ModelPropertyCatalog.Project(o)))
                 .ToList();
 
             return TomixResult<LsModelResult>.Ok(

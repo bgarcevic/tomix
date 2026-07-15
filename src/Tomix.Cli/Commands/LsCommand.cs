@@ -3,6 +3,7 @@ using Tomix.App.Ls;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
@@ -15,12 +16,6 @@ internal sealed class LsCommand : ICommandModule
 
     public Command Build()
     {
-        var modelArgument = new Argument<string>("model")
-        {
-            Description = "Path to model (if not using --model)",
-            Arity = ArgumentArity.ZeroOrOne
-        };
-
         var pathArgument = new Argument<string?>("path-filter")
         {
             Description =
@@ -28,6 +23,12 @@ internal sealed class LsCommand : ICommandModule
                 "keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard " +
                 "('Sa*', '*/Amount'); quote names with spaces (\"'Net Sales'/'Sales Amount'\"); " +
                 "inside quotes, '' is a literal apostrophe.",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
+        var modelArgument = new Argument<string>("model")
+        {
+            Description = "Path to model (if not using --model)",
             Arity = ArgumentArity.ZeroOrOne
         };
 
@@ -50,8 +51,8 @@ internal sealed class LsCommand : ICommandModule
 
         var command = new Command("ls", "List model objects")
         {
-            modelArgument,
             pathArgument,
+            modelArgument,
             typeOption,
             pathsOnlyOption,
             noMultilineOption
@@ -59,7 +60,8 @@ internal sealed class LsCommand : ICommandModule
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var modelValue = parseResult.GetValue(modelArgument);
+            var firstValue = parseResult.GetValue(pathArgument);
+            var secondValue = parseResult.GetValue(modelArgument);
             var globalModel = GlobalOptions.ModelValue(parseResult);
             var server = parseResult.GetValue(GlobalOptions.Server);
             var database = parseResult.GetValue(GlobalOptions.Database);
@@ -67,26 +69,34 @@ internal sealed class LsCommand : ICommandModule
             var activeReference = new ActiveModelResolver().ResolveReference(globalModel, database, server);
             var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
 
-            var positionalIsModel = !string.IsNullOrWhiteSpace(modelValue)
-                && _providers.Any(p => p.CanOpen(new ModelReference(modelValue)));
+            // Canonical order is `ls [path-filter] [model]`, matching `get <path> [model]`.
+            // The legacy `ls <model> [path-filter]` order stays accepted: a first positional
+            // that actually opens as a model is treated as the model.
+            var firstIsModel = !string.IsNullOrWhiteSpace(firstValue)
+                && _providers.Any(p => p.CanOpen(new ModelReference(firstValue)));
 
             ModelReference reference;
             string? pathFilter;
 
-            if (positionalIsModel)
+            if (firstIsModel)
             {
-                reference = new ModelReference(modelValue!);
-                pathFilter = parseResult.GetValue(pathArgument);
+                reference = new ModelReference(firstValue!);
+                pathFilter = secondValue;
+            }
+            else if (!string.IsNullOrWhiteSpace(secondValue))
+            {
+                reference = new ModelReference(secondValue);
+                pathFilter = firstValue;
             }
             else if (hasContextModel)
             {
                 reference = activeReference;
-                pathFilter = parseResult.GetValue(pathArgument) ?? modelValue;
+                pathFilter = firstValue;
             }
             else
             {
-                reference = new ModelReference(modelValue ?? "");
-                pathFilter = parseResult.GetValue(pathArgument);
+                reference = new ModelReference(firstValue ?? "");
+                pathFilter = null;
             }
             var typeValue = parseResult.GetValue(typeOption);
             var pathsOnly = parseResult.GetValue(pathsOnlyOption);
@@ -134,181 +144,41 @@ internal sealed class LsCommand : ICommandModule
 
     private static IReadOnlyDictionary<string, object?> ToReferenceJson(LsObject obj)
     {
-        if (obj.Kind == ModelObjectKind.Table)
-        {
-            return new Dictionary<string, object?>
-            {
-                ["name"] = obj.Name,
-                ["path"] = obj.Path,
-                ["description"] = obj.Description ?? "",
-                ["isHidden"] = obj.Hidden,
-                ["dataCategory"] = "",
-                ["lineageTag"] = "",
-                ["columns"] = obj.ChildCounts.GetValueOrDefault(ModelObjectKind.Column),
-                ["measures"] = obj.ChildCounts.GetValueOrDefault(ModelObjectKind.Measure),
-                ["hierarchies"] = obj.ChildCounts.GetValueOrDefault(ModelObjectKind.Hierarchy),
-                ["partitions"] = obj.ChildCounts.GetValueOrDefault(ModelObjectKind.Partition),
-                ["refreshPolicy"] = null,
-                ["defaultDetailRowsExpression"] = null
-            };
-        }
-
-        if (obj.Kind == ModelObjectKind.Column)
-        {
-            return new Dictionary<string, object?>
-            {
-                ["name"] = obj.Name,
-                ["path"] = obj.Path,
-                ["description"] = obj.Description ?? "",
-                ["sourceColumn"] = obj.SourceColumn ?? "",
-                ["dataType"] = DataTypeProperty(obj, DataTypeName(obj.Detail)),
-                ["isHidden"] = obj.Hidden,
-                ["formatString"] = Property(obj, "FormatString", ""),
-                ["displayFolder"] = "",
-                ["sortByColumn"] = EmptyToNull(Property(obj, "SortByColumn", "")),
-                ["summarizeBy"] = Property(obj, "SummarizeBy", "Default"),
-                ["lineageTag"] = ""
-            };
-        }
-
-        if (obj.Kind == ModelObjectKind.Measure)
-        {
-            return new Dictionary<string, object?>
-            {
-                ["name"] = obj.Name,
-                ["path"] = obj.Path,
-                ["description"] = obj.Description ?? "",
-                ["expression"] = obj.Expression ?? "",
-                ["formatString"] = Property(obj, "FormatString", ""),
-                ["isHidden"] = obj.Hidden,
-                ["displayFolder"] = Property(obj, "DisplayFolder", ""),
-                ["dataType"] = DataTypeProperty(obj, GuessMeasureDataType(obj.Expression)),
-                ["detailRowsExpression"] = null,
-                ["formatStringExpression"] = null,
-                ["kpi"] = null,
-                ["lineageTag"] = ""
-            };
-        }
-
-        return new Dictionary<string, object?>
+        var row = new Dictionary<string, object?>
         {
             ["type"] = obj.Kind.ToString(),
-            ["path"] = obj.Path,
-            ["name"] = obj.Name,
-            ["description"] = obj.Description ?? "",
-            ["isHidden"] = obj.Hidden,
-            ["detail"] = obj.Detail,
-            ["expression"] = obj.Expression
+            ["path"] = obj.Path
         };
-    }
-
-    private static string Property(LsObject obj, string key, string fallback)
-        => obj.Properties is not null && obj.Properties.TryGetValue(key, out var value)
-            ? value
-            : fallback;
-
-    private static object? EmptyToNull(string value)
-        => string.IsNullOrWhiteSpace(value) ? null : value;
-
-    private static string DataTypeProperty(LsObject obj, string fallback)
-    {
-        var value = Property(obj, "DataType", "");
-        return string.IsNullOrWhiteSpace(value) || value.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
-            ? fallback
-            : DataTypeName(value);
-    }
-
-    private static string DataTypeName(string? detail)
-        => detail?.Trim().ToLowerInvariant() switch
-        {
-            "int64" => "Int64",
-            "decimal" => "Decimal",
-            "double" => "Double",
-            "string" => "String",
-            "boolean" or "bool" => "Boolean",
-            "datetime" => "DateTime",
-            _ => detail ?? ""
-        };
-
-    private static string GuessMeasureDataType(string? expression)
-    {
-        var text = expression ?? "";
-        return text.Contains("COUNTROWS", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains("DISTINCTCOUNT", StringComparison.OrdinalIgnoreCase)
-            ? "Int64"
-            : "Decimal";
+        foreach (var (key, value) in obj.Projected)
+            row[key] = value;
+        return row;
     }
 
     private static void RenderCsv(LsModelResult data)
     {
         var objects = data.Objects;
-        if (objects.Count > 0 && objects.All(o => o.Kind == ModelObjectKind.Table))
-        {
-            CsvOutput.Write(
-                ["Name", "Columns", "Measures", "Partitions", "Hidden", "Description"],
-                objects.Select(o => (IReadOnlyList<object?>)
-                [
-                    o.Name,
-                    o.ChildCounts.GetValueOrDefault(ModelObjectKind.Column),
-                    o.ChildCounts.GetValueOrDefault(ModelObjectKind.Measure),
-                    o.ChildCounts.GetValueOrDefault(ModelObjectKind.Partition),
-                    o.Hidden,
-                    o.Description ?? ""
-                ]));
-            return;
-        }
 
-        if (objects.Count > 0 && objects.All(o => o.Kind == ModelObjectKind.Column))
-        {
-            CsvOutput.Write(
-                ["Name", "SourceColumn", "DataType", "Description", "Hidden"],
-                objects.Select(o => (IReadOnlyList<object?>)
-                [
-                    o.Name,
-                    o.SourceColumn ?? "",
-                    DataTypeDisplay(Property(o, "DataType", o.Detail ?? "")),
-                    o.Description ?? "",
-                    o.Hidden
-                ]));
-            return;
-        }
+        // Homogeneous results get their kind's full catalog columns. Mixed kinds fall back to
+        // the generic descriptors; their values come from LsObject's own fields because each
+        // row's Projected dictionary is keyed by its OWN kind's catalog (a Column projection
+        // has "dataType", not "detail").
+        var homogeneous = objects.Count > 0 && objects.All(o => o.Kind == objects[0].Kind);
 
-        if (objects.Count > 0 && objects.All(o => o.Kind == ModelObjectKind.Measure))
-        {
-            CsvOutput.Write(
-                ["Name", "Description", "Hidden", "Expression", "FormatString"],
-                objects.Select(o => (IReadOnlyList<object?>)
-                [
-                    o.Name,
-                    o.Description ?? "",
-                    o.Hidden,
-                    o.Expression ?? "",
-                    ""
-                ]));
-            return;
-        }
-
-        CsvOutput.Write(
-            ["Name", "Description", "Hidden", "Detail", "Expression"],
-            objects.Select(o => (IReadOnlyList<object?>)
-            [
-                o.Name,
-                o.Description ?? "",
-                o.Hidden,
-                o.Detail ?? "",
-                o.Expression ?? ""
-            ]));
+        PropertyCsvRenderer.Write(
+            homogeneous ? ModelPropertyCatalog.For(objects[0].Kind) : ModelPropertyCatalog.GenericDescriptors,
+            objects.Select(o => (
+                (IReadOnlyList<object?>)[o.Path],
+                homogeneous ? o.Projected : GenericProjection(o))),
+            "Path");
     }
 
-    private static string DataTypeDisplay(string value)
-        => value.Trim().ToLowerInvariant() switch
+    private static IReadOnlyDictionary<string, object?> GenericProjection(LsObject obj)
+        => new Dictionary<string, object?>
         {
-            "int64" => "Integer / Whole Number (int64)",
-            "decimal" => "Currency / Fixed Decimal Number (decimal)",
-            "string" => "String / Text",
-            "double" => "Decimal Number (double)",
-            "boolean" or "bool" => "Boolean / True/False",
-            "datetime" => "DateTime / Date/Time",
-            _ => value
+            ["name"] = obj.Name,
+            ["description"] = obj.Description ?? "",
+            ["isHidden"] = obj.Hidden,
+            ["detail"] = obj.Detail ?? "",
+            ["expression"] = obj.Expression ?? ""
         };
 }

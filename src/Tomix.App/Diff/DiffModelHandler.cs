@@ -1,5 +1,6 @@
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Diff;
@@ -110,6 +111,15 @@ public sealed class DiffModelHandler
         yield return ("Expression", NormalizeExpression(left.Expression), NormalizeExpression(right.Expression));
         yield return ("Description", left.Description, right.Description);
         yield return ("IsHidden", left.Hidden, right.Hidden);
+
+        if (left.Kind != right.Kind)
+            yield break;
+
+        foreach (var descriptor in ModelPropertyCatalog.For(left.Kind))
+        {
+            if (descriptor.Diffable)
+                yield return (descriptor.Header, descriptor.Value(left), descriptor.Value(right));
+        }
     }
 
     private static string? NormalizeExpression(string? value)

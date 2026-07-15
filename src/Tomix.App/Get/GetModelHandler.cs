@@ -1,5 +1,6 @@
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Get;
@@ -43,7 +44,7 @@ public sealed class GetModelHandler
                 hint: AmbiguousMatchMessage.Hint);
 
         var obj = matches[0];
-        var properties = ModelObjectProjection.ToProperties(obj);
+        var properties = ModelPropertyCatalog.Project(obj);
 
         if (!string.IsNullOrWhiteSpace(request.Query))
             properties = ProjectSingleProperty(properties, request.Query);

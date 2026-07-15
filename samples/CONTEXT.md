@@ -10,8 +10,8 @@ Small sample models, rules, tests, and CI examples.
 
 ## Cross-folder dependencies
 
-- Used by `/tests/Tomix.Provider.Tests`.
-- Used by `/tests/Tomix.GoldenTests`.
+- Used by `/tests/Tomix.Provider.Tom.Tests`.
+- Used by `/tests/Tomix.Cli.Tests` (output-contract tests run against `basic-tmdl`).
 - Referenced by `/docs`.
 - Should remain independent of private services or credentials.
 

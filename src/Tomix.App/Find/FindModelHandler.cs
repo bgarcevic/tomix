@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Find;
@@ -81,16 +82,15 @@ public sealed class FindModelHandler
     {
         var normalized = string.IsNullOrWhiteSpace(scope) ? "all" : scope.Trim().ToLowerInvariant();
 
-        if (normalized is "all" or "names")
-            yield return ("Name", obj.Name);
-        if (normalized is "all" or "expressions")
-            yield return ("Expression", obj.Expression);
-        if (normalized is "all" or "descriptions")
-            yield return ("Description", obj.Description);
-        if (normalized is "all" or "formatstrings")
-            yield return ("FormatString", NonEmpty(obj.Property("FormatString")));
-        if (normalized is "all" or "displayfolders")
-            yield return ("DisplayFolder", NonEmpty(obj.Property("DisplayFolder")));
+        foreach (var descriptor in ModelPropertyCatalog.For(obj.Kind))
+        {
+            if (descriptor is not { Searchable: true, SearchScope: { } descriptorScope })
+                continue;
+            if (normalized is not "all" && normalized != descriptorScope)
+                continue;
+
+            yield return (descriptor.Header, NonEmpty(descriptor.Value(obj) as string));
+        }
 
         // Annotations are searched only when explicitly requested: models routinely carry
         // hundreds of machine-generated annotations (PBI_*, TabularEditor_*) that would
@@ -99,7 +99,7 @@ public sealed class FindModelHandler
         {
             foreach (var (key, value) in obj.Properties)
             {
-                if (key.StartsWith("Annotation:", StringComparison.Ordinal))
+                if (key.StartsWith(PropertyBagKeys.AnnotationPrefix, StringComparison.Ordinal))
                     yield return (key, value);
             }
         }

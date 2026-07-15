@@ -10,6 +10,7 @@ Core domain types and abstractions.
 - Object paths.
 - Provider interfaces.
 - Common enums and value objects.
+- The property descriptor catalog (`Properties/ModelPropertyCatalog`) — the single definition of every model-object property (JSON key, CSV/text header, value extraction, writable/searchable/diffable flags). get, ls, find, diff, and the mutator's error hints all consume it; add or change properties there, never in a command.
 
 ## Cross-folder dependencies
 

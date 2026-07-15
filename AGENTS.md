@@ -19,7 +19,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - `/src/Tomix.Provider.*` - Model providers for TOM and TMDL
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
 - `/samples` - Sample models, rules, tests, and CI workflows
-- `/docs` - Architecture, command docs, JSON schemas, ADRs, and detailed contributor context
+- `/docs` - CLI UX guidelines, color strategy, error codes, and detailed contributor context
 
 ## Routing
 
@@ -28,7 +28,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 | Add or change a CLI command | `/src/Tomix.Cli`, `/src/Tomix.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers |
 | Change command output or color styling | `/src/Tomix.Cli/Output` | `Output/CONTEXT.md`, `/docs/cli-color-strategy.md` | Use `Styling` helpers; do not hard-code ANSI |
 | Add domain types, diagnostics, paths, or result models | `/src/Tomix.Core` | `CONTEXT.md` | Core must stay dependency-light |
-| Change command output | `/src/Tomix.Cli/Output`, `/tests/Tomix.GoldenTests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts |
+| Change command output | `/src/Tomix.Cli/Output`, `/tests/Tomix.Cli.Tests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts (`GetLsParityTests`, `PropertyCatalogTests`) |
 | Add TMDL or TOM support | `/src/Tomix.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
 | Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |

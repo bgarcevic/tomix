@@ -12,6 +12,8 @@ public sealed record LsModelResult(
 /// A flat, render-ready projection of a matched <see cref="ModelObject"/>. The child tree itself is
 /// dropped so the JSON contract stays a flat list; <see cref="ChildCounts"/> preserves a per-kind
 /// tally (e.g. a table's column/measure/partition counts) for richer rendering.
+/// <see cref="Projected"/> carries the catalog projection shared with <c>get</c> — JSON/CSV output
+/// must read from it so the two commands cannot drift.
 /// </summary>
 public sealed record LsObject(
     string Path,
@@ -23,4 +25,4 @@ public sealed record LsObject(
     bool Hidden,
     string? SourceColumn,
     IReadOnlyDictionary<ModelObjectKind, int> ChildCounts,
-    IReadOnlyDictionary<string, string>? Properties);
+    IReadOnlyDictionary<string, object?> Projected);

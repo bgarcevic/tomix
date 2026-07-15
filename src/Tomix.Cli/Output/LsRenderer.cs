@@ -137,7 +137,7 @@ internal sealed partial class LsRenderer
                 Styling.MarkupEscape(o.Description ?? ""),
                 BoolText(o.Hidden),
                 Styling.MarkupEscape(expression),
-                Styling.MarkupEscape(Property(o, "FormatString", "")));
+                Styling.MarkupEscape(Projected(o, "formatString")));
         }
 
         AnsiConsole.Write(table);
@@ -263,12 +263,10 @@ internal sealed partial class LsRenderer
         => Styling.BoolText(value);
 
     private static string ColumnDataTypeDisplay(LsObject obj)
-        => DataTypeDisplay(Property(obj, "DataType", obj.Detail ?? ""));
+        => DataTypeDisplay(Projected(obj, "dataType"));
 
-    private static string Property(LsObject obj, string key, string fallback)
-        => obj.Properties is not null && obj.Properties.TryGetValue(key, out var value)
-            ? value
-            : fallback;
+    private static string Projected(LsObject obj, string jsonKey)
+        => obj.Projected.GetValueOrDefault(jsonKey) as string ?? "";
 
     private static string DataTypeDisplay(string value)
         => value.Trim().ToLowerInvariant() switch

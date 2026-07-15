@@ -17,6 +17,7 @@ Shared output wiring for all commands.
 - `CommandOutput` — format validation, human/JSON/CSV dispatch, diagnostic printing, exit-code mapping.
 - `JsonOutput` — single JSON serializer (the `--format json` contract).
 - `CsvOutput` — CSV serialization (the `--format csv` contract).
+- `PropertyCsvRenderer` — CSV columns/rows driven by the shared property catalog (`Tomix.Core.Properties.ModelPropertyCatalog`); `get` and `ls` both render CSV through it so their columns cannot drift.
 - `ErrorOutput` — diagnostic rendering to stderr (JSON or colored text).
 - `DidYouMean` — Levenshtein-based "Did you mean?" suggestion helper for unknown subcommands.
 - `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).

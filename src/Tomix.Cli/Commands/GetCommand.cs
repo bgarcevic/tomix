@@ -4,6 +4,7 @@ using Tomix.App.Get;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
@@ -133,95 +134,8 @@ internal sealed class GetCommand : ICommandModule
             return;
         }
 
-        if (string.Equals(result.Type, "Table", StringComparison.Ordinal))
-        {
-            CsvOutput.Write(
-                [
-                    "Name",
-                    "Description",
-                    "Hidden",
-                    "DataCategory",
-                    "LineageTag",
-                    "Columns",
-                    "Measures",
-                    "Hierarchies",
-                    "Partitions",
-                    "RefreshPolicy",
-                    "DefaultDetailRowsExpression"
-                ],
-                [TableRow(result.Properties)]);
-            return;
-        }
-
-        if (string.Equals(result.Type, "Measure", StringComparison.Ordinal))
-        {
-            CsvOutput.Write(
-                [
-                    "Name",
-                    "Description",
-                    "Expression",
-                    "FormatString",
-                    "Hidden",
-                    "DisplayFolder",
-                    "DataType",
-                    "DetailRowsExpression",
-                    "FormatStringExpression",
-                    "KPI",
-                    "LineageTag"
-                ],
-                [MeasureRow(result.Properties)]);
-            return;
-        }
-
-        CsvOutput.Write(
-            ["Name", "Description", "Hidden", "Detail", "Expression"],
-            [GenericRow(result.Properties)]);
+        PropertyCsvRenderer.Write(ModelPropertyCatalog.For(result.Object.Kind), result.Properties);
     }
-
-    private static IReadOnlyList<object?> TableRow(IReadOnlyDictionary<string, object?> properties)
-        =>
-        [
-            Value(properties, "name"),
-            Value(properties, "description"),
-            Value(properties, "isHidden"),
-            Value(properties, "dataCategory"),
-            Value(properties, "lineageTag"),
-            Value(properties, "columns"),
-            Value(properties, "measures"),
-            Value(properties, "hierarchies"),
-            Value(properties, "partitions"),
-            Value(properties, "refreshPolicy"),
-            Value(properties, "defaultDetailRowsExpression")
-        ];
-
-    private static IReadOnlyList<object?> MeasureRow(IReadOnlyDictionary<string, object?> properties)
-        =>
-        [
-            Value(properties, "name"),
-            Value(properties, "description"),
-            Value(properties, "expression"),
-            Value(properties, "formatString"),
-            Value(properties, "isHidden"),
-            Value(properties, "displayFolder"),
-            Value(properties, "dataType"),
-            Value(properties, "detailRowsExpression"),
-            Value(properties, "formatStringExpression"),
-            Value(properties, "kpi"),
-            Value(properties, "lineageTag")
-        ];
-
-    private static IReadOnlyList<object?> GenericRow(IReadOnlyDictionary<string, object?> properties)
-        =>
-        [
-            Value(properties, "name"),
-            Value(properties, "description"),
-            Value(properties, "isHidden"),
-            Value(properties, "detail"),
-            Value(properties, "expression")
-        ];
-
-    private static object? Value(IReadOnlyDictionary<string, object?> properties, string key)
-        => properties.TryGetValue(key, out var value) ? value : "";
 
     private static object? ToReferenceJson(GetModelResult result)
         => IsScalarQuery(result) ? result.Properties.Values.First() : result;
