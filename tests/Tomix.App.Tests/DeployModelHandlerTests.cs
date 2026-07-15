@@ -172,6 +172,61 @@ public sealed class DeployModelHandlerTests
         Assert.False(session.DeployCalled);
     }
 
+    [Fact]
+    public async Task HandleAsync_LetsModelLoadExceptionPropagate()
+    {
+        var handler = new DeployModelHandler([new BrokenModelDeployProvider()], () => null);
+
+        // The source model being unloadable is not a deploy failure: it must reach the CLI's
+        // top-level TOMIX_MODEL_LOAD_FAILED handler instead of becoming TOMIX_DEPLOY_FAILED.
+        await Assert.ThrowsAsync<ModelLoadException>(() => handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("broken.bim"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                DeployFull: false,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null),
+            CancellationToken.None));
+    }
+
+    private sealed class BrokenModelDeployProvider : IModelProvider
+    {
+        public bool CanOpen(ModelReference _) => true;
+
+        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
+            => Task.FromResult<IModelSession>(new BrokenModelDeploySession());
+    }
+
+    /// <summary>Loads its model lazily like the real file sessions: deploy is the first touch.</summary>
+    private sealed class BrokenModelDeploySession : IModelSession, IModelDeploySession
+    {
+        public string SourcePath => "";
+
+        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
+            => throw Load();
+
+        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
+            => throw Load();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
+            => throw Load();
+
+        public string GenerateScript(ModelDeployRequest request)
+            => throw Load();
+
+        private static ModelLoadException Load()
+            => new("Cannot load model from 'broken.bim': unparsable.", new InvalidOperationException("inner"));
+    }
+
     private sealed class StubDeployProvider : IModelProvider
     {
         public bool CanOpen(ModelReference _) => true;

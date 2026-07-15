@@ -127,7 +127,9 @@ public sealed class DeployModelHandler
             return TomixResult<DeployModelResult>.Fail("TOMIX_DEPLOY_FAILED", ex.Message, exitCode: 1,
                 hint: "Check that the target workspace exists and you have deploy permissions.");
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        // ModelLoadException stays unhandled: the source model being unloadable is not a deploy
+        // failure — the CLI's top-level handler reports it as TOMIX_MODEL_LOAD_FAILED (exit 2).
+        catch (Exception ex) when (ex is not OperationCanceledException and not ModelLoadException)
         {
             return TomixResult<DeployModelResult>.Fail("TOMIX_DEPLOY_FAILED", $"Deploy to '{server}' failed: {ex.InnerException?.Message ?? ex.Message}", exitCode: 1,
                 hint: "Check that the target workspace exists and you have deploy permissions.");

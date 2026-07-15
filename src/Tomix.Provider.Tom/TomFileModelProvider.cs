@@ -130,10 +130,22 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
         => TomModelDeployer.GenerateScript(GetDatabase(), request);
 
     private TabularDatabase GetDatabase()
-        => _database ??= TabularJsonSerializer.DeserializeDatabase(
-            ExtractDatabaseJson(File.ReadAllText(_path)),
-            new DeserializeOptions(),
-            CompatibilityMode.PowerBI);
+    {
+        if (_database is not null)
+            return _database;
+
+        try
+        {
+            return _database = TabularJsonSerializer.DeserializeDatabase(
+                ExtractDatabaseJson(File.ReadAllText(_path)),
+                new DeserializeOptions(),
+                CompatibilityMode.PowerBI);
+        }
+        catch (Exception ex)
+        {
+            throw new ModelLoadException($"Cannot load model from '{_path}': {ex.Message}", ex);
+        }
+    }
 
     private static string ExtractDatabaseJson(string json)
     {

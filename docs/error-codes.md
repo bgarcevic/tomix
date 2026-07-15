@@ -198,6 +198,7 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_NO_PROVIDER` | 2 | No registered provider can open the model. |
+| `TOMIX_MODEL_LOAD_FAILED` | 2 | A provider matched the model but its source could not be loaded (unparsable TMDL/BIM, unresolvable references, unreadable file). The provider's message describes what failed; the command never ran. |
 | `TOMIX_NO_MODEL` | 2 | No model reference was provided and none could be inferred. |
 | `TOMIX_CONNECT_FAILED` | 1 | `connect` failed to establish a session. |
 | `TOMIX_CONNECT_INVALID_TARGET` | 1 | `connect` was given a server that is neither a remote endpoint nor a local model path. |

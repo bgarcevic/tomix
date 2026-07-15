@@ -103,7 +103,20 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
     public string GenerateScript(ModelDeployRequest request)
         => TomModelDeployer.GenerateScript(GetDatabase(), request);
 
-    private Database GetDatabase() => _database ??= TmdlSerializer.DeserializeDatabaseFromFolder(_path);
+    private Database GetDatabase()
+    {
+        if (_database is not null)
+            return _database;
+
+        try
+        {
+            return _database = TmdlSerializer.DeserializeDatabaseFromFolder(_path);
+        }
+        catch (Exception ex)
+        {
+            throw new ModelLoadException($"Cannot load TMDL model from '{_path}': {ex.Message}", ex);
+        }
+    }
 
     private static string ModelName(Database database)
         => string.IsNullOrWhiteSpace(database.Name) ? "(unnamed)" : database.Name;
