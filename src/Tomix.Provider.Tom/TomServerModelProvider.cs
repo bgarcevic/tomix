@@ -13,7 +13,7 @@ namespace Tomix.Provider.Tom;
 /// Supports read operations (summary, snapshot), mutation (add/set/rm/replace), deploy, and export.
 /// Mutations are persisted to the server via <c>Model.SaveChanges()</c> on save.
 /// </summary>
-public sealed class TomServerModelProvider : IModelProvider
+public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
 {
     private readonly IAccessTokenProvider? _tokenProvider;
 
@@ -22,6 +22,42 @@ public sealed class TomServerModelProvider : IModelProvider
     public bool CanOpen(ModelReference reference) => reference.IsRemote;
 
     public async Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
+    {
+        var server = await ConnectServerAsync(reference, cancellationToken).ConfigureAwait(false);
+        return new TomServerModelSession(server, ResolveDatabase(server, reference.Database), _tokenProvider);
+    }
+
+    public bool CanList(ModelReference endpoint) => endpoint.IsRemote;
+
+    public async Task<IReadOnlyList<ServerDatabaseInfo>> ListDatabasesAsync(
+        ModelReference endpoint,
+        CancellationToken cancellationToken)
+    {
+        var server = await ConnectServerAsync(endpoint with { Database = null }, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var databases = new List<ServerDatabaseInfo>(server.Databases.Count);
+            foreach (TabularDatabase database in server.Databases)
+            {
+                databases.Add(new ServerDatabaseInfo(
+                    string.IsNullOrWhiteSpace(database.Name) ? database.ID : database.Name,
+                    database.CompatibilityLevel,
+                    database.LastUpdate == default
+                        ? null
+                        : new DateTimeOffset(DateTime.SpecifyKind(database.LastUpdate, DateTimeKind.Utc))));
+            }
+
+            return databases;
+        }
+        finally
+        {
+            if (server.Connected)
+                server.Disconnect();
+            server.Dispose();
+        }
+    }
+
+    private async Task<TabularServer> ConnectServerAsync(ModelReference reference, CancellationToken cancellationToken)
     {
         var server = new TabularServer();
 
@@ -41,7 +77,7 @@ public sealed class TomServerModelProvider : IModelProvider
         }
 
         server.Connect(BuildConnectionString(reference));
-        return new TomServerModelSession(server, ResolveDatabase(server, reference.Database), _tokenProvider);
+        return server;
     }
 
     private static string BuildConnectionString(ModelReference reference)

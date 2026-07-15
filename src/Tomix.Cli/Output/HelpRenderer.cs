@@ -80,8 +80,10 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ],
         ["connect"] = [
             "tx connect",
+            "tx connect --remote",
             "tx connect MyWorkspace Sales",
             "tx connect ./model.tmdl",
+            "tx connect ./model.tmdl -w",
             "tx connect --local",
             "tx connect ./model.tmdl -w MyWorkspace Sales",
         ],

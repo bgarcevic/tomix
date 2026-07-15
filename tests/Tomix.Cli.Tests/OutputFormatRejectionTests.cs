@@ -23,7 +23,7 @@ public sealed class OutputFormatRejectionTests
             "auth" => new AuthCommand(),
             "bpa" => new BpaCommand(NoProviders),
             "config" => new ConfigCommand(),
-            "connect" => new ConnectCommand(NoProviders),
+            "connect" => new ConnectCommand(NoProviders, FakeWorkspaceCatalog.Empty, () => null),
             "deploy" => new DeployCommand(NoProviders),
             "diff" => new DiffCommand(NoProviders),
             "doctor" => new DoctorCommand("0.0.0-test"),

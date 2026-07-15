@@ -9,6 +9,10 @@ namespace Tomix.Cli.Tests;
 /// the missing-argument parse errors the way the built-in HelpAction does. Help must exit 0 on
 /// every command so <c>tx &lt;cmd&gt; --help &amp;&amp; ...</c> scripting works.
 /// </summary>
+// Renders help through the global AnsiConsole; joins the console-state collection so it never
+// runs concurrently with tests that swap Console.Out (e.g. GetLsParityTests), which would
+// otherwise capture the root-help banner in their redirected stdout.
+[Collection(ConsoleStateCollection.Name)]
 public sealed class HelpExitCodeTests
 {
     private static RootCommand BuildRoot()

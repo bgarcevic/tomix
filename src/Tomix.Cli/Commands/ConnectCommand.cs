@@ -3,6 +3,7 @@ using Tomix.App.Connect;
 using Tomix.App.Info;
 using Tomix.App.State;
 using Tomix.Cli.Output;
+using Tomix.Core.Authentication;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Spectre.Console;
@@ -12,8 +13,18 @@ namespace Tomix.Cli.Commands;
 internal sealed class ConnectCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IWorkspaceCatalog _workspaceCatalog;
+    private readonly Func<string?> _cachedUsername;
 
-    public ConnectCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    public ConnectCommand(
+        IReadOnlyList<IModelProvider> providers,
+        IWorkspaceCatalog workspaceCatalog,
+        Func<string?> cachedUsername)
+    {
+        _providers = providers;
+        _workspaceCatalog = workspaceCatalog;
+        _cachedUsername = cachedUsername;
+    }
 
     public Command Build()
     {
@@ -24,14 +35,19 @@ internal sealed class ConnectCommand : ICommandModule
         };
         var databaseArgument = new Argument<string>("database")
         {
-            Description = "Semantic model name (omit to list all models on workspace)",
+            Description = "Semantic model name (omit on a TTY to pick from the workspace's models).",
             Arity = ArgumentArity.ZeroOrOne
         };
         var workspaceOption = new Option<string?>("--workspace")
         {
-            Description = "Enable workspace mode: mirror saves between the primary source and a secondary target. Primary remote -> pass a local folder or .bim file. Primary local -> pass <server> <database>."
+            Description = "Enable workspace mode: mirror saves between the primary source and a secondary target. Primary remote -> pass a local folder or .bim file. Primary local -> pass <server> <database>. Pass -w with no value to pick the target workspace and model interactively.",
+            Arity = ArgumentArity.ZeroOrOne
         };
         workspaceOption.Aliases.Add("-w");
+        var remoteOption = new Option<bool>("--remote")
+        {
+            Description = "Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login')."
+        };
         var profileOption = new Option<string?>("--profile")
         {
             Description = "Activate a saved connection profile (see: tx profile list)"
@@ -59,6 +75,7 @@ internal sealed class ConnectCommand : ICommandModule
             serverArgument,
             databaseArgument,
             workspaceOption,
+            remoteOption,
             profileOption,
             clearOption,
             forceOption,
@@ -90,6 +107,43 @@ internal sealed class ConnectCommand : ICommandModule
             var force = parseResult.GetValue(forceOption);
             var auth = GlobalOptions.AuthValue(parseResult);
             var local = parseResult.GetValue(GlobalOptions.Local);
+            var remote = parseResult.GetValue(remoteOption);
+            // ArgumentArity.ZeroOrOne surfaces both "absent" and "bare -w" as null from GetValue;
+            // gate on GetResult so a valueless -w (present, no value) is distinguishable from absent.
+            var workspacePresent = parseResult.GetResult(workspaceOption) is not null;
+            var canPrompt = InteractionGate.CanPrompt(parseResult, format);
+
+            // --remote: interactive server-only connect. Pick a workspace and model from the tenant,
+            // then fall through into the normal remote pipeline with those values filled in.
+            if (remote)
+            {
+                if (!string.IsNullOrWhiteSpace(server) || !string.IsNullOrWhiteSpace(database) ||
+                    !string.IsNullOrWhiteSpace(profile) || workspacePresent || local)
+                    return RenderWorkspaceOptionError("--remote cannot be combined with a server/database, --local, --profile, or --workspace.");
+
+                if (!canPrompt)
+                    return RenderInteractiveRequired(
+                        parseResult,
+                        "connect --remote is interactive and needs a TTY.",
+                        "Pass the workspace and model explicitly: tx connect <workspace> <database>");
+
+                var pickedRemote = await ResolveRemoteInteractiveAsync(cancellationToken);
+                if (pickedRemote is null)
+                    return 1;
+
+                (server, database) = pickedRemote.Value;
+            }
+
+            // Recovery: `tx connect -w model.bim` — the ZeroOrOne option greedily consumed the model
+            // path as its value. Reinterpret it as the primary model and treat -w as valueless.
+            if (ShouldReinterpretWorkspaceAsModel(server, workspace, workspacePresent))
+            {
+                ErrConsole().MarkupLine(Styling.Muted($"Treating '{Styling.MarkupEscape(workspace!)}' as the model; -w had no value."));
+                server = workspace;
+                workspace = null;
+            }
+
+            var workspaceValueless = workspacePresent && string.IsNullOrWhiteSpace(workspace);
 
             if (local &&
                 string.IsNullOrWhiteSpace(database) &&
@@ -99,6 +153,81 @@ internal sealed class ConnectCommand : ICommandModule
                 database = server;
                 server = null;
             }
+
+            // Interactive fill-in for missing pieces (TTY only; non-TTY keeps today's errors below).
+            // Fills `workspace` / `database` so the existing validation and mirror logic run unchanged.
+            // Skipped for --remote, which already resolved both above (a null database there means the
+            // user deliberately chose "workspace only" and must not be re-prompted).
+            if (canPrompt && !local && !remote)
+            {
+                var primaryIsLocalModel = !string.IsNullOrWhiteSpace(server) &&
+                                          !ModelReference.IsRemoteEndpoint(server) &&
+                                          LooksLikeLocalModelPath(server);
+
+                // Local model + valueless -w: pick the remote mirror workspace.
+                if (workspaceValueless && primaryIsLocalModel &&
+                    string.IsNullOrWhiteSpace(profile))
+                {
+                    var picked = await PickWorkspaceAsync(cancellationToken);
+                    if (picked is null)
+                        return 1;
+                    workspace = picked.XmlaEndpoint;
+                    workspaceValueless = false;
+                }
+
+                // Local model + remote mirror workspace known but no dataset: pick or create one.
+                if (primaryIsLocalModel &&
+                    !string.IsNullOrWhiteSpace(workspace) &&
+                    string.IsNullOrWhiteSpace(database) &&
+                    ModelReference.IsRemoteEndpoint(ModelReference.NormalizeEndpoint(workspace)))
+                {
+                    var suggestion = ConnectPrompts.SuggestMirrorDatabaseName(ModelNameFromPath(server!), _cachedUsername());
+                    var selection = await PickDatabaseAsync(
+                        ModelReference.Remote(ModelReference.NormalizeEndpoint(workspace)),
+                        allowCreateNew: true, allowWorkspaceOnly: false, suggestion, cancellationToken);
+                    if (selection is null)
+                        return 1; // listing failed — do not save a half-configured mirror
+                    database = selection.Value.Name; // workspace-only is not offered here
+                }
+
+                // Remote primary without a dataset (no mirror): pick a model, or connect workspace-only.
+                if (!primaryIsLocalModel &&
+                    !workspacePresent &&
+                    !string.IsNullOrWhiteSpace(server) &&
+                    ModelReference.IsRemoteEndpoint(ModelReference.NormalizeEndpoint(server)) &&
+                    !ModelReference.IsLocalInstanceEndpoint(ModelReference.NormalizeEndpoint(server)) &&
+                    string.IsNullOrWhiteSpace(database))
+                {
+                    var selection = await PickDatabaseAsync(
+                        ModelReference.Remote(ModelReference.NormalizeEndpoint(server)),
+                        allowCreateNew: false, allowWorkspaceOnly: true, null, cancellationToken);
+                    if (selection is null)
+                        return 1; // listing failed — do not overwrite the active connection
+                    database = selection.Value.IsWorkspaceOnly ? null : selection.Value.Name;
+                }
+
+                // Remote primary + valueless -w: -w is a local mirror folder — prompt for the path.
+                if (workspaceValueless && !primaryIsLocalModel &&
+                    !string.IsNullOrWhiteSpace(server) &&
+                    ModelReference.IsRemoteEndpoint(ModelReference.NormalizeEndpoint(server)))
+                {
+                    var suggested = "./" + (string.IsNullOrWhiteSpace(database) ? "workspace" : SlugPath(database));
+                    var folder = await ErrConsole().PromptAsync(
+                        new TextPrompt<string>("Local workspace folder:").DefaultValue(suggested),
+                        cancellationToken);
+                    workspace = folder.Trim();
+                    workspaceValueless = false;
+                }
+            }
+
+            // A valueless -w that could not be resolved interactively (non-TTY, --non-interactive,
+            // --quiet, or json/csv output) has no target — surface the same machine-readable
+            // TOMIX_INTERACTIVE_REQUIRED diagnostic as --remote, with the flag-equivalent hint.
+            if (workspaceValueless)
+                return RenderInteractiveRequired(
+                    parseResult,
+                    "-w with no value needs an interactive terminal to pick the workspace.",
+                    "Pass the target explicitly: tx connect <model> <database> -w <workspace>.");
 
             if (!string.IsNullOrWhiteSpace(workspace))
             {
@@ -366,9 +495,116 @@ internal sealed class ConnectCommand : ICommandModule
 
     private static int RenderWorkspaceOptionError(string message)
     {
-        var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
-        err.MarkupLine(Styling.Error(Styling.MarkupEscape(message)));
+        ErrConsole().MarkupLine(Styling.Error(Styling.MarkupEscape(message)));
         return 1;
+    }
+
+    // An interactive-only flow (--remote, valueless -w) was invoked without a usable TTY. Emit the
+    // documented TOMIX_INTERACTIVE_REQUIRED diagnostic through ErrorOutput so --error-format json
+    // callers can detect the condition, and exit 1.
+    private static int RenderInteractiveRequired(ParseResult parseResult, string message, string hint)
+    {
+        ErrorOutput.Write(
+            new[] { new TomixDiagnostic("TOMIX_INTERACTIVE_REQUIRED", DiagnosticSeverity.Error, message, Hint: hint) },
+            parseResult.GetValue(GlobalOptions.ErrorFormat));
+        return 1;
+    }
+
+    private static IAnsiConsole ErrConsole()
+        => AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+
+    // Detects `tx connect -w model.bim`, where the ZeroOrOne -w option greedily consumed the model
+    // path as its value while the server argument stayed empty. Reinterpreted by the caller as a
+    // local primary with a valueless -w.
+    internal static bool ShouldReinterpretWorkspaceAsModel(string? server, string? workspaceValue, bool workspacePresent)
+        => workspacePresent
+           && !string.IsNullOrWhiteSpace(workspaceValue)
+           && string.IsNullOrWhiteSpace(server)
+           && LooksLikeLocalModelPath(workspaceValue);
+
+    private async Task<(string Server, string? Database)?> ResolveRemoteInteractiveAsync(CancellationToken cancellationToken)
+    {
+        var workspace = await PickWorkspaceAsync(cancellationToken);
+        if (workspace is null)
+            return null;
+
+        var selection = await PickDatabaseAsync(
+            ModelReference.Remote(workspace.XmlaEndpoint),
+            allowCreateNew: false, allowWorkspaceOnly: true, suggestedNewName: null, cancellationToken);
+        if (selection is null)
+            return null; // listing failed — do not fall through to "workspace only"
+
+        return (workspace.XmlaEndpoint, selection.Value.IsWorkspaceOnly ? null : selection.Value.Name);
+    }
+
+    private async Task<WorkspaceInfo?> PickWorkspaceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ConnectPrompts.PickWorkspaceAsync(ErrConsole(), _workspaceCatalog, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            RenderInteractiveError(ex);
+            return null;
+        }
+    }
+
+    // Returns the model selection, or null on failure (listing error, expired auth, or no catalog).
+    // A null here means "could not resolve" and must NOT be treated as an explicit workspace-only
+    // choice — callers stop with exit 1 rather than saving a connection.
+    private async Task<ConnectPrompts.DatabaseSelection?> PickDatabaseAsync(
+        ModelReference endpoint,
+        bool allowCreateNew,
+        bool allowWorkspaceOnly,
+        string? suggestedNewName,
+        CancellationToken cancellationToken)
+    {
+        var catalog = _providers.OfType<IServerCatalog>().FirstOrDefault(c => c.CanList(endpoint));
+        if (catalog is null)
+        {
+            RenderInteractiveError(new InvalidOperationException(
+                $"No provider can list models on '{endpoint.Value}'."));
+            return null;
+        }
+
+        try
+        {
+            return await ConnectPrompts.PickDatabaseAsync(
+                ErrConsole(), catalog, endpoint, allowCreateNew, allowWorkspaceOnly, suggestedNewName, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            RenderInteractiveError(ex);
+            return null;
+        }
+    }
+
+    private static void RenderInteractiveError(Exception ex)
+    {
+        var (code, hint) = ex is AuthenticationRequiredException
+            ? ("TOMIX_AUTH_REQUIRED", "Run 'tx auth login', then retry.")
+            : ("TOMIX_REMOTE_LIST_FAILED", (string?)null);
+        ErrorOutput.Write(
+            new[] { new TomixDiagnostic(code, DiagnosticSeverity.Error, ex.Message, Hint: hint) },
+            null);
+    }
+
+    // Model name for the autogenerated mirror-dataset suggestion: a .bim/.tmsl file's name without
+    // extension, else the containing folder's name (TMDL/TE folder).
+    private static string ModelNameFromPath(string path)
+    {
+        var trimmed = path.TrimEnd('/', '\\');
+        var name = Directory.Exists(trimmed)
+            ? System.IO.Path.GetFileName(trimmed)
+            : System.IO.Path.GetFileNameWithoutExtension(trimmed);
+        return string.IsNullOrWhiteSpace(name) ? "model" : name;
+    }
+
+    private static string SlugPath(string value)
+    {
+        var slug = new string(value.Trim().Select(ch => char.IsAsciiLetterOrDigit(ch) ? ch : '-').ToArray());
+        return slug.Trim('-') is { Length: > 0 } s ? s : "workspace";
     }
 
     private static bool LooksLikeLocalModelPath(string? value)

@@ -105,4 +105,26 @@ public class ConnectCommandWorkspaceTests
     [InlineData("Contoso_core", "   ")]
     public void ResolveWorkspaceDatabase_BlankRemote_FallsBackToRequested(string requested, string? resolved)
         => Assert.Equal(requested, ConnectCommand.ResolveWorkspaceDatabase(requested, resolved));
+
+    // `tx connect -w ./model.bim`: the valueless -w greedily consumed the model path while the
+    // server argument stayed empty. Reinterpret it as the primary model with a valueless -w.
+    [Theory]
+    [InlineData("./model.bim")]
+    [InlineData("/abs/path/model")]
+    [InlineData("C:\\models\\sales.bim")]
+    public void ShouldReinterpretWorkspaceAsModel_SwallowedPath_True(string swallowed)
+        => Assert.True(ConnectCommand.ShouldReinterpretWorkspaceAsModel(server: null, swallowed, workspacePresent: true));
+
+    // Not a swallow: server already set, -w absent, blank -w value, or a bare name that is not a path.
+    [Fact]
+    public void ShouldReinterpretWorkspaceAsModel_ServerSet_False()
+        => Assert.False(ConnectCommand.ShouldReinterpretWorkspaceAsModel(server: "MyWorkspace", "./model.bim", workspacePresent: true));
+
+    [Fact]
+    public void ShouldReinterpretWorkspaceAsModel_WorkspaceAbsent_False()
+        => Assert.False(ConnectCommand.ShouldReinterpretWorkspaceAsModel(server: null, "./model.bim", workspacePresent: false));
+
+    [Fact]
+    public void ShouldReinterpretWorkspaceAsModel_BareName_False()
+        => Assert.False(ConnectCommand.ShouldReinterpretWorkspaceAsModel(server: null, "SalesWorkspace", workspacePresent: true));
 }

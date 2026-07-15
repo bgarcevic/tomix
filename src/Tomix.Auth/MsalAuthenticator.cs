@@ -113,6 +113,23 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
             TokenAccount: state.Username, TokenTenantId: state.TenantId);
     }
 
+    /// <summary>
+    /// Username recorded at the last login, read from the sidecar state file only — never
+    /// touches MSAL or the OS keystore, so it is safe to call on any code path (keystore
+    /// access can block or prompt; see <see cref="GetTokenAsync"/>).
+    /// </summary>
+    public string? CachedUsername()
+    {
+        try
+        {
+            return _stateStore.Load()?.Username;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<bool> LogoutAsync(CancellationToken cancellationToken)
     {
         var hadState = _stateStore.Delete();
