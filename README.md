@@ -66,7 +66,8 @@ Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 Discover: `ls`, `get`, `find`, `deps`
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
 formatter APIs), `script` (run C# scripts against a model)
-Connect: `connect`, `deploy`, `refresh`, `load`, `save`, `auth`, `session`
+Connect: `connect`, `deploy`, `refresh`, `query` (run DAX/DMV queries against
+a live model), `load`, `save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
 `vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
@@ -97,8 +98,7 @@ to stdout.
 
 This is a proof of concept under active development. The command surface is
 settling but not settled; JSON field names and exit codes may still change
-before 1.0. `query`, `test`, and `incremental-refresh` exist as
-placeholders and are not implemented yet.
+before 1.0.
 
 If you try it and something breaks or reads wrong, an issue with the output
 of `tx doctor` attached is genuinely useful at this stage.

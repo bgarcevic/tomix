@@ -48,22 +48,7 @@ internal sealed class CompatibilityStubCommand : ICommandModule
         return command;
     }
 
-    public static IReadOnlyList<CompatibilityStubCommand> All() =>
-    [
-        New("query", "Execute a DAX query against a deployed model (-q inline, -f file, or stdin)",
-            options:
-            [
-                Value("--query", "-q"),
-                Value("--file"),
-                Value("--limit"),
-                Value("--output-file", "-o"),
-                Flag("--no-validate"),
-                Flag("--trace"),
-                Flag("--cold"),
-                Flag("--plan"),
-                Value("--runs")
-            ])
-    ];
+    public static IReadOnlyList<CompatibilityStubCommand> All() => [];
 
     private static CompatibilityStubCommand New(
         string name,

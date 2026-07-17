@@ -12,7 +12,10 @@ internal static class JsonOutput
     private static readonly JsonSerializerOptions Options = CreateOptions();
 
     public static void Write<T>(T value)
-        => Console.WriteLine(JsonSerializer.Serialize(value, Options));
+        => Console.WriteLine(Serialize(value));
+
+    public static string Serialize<T>(T value)
+        => JsonSerializer.Serialize(value, Options);
 
     private static JsonSerializerOptions CreateOptions()
     {

@@ -22,6 +22,7 @@ Shared output wiring for all commands.
 - `DidYouMean` — Levenshtein-based "Did you mean?" suggestion helper for unknown subcommands.
 - `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
+- `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer).
 - `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions.
 
 ## Color Strategy
@@ -48,5 +49,5 @@ Key rules:
 - Do not hand-roll JSON output; serialize through `JsonOutput`.
 - Do not add Spectre.Console usages outside this directory and `Commands/`.
 - Do not reference provider-specific types.
-- Keep `LsRenderer` as the only command-specific renderer factored into a separate file.
+- Keep `LsRenderer` and `QueryResultRenderer` as the only command-specific renderers factored into separate files.
 - When adding new styling, extend `Styling.cs` — do not create per-command color constants.

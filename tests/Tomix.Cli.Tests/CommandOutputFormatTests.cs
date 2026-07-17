@@ -25,4 +25,19 @@ public sealed class CommandOutputFormatTests
     [Fact]
     public void InvalidFormat_IsStillRejected()
         => Assert.False(CommandOutput.TryValidateFormat("yaml", "find", OutputFormats.Text, OutputFormats.Json));
+
+    [Theory]
+    [InlineData("text")]
+    [InlineData("json")]
+    [InlineData("csv")]
+    [InlineData("auto")]
+    public void Query_SupportedFormats_PassValidation(string format)
+        => Assert.True(CommandOutput.TryValidateFormat(format, "query", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv));
+
+    [Theory]
+    [InlineData("tmdl")]
+    [InlineData("bim")]
+    [InlineData("tmsl")]
+    public void Query_UnsupportedFormats_AreRejected(string format)
+        => Assert.False(CommandOutput.TryValidateFormat(format, "query", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv));
 }

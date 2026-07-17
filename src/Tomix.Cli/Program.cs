@@ -130,8 +130,6 @@ internal static class Program
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
 
-        var stubs = CompatibilityStubCommand.All().ToDictionary(command => command.Name);
-
         var modules = new ICommandModule[]
         {
             new AddCommand(providers),
@@ -157,7 +155,7 @@ internal static class Program
             new LsCommand(providers),
             new MvCommand(providers),
             new ProfileCommand(),
-            stubs["query"],
+            new QueryCommand(providers),
             new RefreshCommand(providers),
             new ReplaceCommand(providers),
             new RmCommand(providers),

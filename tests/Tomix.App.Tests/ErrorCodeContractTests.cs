@@ -102,6 +102,23 @@ public sealed class ErrorCodeContractTests
         Assert.Equal(2, result.ExitCode);
     }
 
+    // ── Query error codes ───────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("TOMIX_QUERY_REQUIRED")]
+    [InlineData("TOMIX_QUERY_INPUT_CONFLICT")]
+    [InlineData("TOMIX_QUERY_FILE_NOT_FOUND")]
+    [InlineData("TOMIX_QUERY_BAD_PARAM")]
+    [InlineData("TOMIX_QUERY_OUTPUT_FORMAT")]
+    [InlineData("TOMIX_QUERY_INVALID")]
+    [InlineData("TOMIX_QUERY_NO_REMOTE_TARGET")]
+    [InlineData("TOMIX_QUERY_UNSUPPORTED")]
+    [InlineData("TOMIX_QUERY_FAILED")]
+    public void QueryErrorCodes_AreValidUppercaseSnakeCase(string code)
+    {
+        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
+    }
+
     // ── Incremental-refresh error codes ─────────────────────────────────────
 
     [Theory]

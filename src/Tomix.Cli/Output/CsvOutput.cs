@@ -7,11 +7,17 @@ internal static class CsvOutput
     public static void Write(
         IReadOnlyList<string> headers,
         IEnumerable<IReadOnlyList<object?>> rows)
+        => Write(Console.Out, headers, rows);
+
+    public static void Write(
+        TextWriter writer,
+        IReadOnlyList<string> headers,
+        IEnumerable<IReadOnlyList<object?>> rows)
     {
-        Console.WriteLine(string.Join(",", headers.Select(Escape)));
+        writer.WriteLine(string.Join(",", headers.Select(Escape)));
 
         foreach (var row in rows)
-            Console.WriteLine(string.Join(",", row.Select(value => Escape(Format(value)))));
+            writer.WriteLine(string.Join(",", row.Select(value => Escape(Format(value)))));
     }
 
     public static void WriteValue(object? value)

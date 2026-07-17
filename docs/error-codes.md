@@ -122,6 +122,20 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_REFRESH_BAD_PARTITION` | 2 | A `--partition` value was not formatted as `TableName.PartitionName`. |
 | `TOMIX_REFRESH_FAILED` | 1 | The refresh command was rejected by the server (table not found, no permissions, etc.). |
 
+## Query Codes (`TOMIX_QUERY_*`)
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_QUERY_REQUIRED` | 2 | `query` called without `-q`, `--file`, or piped stdin. |
+| `TOMIX_QUERY_INPUT_CONFLICT` | 2 | `-q` and `--file` were passed together; choose one. |
+| `TOMIX_QUERY_FILE_NOT_FOUND` | 2 | The `--file` path does not exist. |
+| `TOMIX_QUERY_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
+| `TOMIX_QUERY_OUTPUT_FORMAT` | 2 | `-o`/`--output-file` could not resolve a json or csv format (pass `--output-format json\|csv` or use a `.json`/`.csv` extension). |
+| `TOMIX_QUERY_INVALID` | 2 | The query does not start with `EVALUATE`, `DEFINE`, or `SELECT`; bypass with `--no-validate`. |
+| `TOMIX_QUERY_NO_REMOTE_TARGET` | 2 | `query` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
+| `TOMIX_QUERY_UNSUPPORTED` | 2 | The provider session does not implement `IModelQuerySession` (e.g. a local TMDL/BIM model). |
+| `TOMIX_QUERY_FAILED` | 1 | The query was rejected or failed on the server (DAX error, no permissions, timeout, etc.). |
+
 ## Incremental Refresh Codes (`TOMIX_REFRESH_POLICY_*`)
 
 Emitted by `incremental-refresh` (show/set/rm/apply).

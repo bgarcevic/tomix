@@ -10,7 +10,7 @@ public sealed class TomServerModelSessionTests
     {
         using var server = new Server();
         var database = NewDatabase();
-        await using var session = new TomServerModelSession(server, database, null);
+        await using var session = new TomServerModelSession(server, database, new ModelReference("localhost:0"), null);
 
         Assert.IsAssignableFrom<IModelMutationSession>(session);
     }
@@ -20,7 +20,7 @@ public sealed class TomServerModelSessionTests
     {
         using var server = new Server();
         var database = WithSales();
-        await using var session = new TomServerModelSession(server, database, null);
+        await using var session = new TomServerModelSession(server, database, new ModelReference("localhost:0"), null);
         var mutator = (IModelMutationSession)session;
 
         var result = mutator.AddObject(new ModelObjectAddRequest(
@@ -36,7 +36,7 @@ public sealed class TomServerModelSessionTests
     {
         using var server = new Server();
         var database = WithSalesMeasure();
-        await using var session = new TomServerModelSession(server, database, null);
+        await using var session = new TomServerModelSession(server, database, new ModelReference("localhost:0"), null);
         var mutator = (IModelMutationSession)session;
 
         var result = mutator.SetProperty(new ModelObjectSetRequest(
@@ -51,7 +51,7 @@ public sealed class TomServerModelSessionTests
     {
         using var server = new Server();
         var database = WithSalesMeasure();
-        await using var session = new TomServerModelSession(server, database, null);
+        await using var session = new TomServerModelSession(server, database, new ModelReference("localhost:0"), null);
         var mutator = (IModelMutationSession)session;
 
         var result = mutator.RemoveObject(new ModelObjectRemoveRequest("Sales/Revenue", null, IfExists: false));
@@ -65,7 +65,7 @@ public sealed class TomServerModelSessionTests
     {
         using var server = new Server();
         var database = WithSalesMeasure();
-        await using var session = new TomServerModelSession(server, database, null);
+        await using var session = new TomServerModelSession(server, database, new ModelReference("localhost:0"), null);
         var mutator = (IModelMutationSession)session;
 
         var result = mutator.ReplaceText(new ModelReplaceRequest(

@@ -144,7 +144,7 @@ public sealed class TomModelRefresherTests
     {
         using var server = new Server();
         var db = NewDatabase();
-        await using var session = new TomServerModelSession(server, db, null);
+        await using var session = new TomServerModelSession(server, db, new ModelReference("localhost:0"), null);
 
         Assert.IsAssignableFrom<IModelRefreshSession>(session);
     }
@@ -154,7 +154,7 @@ public sealed class TomModelRefresherTests
     {
         using var server = new Server();
         var db = NewDatabase();
-        await using var session = new TomServerModelSession(server, db, null);
+        await using var session = new TomServerModelSession(server, db, new ModelReference("localhost:0"), null);
         var refresher = (IModelRefreshSession)session;
 
         var script = refresher.GenerateRefreshScript(
