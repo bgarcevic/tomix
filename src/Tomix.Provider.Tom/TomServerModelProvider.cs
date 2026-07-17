@@ -227,6 +227,7 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
 
     public Task<ModelQueryResult> ExecuteQueryAsync(
         ModelQueryRequest request,
+        TextWriter? traceWriter,
         CancellationToken cancellationToken)
         // Rebuild the connection string with the *resolved* database so single-database
         // endpoints opened without --database still target the right catalog over ADOMD.
@@ -234,8 +235,11 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
             TomServerModelProvider.BuildConnectionString(_reference with { Database = ModelName() }),
             _reference,
             ModelName(),
+            // ClearCache needs the database *ID* (DaxStudio prefers ID, falls back to Name).
+            string.IsNullOrWhiteSpace(_database.ID) ? ModelName() : _database.ID,
             _tokenProvider,
             request,
+            traceWriter,
             cancellationToken);
 
     private string ModelName()

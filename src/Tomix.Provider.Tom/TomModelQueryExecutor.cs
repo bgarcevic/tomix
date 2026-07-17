@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security;
 using Microsoft.AnalysisServices.AdomdClient;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
@@ -12,6 +13,13 @@ namespace Tomix.Provider.Tom;
 /// <c>TomServerModelSession.ExecuteQueryAsync</c>. ADOMD cannot share the AMO connection,
 /// so a fresh <see cref="AdomdConnection"/> is opened per query using the same endpoint
 /// and token plumbing as <see cref="TomServerModelProvider.OpenAsync"/>.
+/// <para>
+/// Perf options: with <c>Trace</c>/<c>Plan</c> a <see cref="TomQueryTraceSink"/> captures
+/// server timings and query plans; with <c>ClearCache</c> the model cache is flushed (and warmed)
+/// before each run; with <c>Runs &gt; 1</c> the query is repeated for benchmarking. All perf
+/// features are best-effort — the rowset is always returned even when tracing/clear-cache is
+/// unavailable (they need admin rights on the endpoint).
+/// </para>
 /// </summary>
 public static class TomModelQueryExecutor
 {
@@ -19,14 +27,17 @@ public static class TomModelQueryExecutor
         string connectionString,
         ModelReference reference,
         string databaseName,
+        string databaseId,
         IAccessTokenProvider? tokenProvider,
         ModelQueryRequest request,
+        TextWriter? traceWriter,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         using var connection = new AdomdConnection(connectionString);
 
+        Func<AsAccessToken>? tokenFactory = null;
         if (!reference.IsLocalInstance)
         {
             if (tokenProvider is null)
@@ -34,12 +45,14 @@ public static class TomModelQueryExecutor
 
             var token = await tokenProvider.GetTokenAsync(reference.Value, cancellationToken).ConfigureAwait(false);
             connection.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
-            connection.OnAccessTokenExpired = _ =>
+            // Shared by the ADOMD connection's expiry callback and the trace connection.
+            tokenFactory = () =>
             {
                 var refreshed = tokenProvider.GetTokenAsync(reference.Value, cancellationToken)
                     .ConfigureAwait(false).GetAwaiter().GetResult();
                 return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
             };
+            connection.OnAccessTokenExpired = _ => tokenFactory();
         }
 
         using var command = new AdomdCommand(request.Query);
@@ -58,32 +71,75 @@ public static class TomModelQueryExecutor
             catch { /* connection may already be closed */ }
         });
 
-        var sw = Stopwatch.StartNew();
+        var runs = Math.Max(1, request.Runs);
+
         try
         {
             return await Task.Run(() =>
             {
                 connection.Open();
                 command.Connection = connection;
-                using var reader = command.ExecuteReader();
 
-                var columns = ReadColumns(reader);
-                var rows = new List<IReadOnlyList<object?>>();
+                // Attach a trace only when timings or plans are requested. Best-effort: a null sink
+                // (no admin rights) means the query still runs, just without server timings.
+                using var sink = request.Trace || request.Plan
+                    ? TomQueryTraceSink.Attach(connectionString, tokenFactory, connection.SessionID, request.Plan, traceWriter)
+                    : null;
+
+                List<QueryColumn> columns = [];
+                List<IReadOnlyList<object?>> rows = [];
                 var truncated = false;
+                var runResults = new List<QueryRun>(runs);
+                var coldWarned = false;
 
-                while (reader.Read())
+                for (var run = 1; run <= runs; run++)
                 {
-                    if (request.MaxRows is { } cap && rows.Count >= cap)
+                    // A run is only "cold" if the cache actually cleared; a best-effort clear that
+                    // failed (no admin rights / shared capacity) leaves the cache warm.
+                    var cold = false;
+                    if (request.ClearCache)
+                        (cold, coldWarned) = ClearCache(connection, databaseId, coldWarned);
+
+                    sink?.StartRun();
+                    var runStopwatch = Stopwatch.StartNew();
+                    using (var reader = command.ExecuteReader())
                     {
-                        truncated = true;
-                        break;
+                        if (run == 1)
+                        {
+                            columns = ReadColumns(reader);
+                            while (reader.Read())
+                            {
+                                if (request.MaxRows is { } cap && rows.Count >= cap)
+                                {
+                                    truncated = true;
+                                    break;
+                                }
+                                rows.Add(MapRow(reader, columns.Count));
+                            }
+                        }
+                        else
+                        {
+                            DrainReader(reader, request.MaxRows);
+                        }
                     }
-                    rows.Add(MapRow(reader, columns.Count));
+                    runStopwatch.Stop();
+
+                    var timings = sink is { Active: true }
+                        ? sink.WaitForRun(TimeSpan.FromSeconds(5))
+                        : null;
+                    runResults.Add(new QueryRun(run, cold, runStopwatch.ElapsedMilliseconds, timings));
                 }
 
-                sw.Stop();
+                var plans = sink?.BuildPlans();
                 return new ModelQueryResult(
-                    reference.Value, databaseName, columns, rows, truncated, sw.ElapsedMilliseconds);
+                    reference.Value,
+                    databaseName,
+                    columns,
+                    rows,
+                    truncated,
+                    runResults[0].ClientMs,
+                    runResults,
+                    plans);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (AdomdException ex) when (cancellationToken.IsCancellationRequested)
@@ -95,6 +151,54 @@ public static class TomModelQueryExecutor
             // Never leak ADOMD types past the provider boundary; the App handler maps
             // InvalidOperationException to TOMIX_QUERY_FAILED.
             throw new InvalidOperationException(ex.Message, ex);
+        }
+    }
+
+    /// <summary>
+    /// Clears the model cache (database-scoped) then runs a marked warm-up query so the calculation
+    /// script re-evaluates and the following cold run isn't polluted by one-time init. Best-effort:
+    /// clearing the cache needs admin rights, so a failure warns once and leaves the cache warm.
+    /// Returns whether the cache was actually cleared (so the run can be labeled cold) and the
+    /// updated "already warned" flag.
+    /// </summary>
+    private static (bool Cleared, bool Warned) ClearCache(AdomdConnection connection, string databaseId, bool alreadyWarned)
+    {
+        try
+        {
+            var xmla =
+                "<Batch xmlns=\"http://schemas.microsoft.com/analysisservices/2003/engine\">" +
+                "<ClearCache><Object><DatabaseID>" +
+                SecurityElement.Escape(databaseId) +
+                "</DatabaseID></Object></ClearCache></Batch>";
+            using (var clear = new AdomdCommand(xmla, connection))
+                clear.ExecuteNonQuery();
+
+            using var warmup = new AdomdCommand(
+                $"EVALUATE /* {TomQueryTraceSink.InternalMarker} */ ROW(\"tomix\", 0)", connection);
+            warmup.ExecuteNonQuery();
+            return (true, alreadyWarned);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (!alreadyWarned)
+            {
+                try { Console.Error.WriteLine($"[tomix] --cold clear-cache failed (need admin rights?): {ex.Message}"); }
+                catch { /* ignore */ }
+            }
+            return (false, true);
+        }
+    }
+
+    private static void DrainReader(AdomdDataReader reader, int? maxRows)
+    {
+        var read = 0;
+        while (reader.Read())
+        {
+            if (maxRows is { } cap && read >= cap)
+                break;
+            for (var i = 0; i < reader.FieldCount; i++)
+                _ = reader.GetValue(i);
+            read++;
         }
     }
 

@@ -29,8 +29,12 @@ public sealed class QueryModelHandler
         _resolveSession = resolveSession;
     }
 
+    /// <param name="traceWriter">Optional raw XMLA trace dump sink (from <c>--trace &lt;path&gt;</c>),
+    /// threaded to the provider like <see cref="Refresh.RefreshModelHandler"/> so the App layer stays
+    /// free of console/Spectre concerns. Null disables the raw dump.</param>
     public async Task<TomixResult<QueryModelResult>> HandleAsync(
         QueryModelRequest request,
+        TextWriter? traceWriter,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Query))
@@ -79,7 +83,15 @@ public sealed class QueryModelHandler
                     hint: "Queries are only supported on live models connected via XMLA (-s <workspace> -d <model>).");
 
             var result = await querySession.ExecuteQueryAsync(
-                new ModelQueryRequest(request.Query, request.Parameters, request.Limit),
+                new ModelQueryRequest(
+                    request.Query,
+                    request.Parameters,
+                    request.Limit,
+                    Trace: request.Trace,
+                    Plan: request.Plan,
+                    ClearCache: request.Cold,
+                    Runs: request.Runs < 1 ? 1 : request.Runs),
+                traceWriter,
                 cancellationToken).ConfigureAwait(false);
 
             return TomixResult<QueryModelResult>.Ok(new QueryModelResult(
@@ -89,7 +101,10 @@ public sealed class QueryModelHandler
                 result.Rows,
                 result.Rows.Count,
                 result.Truncated,
-                result.DurationMs));
+                result.DurationMs,
+                Timings: result.Runs is { Count: > 0 } ? result.Runs[0].Timings : null,
+                Plans: result.Plans,
+                Benchmark: QueryBenchmark.Compute(result.Runs)));
         }
         catch (AuthenticationRequiredException ex)
         {

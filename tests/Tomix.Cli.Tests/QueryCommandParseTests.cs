@@ -126,4 +126,31 @@ public sealed class QueryCommandParseTests
     [Fact]
     public void ResolveOutputFileFormat_ExplicitText_IsRejected()
         => Assert.Null(QueryCommand.ResolveOutputFileFormat("out.csv", "text"));
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-2")]
+    public void Query_RunsBelowOne_FailsAtParseTime(string runs)
+    {
+        var result = Parse("query", "-q", "EVALUATE x", "--runs", runs);
+
+        Assert.Contains(result.Errors, e => e.Message.Contains("--runs must be at least 1"));
+    }
+
+    [Fact]
+    public void Query_PerfFlags_Bind()
+    {
+        // Bare --trace (ZeroOrOne) placed last so it doesn't swallow a following option as its value.
+        var result = Parse("query", "-q", "EVALUATE x", "--plan", "--cold", "--runs", "3", "--trace");
+
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void Query_TraceWithPath_Binds()
+    {
+        var result = Parse("query", "-q", "EVALUATE x", "--trace", "trace.log");
+
+        Assert.Empty(result.Errors);
+    }
 }

@@ -57,6 +57,32 @@ internal sealed class QueryCommand : ICommandModule
             Description = "Skip the EVALUATE/DEFINE/SELECT keyword pre-check and send the text as-is."
         };
 
+        var traceOption = new Option<string?>("--trace")
+        {
+            Description = "Show server timings (formula vs storage engine). Add a path to also dump raw trace events. Needs admin rights.",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
+        var planOption = new Option<bool>("--plan")
+        {
+            Description = "Show the logical and physical DAX query plans. Needs admin rights."
+        };
+
+        var coldOption = new Option<bool>("--cold")
+        {
+            Description = "Clear the model cache before each run so timings reflect a cold cache. Needs admin rights."
+        };
+
+        var runsOption = new Option<int?>("--runs")
+        {
+            Description = "Execute the query N times and report per-run timings with Avg/Min/Max/StdDev (default: 1)."
+        };
+        runsOption.Validators.Add(result =>
+        {
+            if (result.GetValueOrDefault<int?>() is < 1)
+                result.AddError("--runs must be at least 1.");
+        });
+
         var command = new Command("query", "Execute a DAX or DMV query against a live model (-q inline, --file, or stdin)")
         {
             queryOption,
@@ -64,7 +90,11 @@ internal sealed class QueryCommand : ICommandModule
             paramOption,
             limitOption,
             outputFileOption,
-            noValidateOption
+            noValidateOption,
+            traceOption,
+            planOption,
+            coldOption,
+            runsOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -128,6 +158,12 @@ internal sealed class QueryCommand : ICommandModule
                 }
             }
 
+            // --trace present enables server timings; an accompanying value (path or "-") also
+            // dumps raw trace events. Bare --trace is summary-only, so it does NOT write a raw dump.
+            var traceEnabled = parseResult.GetResult(traceOption) is not null;
+            var traceValue = parseResult.GetValue(traceOption);
+            var rawTracePath = traceEnabled && !string.IsNullOrEmpty(traceValue) ? traceValue : null;
+
             var request = new QueryModelRequest(
                 Model: GlobalOptions.ModelValue(parseResult),
                 Server: parseResult.GetValue(GlobalOptions.Server),
@@ -136,13 +172,27 @@ internal sealed class QueryCommand : ICommandModule
                 Query: query,
                 Parameters: parameters.Count > 0 ? parameters : null,
                 Limit: parseResult.GetValue(limitOption),
-                NoValidate: parseResult.GetValue(noValidateOption));
+                NoValidate: parseResult.GetValue(noValidateOption),
+                Trace: traceEnabled,
+                TracePath: rawTracePath,
+                Plan: parseResult.GetValue(planOption),
+                Cold: parseResult.GetValue(coldOption),
+                Runs: parseResult.GetValue(runsOption) ?? 1);
+
+            // The raw-event dump reuses refresh's writer plumbing (file, or "-" for stderr).
+            using var rawTraceWriter = RefreshCommand.OpenTraceWriter(rawTracePath, quiet);
 
             var result = await CliSpinner.RunAsync(
                 "Running query...",
-                () => new QueryModelHandler(_providers).HandleAsync(request, cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
+                () => new QueryModelHandler(_providers).HandleAsync(request, rawTraceWriter, cancellationToken),
+                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || rawTracePath == "-");
 
+            // Timings/plans/benchmark are diagnostics (stderr); they are embedded in the result when
+            // the primary sink is JSON, so avoid duplicating them there.
+            var emitsJson = OutputFormats.IsJson(format)
+                || (fileFormat is not null && OutputFormats.IsJson(fileFormat));
+
+            int exitCode;
             if (fileFormat is not null)
             {
                 if (result.Data is null)
@@ -154,16 +204,27 @@ internal sealed class QueryCommand : ICommandModule
                 QueryResultRenderer.WriteFile(result.Data, outputFile!, fileFormat);
                 if (!quiet)
                     Console.Error.WriteLine($"Wrote {result.Data.RowCount} row(s) to {outputFile}");
-                return result.ExitCode;
+                exitCode = result.ExitCode;
+            }
+            else
+            {
+                exitCode = CommandOutput.Render(
+                    result,
+                    format,
+                    data => QueryResultRenderer.Render(data, quiet),
+                    data => data,
+                    renderCsv: QueryResultRenderer.RenderCsv,
+                    errorFormat: errorFormat);
             }
 
-            return CommandOutput.Render(
-                result,
-                format,
-                data => QueryResultRenderer.Render(data, quiet),
-                data => data,
-                renderCsv: QueryResultRenderer.RenderCsv,
-                errorFormat: errorFormat);
+            if (!quiet && !emitsJson && result.Success && result.Data is { } data)
+            {
+                QueryResultRenderer.WriteTimings(data.Timings);
+                QueryResultRenderer.WritePlans(data.Plans);
+                QueryResultRenderer.WriteBenchmark(data.Benchmark);
+            }
+
+            return exitCode;
         });
 
         return command;

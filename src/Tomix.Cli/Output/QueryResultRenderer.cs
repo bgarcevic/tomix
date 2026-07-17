@@ -75,6 +75,71 @@ internal static class QueryResultRenderer
             Console.Error.WriteLine($"Output truncated at {result.RowCount} rows (--limit {result.RowCount}).");
     }
 
+    /// <summary>
+    /// Writes the server-timings summary (from <c>--trace</c>) to stderr as plain text so stdout
+    /// stays pipeable data. No-op when timings are absent (tracing unavailable or not requested).
+    /// </summary>
+    public static void WriteTimings(QueryTimings? timings)
+    {
+        if (timings is null)
+            return;
+
+        var e = Console.Error;
+        e.WriteLine();
+        e.WriteLine("Server timings:");
+        e.WriteLine($"  Total          {Ms(timings.TotalMs)}  (CPU {Ms(timings.TotalCpuMs)})");
+        e.WriteLine($"  FE             {Ms(timings.FormulaEngineMs)}  ({Percent(timings.FormulaEngineMs, timings.TotalMs)})");
+        e.WriteLine($"  SE             {Ms(timings.StorageEngineMs)}  ({Percent(timings.StorageEngineMs, timings.TotalMs)}, CPU {Ms(timings.StorageEngineCpuMs)})");
+        e.WriteLine($"  SE queries     {timings.StorageEngineQueryCount}");
+        e.WriteLine($"  SE cache hits  {timings.StorageEngineCacheHits}");
+    }
+
+    /// <summary>Writes the logical/physical query plans (from <c>--plan</c>) to stderr.</summary>
+    public static void WritePlans(IReadOnlyList<QueryPlan>? plans)
+    {
+        if (plans is null || plans.Count == 0)
+            return;
+
+        var e = Console.Error;
+        foreach (var plan in plans)
+        {
+            e.WriteLine();
+            var kind = plan.Kind.Length > 0
+                ? char.ToUpperInvariant(plan.Kind[0]) + plan.Kind[1..]
+                : plan.Kind;
+            e.WriteLine($"{kind} plan:");
+            e.WriteLine(plan.Text.TrimEnd());
+        }
+    }
+
+    /// <summary>Writes the multi-run benchmark summary (from <c>--runs</c>) to stderr.</summary>
+    public static void WriteBenchmark(QueryBenchmark? benchmark)
+    {
+        if (benchmark is null)
+            return;
+
+        var e = Console.Error;
+        e.WriteLine();
+        e.WriteLine($"Benchmark ({benchmark.Runs.Count} runs):");
+        foreach (var run in benchmark.Runs)
+        {
+            var cache = run.Cold ? "cold" : "warm";
+            var se = run.SeMs.HasValue ? $"  SE {Ms(run.SeMs.Value)}" : "";
+            e.WriteLine($"  run {run.Index} ({cache})  {Ms(run.TotalMs)}{se}");
+        }
+
+        e.WriteLine($"  Total  avg {Ms(benchmark.TotalStats.Avg)}  min {Ms(benchmark.TotalStats.Min)}  max {Ms(benchmark.TotalStats.Max)}  stddev {Ms(benchmark.TotalStats.StdDev)}");
+        if (benchmark.SeStats is { } seStats)
+            e.WriteLine($"  SE     avg {Ms(seStats.Avg)}  min {Ms(seStats.Min)}  max {Ms(seStats.Max)}  stddev {Ms(seStats.StdDev)}");
+    }
+
+    private static string Ms(long ms) => ms.ToString(CultureInfo.InvariantCulture) + " ms";
+
+    private static string Ms(double ms) => ms.ToString("0.0", CultureInfo.InvariantCulture) + " ms";
+
+    private static string Percent(long part, long total)
+        => (total > 0 ? (100.0 * part / total) : 0).ToString("0", CultureInfo.InvariantCulture) + "%";
+
     private static string CellMarkup(object? value) => value switch
     {
         null => Styling.Muted("(blank)"),

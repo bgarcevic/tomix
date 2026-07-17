@@ -90,6 +90,24 @@ tx ls --type column --output-format json |
   jq 'group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
 ```
 
+`query` runs DAX or DMV against a live model, with DAX Studio-style performance
+options: `--trace` (formula- vs storage-engine timings), `--plan` (logical and
+physical query plans), `--cold` (clear the cache first), and `--runs N`
+(benchmark, reporting Avg/Min/Max/StdDev). Timings and plans print to stderr, so
+the rowset on stdout stays pipeable; with `--output-format json` they are folded
+into the result document instead.
+
+```sh
+# Server timings + query plan for a measure (needs workspace/server admin)
+tx query -q 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
+
+# Benchmark a heavy query cold, five runs
+tx query --file heavy.dax --cold --runs 5
+```
+
+The trace-based options (`--trace`, `--plan`, `--cold`) require admin rights on
+the endpoint; when unavailable they warn and the query still returns its rows.
+
 Exit codes are documented in [docs/error-codes.md](docs/error-codes.md).
 Errors go to stderr (as JSON if you pass `--error-format json`), data goes
 to stdout.

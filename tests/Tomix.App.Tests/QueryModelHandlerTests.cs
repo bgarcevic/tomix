@@ -31,7 +31,7 @@ public sealed class QueryModelHandlerTests
     public async Task HandleAsync_ReturnsRequired_WhenQueryBlank()
     {
         var handler = new QueryModelHandler([new StubQueryProvider(new StubQuerySession())], RemoteState);
-        var result = await handler.HandleAsync(Request(query: "   "), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: "   "), null, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_QUERY_REQUIRED", result.Diagnostics[0].Code);
@@ -45,7 +45,7 @@ public sealed class QueryModelHandlerTests
     public async Task HandleAsync_ReturnsInvalid_WhenQueryDoesNotStartWithStatement(string query)
     {
         var handler = new QueryModelHandler([new StubQueryProvider(new StubQuerySession())], RemoteState);
-        var result = await handler.HandleAsync(Request(query: query), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: query), null, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_QUERY_INVALID", result.Diagnostics[0].Code);
@@ -64,7 +64,7 @@ public sealed class QueryModelHandlerTests
     {
         var session = new StubQuerySession();
         var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
-        var result = await handler.HandleAsync(Request(query: query), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: query), null, CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(query, session.LastRequest!.Query);
@@ -77,6 +77,7 @@ public sealed class QueryModelHandlerTests
         var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
         var result = await handler.HandleAsync(
             Request(query: "SUMMARIZE(Sales)", noValidate: true),
+            null,
             CancellationToken.None);
 
         Assert.True(result.Success);
@@ -87,7 +88,7 @@ public sealed class QueryModelHandlerTests
     public async Task HandleAsync_ReturnsNoRemoteTarget_WhenConnectionIsLocal()
     {
         var handler = new QueryModelHandler([new StubQueryProvider(new StubQuerySession())], LocalState);
-        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_QUERY_NO_REMOTE_TARGET", result.Diagnostics[0].Code);
@@ -98,7 +99,7 @@ public sealed class QueryModelHandlerTests
     public async Task HandleAsync_ReturnsUnsupported_WhenSessionIsNotQueryCapable()
     {
         var handler = new QueryModelHandler([new StubNonQueryProvider()], RemoteState);
-        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_QUERY_UNSUPPORTED", result.Diagnostics[0].Code);
@@ -110,7 +111,7 @@ public sealed class QueryModelHandlerTests
     {
         var handler = new QueryModelHandler(
             [new ThrowingProvider(new AuthenticationRequiredException("login"))], RemoteState);
-        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_AUTH_REQUIRED", result.Diagnostics[0].Code);
@@ -122,7 +123,7 @@ public sealed class QueryModelHandlerTests
     {
         var session = new StubQuerySession { Throw = new InvalidOperationException("syntax error near BAD") };
         var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
-        var result = await handler.HandleAsync(Request(query: "EVALUATE BAD("), CancellationToken.None);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE BAD("), null, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_QUERY_FAILED", result.Diagnostics[0].Code);
@@ -140,6 +141,7 @@ public sealed class QueryModelHandlerTests
                 query: "EVALUATE 'Sales'",
                 parameters: new Dictionary<string, string> { ["color"] = "Red" },
                 limit: 10),
+            null,
             CancellationToken.None);
 
         Assert.True(result.Success);
@@ -153,6 +155,83 @@ public sealed class QueryModelHandlerTests
         Assert.Equal(2, data.RowCount);
         Assert.True(data.Truncated);
         Assert.Equal(7, data.DurationMs);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ForwardsPerfOptionsAndTraceWriter()
+    {
+        var session = new StubQuerySession();
+        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var writer = new StringWriter();
+
+        var result = await handler.HandleAsync(
+            Request(query: "EVALUATE 'Sales'", trace: true, plan: true, cold: true, runs: 3),
+            writer,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(session.LastRequest!.Trace);
+        Assert.True(session.LastRequest.Plan);
+        Assert.True(session.LastRequest.ClearCache);
+        Assert.Equal(3, session.LastRequest.Runs);
+        Assert.Same(writer, session.LastTraceWriter);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClampsRunsBelowOneToOne()
+    {
+        var session = new StubQuerySession();
+        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+
+        await handler.HandleAsync(Request(query: "EVALUATE 'Sales'", runs: 0), null, CancellationToken.None);
+
+        Assert.Equal(1, session.LastRequest!.Runs);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SurfacesTimingsPlansAndBenchmark_FromRuns()
+    {
+        var runs = new List<QueryRun>
+        {
+            new(1, Cold: true, ClientMs: 100, Timings: new QueryTimings(90, 120, 30, 60, 80, 2, 1)),
+            new(2, Cold: true, ClientMs: 80, Timings: new QueryTimings(70, 100, 20, 50, 70, 2, 0))
+        };
+        var plans = new List<QueryPlan> { new("logical", "AddColumns: ..."), new("physical", "Spool: ...") };
+        var session = new StubQuerySession { Runs = runs, Plans = plans };
+        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+
+        var result = await handler.HandleAsync(
+            Request(query: "EVALUATE 'Sales'", trace: true, plan: true, runs: 2),
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var data = result.Data!;
+        Assert.Equal(90, data.Timings!.TotalMs);          // first run's server timings
+        Assert.Equal(plans, data.Plans);
+        Assert.NotNull(data.Benchmark);
+        Assert.Equal(2, data.Benchmark!.Runs.Count);
+        Assert.Equal(80, data.Benchmark.TotalStats.Avg);  // (90 + 70) / 2
+        Assert.Equal(70, data.Benchmark.TotalStats.Min);
+        Assert.Equal(90, data.Benchmark.TotalStats.Max);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DegradesGracefully_WhenNoTimingsCaptured()
+    {
+        // Trace requested but the provider returned no runs (e.g. non-admin, tracing unavailable).
+        var session = new StubQuerySession { Runs = null };
+        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+
+        var result = await handler.HandleAsync(
+            Request(query: "EVALUATE 'Sales'", trace: true),
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Null(result.Data!.Timings);
+        Assert.Null(result.Data.Benchmark);
+        Assert.Equal(2, result.Data.RowCount);  // rowset still returned
     }
 
     [Theory]
@@ -169,7 +248,11 @@ public sealed class QueryModelHandlerTests
         string? query = null,
         IReadOnlyDictionary<string, string>? parameters = null,
         int? limit = null,
-        bool noValidate = false) =>
+        bool noValidate = false,
+        bool trace = false,
+        bool plan = false,
+        bool cold = false,
+        int runs = 1) =>
         new(Model: null,
             Server: null,
             Database: null,
@@ -177,7 +260,12 @@ public sealed class QueryModelHandlerTests
             Query: query,
             Parameters: parameters,
             Limit: limit,
-            NoValidate: noValidate);
+            NoValidate: noValidate,
+            Trace: trace,
+            TracePath: null,
+            Plan: plan,
+            Cold: cold,
+            Runs: runs);
 
     private sealed class StubQueryProvider : IModelProvider
     {
@@ -191,7 +279,10 @@ public sealed class QueryModelHandlerTests
     private sealed class StubQuerySession : IModelSession, IModelQuerySession
     {
         public ModelQueryRequest? LastRequest { get; private set; }
+        public TextWriter? LastTraceWriter { get; private set; }
         public Exception? Throw { get; init; }
+        public IReadOnlyList<QueryRun>? Runs { get; init; }
+        public IReadOnlyList<QueryPlan>? Plans { get; init; }
         public string SourcePath => "";
         public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
             => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
@@ -199,9 +290,13 @@ public sealed class QueryModelHandlerTests
             => Task.FromResult(new ModelSnapshot("stub", 1601, []));
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-        public Task<ModelQueryResult> ExecuteQueryAsync(ModelQueryRequest request, CancellationToken cancellationToken)
+        public Task<ModelQueryResult> ExecuteQueryAsync(
+            ModelQueryRequest request,
+            TextWriter? traceWriter,
+            CancellationToken cancellationToken)
         {
             LastRequest = request;
+            LastTraceWriter = traceWriter;
             if (Throw is not null)
                 throw Throw;
             return Task.FromResult(new ModelQueryResult(
@@ -210,7 +305,9 @@ public sealed class QueryModelHandlerTests
                 [new QueryColumn("Sales[Amount]", "decimal")],
                 [[100.5m], [(object?)null]],
                 Truncated: true,
-                DurationMs: 7));
+                DurationMs: 7,
+                Runs: Runs,
+                Plans: Plans));
         }
     }
 

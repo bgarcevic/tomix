@@ -71,4 +71,46 @@ public sealed class QueryResultJsonContractTests
         => Assert.Equal(
             "2026-07-15T13:30:00",
             QueryResultRenderer.FormatCell(new DateTime(2026, 7, 15, 13, 30, 0)));
+
+    [Fact]
+    public void Json_PerfSections_AreNull_WhenAbsent()
+    {
+        var root = JsonDocument.Parse(JsonOutput.Serialize(SampleResult())).RootElement;
+
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("timings").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("plans").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("benchmark").ValueKind);
+    }
+
+    [Fact]
+    public void Json_PerfSections_UseDocumentedFieldNames_WhenPresent()
+    {
+        var result = SampleResult() with
+        {
+            Timings = new QueryTimings(231, 300, 40, 191, 250, 3, 1),
+            Plans = [new QueryPlan("logical", "tree"), new QueryPlan("physical", "tree2")],
+            Benchmark = new QueryBenchmark(
+                [new QueryBenchmarkRun(1, Cold: true, TotalMs: 231, SeMs: 191)],
+                new QueryStat(231, 231, 231, 0),
+                new QueryStat(191, 191, 191, 0))
+        };
+        var root = JsonDocument.Parse(JsonOutput.Serialize(result)).RootElement;
+
+        var timings = root.GetProperty("timings");
+        Assert.Equal(231, timings.GetProperty("totalMs").GetInt64());
+        Assert.Equal(40, timings.GetProperty("formulaEngineMs").GetInt64());
+        Assert.Equal(191, timings.GetProperty("storageEngineMs").GetInt64());
+        Assert.Equal(3, timings.GetProperty("storageEngineQueryCount").GetInt32());
+        Assert.Equal(1, timings.GetProperty("storageEngineCacheHits").GetInt32());
+
+        var plans = root.GetProperty("plans");
+        Assert.Equal("logical", plans[0].GetProperty("kind").GetString());
+        Assert.Equal("tree", plans[0].GetProperty("text").GetString());
+
+        var benchmark = root.GetProperty("benchmark");
+        Assert.Equal(1, benchmark.GetProperty("runs").GetArrayLength());
+        Assert.True(benchmark.GetProperty("runs")[0].GetProperty("cold").GetBoolean());
+        Assert.Equal(231, benchmark.GetProperty("totalStats").GetProperty("avg").GetDouble());
+        Assert.Equal(191, benchmark.GetProperty("seStats").GetProperty("avg").GetDouble());
+    }
 }
