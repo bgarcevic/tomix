@@ -179,8 +179,8 @@ internal sealed class QueryCommand : ICommandModule
                 Cold: parseResult.GetValue(coldOption),
                 Runs: parseResult.GetValue(runsOption) ?? 1);
 
-            // The raw-event dump reuses refresh's writer plumbing (file, or "-" for stderr).
-            using var rawTraceWriter = RefreshCommand.OpenTraceWriter(rawTracePath, quiet);
+            // The raw-event dump reuses the shared trace-writer plumbing (file, or "-" for stderr).
+            using var rawTraceWriter = TraceWriter.Open(rawTracePath, quiet);
 
             var result = await CliSpinner.RunAsync(
                 "Running query...",

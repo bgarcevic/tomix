@@ -1,14 +1,11 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
-using System.Globalization;
-using Spectre.Console;
 using Tomix.App.Refresh;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
-using RefreshTableResult = Tomix.Core.Models.RefreshTableResult;
 
 namespace Tomix.Cli.Commands;
 
@@ -122,7 +119,7 @@ internal sealed class RefreshCommand : ICommandModule
             // Gate on GetResult so absent stays off, while bare --trace resolves to stderr ("-").
             var tracePath = parseResult.GetResult(traceOption) is null
                 ? null
-                : ResolveTracePath(parseResult.GetValue(traceOption));
+                : TraceWriter.ResolvePath(parseResult.GetValue(traceOption));
 
             if (!RecentConnections.TryGetSource(
                     parseResult,
@@ -155,7 +152,7 @@ internal sealed class RefreshCommand : ICommandModule
 
             // Progress + trace sinks: live spinner display via AnsiConsole.Status, plus optional --trace file/stderr.
             var suppressProgress = noProgress || quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || CliSpinner.ShouldSuppress();
-            using var traceWriter = OpenTraceWriter(tracePath, quiet);
+            using var traceWriter = TraceWriter.Open(tracePath, quiet);
             try
             {
                 // --dry-run never executes; no live display, just emit the script.
@@ -170,7 +167,7 @@ internal sealed class RefreshCommand : ICommandModule
                         if (OutputFormats.IsJson(format))
                             JsonOutput.Write(dryResult.Data);
                         else
-                            PrettyPrintTmsl(dryResult.Data.Script);
+                            RefreshRenderer.WriteTmsl(dryResult.Data.Script);
                     }
                     else
                     {
@@ -198,9 +195,9 @@ internal sealed class RefreshCommand : ICommandModule
                 return CommandOutput.Render(
                     result,
                     format,
-                    data => Render(data, request),
+                    RefreshRenderer.Render,
                     data => data,
-                    data => RenderCsv(data),
+                    RefreshRenderer.RenderCsv,
                     errorFormat: parseResult.GetValue(GlobalOptions.ErrorFormat));
             }
             finally
@@ -240,41 +237,6 @@ internal sealed class RefreshCommand : ICommandModule
         return true;
     }
 
-    /// <summary>
-    /// Normalizes the <c>--trace</c> option value. Bare <c>--trace</c> (no value) and
-    /// <c>--trace -</c> both map to stderr (<c>"-"</c>); any other non-empty value is treated
-    /// as a file path. Returns null only when <c>--trace</c> is absent.
-    /// </summary>
-    internal static string? ResolveTracePath(string? traceValue)
-        => string.IsNullOrEmpty(traceValue) ? "-" : traceValue;
-
-    /// <summary>
-    /// Opens a trace writer for <c>--trace</c>: null (off), "-" or empty (stderr), or a path (file).
-    /// Returns null when <paramref name="tracePath"/> is null. Tracing is independent of progress.
-    /// </summary>
-    internal static TextWriter? OpenTraceWriter(string? tracePath, bool quiet)
-    {
-        if (string.IsNullOrEmpty(tracePath))
-            return null;
-
-        if (tracePath == "-")
-            return quiet ? TextWriter.Null : NonDisposingTextWriter.Wrap(Console.Error);
-
-        try
-        {
-            var full = Path.GetFullPath(tracePath);
-            var dir = Path.GetDirectoryName(full);
-            if (!string.IsNullOrEmpty(dir))
-                Directory.CreateDirectory(dir);
-            return new StreamWriter(full, append: false, System.Text.Encoding.UTF8) { AutoFlush = true };
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Could not open --trace file '{tracePath}': {ex.Message}");
-            return NonDisposingTextWriter.Wrap(Console.Error);
-        }
-    }
-
     private static string BuildSpinnerLabel(RefreshModelRequest request)
     {
         var type = string.IsNullOrWhiteSpace(request.RefreshType) ? "automatic" : request.RefreshType;
@@ -283,263 +245,5 @@ internal sealed class RefreshCommand : ICommandModule
         if (request.Tables is { Count: > 0 })
             return $"Refreshing {request.Tables.Count} table(s) ({type})...";
         return $"Refreshing model ({type})...";
-    }
-
-    /// <summary>
-    /// Pretty-prints a compact TMSL JSON script with 2-space indentation.
-    /// </summary>
-    private static void PrettyPrintTmsl(string script)
-    {
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(script);
-            var options = new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true,
-                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            };
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(doc.RootElement, options));
-        }
-        catch
-        {
-            // If parsing fails, just print the raw script.
-            Console.WriteLine(script);
-        }
-    }
-
-    private static void Render(RefreshModelResult result, RefreshModelRequest request)
-    {
-        var database = string.IsNullOrWhiteSpace(result.Database) ? "<model>" : result.Database;
-        var server = string.IsNullOrWhiteSpace(result.Server) ? "<endpoint>" : result.Server;
-        var seconds = Styling.DurationSeconds(result.DurationMs / 1000.0);
-
-        var header =
-            $"[{Palette.Moss.ToMarkup()}]Refreshed[/] " +
-            $"[{Palette.Terra.ToMarkup()}]{Styling.MarkupEscape(database)}[/] " +
-            $"[{Palette.Moss.ToMarkup()}]on[/] " +
-            $"[{Palette.Harbor.ToMarkup()}]{Styling.MarkupEscape(server)}[/] " +
-            $"[{Palette.Moss.ToMarkup()}]({seconds})[/]";
-        AnsiConsole.MarkupLine(header);
-        AnsiConsole.WriteLine();
-
-        if (result.Tables.Count == 0)
-        {
-            AnsiConsole.MarkupLine(Styling.Muted("No per-table statistics available. Use without --no-progress to capture XMLA trace events."));
-            return;
-        }
-
-        var table = Styling.NewTable("Table", "Rows", "Query", "Read", "Total", "Rows/s");
-        foreach (var column in table.Columns)
-            column.Alignment = Justify.Left;
-        table.Columns[1].Alignment = Justify.Right;
-        for (var i = 2; i < table.Columns.Count; i++)
-            table.Columns[i].Alignment = Justify.Right;
-        table.Columns[0].Padding = new Padding(1, 0, 1, 0);
-
-        foreach (var t in result.Tables.OrderBy(t => t.TotalMs))
-            table.AddRow(BuildRowMarkup(t));
-
-        if (result.Totals is { } total)
-        {
-            // Build bold-styled values directly. Styling.Bold(Styling.Muted(...)) would
-            // double-escape the brackets; the Slate palette constant is the muted color.
-            var slate = Palette.Slate.ToMarkup();
-            var totalSeconds = (total.TotalMs / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + "s";
-            table.AddRow(
-                Styling.Bold("Total"),
-                Styling.Number(total.Rows),
-                Styling.Muted(""),
-                Styling.Muted(""),
-                $"[{slate}]{totalSeconds}[/]",
-                Styling.Muted(""));
-        }
-
-        AnsiConsole.Write(table);
-    }
-
-    private static string[] BuildRowMarkup(RefreshTableResult t)
-    {
-        var rate = t.TotalMs > 0 ? (long)Math.Round(t.Rows * 1000.0 / t.TotalMs) : 0;
-        return
-        [
-            Styling.MarkupEscape(t.Table),
-            Styling.Number(t.Rows),
-            DurationMarkup(t.QueryMs),
-            DurationMarkup(t.ReadMs),
-            DurationMarkup(t.TotalMs),
-            rate > 0 ? Styling.Number(rate) : ""
-        ];
-    }
-
-    private static string DurationMarkup(long ms)
-        => ms > 0 ? Styling.Muted((ms / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + "s") : Styling.Muted("0s");
-
-    private static void RenderCsv(RefreshModelResult result)
-    {
-        Console.WriteLine("table,rows,query_ms,read_ms,total_ms,rows_per_second");
-        foreach (var t in result.Tables)
-        {
-            var rate = t.TotalMs > 0 ? (long)Math.Round(t.Rows * 1000.0 / t.TotalMs) : 0;
-            Console.WriteLine(string.Join(',',
-                Csv(t.Table), Csv(t.Rows), Csv(t.QueryMs), Csv(t.ReadMs), Csv(t.TotalMs), Csv(rate)));
-        }
-        if (result.Totals is { } total)
-        {
-            var rate = total.TotalMs > 0 ? (long)Math.Round(total.Rows * 1000.0 / total.TotalMs) : 0;
-            Console.WriteLine(string.Join(',',
-                Csv("Total"), Csv(total.Rows), Csv(total.QueryMs), Csv(total.ReadMs), Csv(total.TotalMs), Csv(rate)));
-        }
-    }
-
-    private static string Csv(string value)
-    {
-        // Minimal CSV escaping: wrap in quotes if it contains a comma, quote, or newline.
-        if (value.IndexOfAny([',', '"', '\r', '\n']) < 0) return value;
-        return "\"" + value.Replace("\"", "\"\"") + "\"";
-    }
-
-    private static string Csv<T>(T value) where T : struct, IFormattable
-        => value.ToString(null, CultureInfo.InvariantCulture) ?? "";
-}
-
-/// <summary>
-/// Live refresh display using <c>AnsiConsole.Status()</c>: a spinner whose status label updates
-/// in real time as trace events fire. <c>Status()</c> runs its own render timer, so we just set
-/// <c>ctx.Status</c> from the trace thread — no <c>Refresh()</c> calls needed and no cross-thread
-/// rendering issues like with <c>AnsiConsole.Live()</c>. The final summary table renders after
-/// the refresh completes.
-/// </summary>
-internal sealed class RefreshLiveDisplay : IDisposable
-{
-    private readonly Dictionary<string, (long Rows, string Phase, bool Completed)> _rows = new(StringComparer.Ordinal);
-    private readonly object _rowsLock = new();
-    private StatusContext? _ctx;
-
-    public RefreshLiveDisplay()
-    {
-        // SynchronousProgress calls OnReport directly on the trace thread during server.Execute,
-        // so the status label updates immediately when ProgressReportEnd events fire.
-        Progress = new SynchronousProgress(OnReport);
-    }
-
-    public IProgress<RefreshProgress> Progress { get; }
-
-    private void OnReport(RefreshProgress p)
-    {
-        if (!string.IsNullOrEmpty(p.Table))
-        {
-            lock (_rowsLock)
-            {
-                if (_rows.TryGetValue(p.Table, out var existing))
-                {
-                    existing.Rows = p.RowsRead ?? existing.Rows;
-                    existing.Phase = p.Phase ?? existing.Phase;
-                    existing.Completed = p.Completed;
-                    _rows[p.Table] = existing;
-                }
-                else
-                {
-                    _rows[p.Table] = (p.RowsRead ?? 0, p.Phase ?? "", p.Completed);
-                }
-            }
-        }
-
-        UpdateStatus();
-    }
-
-    private void UpdateStatus()
-    {
-        if (_ctx is null) return;
-
-        List<(string Name, long Rows, string Phase, bool Completed)> snapshot;
-        lock (_rowsLock)
-        {
-            snapshot = _rows
-                .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => (kv.Key, kv.Value.Rows, kv.Value.Phase, kv.Value.Completed))
-                .ToList();
-        }
-
-        var active = snapshot.Where(s => !s.Completed).ToList();
-        if (active.Count == 0) return;
-
-        var parts = active.Select(s =>
-        {
-            var detail = s.Rows > 0 ? $" {s.Rows:N0} rows" : "";
-            var phaseStr = s.Phase ?? "processing";
-            return $"{s.Name}{detail} {phaseStr}".Trim();
-        });
-
-        _ctx.Status = string.Join("  |  ", parts);
-    }
-
-    public async Task<TomixResult<RefreshModelResult>> RunAsync(string label, Func<Task<TomixResult<RefreshModelResult>>> action)
-    {
-        TomixResult<RefreshModelResult>? captured = null;
-        await AnsiConsole.Status()
-            .Spinner(Spectre.Console.Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse(Palette.Sage.ToMarkup()))
-            .StartAsync(label, async ctx =>
-            {
-                _ctx = ctx;
-                captured = await action().ConfigureAwait(false);
-            })
-            .ConfigureAwait(false);
-        return captured!;
-    }
-
-    public void Dispose() { }
-}
-
-/// <summary>
-/// Synchronous <see cref="IProgress{T}"/> adapter: calls the handler immediately on the
-/// reporting thread instead of posting to the thread pool like <see cref="Progress{T}"/>.
-/// Used by <see cref="RefreshLiveDisplay"/> so trace events during server.Execute update the
-/// live table in real time.
-/// </summary>
-internal sealed class SynchronousProgress : IProgress<RefreshProgress>
-{
-    private readonly Action<RefreshProgress> _handler;
-    public SynchronousProgress(Action<RefreshProgress> handler) => _handler = handler;
-    public void Report(RefreshProgress value) => _handler(value);
-}
-
-/// <summary>
-/// Delegates all writes to a shared <see cref="TextWriter"/> (for example
-/// <see cref="Console.Error"/>) but never disposes it. The CLI owns only the
-/// <see cref="StreamWriter"/> instances it opens for <c>--trace &lt;file&gt;</c>;
-/// <see cref="Console.Error"/> is process-shared and must survive the command's
-/// <c>using</c> scope, otherwise later stderr writes throw
-/// <see cref="ObjectDisposedException"/>.
-/// </summary>
-internal sealed class NonDisposingTextWriter : TextWriter
-{
-    private readonly TextWriter _inner;
-
-    private NonDisposingTextWriter(TextWriter inner) => _inner = inner;
-
-    public static NonDisposingTextWriter Wrap(TextWriter inner) => new(inner);
-
-    /// <summary>The wrapped shared writer (exposed for assertions).</summary>
-    public TextWriter Inner => _inner;
-
-    public override System.Text.Encoding Encoding => _inner.Encoding;
-
-    public override void Write(char value) => _inner.Write(value);
-    public override void Write(string? value) => _inner.Write(value);
-    public override void WriteLine() => _inner.WriteLine();
-    public override void WriteLine(string? value) => _inner.WriteLine(value);
-    public override void WriteLine(char value) => _inner.WriteLine(value);
-    public override Task WriteAsync(char value) => _inner.WriteAsync(value);
-    public override Task WriteAsync(string? value) => _inner.WriteAsync(value);
-    public override Task WriteLineAsync(string? value) => _inner.WriteLineAsync(value);
-    public override void Flush() => _inner.Flush();
-    public override Task FlushAsync() => _inner.FlushAsync();
-    public override Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
-
-    protected override void Dispose(bool disposing)
-    {
-        // Intentionally do not dispose the shared inner writer (e.g. Console.Error).
-        base.Dispose(disposing);
     }
 }

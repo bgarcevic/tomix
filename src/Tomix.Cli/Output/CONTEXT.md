@@ -21,12 +21,15 @@ Shared output wiring for all commands.
 - `ErrorOutput` — diagnostic rendering to stderr (JSON or colored text).
 - `DidYouMean` — Levenshtein-based "Did you mean?" suggestion helper for unknown subcommands.
 - `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).
+- `TraceWriter` / `NonDisposingTextWriter` — shared `--trace` destination plumbing for `refresh` and `query`: resolves the option value (bare/`-` → stderr, otherwise file) and opens the writer; the wrapper keeps `using` scopes from disposing the process-shared `Console.Error`.
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--plan`/`--runs` server-timings, query-plan, and benchmark summaries written to stderr).
 - `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.
 - `BpaRunView` / `BpaRunRenderer` — pure grouping/ordering logic, Spectre rendering, JSON projection, and CI annotation emission for `bpa run`.
 - `BpaRulesRenderer` — Spectre rendering and JSON projections for the `bpa rules` subcommands.
 - `ConnectRenderer` — connected-model summary (text + JSON projection), show-current and raw-connection views for the `connect` command.
+- `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), `--dry-run` TMSL pretty-print, and the live `AnsiConsole.Status()` progress display fed by XMLA trace events.
+- `IncrementalRefreshRenderer` — text rendering for the `incremental-refresh` subcommands (`show`, `set`, `rm`, `apply`).
 - `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions.
 
 ## Color Strategy
