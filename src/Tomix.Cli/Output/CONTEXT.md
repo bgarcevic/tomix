@@ -26,6 +26,7 @@ Shared output wiring for all commands.
 - `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.
 - `BpaRunView` / `BpaRunRenderer` — pure grouping/ordering logic, Spectre rendering, JSON projection, and CI annotation emission for `bpa run`.
 - `BpaRulesRenderer` — Spectre rendering and JSON projections for the `bpa rules` subcommands.
+- `ConnectRenderer` — connected-model summary (text + JSON projection), show-current and raw-connection views for the `connect` command.
 - `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions.
 
 ## Color Strategy

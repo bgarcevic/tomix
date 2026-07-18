@@ -25,6 +25,7 @@ Application use cases and command handlers.
   - DAX formatting uses the SQLBI DaxFormatter API/client from https://github.com/sql-bi/DaxFormatter.
   - Power Query formatting uses the Power Query Formatter API from https://www.powerqueryformatter.com/api.
 - Workspace discovery uses the Power BI REST API (`GET /v1.0/myorg/groups`) via `Connect/PowerBiWorkspaceCatalog`, authenticated with the shared `IAccessTokenProvider` token (same scope as XMLA). Interactive picking lives in the CLI, not here.
+- Connect decision logic lives in `Connect/ConnectPlanHandler` (pure plan/resolve loop: the CLI resolves each reported `ConnectNeed` with a prompt and re-plans), with mirror probing/scaffolding in `Connect/ConnectWorkspaceHandler` and Desktop instance discovery in `Connect/PowerBiDesktopDiscovery`. `ConnectHandler` stays the session/recents state facade.
 - BPA default rules should use the bundled `src/Tomix.App/Bpa/Rules/bpa-rules.json` catalog as the offline standard rules.
 - BPA rule loading may support selectable upstream Microsoft Analysis Services BestPracticeRules catalogs from https://github.com/microsoft/Analysis-Services/tree/master/BestPracticeRules.
 - Keep licensing-sensitive compatibility work free of versioned third-party product names or abbreviations in source, docs, help, and output.
