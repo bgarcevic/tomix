@@ -1,61 +1,14 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Tomix.Core.Diagnostics;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Tests;
 
 /// <summary>
-/// JSON contract tests for the error envelope shape and specific error codes
-/// emitted by mutation commands.
+/// Contract tests for the error codes emitted by mutation commands. The JSON envelope
+/// shape itself is pinned against the production serializer in
+/// <c>Tomix.Cli.Tests.ErrorOutputContractTests</c>.
 /// </summary>
 public sealed class ErrorCodeContractTests
 {
-    private static readonly JsonSerializerOptions ErrorOptions = new()
-    {
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
-    private static string SerializeError(string code, string message, string? hint = null)
-    {
-        var errorObj = new Dictionary<string, string?>
-        {
-            ["error"] = message,
-            ["code"] = code,
-            ["severity"] = nameof(DiagnosticSeverity.Error),
-            ["hint"] = hint
-        };
-        return JsonSerializer.Serialize(errorObj, ErrorOptions);
-    }
-
-    private static string JsonFromResult<T>(TomixResult<T> result)
-    {
-        var diag = result.Diagnostics.First();
-        return SerializeError(diag.Code, diag.Message, diag.Hint);
-    }
-
-    // ── Error envelope shape ────────────────────────────────────────────────
-
-    [Fact]
-    public void ErrorEnvelope_HasAllFourFields()
-    {
-        var json = JsonDocument.Parse(SerializeError("TOMIX_TEST", "test message", "test hint"));
-
-        Assert.Equal("test message", json.RootElement.GetProperty("error").GetString());
-        Assert.Equal("TOMIX_TEST", json.RootElement.GetProperty("code").GetString());
-        Assert.Equal("Error", json.RootElement.GetProperty("severity").GetString());
-        Assert.Equal("test hint", json.RootElement.GetProperty("hint").GetString());
-    }
-
-    [Fact]
-    public void ErrorEnvelope_NullHint_StillIncludesHintAsNull()
-    {
-        var json = SerializeError("TOMIX_TEST", "test message", hint: null);
-
-        Assert.Contains("\"hint\": null", json);
-    }
-
     // ── Mutation error codes ────────────────────────────────────────────────
 
     [Theory]
@@ -89,9 +42,8 @@ public sealed class ErrorCodeContractTests
     public void MutationErrorCode_Failed_UsedForInvalidOperationException()
     {
         var result = TomixResult<object>.Fail("TOMIX_MUTATION_FAILED", "Operation failed");
-        var json = JsonDocument.Parse(JsonFromResult(result));
 
-        Assert.Equal("TOMIX_MUTATION_FAILED", json.RootElement.GetProperty("code").GetString());
+        Assert.Equal("TOMIX_MUTATION_FAILED", result.Diagnostics.Single().Code);
     }
 
     [Fact]
@@ -139,9 +91,8 @@ public sealed class ErrorCodeContractTests
             "TOMIX_REFRESH_POLICY_INVALID",
             "Refresh policy for 'Sales' has validation errors: ...",
             hint: "Fix the reported issues or re-run with --force to save anyway.");
-        var json = JsonDocument.Parse(JsonFromResult(result));
 
-        Assert.Contains("--force", json.RootElement.GetProperty("hint").GetString());
+        Assert.Contains("--force", result.Diagnostics.Single().Hint);
     }
 
     // ── Object lookup error codes ───────────────────────────────────────────
@@ -161,9 +112,8 @@ public sealed class ErrorCodeContractTests
             "TOMIX_OBJECT_NOT_FOUND",
             "Object 'X' not found.",
             hint: "Run 'tx ls' to list available objects.");
-        var json = JsonDocument.Parse(JsonFromResult(result));
 
-        Assert.NotNull(json.RootElement.GetProperty("hint").GetString());
+        Assert.NotNull(result.Diagnostics.Single().Hint);
     }
 
     // ── Deprecated/removed error codes (regression guard) ───────────────────

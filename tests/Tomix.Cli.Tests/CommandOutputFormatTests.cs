@@ -6,6 +6,7 @@ namespace Tomix.Cli.Tests;
 /// Per-command output-format validation: formats a command cannot render are rejected
 /// (exit 2 at the call site) instead of silently falling back to text.
 /// </summary>
+[Collection(ConsoleStateCollection.Name)] // rejection messages go to the process-global stderr
 public sealed class CommandOutputFormatTests
 {
     [Theory]

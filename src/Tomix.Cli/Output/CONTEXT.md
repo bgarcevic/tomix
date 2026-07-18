@@ -28,7 +28,6 @@ Shared output wiring for all commands.
 ## Color Strategy
 
 See [`/docs/cli-color-strategy.md`](../../docs/cli-color-strategy.md) for the full palette, message categories, and styling rules.
-See [`/docs/spectre-migration.md`](../../docs/spectre-migration.md) for the migration plan and per-command progress.
 
 Key rules:
 

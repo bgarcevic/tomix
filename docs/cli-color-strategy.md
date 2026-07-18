@@ -98,5 +98,3 @@ All output helpers live in `src/Tomix.Cli/Output/Styling.cs`. Use these instead 
 - **TMDL/BIM raw output** (`--format tmdl`, `--format bim`) — raw syntax.
 - **CI annotations** (`::error::`, `##vso[task.logissue...]`) — plain-text CI protocols.
 - **Completion scripts** (`completion bash/zsh/fish`) — shell script output.
-
-For the migration plan and per-command progress, see `/docs/spectre-migration.md`.

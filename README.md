@@ -66,8 +66,9 @@ Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 Discover: `ls`, `get`, `find`, `deps`
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
 formatter APIs), `script` (run C# scripts against a model)
-Connect: `connect`, `deploy`, `refresh`, `query` (run DAX/DMV queries against
-a live model), `load`, `save`, `auth`, `session`
+Connect: `connect`, `deploy`, `refresh`, `incremental-refresh` (manage refresh
+policies), `query` (run DAX/DMV queries against a live model), `load`, `save`,
+`auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
 `vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are

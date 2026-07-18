@@ -33,7 +33,6 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 | Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
 | Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |
-| Migrate Console.WriteLine to Spectre | `/src/Tomix.Cli/Commands` | `/docs/spectre-migration.md` | Follow migration tracker phases |
 | Change the color palette or message categories | `/src/Tomix.Cli/Output/Styling.cs` | `/docs/cli-color-strategy.md` | Update palette in one place only |
 
 ## Local Context Files

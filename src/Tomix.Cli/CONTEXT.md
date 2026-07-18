@@ -14,7 +14,9 @@ CLI entry point for `tx`.
 - Depends on `/src/Tomix.App` for command behavior.
 - Depends on `/src/Tomix.Core` for shared result and diagnostic types.
 - Renders output in `Output/` (see Structure below).
-- Must not depend directly on `/src/Tomix.Provider.*` unless wired through App-level abstractions.
+- References `/src/Tomix.Provider.*` projects only so `Program` (the composition root) can
+  construct providers and pass them to commands as `IModelProvider` lists. Feature logic must
+  go through App/Core abstractions — never use provider-specific types in command modules.
 
 ## Structure
 
