@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Interactive;
 using Tomix.Cli.Output;
 
@@ -8,6 +9,10 @@ namespace Tomix.Cli.Commands;
 
 internal sealed class InteractiveCommand : ICommandModule
 {
+    private readonly AppServices _services;
+
+    public InteractiveCommand(AppServices services) => _services = services;
+
     public Command Build()
     {
         var modelArgument = new Argument<string>("model")
@@ -27,7 +32,7 @@ internal sealed class InteractiveCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "interactive", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new InteractiveHandler().Start(new InteractiveStartRequest(
+            var result = new InteractiveHandler(_services.State).Start(new InteractiveStartRequest(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Server),
                 parseResult.GetValue(GlobalOptions.Database),

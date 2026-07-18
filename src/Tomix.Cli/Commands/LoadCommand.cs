@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Info;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -11,7 +12,13 @@ internal sealed class LoadCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public LoadCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public LoadCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -32,10 +39,11 @@ internal sealed class LoadCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? path,
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
-            var reference = RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server);
+            var reference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 

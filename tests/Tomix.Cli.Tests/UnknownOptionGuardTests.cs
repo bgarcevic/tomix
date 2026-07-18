@@ -16,9 +16,9 @@ public sealed class UnknownOptionGuardTests
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
-        root.Subcommands.Add(new LsCommand(providers).Build());
-        root.Subcommands.Add(new GetCommand(providers).Build());
-        root.Subcommands.Add(new FindCommand(providers).Build());
+        root.Subcommands.Add(new LsCommand(providers, TestServices.Create()).Build());
+        root.Subcommands.Add(new GetCommand(providers, TestServices.Create()).Build());
+        root.Subcommands.Add(new FindCommand(providers, TestServices.Create()).Build());
         return (root.Parse(args), args);
     }
 

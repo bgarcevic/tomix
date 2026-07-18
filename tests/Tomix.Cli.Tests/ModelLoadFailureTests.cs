@@ -80,7 +80,7 @@ public sealed class ModelLoadFailureTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new LsCommand([new ThrowingProvider()]).Build());
+        root.Subcommands.Add(new LsCommand([new ThrowingProvider()], TestServices.Create()).Build());
 
         var parseResult = root.Parse(args);
         var original = Console.Error;

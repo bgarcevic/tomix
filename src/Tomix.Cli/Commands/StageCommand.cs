@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Stage;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -15,7 +16,13 @@ internal sealed class StageCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public StageCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public StageCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -51,7 +58,7 @@ internal sealed class StageCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Committing staged changes...",
-                () => new StageHandler().CommitAsync(
+                () => new StageHandler(_services.Staging).CommitAsync(
                     reference, _providers, parseResult.GetValue(forceOption), cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
             return CommandOutput.Render(result, format, RenderCommit);
@@ -59,14 +66,14 @@ internal sealed class StageCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildStatus()
+    private Command BuildStatus()
     {
         var command = new Command("status", "Show staged mutations for the active model");
         command.SetAction(parseResult => RenderStatus(parseResult));
         return command;
     }
 
-    private static Command BuildList()
+    private Command BuildList()
     {
         var command = new Command("list", "List all staged models in the current session");
         command.SetAction(parseResult =>
@@ -75,12 +82,12 @@ internal sealed class StageCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "stage list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new StageHandler().List(), format, RenderList);
+            return CommandOutput.Render(new StageHandler(_services.Staging).List(), format, RenderList);
         });
         return command;
     }
 
-    private static Command BuildDiscard()
+    private Command BuildDiscard()
     {
         var allOption = new Option<bool>("--all")
         {
@@ -101,14 +108,14 @@ internal sealed class StageCommand : ICommandModule
             if (!TryResolveModel(parseResult, out var reference, out var recentExit))
                 return recentExit;
             return CommandOutput.Render(
-                new StageHandler().Discard(reference, all),
+                new StageHandler(_services.Staging).Discard(reference, all),
                 format,
                 result => AnsiConsole.MarkupLine(Styling.Success($"Discarded {result.Discarded} staged change set(s).")));
         });
         return command;
     }
 
-    private static int RenderStatus(ParseResult parseResult)
+    private int RenderStatus(ParseResult parseResult)
     {
         var format = GlobalOptions.OutputFormatValue(parseResult);
         if (!CommandOutput.TryValidateFormat(parseResult, format, "stage", OutputFormats.Text, OutputFormats.Json))
@@ -116,7 +123,7 @@ internal sealed class StageCommand : ICommandModule
 
         if (!TryResolveModel(parseResult, out var reference, out var recentExit))
             return recentExit;
-        return CommandOutput.Render(new StageHandler().Status(reference), format, RenderStatusResult);
+        return CommandOutput.Render(new StageHandler(_services.Staging).Status(reference), format, RenderStatusResult);
     }
 
     private static void RenderStatusResult(StageStatusResult result)
@@ -159,9 +166,9 @@ internal sealed class StageCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.KeyValue("Remote:", $" {result.Server}{(string.IsNullOrEmpty(result.Database) ? "" : $" / {result.Database}")}"));
     }
 
-    private static bool TryResolveModel(ParseResult parseResult, out ModelReference reference, out int exitCode)
+    private bool TryResolveModel(ParseResult parseResult, out ModelReference reference, out int exitCode)
     {
-        if (!RecentConnections.TryGetSource(parseResult, GlobalOptions.ModelValue(parseResult), out var source, out exitCode))
+        if (!RecentConnections.TryGetSource(parseResult, GlobalOptions.ModelValue(parseResult), _services.State, out var source, out exitCode))
         {
             reference = new ModelReference("");
             return false;
@@ -170,8 +177,8 @@ internal sealed class StageCommand : ICommandModule
         // Stage resolution deliberately ignores --server today; a server only takes part
         // when it comes from the --recent override.
         reference = GlobalOptions.RecentSpecified(parseResult)
-            ? RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server)
-            : new ActiveModelResolver().ResolveReference(source.Model, source.Database);
+            ? RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server)
+            : new ActiveModelResolver(_services.State).ResolveReference(source.Model, source.Database);
         return true;
     }
 }

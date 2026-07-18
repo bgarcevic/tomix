@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Tomix.App;
 using Tomix.App.Query;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
@@ -15,7 +16,13 @@ internal sealed class QueryCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public QueryCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public QueryCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -184,7 +191,7 @@ internal sealed class QueryCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Running query...",
-                () => new QueryModelHandler(_providers).HandleAsync(request, rawTraceWriter, cancellationToken),
+                () => new QueryModelHandler(_providers, _services.LoadCurrentSession).HandleAsync(request, rawTraceWriter, cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || rawTracePath == "-");
 
             // Timings/plans/benchmark are diagnostics (stderr); they are embedded in the result when

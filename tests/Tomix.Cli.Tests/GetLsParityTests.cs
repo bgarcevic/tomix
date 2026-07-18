@@ -127,8 +127,8 @@ public sealed class GetLsParityTests
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
         root.Subcommands.Add(args[0] == "get"
-            ? new GetCommand(Providers).Build()
-            : new LsCommand(Providers).Build());
+            ? new GetCommand(Providers, TestServices.Create()).Build()
+            : new LsCommand(Providers, TestServices.Create()).Build());
 
         var originalOut = Console.Out;
         var originalError = Console.Error;

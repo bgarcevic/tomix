@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Ls;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,7 +13,13 @@ internal sealed class LsCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public LsCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public LsCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -65,11 +72,12 @@ internal sealed class LsCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
 
-            var activeReference = RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server);
+            var activeReference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
 
             // Canonical order is `ls [path-filter] [model]`, matching `get <path> [model]`.

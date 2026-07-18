@@ -18,7 +18,7 @@ public sealed class QueryCommandParseTests
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
-        root.Subcommands.Add(new QueryCommand(providers).Build());
+        root.Subcommands.Add(new QueryCommand(providers, TestServices.Create()).Build());
         return root.Parse(args);
     }
 

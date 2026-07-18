@@ -21,7 +21,7 @@ public sealed class MutationCommandParseTests
     [Fact]
     public void Rm_InvalidSerialization_FailsAtParseTime()
     {
-        var result = Parse(new RmCommand([]).Build(), "rm", "Sales/M", "--serialization", "te-folder");
+        var result = Parse(new RmCommand([], TestServices.Create()).Build(), "rm", "Sales/M", "--serialization", "te-folder");
 
         Assert.Contains(result.Errors, e => e.Message.Contains("Unknown value for --serialization"));
     }
@@ -32,7 +32,7 @@ public sealed class MutationCommandParseTests
     [InlineData("tmsl")]
     public void Rm_ValidSerialization_IsCaseInsensitive(string value)
     {
-        var result = Parse(new RmCommand([]).Build(), "rm", "Sales/M", "--serialization", value);
+        var result = Parse(new RmCommand([], TestServices.Create()).Build(), "rm", "Sales/M", "--serialization", value);
 
         Assert.Empty(result.Errors);
     }

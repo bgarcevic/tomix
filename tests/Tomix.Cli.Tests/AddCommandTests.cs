@@ -16,7 +16,7 @@ public sealed class AddCommandTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new AddCommand([]).Build());
+        root.Subcommands.Add(new AddCommand([], TestServices.Create()).Build());
         return root;
     }
 

@@ -1,13 +1,17 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Config;
 using Tomix.Cli.Output;
-using Tomix.Core.Configuration;
 
 namespace Tomix.Cli.Commands;
 
 internal sealed class ConfigCommand : ICommandModule
 {
+    private readonly AppServices _services;
+
+    public ConfigCommand(AppServices services) => _services = services;
+
     public Command Build()
     {
         var command = new Command("config", "View and manage CLI configuration");
@@ -20,7 +24,7 @@ internal sealed class ConfigCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildInit()
+    private Command BuildInit()
     {
         var forceOption = new Option<bool>("--force") { Description = "Overwrite existing config file" };
 
@@ -31,18 +35,18 @@ internal sealed class ConfigCommand : ICommandModule
 
         command.SetAction(parseResult =>
         {
-            Directory.CreateDirectory(TomixPaths.ConfigDirectory);
-            if (parseResult.GetValue(forceOption) || !File.Exists(TomixPaths.ConfigFile))
-                File.WriteAllText(TomixPaths.ConfigFile, "{\n}\n");
+            Directory.CreateDirectory(_services.ConfigDirectory);
+            if (parseResult.GetValue(forceOption) || !File.Exists(_services.ConfigFilePath))
+                File.WriteAllText(_services.ConfigFilePath, "{\n}\n");
 
-            AnsiConsole.MarkupLine(Styling.Path(TomixPaths.ConfigFile));
+            AnsiConsole.MarkupLine(Styling.Path(_services.ConfigFilePath));
             return 0;
         });
 
         return command;
     }
 
-    private static Command BuildSet()
+    private Command BuildSet()
     {
         var keyArgument = new Argument<string>("key") { Description = "Configuration key." };
         var valueArgument = new Argument<string>("value") { Description = "Configuration value." };
@@ -62,28 +66,28 @@ internal sealed class ConfigCommand : ICommandModule
 
             var key = parseResult.GetValue(keyArgument) ?? "";
             var value = parseResult.GetValue(valueArgument) ?? "";
-            var result = new ConfigHandler().Set(key, value);
+            var result = new ConfigHandler(_services.ConfigStore).Set(key, value);
             return CommandOutput.Render(result, formatValue, RenderSet);
         });
 
         return command;
     }
 
-    private static Command BuildPaths()
+    private Command BuildPaths()
     {
         var command = new Command("paths", "Show resolved paths for local CLI files.");
 
         command.SetAction(_ =>
         {
-            AnsiConsole.MarkupLine(Styling.KeyValue("configDir   ", TomixPaths.ConfigDirectory));
-            AnsiConsole.MarkupLine(Styling.KeyValue("configFile  ", TomixPaths.ConfigFile));
+            AnsiConsole.MarkupLine(Styling.KeyValue("configDir   ", _services.ConfigDirectory));
+            AnsiConsole.MarkupLine(Styling.KeyValue("configFile  ", _services.ConfigFilePath));
             return 0;
         });
 
         return command;
     }
 
-    private static Command BuildShow()
+    private Command BuildShow()
     {
         var command = new Command("show", "Show current CLI configuration.");
 
@@ -94,7 +98,7 @@ internal sealed class ConfigCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "config show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new ConfigHandler().List();
+            var result = new ConfigHandler(_services.ConfigStore).List();
             return CommandOutput.Render(result, formatValue, RenderList);
         });
 

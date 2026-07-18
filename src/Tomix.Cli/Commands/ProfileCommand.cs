@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Profile;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -8,6 +9,10 @@ namespace Tomix.Cli.Commands;
 
 internal sealed class ProfileCommand : ICommandModule
 {
+    private readonly AppServices _services;
+
+    public ProfileCommand(AppServices services) => _services = services;
+
     public Command Build()
     {
         var command = new Command("profile", "Manage named connection profiles for quick environment switching");
@@ -18,7 +23,7 @@ internal sealed class ProfileCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildList()
+    private Command BuildList()
     {
         var command = new Command("list", "List all saved connection profiles");
         command.SetAction(parseResult =>
@@ -27,12 +32,12 @@ internal sealed class ProfileCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "profile list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new ProfileHandler().List(), format, RenderList);
+            return CommandOutput.Render(new ProfileHandler(_services.State).List(), format, RenderList);
         });
         return command;
     }
 
-    private static Command BuildShow()
+    private Command BuildShow()
     {
         var nameArgument = new Argument<string>("name") { Description = "Profile name to show" };
         var command = new Command("show", "Show details of a saved connection profile")
@@ -47,14 +52,14 @@ internal sealed class ProfileCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
-                new ProfileHandler().Show(parseResult.GetValue(nameArgument) ?? ""),
+                new ProfileHandler(_services.State).Show(parseResult.GetValue(nameArgument) ?? ""),
                 format,
                 result => RenderProfile(result.Profile));
         });
         return command;
     }
 
-    private static Command BuildRemove()
+    private Command BuildRemove()
     {
         var nameArgument = new Argument<string>("name") { Description = "Profile name to remove" };
         var command = new Command("remove", "Delete a saved connection profile")
@@ -69,14 +74,14 @@ internal sealed class ProfileCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
-                new ProfileHandler().Remove(parseResult.GetValue(nameArgument) ?? ""),
+                new ProfileHandler(_services.State).Remove(parseResult.GetValue(nameArgument) ?? ""),
                 format,
                 result => AnsiConsole.MarkupLine(result.Removed ? Styling.Success($"Removed: {result.Name}") : Styling.Warning($"Not found: {result.Name}")));
         });
         return command;
     }
 
-    private static Command BuildSet()
+    private Command BuildSet()
     {
         var nameArgument = new Argument<string>("name") { Description = "Profile name" };
         var descriptionOption = new Option<string?>("--description") { Description = "Human-readable description of this profile" };
@@ -108,7 +113,7 @@ internal sealed class ProfileCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "profile set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new ProfileHandler().Set(new ProfileSetRequest(
+            var result = new ProfileHandler(_services.State).Set(new ProfileSetRequest(
                 parseResult.GetValue(nameArgument) ?? "",
                 parseResult.GetValue(GlobalOptions.Server),
                 parseResult.GetValue(GlobalOptions.Database),

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Auth;
 using Tomix.App.State;
 using Tomix.Auth;
@@ -14,6 +15,10 @@ namespace Tomix.Cli.Commands;
 /// </summary>
 internal sealed class AuthCommand : ICommandModule
 {
+    private readonly AppServices _services;
+
+    public AuthCommand(AppServices services) => _services = services;
+
     public Command Build()
     {
         var command = new Command("auth", "Manage authentication for remote workspaces");
@@ -23,7 +28,7 @@ internal sealed class AuthCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildLogin()
+    private Command BuildLogin()
     {
         var usernameOption = new Option<string?>("--username") { Description = "Service-principal application (client) id" };
         usernameOption.Aliases.Add("-u");
@@ -74,7 +79,7 @@ internal sealed class AuthCommand : ICommandModule
             // itself is resolved afterwards so an interactive login can be prompted for it.
             var method = ResolveMethod(useIdentity, certificate, username, useDeviceCode);
             var endpoint = parseResult.GetValue(GlobalOptions.Server)
-                ?? new CliStateStore().LoadCurrentSession()?.Server;
+                ?? _services.State.LoadCurrentSession()?.Server;
 
             string? password = null;
             if (method == AuthMethod.ServicePrincipalSecret)
@@ -141,7 +146,7 @@ internal sealed class AuthCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildStatus()
+    private Command BuildStatus()
     {
         var command = new Command("status", "Show authentication status");
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -157,7 +162,7 @@ internal sealed class AuthCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildLogout()
+    private Command BuildLogout()
     {
         var command = new Command("logout", "Clear cached authentication credentials");
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -221,8 +226,10 @@ internal sealed class AuthCommand : ICommandModule
     private static bool IsServicePrincipal(AuthMethod method)
         => method is AuthMethod.ServicePrincipalSecret or AuthMethod.ServicePrincipalCertificate;
 
-    private static MsalAuthenticator CreateAuthenticator(string? clientIdOverride, string? tenant)
-        => new(App.Auth.AuthSettingsFactory.Resolve(clientIdOverride, tenant), messageWriter: Console.Error.WriteLine);
+    private MsalAuthenticator CreateAuthenticator(string? clientIdOverride, string? tenant)
+        => new(
+            App.Auth.AuthSettingsFactory.Resolve(_services.ConfigStore.Load(), clientIdOverride, tenant),
+            messageWriter: Console.Error.WriteLine);
 
     private static void RenderLogin(AuthLoginResult result)
     {

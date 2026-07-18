@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Tomix.App;
 using Tomix.App.Bpa;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -11,7 +12,13 @@ internal sealed class BpaCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public BpaCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public BpaCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -201,15 +208,16 @@ internal sealed class BpaCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
 
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
-                () => new BpaRunHandler(_providers).HandleAsync(
+                () => new BpaRunHandler(_providers, _services.Mutations, _services.BpaRules).HandleAsync(
                     new BpaRunRequest(
-                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
+                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
                         ruleFiles,
                         parseResult.GetValue(noDefaultsOption),
                         parseResult.GetValue(pathOption),
@@ -332,19 +340,19 @@ internal sealed class BpaCommand : ICommandModule
             ModelReference? model = null;
             if (GlobalOptions.RecentSpecified(parseResult))
             {
-                if (!RecentConnections.TryGetSource(parseResult, modelPath, out var source, out var recentExit))
+                if (!RecentConnections.TryGetSource(parseResult, modelPath, _services.State, out var source, out var recentExit))
                     return recentExit;
-                model = RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server);
+                model = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             }
             else if (!string.IsNullOrWhiteSpace(modelPath))
             {
-                model = new ActiveModelResolver().ResolveReference(
+                model = new ActiveModelResolver(_services.State).ResolveReference(
                     modelPath,
                     parseResult.GetValue(GlobalOptions.Database),
                     parseResult.GetValue(GlobalOptions.Server));
             }
 
-            var result = await new BpaRulesListHandler(_providers).HandleAsync(
+            var result = await new BpaRulesListHandler(_providers, _services.BpaRules).HandleAsync(
                 new BpaRulesListRequest(
                     Model: model,
                     All: parseResult.GetValue(allOption),
@@ -428,7 +436,7 @@ internal sealed class BpaCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildRulesFlagCommand(string name, string description)
+    private Command BuildRulesFlagCommand(string name, string description)
     {
         var ruleIdArgument = new Argument<string>("rule-id") { Description = "Rule ID" };
         var command = new Command(name, description) { ruleIdArgument };
@@ -440,7 +448,7 @@ internal sealed class BpaCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new BpaRulesDisableHandler().Handle(
+            var result = new BpaRulesDisableHandler(_services.BpaRules).Handle(
                 new BpaRulesDisableRequest(parseResult.GetValue(ruleIdArgument)!, Disable: disable));
 
             return CommandOutput.Render(result, format, BpaRulesRenderer.RenderDisable, BpaRulesRenderer.ToDisableJson);
@@ -500,12 +508,13 @@ internal sealed class BpaCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
-            var model = RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server);
+            var model = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
 
-            var result = await new BpaRulesIgnoreHandler(_providers).HandleAsync(
+            var result = await new BpaRulesIgnoreHandler(_providers, _services.Mutations).HandleAsync(
                 new BpaRulesIgnoreRequest(
                     model,
                     parseResult.GetValue(ruleIdArgument)!,

@@ -145,7 +145,7 @@ public sealed class AuthLoginSecretIntakeTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new AuthCommand().Build());
+        root.Subcommands.Add(new AuthCommand(TestServices.Create()).Build());
         return root.Parse(args);
     }
 

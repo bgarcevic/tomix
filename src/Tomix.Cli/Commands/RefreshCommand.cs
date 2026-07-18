@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using Tomix.App;
 using Tomix.App.Refresh;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -13,7 +14,13 @@ internal sealed class RefreshCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public RefreshCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public RefreshCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -124,6 +131,7 @@ internal sealed class RefreshCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
@@ -147,7 +155,7 @@ internal sealed class RefreshCommand : ICommandModule
             // so the refresh target and its workspace mirror come from the recent connection.
             var recentSession = RecentConnections.SessionSource(source);
             RefreshModelHandler CreateHandler() => recentSession is null
-                ? new RefreshModelHandler(_providers)
+                ? new RefreshModelHandler(_providers, _services.LoadCurrentSession)
                 : new RefreshModelHandler(_providers, recentSession);
 
             // Progress + trace sinks: live spinner display via AnsiConsole.Status, plus optional --trace file/stderr.

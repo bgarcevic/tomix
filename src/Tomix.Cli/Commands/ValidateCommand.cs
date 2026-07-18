@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Xml.Linq;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.State;
 using Tomix.App.Validate;
 using Tomix.Cli.Output;
@@ -12,7 +13,13 @@ internal sealed class ValidateCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public ValidateCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public ValidateCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -69,6 +76,7 @@ internal sealed class ValidateCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
@@ -77,7 +85,7 @@ internal sealed class ValidateCommand : ICommandModule
                 "Validating model...",
                 () => new ValidateModelHandler(_providers).HandleAsync(
                     new ValidateModelRequest(
-                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
+                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
                         errorsOnly,
                         parseResult.GetValue(noWarningsOption) || errorsOnly,
                         parseResult.GetValue(serverOnlyOption)),

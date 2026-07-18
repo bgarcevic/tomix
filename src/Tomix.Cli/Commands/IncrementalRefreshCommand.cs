@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Tomix.App;
 using Tomix.App.IncrementalRefresh;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -10,7 +11,13 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public IncrementalRefreshCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public IncrementalRefreshCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -43,7 +50,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var reference = new ActiveModelResolver().ResolveReference(
+            var reference = new ActiveModelResolver(_services.State).ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
@@ -171,7 +178,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var reference = new ActiveModelResolver().ResolveReference(
+            var reference = new ActiveModelResolver(_services.State).ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
@@ -183,7 +190,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new SetRefreshPolicyHandler(_providers).HandleAsync(
+                () => new SetRefreshPolicyHandler(_providers, _services.Mutations).HandleAsync(
                     new SetRefreshPolicyRequest(
                         reference,
                         parseResult.GetValue(tableArgument) ?? "",
@@ -286,7 +293,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                 parseResult.GetValue(GlobalOptions.NonInteractive)))
                 return 1;
 
-            var reference = new ActiveModelResolver().ResolveReference(
+            var reference = new ActiveModelResolver(_services.State).ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
@@ -298,7 +305,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new RemoveRefreshPolicyHandler(_providers).HandleAsync(
+                () => new RemoveRefreshPolicyHandler(_providers, _services.Mutations).HandleAsync(
                     new RemoveRefreshPolicyRequest(
                         reference,
                         table,
@@ -353,7 +360,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 $"Applying refresh policy for {table}...",
-                () => new ApplyRefreshPolicyHandler(_providers).HandleAsync(
+                () => new ApplyRefreshPolicyHandler(_providers, _services.LoadCurrentSession).HandleAsync(
                     new ApplyRefreshPolicyRequest(
                         GlobalOptions.ModelValue(parseResult),
                         parseResult.GetValue(GlobalOptions.Server),

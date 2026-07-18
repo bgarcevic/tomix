@@ -3,6 +3,7 @@ using System.CommandLine.Help;
 using System.Reflection;
 using System.Text;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Auth;
 using Tomix.App.Config;
 using Tomix.App.Connect;
@@ -27,14 +28,15 @@ internal static class Program
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
 
-        var config = new TomixConfigStore().Load();
+        var services = AppServices.Create();
+        var config = services.ConfigStore.Load();
         var noColorEnv = Environment.GetEnvironmentVariable("NO_COLOR") is not null;
         var noColorCfg = config.TryGetValue(ConfigKeys.NoColor, out var noColor) && bool.TryParse(noColor, out var noColorEnabled) && noColorEnabled;
         if (noColorEnv || noColorCfg)
             AnsiConsole.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
 
         var tokenProvider = new MsalAuthenticator(
-            App.Auth.AuthSettingsFactory.Resolve(),
+            App.Auth.AuthSettingsFactory.Resolve(config),
             messageWriter: Console.Error.WriteLine);
         IReadOnlyList<IModelProvider> providers =
             [new TmdlModelProvider(tokenProvider), new TomFileModelProvider(tokenProvider), new TomServerModelProvider(tokenProvider)];
@@ -50,7 +52,7 @@ internal static class Program
 
         var version = ResolveVersion();
         var root = BuildRootCommand(
-            providers, formatter, version, workspaceCatalog, tokenProvider.CachedUsername,
+            providers, formatter, version, services, workspaceCatalog, tokenProvider.CachedUsername,
             new VpaxVertipaqAnalyzer(tokenProvider, version));
 
         if (args.Length == 0)
@@ -145,6 +147,7 @@ internal static class Program
         IReadOnlyList<IModelProvider> providers,
         IExpressionFormatterClient formatter,
         string version,
+        AppServices services,
         IWorkspaceCatalog? workspaceCatalog = null,
         Func<string?>? cachedUsername = null,
         IVertipaqAnalyzer? analyzer = null)
@@ -156,40 +159,41 @@ internal static class Program
 
         var modules = new ICommandModule[]
         {
-            new AddCommand(providers),
-            new AuthCommand(),
-            new BpaCommand(providers),
+            new AddCommand(providers, services),
+            new AuthCommand(services),
+            new BpaCommand(providers, services),
             new CompletionCommand(() => root.Subcommands.Select(command => command.Name).ToList()),
-            new ConfigCommand(),
+            new ConfigCommand(services),
             new ConnectCommand(
                 providers,
                 workspaceCatalog ?? EmptyWorkspaceCatalog.Instance,
-                cachedUsername ?? (() => null)),
-            new DeployCommand(providers),
-            new DepsCommand(providers),
+                cachedUsername ?? (() => null),
+                services),
+            new DeployCommand(providers, services),
+            new DepsCommand(providers, services),
             new DiffCommand(providers),
             new DoctorCommand(version),
-            new FindCommand(providers),
-            new FormatCommand(providers, formatter),
-            new GetCommand(providers),
-            new IncrementalRefreshCommand(providers),
+            new FindCommand(providers, services),
+            new FormatCommand(providers, formatter, services),
+            new GetCommand(providers, services),
+            new IncrementalRefreshCommand(providers, services),
             new InitCommand(),
-            new InteractiveCommand(),
-            new LoadCommand(providers),
-            new LsCommand(providers),
-            new MvCommand(providers),
-            new ProfileCommand(),
-            new QueryCommand(providers),
-            new RefreshCommand(providers),
-            new ReplaceCommand(providers),
-            new RmCommand(providers),
-            new SaveCommand(providers),
-            new ScriptCommand(providers),
-            new SessionCommand(),
-            new SetCommand(providers),
-            new StageCommand(providers),
-            new ValidateCommand(providers),
-            new VertipaqCommand(providers, analyzer)
+            new InteractiveCommand(services),
+            new LoadCommand(providers, services),
+            new LsCommand(providers, services),
+            new MvCommand(providers, services),
+            new ProfileCommand(services),
+            new QueryCommand(providers, services),
+            new RefreshCommand(providers, services),
+            new ReplaceCommand(providers, services),
+            new RmCommand(providers, services),
+            new SaveCommand(providers, services),
+            new ScriptCommand(providers, services),
+            new SessionCommand(services),
+            new SetCommand(providers, services),
+            new StageCommand(providers, services),
+            new ValidateCommand(providers, services),
+            new VertipaqCommand(providers, analyzer, services)
         };
 
         foreach (var module in modules)

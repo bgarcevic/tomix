@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Format;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,12 +13,16 @@ internal sealed class FormatCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly IExpressionFormatterClient _formatter;
 
+    private readonly AppServices _services;
+
     public FormatCommand(
         IReadOnlyList<IModelProvider> providers,
-        IExpressionFormatterClient formatter)
+        IExpressionFormatterClient formatter,
+        AppServices services)
     {
         _providers = providers;
         _formatter = formatter;
+        _services = services;
     }
 
     public Command Build()
@@ -124,15 +129,16 @@ internal sealed class FormatCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
 
             var result = await CliSpinner.RunAsync(
                 "Formatting...",
-                () => new FormatModelHandler(_providers, _formatter).HandleAsync(
+                () => new FormatModelHandler(_providers, _formatter, _services.Mutations).HandleAsync(
                     new FormatModelRequest(
-                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
+                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
                         expression,
                         parseResult.GetValue(pathOption),
                         parseResult.GetValue(langOption) ?? "",

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Deps;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -11,7 +12,13 @@ internal sealed class DepsCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public DepsCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public DepsCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -102,6 +109,7 @@ internal sealed class DepsCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    _services.State,
                     out var source,
                     out var recentExit))
                 return recentExit;
@@ -111,7 +119,7 @@ internal sealed class DepsCommand : ICommandModule
                 "Analyzing dependencies...",
                 () => new DepsModelHandler(_providers).HandleAsync(
                     new DepsModelRequest(
-                        RecentConnections.CreateResolver(source).ResolveReference(source.Model, source.Database, source.Server),
+                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
                         parseResult.GetValue(pathArgument),
                         type,
                         upstreamOnly,

@@ -15,7 +15,7 @@ public sealed class IncrementalRefreshCommandParseTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new IncrementalRefreshCommand([]).Build());
+        root.Subcommands.Add(new IncrementalRefreshCommand([], TestServices.Create()).Build());
         return root.Parse(args);
     }
 

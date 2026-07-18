@@ -37,6 +37,7 @@ internal static class RecentConnections
     public static bool TryGetSource(
         ParseResult parseResult,
         string? explicitModel,
+        CliStateStore store,
         out ModelSource source,
         out int exitCode)
     {
@@ -58,7 +59,7 @@ internal static class RecentConnections
             return false;
         }
 
-        if (!TryResolve(parseResult, new CliStateStore(), out var entry, out exitCode))
+        if (!TryResolve(parseResult, store, out var entry, out exitCode))
         {
             source = default;
             return false;
@@ -78,9 +79,9 @@ internal static class RecentConnections
     /// and <c>ResolveSyncTarget</c> draw the database and workspace mirror from that entry,
     /// never the active session. Otherwise it reads the active session as usual.
     /// </summary>
-    public static ActiveModelResolver CreateResolver(ModelSource source)
+    public static ActiveModelResolver CreateResolver(ModelSource source, CliStateStore store)
         => source.RecentEntry is null
-            ? new ActiveModelResolver()
+            ? new ActiveModelResolver(store)
             : new ActiveModelResolver(() => source.RecentEntry);
 
     /// <summary>

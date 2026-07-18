@@ -80,8 +80,8 @@ public sealed class RecentConnectionsTests
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
-        root.Subcommands.Add(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null).Build());
-        root.Subcommands.Add(new LsCommand(providers).Build());
+        root.Subcommands.Add(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, TestServices.Create()).Build());
+        root.Subcommands.Add(new LsCommand(providers, TestServices.Create()).Build());
         return root.Parse(args);
     }
 
@@ -113,7 +113,7 @@ public sealed class RecentConnectionsTests
             Auth: null, Local: false, Profile: null);
         var source = new RecentConnections.ModelSource(entry.Model, entry.Server, entry.Database, entry);
 
-        var reference = RecentConnections.CreateResolver(source)
+        var reference = RecentConnections.CreateResolver(source, TestServices.Create().State)
             .ResolveReference(source.Model, source.Database, source.Server);
 
         Assert.True(reference.IsRemote);
@@ -131,7 +131,7 @@ public sealed class RecentConnectionsTests
             Workspace: "powerbi://api.powerbi.com/v1.0/myorg/mirror");
         var source = new RecentConnections.ModelSource(entry.Model, entry.Server, entry.Database, entry);
 
-        var syncTarget = RecentConnections.CreateResolver(source).ResolveSyncTarget();
+        var syncTarget = RecentConnections.CreateResolver(source, TestServices.Create().State).ResolveSyncTarget();
 
         Assert.NotNull(syncTarget);
         Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/mirror", syncTarget!.Value);

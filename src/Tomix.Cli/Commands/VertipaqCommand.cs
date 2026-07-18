@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.State;
 using Tomix.App.Vertipaq;
 using Tomix.Cli.Output;
@@ -13,10 +14,13 @@ internal sealed class VertipaqCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly IVertipaqAnalyzer _analyzer;
 
-    public VertipaqCommand(IReadOnlyList<IModelProvider> providers, IVertipaqAnalyzer analyzer)
+    private readonly AppServices _services;
+
+    public VertipaqCommand(IReadOnlyList<IModelProvider> providers, IVertipaqAnalyzer analyzer, AppServices services)
     {
         _providers = providers;
         _analyzer = analyzer;
+        _services = services;
     }
 
     public Command Build()
@@ -138,6 +142,7 @@ internal sealed class VertipaqCommand : ICommandModule
                 if (!RecentConnections.TryGetSource(
                         parseResult,
                         GlobalOptions.ModelValue(parseResult),
+                        _services.State,
                         out var source,
                         out var recentExit))
                     return recentExit;
@@ -152,7 +157,7 @@ internal sealed class VertipaqCommand : ICommandModule
 
                 // Seed with the picked --recent entry (if any) so the workspace-primary read side
                 // (syncTarget) comes from that entry's mirror, not the active session's.
-                var resolver = RecentConnections.CreateResolver(source);
+                var resolver = RecentConnections.CreateResolver(source, _services.State);
                 reference = resolver.ResolveReference(source.Model, source.Database, server);
                 syncTarget = resolver.ResolveSyncTarget();
             }
@@ -178,7 +183,7 @@ internal sealed class VertipaqCommand : ICommandModule
                     ? "Exporting statistics..."
                     : "Analyzing storage...";
 
-            var handler = new VertipaqHandler(_providers, _analyzer);
+            var handler = new VertipaqHandler(_providers, _analyzer, _services.Mutations);
             var result = await CliSpinner.RunAsync(
                 spinnerLabel,
                 () => handler.HandleAsync(request, cancellationToken),

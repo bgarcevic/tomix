@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App;
 using Tomix.App.Deploy;
 using Tomix.App.Diff;
 using Tomix.App.State;
@@ -12,7 +13,13 @@ internal sealed class DeployCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    public DeployCommand(IReadOnlyList<IModelProvider> providers) => _providers = providers;
+    private readonly AppServices _services;
+
+    public DeployCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    {
+        _providers = providers;
+        _services = services;
+    }
 
     public Command Build()
     {
@@ -130,7 +137,7 @@ internal sealed class DeployCommand : ICommandModule
                     return 2;
                 }
 
-                if (!RecentConnections.TryResolve(parseResult, new CliStateStore(), out var entry, out var recentExit))
+                if (!RecentConnections.TryResolve(parseResult, _services.State, out var entry, out var recentExit))
                     return recentExit;
 
                 // Resolve against the picked entry (not the active session) so a server-only
@@ -140,7 +147,7 @@ internal sealed class DeployCommand : ICommandModule
             }
             else
             {
-                reference = new ActiveModelResolver().ResolveReference(
+                reference = new ActiveModelResolver(_services.State).ResolveReference(
                     explicitModel,
                     parseResult.GetValue(GlobalOptions.Database));
             }
@@ -158,7 +165,7 @@ internal sealed class DeployCommand : ICommandModule
             var spinnerLabel = dryRun ? "Previewing deployment..." : "Deploying model...";
             var result = await CliSpinner.RunAsync(
                 spinnerLabel,
-                () => new DeployModelHandler(_providers).HandleAsync(
+                () => new DeployModelHandler(_providers, _services.State).HandleAsync(
                     new DeployModelRequest(
                         reference,
                         server,

@@ -19,7 +19,8 @@ public sealed class HelpExitCodeTests
         => Program.BuildRootCommand(
             providers: [],
             new CompositeExpressionFormatterClient([]),
-            version: "0.0.0-test");
+            version: "0.0.0-test",
+            TestServices.Create());
 
     [Fact]
     public void EveryCommand_Help_ParsesCleanAndExitsZero()
