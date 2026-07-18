@@ -1,7 +1,7 @@
 # Manage
 
-Housekeeping: configuration, profiles, model scaffolding, shell integration,
-and interactive use.
+Housekeeping: configuration, profiles, model scaffolding, and shell
+integration.
 
 ## `config` — CLI configuration
 
@@ -89,17 +89,4 @@ Inspect and manage staged (uncommitted) model mutations — see
 tx stage             # staged mutations for the active model
 tx stage commit      # promote them onto the source (and workspace mirror)
 tx stage discard
-```
-
-## `interactive` — REPL
-
-```
-tx interactive [model]
-```
-
-Starts an interactive session for running multiple commands against a model
-without re-loading it each time.
-
-```sh
-tx interactive ./model.tmdl
 ```

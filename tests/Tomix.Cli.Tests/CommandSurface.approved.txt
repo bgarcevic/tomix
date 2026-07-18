@@ -344,10 +344,6 @@ Create a new empty semantic model
   opt --serialization <serialization>  Model serialization: tmdl, bim, pbip (default: tmdl)
   opt --force  Replace any existing file or directory at the target path
 
-# tx interactive
-Start an interactive REPL session for running multiple commands against a model
-  arg [model]  Path to semantic model, or omit to connect later inside the session
-
 # tx load
 Load a semantic model and display summary
   arg [model]  Path to model, Fabric path, or omit for active connection

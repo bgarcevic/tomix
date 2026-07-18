@@ -73,7 +73,7 @@ against a live model), `load`, `save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
 `vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
-staged, then committed or discarded), `interactive`
+staged, then committed or discarded)
 
 `tx <command> --help` shows options and examples. `tx doctor` checks your
 environment when something seems off.

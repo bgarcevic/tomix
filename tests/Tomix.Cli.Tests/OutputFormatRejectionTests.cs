@@ -30,7 +30,6 @@ public sealed class OutputFormatRejectionTests
             "format" => new FormatCommand(NoProviders, new CompositeExpressionFormatterClient([]), TestServices.Create()),
             "get" => new GetCommand(NoProviders, TestServices.Create()),
             "init" => new InitCommand(),
-            "interactive" => new InteractiveCommand(TestServices.Create()),
             "load" => new LoadCommand(NoProviders, TestServices.Create()),
             "profile" => new ProfileCommand(TestServices.Create()),
             "refresh" => new RefreshCommand(NoProviders, TestServices.Create()),
@@ -82,7 +81,6 @@ public sealed class OutputFormatRejectionTests
     [InlineData("csv", "doctor")]
     [InlineData("csv", "format")]
     [InlineData("csv", "init")]
-    [InlineData("csv", "interactive")]
     [InlineData("csv", "load")]
     [InlineData("csv", "profile", "list")]
     [InlineData("csv", "replace", "old", "new")]

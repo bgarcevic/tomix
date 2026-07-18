@@ -151,6 +151,7 @@ and the API surface that major versions protect.
 
 ### Removed
 
+- `tx interactive` command: the REPL spawned a fresh `tx` process per line, so it had no warm connection or cached model — just a worse shell (no tab completion, history, pipes, or streamed output). `tx connect` plus shell completions (`tx completion <shell>`) cover the workflow; a true in-process REPL can be revisited if a persistent session ever proves necessary.
 - `TOMIX_CONNECT_INVALID_TARGET` error code: the branch was unreachable — any server value containing a path separator classifies as a local model path, and the remaining bare names always normalize to `powerbi://` (or localhost) endpoints, so `connect` can never plan a dead-end target. Unopenable inputs fail at validation with `TOMIX_NO_PROVIDER`/`TOMIX_MODEL_LOAD_FAILED` as before.
 - `tx macro` command and everything around it: the `TOMIX_MACRO_*` error codes, the `TOMIX_MACROS_PATH`/`TE_MACROS_PATH` environment variables, and the `macros` config key. `macro run` was never implemented, so the catalog could be edited but never executed; `tx script` covers running C# against a model.
 - `tx info` command (use `tx load` or `tx connect` instead).

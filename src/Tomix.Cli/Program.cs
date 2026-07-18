@@ -197,7 +197,6 @@ internal static class Program
             new GetCommand(providers, services),
             new IncrementalRefreshCommand(providers, services),
             new InitCommand(),
-            new InteractiveCommand(services),
             new LoadCommand(providers, services),
             new LsCommand(providers, services),
             new MvCommand(providers, services),
