@@ -25,7 +25,9 @@ Shared output wiring for all commands.
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--plan`/`--runs` server-timings, query-plan, and benchmark summaries written to stderr).
 - `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.
+- `CiAnnotations` — shared `--ci github`/`--ci vsts` logging-command syntax; callers project results into `CiAnnotation`s.
 - `BpaRunView` / `BpaRunRenderer` — pure grouping/ordering logic, Spectre rendering, JSON projection, and CI annotation emission for `bpa run`.
+- `ValidateRenderer` — CI annotation emission for `validate` (error-level only; issues carry no severity).
 - `BpaRulesRenderer` — Spectre rendering and JSON projections for the `bpa rules` subcommands.
 - `ConnectRenderer` — connected-model summary (text + JSON projection), show-current and raw-connection views for the `connect` command.
 - `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), `--dry-run` TMSL pretty-print, and the live `AnsiConsole.Status()` progress display fed by XMLA trace events.

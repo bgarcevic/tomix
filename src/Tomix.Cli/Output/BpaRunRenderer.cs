@@ -286,33 +286,17 @@ internal static class BpaRunRenderer
 
     public static void EmitCi(string? ci, IReadOnlyList<BpaViolation> violations)
     {
-        if (string.IsNullOrWhiteSpace(ci) || violations.Count == 0)
-            return;
-
-        foreach (var v in violations)
-        {
-            var msg = $"{v.RuleName}: {v.ObjectType} '{v.ObjectName}'";
-            if (!string.IsNullOrWhiteSpace(v.Description))
+        var annotations = violations
+            .Select(v =>
             {
-                var shortDesc = CollapseDescription(v.Description);
-                msg += $" - {shortDesc}";
-            }
+                var msg = $"{v.RuleName}: {v.ObjectType} '{v.ObjectName}'";
+                if (!string.IsNullOrWhiteSpace(v.Description))
+                    msg += $" - {CollapseDescription(v.Description)}";
+                return new CiAnnotation(v.Severity == BpaSeverity.Error, $"{msg} [{v.RuleId}]");
+            })
+            .ToList();
 
-            if (ci.Equals("github", StringComparison.OrdinalIgnoreCase))
-            {
-                var level = v.Severity == BpaSeverity.Error ? "error" : "warning";
-                Console.Error.WriteLine($"::{level}::{msg} [{v.RuleId}]");
-            }
-            else if (ci.Equals("vsts", StringComparison.OrdinalIgnoreCase))
-            {
-                var type = v.Severity == BpaSeverity.Error ? "error" : "warning";
-                Console.Error.WriteLine($"##vso[task.logissue type={type};]{msg} [{v.RuleId}]");
-            }
-        }
-
-        var errors = violations.Count(v => v.Severity == BpaSeverity.Error);
-        if (errors > 0 && ci.Equals("vsts", StringComparison.OrdinalIgnoreCase))
-            Console.Error.WriteLine("##vso[task.complete result=Failed;]Done.");
+        CiAnnotations.Emit(ci, annotations, Console.Error);
     }
 
     private static string CollapseDescription(string? description)

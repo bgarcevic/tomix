@@ -90,7 +90,7 @@ internal sealed class ValidateCommand : ICommandModule
                 if (!string.IsNullOrWhiteSpace(trx))
                     WriteTrx(trx, result.Data);
 
-                EmitCi(parseResult.GetValue(ciOption), result.Data);
+                ValidateRenderer.EmitCi(parseResult.GetValue(ciOption), result.Data);
             }
 
             return CommandOutput.Render(
@@ -177,25 +177,6 @@ internal sealed class ValidateCommand : ICommandModule
                 Styling.MarkupEscape(row.Line));
 
         AnsiConsole.Write(table);
-    }
-
-    private static void EmitCi(string? ci, ValidateModelResult result)
-    {
-        if (string.IsNullOrWhiteSpace(ci) || result.Valid)
-            return;
-
-        if (ci.Equals("github", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var error in result.Errors)
-                Console.Error.WriteLine($"::error::{error.Message} [{error.ObjectName}] ({error.Code})");
-        }
-        else if (ci.Equals("vsts", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var error in result.Errors)
-                Console.Error.WriteLine($"##vso[task.logissue type=error;]{error.Message} [{error.ObjectName}] ({error.Code})");
-
-            Console.Error.WriteLine("##vso[task.complete result=Failed;]Done.");
-        }
     }
 
     private static void WriteTrx(string path, ValidateModelResult result)
