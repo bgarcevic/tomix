@@ -2,6 +2,7 @@ using Tomix.App.Bpa;
 using Tomix.App.Config;
 using Tomix.App.Mutations;
 using Tomix.App.State;
+using Tomix.App.Update;
 using Tomix.Core.Configuration;
 
 namespace Tomix.App;
@@ -19,7 +20,8 @@ public sealed record AppServices(
     CliStateStore State,
     StagingStore Staging,
     TomixConfigStore ConfigStore,
-    BpaUserRuleState BpaRules)
+    BpaUserRuleState BpaRules,
+    UpdateCheckStore UpdateCheck)
 {
     public static AppServices Create(string? configDirectory = null)
     {
@@ -33,7 +35,8 @@ public sealed record AppServices(
             state,
             new StagingStore(dir, state.CurrentSessionId),
             new TomixConfigStore(configFile),
-            new BpaUserRuleState(dir));
+            new BpaUserRuleState(dir),
+            new UpdateCheckStore(dir));
     }
 
     /// <summary>The active session, read from disk at call time (never cached).</summary>

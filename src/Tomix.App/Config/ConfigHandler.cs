@@ -72,7 +72,7 @@ public sealed class ConfigHandler
                 error = "defaultFormat must be 'human' or 'json'.";
                 return false;
 
-            case ConfigKeys.NoColor or ConfigKeys.Telemetry or ConfigKeys.HideWarnings
+            case ConfigKeys.NoColor or ConfigKeys.Telemetry or ConfigKeys.HideWarnings or ConfigKeys.UpdateCheck
                 when !bool.TryParse(value, out _):
                 error = $"{key} must be 'true' or 'false'.";
                 return false;

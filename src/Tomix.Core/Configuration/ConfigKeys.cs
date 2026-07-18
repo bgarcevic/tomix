@@ -11,6 +11,9 @@ public static class ConfigKeys
     public const string ActiveProfile = "activeProfile";
     public const string HideWarnings = "hideWarnings";
 
+    /// <summary>Set to <c>false</c> to disable the throttled update check and notice.</summary>
+    public const string UpdateCheck = "updateCheck";
+
     /// <summary>Azure AD application (client) id used for interactive/device-code sign-in. Not a secret.</summary>
     public const string AuthClientId = "auth.clientId";
 
@@ -27,6 +30,7 @@ public static class ConfigKeys
         Telemetry,
         ActiveProfile,
         HideWarnings,
+        UpdateCheck,
         AuthClientId,
         AuthTenant,
         AuthAuthority

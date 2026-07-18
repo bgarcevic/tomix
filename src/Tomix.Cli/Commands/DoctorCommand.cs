@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Spectre.Console;
 using Tomix.App.Doctor;
+using Tomix.App.Update;
 using Tomix.Cli.Output;
 using Tomix.Core.Doctor;
 
@@ -12,10 +13,13 @@ internal sealed class DoctorCommand : ICommandModule
 
     private readonly string _configDirectory;
 
-    public DoctorCommand(string version, string configDirectory)
+    private readonly IReleaseSource? _releaseSource;
+
+    public DoctorCommand(string version, string configDirectory, IReleaseSource? releaseSource = null)
     {
         _version = version;
         _configDirectory = configDirectory;
+        _releaseSource = releaseSource;
     }
 
     public Command Build()
@@ -34,7 +38,7 @@ internal sealed class DoctorCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "doctor", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new DoctorHandler(_configDirectory).Handle(_version);
+            var result = new DoctorHandler(_configDirectory, _releaseSource).Handle(_version);
             return CommandOutput.Render(result, formatValue, Render);
         });
 
@@ -46,6 +50,8 @@ internal sealed class DoctorCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.Title("tx doctor"));
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(Styling.KeyValue("Version:          ", result.Version));
+        if (result.LatestVersion is not null)
+            AnsiConsole.MarkupLine(Styling.KeyValue("Latest version:   ", result.LatestVersion));
         AnsiConsole.MarkupLine(Styling.KeyValue("Operating system: ", result.OperatingSystem));
         AnsiConsole.MarkupLine(Styling.KeyValue(".NET version:     ", result.DotNetVersion));
         AnsiConsole.MarkupLine(Styling.KeyValue("Config directory: ", result.ConfigDirectory));

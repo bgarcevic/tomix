@@ -5,4 +5,5 @@ public sealed record DoctorResult(
     string OperatingSystem,
     string DotNetVersion,
     string ConfigDirectory,
-    IReadOnlyList<DoctorCheck> Checks);
+    IReadOnlyList<DoctorCheck> Checks,
+    string? LatestVersion = null);
