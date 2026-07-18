@@ -1,4 +1,5 @@
 using Tomix.App.Diagnostics;
+using Tomix.App.Mutations;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -21,7 +22,7 @@ public sealed class ShowRefreshPolicyHandler
         ShowRefreshPolicyRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
         if (provider is null)
             return TomixResult<RefreshPolicyInfo>.Fail(
                 "TOMIX_NO_PROVIDER",
@@ -41,7 +42,7 @@ public sealed class ShowRefreshPolicyHandler
                     "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
                     $"Provider cannot read refresh policies for: {request.Model.Value}");
 
-            var policy = mutator.GetRefreshPolicy(request.Table);
+            var policy = MutationCapabilities.RequireRefreshPolicies(mutator).GetRefreshPolicy(request.Table);
             if (policy is null)
                 return TomixResult<RefreshPolicyInfo>.Fail(
                     "TOMIX_REFRESH_POLICY_NOT_FOUND",

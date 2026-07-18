@@ -64,7 +64,7 @@ public sealed class ConnectWorkspaceHandler
             ? Path.Combine(request.Workspace, "model.bim")
             : request.Workspace;
 
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Primary));
+        var provider = _providers.ResolveSingle(request.Primary);
         if (provider is null)
             return new ConnectWorkspaceInitResult(Initialized: false, null, null);
 

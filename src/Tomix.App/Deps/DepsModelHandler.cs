@@ -21,7 +21,7 @@ public sealed class DepsModelHandler
                 message: "A dependency path is required unless --unused is specified.",
                 exitCode: 2);
 
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
 
         if (provider is null)
             return TomixResult<DepsModelResult>.Fail(

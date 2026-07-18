@@ -9,7 +9,7 @@ public sealed class LsModelHandlerTests
     public async Task HandleAsync_ListsTablesByDefault_WhenProviderCanOpen()
     {
         var handler = new LsModelHandler([new StubModelProvider()]);
-        var result  = await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             new LsModelRequest(new ModelReference("any"), PathFilter: null, Type: null),
             CancellationToken.None);
 
@@ -24,7 +24,7 @@ public sealed class LsModelHandlerTests
     public async Task HandleAsync_ProjectsDescriptionAndChildCounts()
     {
         var handler = new LsModelHandler([new StubModelProvider()]);
-        var result  = await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             new LsModelRequest(new ModelReference("any"), PathFilter: null, Type: null),
             CancellationToken.None);
 
@@ -38,7 +38,7 @@ public sealed class LsModelHandlerTests
     public async Task HandleAsync_AppliesPathFilter()
     {
         var handler = new LsModelHandler([new StubModelProvider()]);
-        var result  = await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             new LsModelRequest(new ModelReference("any"), PathFilter: "Measures", Type: null),
             CancellationToken.None);
 
@@ -52,7 +52,7 @@ public sealed class LsModelHandlerTests
     public async Task HandleAsync_ReturnsFail_WhenNoProviderMatches()
     {
         var handler = new LsModelHandler([]);
-        var result  = await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             new LsModelRequest(new ModelReference("any"), PathFilter: null, Type: null),
             CancellationToken.None);
 

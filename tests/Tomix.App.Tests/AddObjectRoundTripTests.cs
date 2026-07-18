@@ -1,6 +1,6 @@
+using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
 using Tomix.Provider.Tom;
-using Microsoft.AnalysisServices.Tabular;
 using CompatibilityMode = Microsoft.AnalysisServices.CompatibilityMode;
 using TabularJsonSerializer = Microsoft.AnalysisServices.Tabular.JsonSerializer;
 

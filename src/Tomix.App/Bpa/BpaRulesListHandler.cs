@@ -1,7 +1,7 @@
+using System.Text.Json;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
-using System.Text.Json;
 
 namespace Tomix.App.Bpa;
 
@@ -111,7 +111,7 @@ public sealed class BpaRulesListHandler
         if (model is null)
             return disabled;
 
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(model));
+        var provider = _providers.ResolveSingle(model);
         if (provider is null)
             return disabled;
 

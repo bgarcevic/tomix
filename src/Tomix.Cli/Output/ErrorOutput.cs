@@ -1,8 +1,8 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Tomix.Core.Diagnostics;
 using Spectre.Console;
+using Tomix.Core.Diagnostics;
 
 namespace Tomix.Cli.Output;
 

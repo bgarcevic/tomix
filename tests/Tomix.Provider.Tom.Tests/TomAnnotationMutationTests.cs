@@ -1,7 +1,7 @@
+using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Provider.Tom;
-using Microsoft.AnalysisServices.Tabular;
 
 namespace Tomix.Provider.Tom.Tests;
 

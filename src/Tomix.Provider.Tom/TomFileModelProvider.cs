@@ -31,7 +31,8 @@ public sealed class TomFileModelProvider : IModelProvider
     }
 }
 
-internal sealed class TomFileModelSession : IModelSession, IModelExportSession, IModelMutationSession, IModelDeploySession
+internal sealed class TomFileModelSession : IModelSession, IModelExportSession, IModelMutationSession,
+    IExpressionRewriteSession, IRefreshPolicyMutationSession, IModelDeploySession
 {
     private readonly string _path;
     private readonly IAccessTokenProvider? _tokenProvider;
@@ -50,7 +51,8 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
         cancellationToken.ThrowIfCancellationRequested();
         var database = GetDatabase();
         return Task.FromResult(TomModelSummarizer.Summarize(database, ModelName(database))
-            with { DatabaseName = string.IsNullOrWhiteSpace(database.Name) ? null : database.Name });
+            with
+        { DatabaseName = string.IsNullOrWhiteSpace(database.Name) ? null : database.Name });
     }
 
     public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)

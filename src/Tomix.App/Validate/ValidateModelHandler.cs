@@ -20,7 +20,7 @@ public sealed class ValidateModelHandler
         ValidateModelRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
         if (provider is null)
             return TomixResult<ValidateModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",

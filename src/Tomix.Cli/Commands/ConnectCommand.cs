@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Spectre.Console;
 using Tomix.App.Connect;
 using Tomix.App.Info;
 using Tomix.App.State;
@@ -6,7 +7,6 @@ using Tomix.Cli.Output;
 using Tomix.Core.Authentication;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
-using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
 
@@ -153,78 +153,78 @@ internal sealed class ConnectCommand : ICommandModule
                 switch (need.Kind)
                 {
                     case ConnectNeedKind.RemotePick:
-                    {
-                        var picked = await ResolveRemoteInteractiveAsync(cancellationToken);
-                        if (picked is null)
-                            return 1;
-                        request = request with { Server = picked.Value.Server, Database = picked.Value.Database, DatabaseResolved = true };
-                        break;
-                    }
+                        {
+                            var picked = await ResolveRemoteInteractiveAsync(cancellationToken);
+                            if (picked is null)
+                                return 1;
+                            request = request with { Server = picked.Value.Server, Database = picked.Value.Database, DatabaseResolved = true };
+                            break;
+                        }
 
                     case ConnectNeedKind.MirrorWorkspace:
-                    {
-                        var picked = await PickWorkspaceAsync(cancellationToken);
-                        if (picked is null)
-                            return 1;
-                        request = request with { WorkspaceValue = picked.XmlaEndpoint };
-                        break;
-                    }
+                        {
+                            var picked = await PickWorkspaceAsync(cancellationToken);
+                            if (picked is null)
+                                return 1;
+                            request = request with { WorkspaceValue = picked.XmlaEndpoint };
+                            break;
+                        }
 
                     case ConnectNeedKind.MirrorDatabase:
-                    {
-                        var suggestion = ConnectPrompts.SuggestMirrorDatabaseName(need.SuggestionModelName!, _cachedUsername());
-                        var selection = await PickDatabaseAsync(
-                            ModelReference.Remote(need.Endpoint!),
-                            allowCreateNew: true, allowWorkspaceOnly: false, suggestion, cancellationToken);
-                        if (selection is null)
-                            return 1; // listing failed — do not save a half-configured mirror
-                        request = request with { Database = selection.Value.Name }; // workspace-only is not offered here
-                        break;
-                    }
+                        {
+                            var suggestion = ConnectPrompts.SuggestMirrorDatabaseName(need.SuggestionModelName!, _cachedUsername());
+                            var selection = await PickDatabaseAsync(
+                                ModelReference.Remote(need.Endpoint!),
+                                allowCreateNew: true, allowWorkspaceOnly: false, suggestion, cancellationToken);
+                            if (selection is null)
+                                return 1; // listing failed — do not save a half-configured mirror
+                            request = request with { Database = selection.Value.Name }; // workspace-only is not offered here
+                            break;
+                        }
 
                     case ConnectNeedKind.PrimaryDatabase:
-                    {
-                        var selection = await PickDatabaseAsync(
-                            ModelReference.Remote(need.Endpoint!),
-                            allowCreateNew: false, allowWorkspaceOnly: true, null, cancellationToken);
-                        if (selection is null)
-                            return 1; // listing failed — do not overwrite the active connection
-                        request = request with
                         {
-                            Database = selection.Value.IsWorkspaceOnly ? null : selection.Value.Name,
-                            DatabaseResolved = true
-                        };
-                        break;
-                    }
+                            var selection = await PickDatabaseAsync(
+                                ModelReference.Remote(need.Endpoint!),
+                                allowCreateNew: false, allowWorkspaceOnly: true, null, cancellationToken);
+                            if (selection is null)
+                                return 1; // listing failed — do not overwrite the active connection
+                            request = request with
+                            {
+                                Database = selection.Value.IsWorkspaceOnly ? null : selection.Value.Name,
+                                DatabaseResolved = true
+                            };
+                            break;
+                        }
 
                     case ConnectNeedKind.MirrorFolder:
-                    {
-                        var folder = await ErrConsole().PromptAsync(
-                            new TextPrompt<string>("Local workspace folder:").DefaultValue(need.SuggestedFolder!),
-                            cancellationToken);
-                        request = request with { WorkspaceValue = folder.Trim() };
-                        break;
-                    }
+                        {
+                            var folder = await ErrConsole().PromptAsync(
+                                new TextPrompt<string>("Local workspace folder:").DefaultValue(need.SuggestedFolder!),
+                                cancellationToken);
+                            request = request with { WorkspaceValue = folder.Trim() };
+                            break;
+                        }
 
                     case ConnectNeedKind.DesktopDiscovery:
-                    {
-                        AnsiConsole.MarkupLine(Styling.Value("Discovering Power BI Desktop instances..."));
-                        var endpoints = PowerBiDesktopDiscovery.DiscoverEndpoints();
-                        if (endpoints.Count == 0)
                         {
-                            ErrConsole().MarkupLine(Styling.Error("No running Power BI Desktop instances found. Start Power BI Desktop and open a report, then retry."));
-                            return 1;
-                        }
+                            AnsiConsole.MarkupLine(Styling.Value("Discovering Power BI Desktop instances..."));
+                            var endpoints = PowerBiDesktopDiscovery.DiscoverEndpoints();
+                            if (endpoints.Count == 0)
+                            {
+                                ErrConsole().MarkupLine(Styling.Error("No running Power BI Desktop instances found. Start Power BI Desktop and open a report, then retry."));
+                                return 1;
+                            }
 
-                        if (endpoints.Count > 1 && string.IsNullOrWhiteSpace(request.Database))
-                        {
-                            ErrConsole().MarkupLine(Styling.Error("Multiple Power BI Desktop instances found. Specify a semantic model name."));
-                            return 1;
-                        }
+                            if (endpoints.Count > 1 && string.IsNullOrWhiteSpace(request.Database))
+                            {
+                                ErrConsole().MarkupLine(Styling.Error("Multiple Power BI Desktop instances found. Specify a semantic model name."));
+                                return 1;
+                            }
 
-                        request = request with { Server = endpoints[0] };
-                        break;
-                    }
+                            request = request with { Server = endpoints[0] };
+                            break;
+                        }
                 }
             }
 

@@ -16,7 +16,7 @@ public sealed class GetModelHandler
         GetModelRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
 
         if (provider is null)
             return TomixResult<GetModelResult>.Fail(

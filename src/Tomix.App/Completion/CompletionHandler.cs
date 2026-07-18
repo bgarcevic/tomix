@@ -23,12 +23,12 @@ public sealed class CompletionHandler
 
         var script = normalized switch
         {
-            "bash"       => Bash(),
-            "zsh"        => Zsh(),
-            "fish"       => Fish(),
+            "bash" => Bash(),
+            "zsh" => Zsh(),
+            "fish" => Fish(),
             "powershell" => PowerShell(),
-            "pwsh"       => PowerShell(),
-            _            => ""
+            "pwsh" => PowerShell(),
+            _ => ""
         };
 
         return TomixResult<CompletionResult>.Ok(new CompletionResult(

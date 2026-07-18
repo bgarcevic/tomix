@@ -1,5 +1,5 @@
-using Tomix.Core.Models;
 using Microsoft.AnalysisServices.Tabular;
+using Tomix.Core.Models;
 
 namespace Tomix.Provider.Tom.Tests;
 
@@ -104,11 +104,15 @@ public sealed class TomRemoveCascadeTests
         var culture = new Culture { Name = "da-DK" };
         culture.ObjectTranslations.Add(new ObjectTranslation
         {
-            Object = sales, Property = TranslatedProperty.Caption, Value = "Salg"
+            Object = sales,
+            Property = TranslatedProperty.Caption,
+            Value = "Salg"
         });
         culture.ObjectTranslations.Add(new ObjectTranslation
         {
-            Object = sales.Columns["Amount"], Property = TranslatedProperty.Caption, Value = "Beløb"
+            Object = sales.Columns["Amount"],
+            Property = TranslatedProperty.Caption,
+            Value = "Beløb"
         });
         db.Model.Cultures.Add(culture);
 
@@ -139,7 +143,9 @@ public sealed class TomRemoveCascadeTests
         var culture = new Culture { Name = "da-DK" };
         culture.ObjectTranslations.Add(new ObjectTranslation
         {
-            Object = measure, Property = TranslatedProperty.Caption, Value = "I alt"
+            Object = measure,
+            Property = TranslatedProperty.Caption,
+            Value = "I alt"
         });
         db.Model.Cultures.Add(culture);
 
@@ -159,7 +165,8 @@ public sealed class TomRemoveCascadeTests
         var permission = new TablePermission { Table = sales };
         permission.ColumnPermissions.Add(new ColumnPermission
         {
-            Column = sales.Columns["Amount"], MetadataPermission = MetadataPermission.None
+            Column = sales.Columns["Amount"],
+            MetadataPermission = MetadataPermission.None
         });
         role.TablePermissions.Add(permission);
         db.Model.Roles.Add(role);

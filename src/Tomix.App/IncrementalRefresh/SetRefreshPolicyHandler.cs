@@ -37,7 +37,7 @@ public sealed class SetRefreshPolicyHandler
             _providers, request.Model, options, "incremental-refresh",
             (mutator, _, _) =>
             {
-                var mutation = mutator.SetRefreshPolicy(new RefreshPolicySetRequest(
+                var mutation = MutationCapabilities.RequireRefreshPolicies(mutator).SetRefreshPolicy(new RefreshPolicySetRequest(
                     request.Table,
                     request.Mode,
                     request.RollingWindowGranularity,

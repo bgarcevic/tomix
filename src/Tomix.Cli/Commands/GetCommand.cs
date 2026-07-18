@@ -1,11 +1,11 @@
 using System.CommandLine;
 using System.Globalization;
+using Spectre.Console;
 using Tomix.App.Get;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
-using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
 

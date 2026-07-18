@@ -26,7 +26,7 @@ public sealed class CatalogWritableAgreementTests
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
-        => [ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column, ModelObjectKind.Partition];
+        => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column, ModelObjectKind.Partition);
 
     [Theory]
     [MemberData(nameof(CatalogedKinds))]

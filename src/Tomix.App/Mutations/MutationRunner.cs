@@ -38,7 +38,7 @@ public static class MutationRunner
         }
 
         var context = begin.Context!;
-        var provider = providers.FirstOrDefault(p => p.CanOpen(context.EffectiveModel));
+        var provider = providers.ResolveSingle(context.EffectiveModel);
         if (provider is null)
             return TomixResult<TResult>.Fail(
                 "TOMIX_NO_PROVIDER",

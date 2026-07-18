@@ -301,7 +301,7 @@ public sealed class RenameReferenceFixupTests
             => Task.FromResult<IModelSession>(_session);
     }
 
-    private sealed class StubSnapshotSession : IModelSession, IModelMutationSession
+    private sealed class StubSnapshotSession : IModelSession, IModelMutationSession, IExpressionRewriteSession
     {
         private readonly ModelSnapshot _snapshot;
 

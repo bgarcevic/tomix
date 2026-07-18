@@ -87,32 +87,32 @@ public sealed class TomModelMutator
         switch (resolved.Target)
         {
             case Table table:
-            {
-                var cascade = TomRemoveCascade.ForTable(table);
-                _database.Model.Tables.Remove(table);
-                return cascade;
-            }
+                {
+                    var cascade = TomRemoveCascade.ForTable(table);
+                    _database.Model.Tables.Remove(table);
+                    return cascade;
+                }
 
             case Measure measure when resolved.Parent is Table table:
-            {
-                var cascade = TomRemoveCascade.ForMeasure(measure);
-                table.Measures.Remove(measure);
-                return cascade;
-            }
+                {
+                    var cascade = TomRemoveCascade.ForMeasure(measure);
+                    table.Measures.Remove(measure);
+                    return cascade;
+                }
 
             case Column column when resolved.Parent is Table table:
-            {
-                var cascade = TomRemoveCascade.ForColumn(column);
-                table.Columns.Remove(column);
-                return cascade;
-            }
+                {
+                    var cascade = TomRemoveCascade.ForColumn(column);
+                    table.Columns.Remove(column);
+                    return cascade;
+                }
 
             case Hierarchy hierarchy when resolved.Parent is Table table:
-            {
-                var cascade = TomRemoveCascade.ForHierarchy(hierarchy);
-                table.Hierarchies.Remove(hierarchy);
-                return cascade;
-            }
+                {
+                    var cascade = TomRemoveCascade.ForHierarchy(hierarchy);
+                    table.Hierarchies.Remove(hierarchy);
+                    return cascade;
+                }
 
             case Partition partition when resolved.Parent is Table table:
                 if (table.Partitions.Count == 1)

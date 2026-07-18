@@ -1,5 +1,5 @@
-using Tomix.Cli.Output;
 using Spectre.Console;
+using Tomix.Cli.Output;
 
 namespace Tomix.Cli.Commands;
 

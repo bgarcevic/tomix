@@ -1,0 +1,59 @@
+# Repository-wide editor and code-style settings. Enforced in CI by
+# `dotnet format --verify-no-changes`; analyzer level is set in Directory.Build.props.
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json,csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.md]
+# Trailing double-space is a hard line break in Markdown.
+trim_trailing_whitespace = false
+
+[*.cs]
+# Match the established style: file-scoped namespaces and var everywhere.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# Conflicts with this repository's conventions: test methods are named
+# Method_Scenario_Expectation (underscores are the xUnit idiom).
+dotnet_diagnostic.CA1707.severity = none
+
+# Initial non-regressive baseline (analyzers enabled 2026-07): rules that fired on existing
+# code are parked at suggestion so the build stays warning-clean and CI can gate on
+# -warnaserror. Promote a rule to warning after cleaning up its remaining hits.
+# (EditorConfig comments are line-only, so each explanation precedes its rule.)
+# CA1000: static members on generic types (TomixResult<T>)
+dotnet_diagnostic.CA1000.severity = suggestion
+# CA1305: IFormatProvider in human-facing renderers
+dotnet_diagnostic.CA1305.severity = suggestion
+# CA1310: StringComparison for StartsWith/EndsWith
+dotnet_diagnostic.CA1310.severity = suggestion
+# CA1711: identifier suffix naming
+dotnet_diagnostic.CA1711.severity = suggestion
+# CA1716: identifiers matching language keywords
+dotnet_diagnostic.CA1716.severity = suggestion
+# CA1720: identifiers containing type names
+dotnet_diagnostic.CA1720.severity = suggestion
+# CA1822: members that could be static
+dotnet_diagnostic.CA1822.severity = suggestion
+# CA1826: Enumerable methods on indexable collections
+dotnet_diagnostic.CA1826.severity = suggestion
+# CA1859: concrete types for perf
+dotnet_diagnostic.CA1859.severity = suggestion
+# CA1861: constant array arguments
+dotnet_diagnostic.CA1861.severity = suggestion
+# CA1865: char overloads for single-char strings
+dotnet_diagnostic.CA1865.severity = suggestion
+# CA1869: cached JsonSerializerOptions
+dotnet_diagnostic.CA1869.severity = suggestion

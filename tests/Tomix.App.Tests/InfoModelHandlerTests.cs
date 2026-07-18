@@ -9,7 +9,7 @@ public sealed class InfoModelHandlerTests
     public async Task HandleAsync_ReturnsSuccess_WhenProviderCanOpen()
     {
         var handler = new InfoModelHandler([new StubModelProvider()]);
-        var result  = await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             new InfoModelRequest(new ModelReference("any")),
             CancellationToken.None);
 
@@ -21,7 +21,7 @@ public sealed class InfoModelHandlerTests
     public async Task HandleAsync_ReturnsFail_WhenNoProviderMatches()
     {
         var handler = new InfoModelHandler([]);
-        var result  = await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             new InfoModelRequest(new ModelReference("any")),
             CancellationToken.None);
 

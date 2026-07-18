@@ -27,5 +27,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet restore
-      - run: dotnet build -m:1 --configuration Release --no-restore
+      # Formatting is platform-independent; verify on one leg to keep CI fast.
+      - run: dotnet format --verify-no-changes --no-restore
+        if: matrix.os == 'ubuntu-latest'
+      # The warning baseline is zero (analyzer levels in .editorconfig); keep it that way.
+      - run: dotnet build -m:1 --configuration Release --no-restore -warnaserror
       - run: dotnet test -m:1 --configuration Release --no-build

@@ -74,7 +74,7 @@ public sealed class AtomicStateTests : IDisposable
     }
 
     [Fact]
-    public void StageHandler_CorruptManifest_SurfacesDiagnosticFromEveryCommand()
+    public async Task StageHandler_CorruptManifest_SurfacesDiagnosticFromEveryCommand()
     {
         var store = new StagingStore(_dir, "test-session");
         var source = new ModelReference(Path.Combine(_dir, "model"));
@@ -83,7 +83,7 @@ public sealed class AtomicStateTests : IDisposable
 
         var status = handler.Status(source);
         var list = handler.List();
-        var commit = handler.CommitAsync(source, [], force: false, CancellationToken.None).Result;
+        var commit = await handler.CommitAsync(source, [], force: false, CancellationToken.None);
 
         foreach (var diagnostics in new[] { status.Diagnostics, list.Diagnostics, commit.Diagnostics })
         {

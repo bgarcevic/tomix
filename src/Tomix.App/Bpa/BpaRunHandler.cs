@@ -1,10 +1,10 @@
+using System.Text.Json;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Bpa;
 using Tomix.Core.Configuration;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
-using System.Text.Json;
 
 namespace Tomix.App.Bpa;
 
@@ -51,7 +51,7 @@ public sealed class BpaRunHandler
         }
 
         var context = begin.Context!;
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(context.EffectiveModel));
+        var provider = _providers.ResolveSingle(context.EffectiveModel);
         if (provider is null)
             return TomixResult<BpaRunResult>.Fail(
                 "TOMIX_NO_PROVIDER",

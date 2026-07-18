@@ -17,7 +17,7 @@ public sealed class SaveModelHandler
         SaveModelRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
         if (provider is null)
             return TomixResult<SaveModelResult>.Fail(
                 code: "TOMIX_NO_PROVIDER",

@@ -65,7 +65,7 @@ public sealed class ScriptHandler
         }
 
         var context = begin.Context!;
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(context.EffectiveModel));
+        var provider = _providers.ResolveSingle(context.EffectiveModel);
         if (provider is null)
             return TomixResult<ScriptRunResult>.Fail(
                 "TOMIX_NO_PROVIDER",

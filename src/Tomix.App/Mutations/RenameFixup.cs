@@ -62,7 +62,7 @@ internal static class RenameReferences
             throw new RenameBrokenReferencesException(RenameFixup.UnfixableWarning(fixup.UnfixablePaths));
 
         if (fixup.Edits.Count > 0)
-            mutator.RewriteExpressions(fixup.Edits);
+            MutationCapabilities.RequireExpressionRewrites(mutator).RewriteExpressions(fixup.Edits);
 
         return fixup.UnfixablePaths;
     }
@@ -72,7 +72,7 @@ internal static class RenameFixup
 {
     /// <summary>
     /// Kinds whose DAX properties can be written back through
-    /// <see cref="IModelMutationSession.RewriteExpressions"/>. Role RLS filters are synthesized
+    /// <see cref="IExpressionRewriteSession.RewriteExpressions"/>. Role RLS filters are synthesized
     /// per-table in the snapshot and have no single writable property, so they stay warnings.
     /// </summary>
     private static bool IsFixable(ModelObjectKind kind)

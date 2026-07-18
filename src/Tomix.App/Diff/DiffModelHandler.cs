@@ -16,7 +16,7 @@ public sealed class DiffModelHandler
         DiffModelRequest request,
         CancellationToken cancellationToken)
     {
-        var leftProvider = _providers.FirstOrDefault(p => p.CanOpen(request.Left));
+        var leftProvider = _providers.ResolveSingle(request.Left);
         if (leftProvider is null)
             return TomixResult<DiffModelResult>.Fail(
                 code: "TOMIX_NO_PROVIDER",
@@ -24,7 +24,7 @@ public sealed class DiffModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        var rightProvider = _providers.FirstOrDefault(p => p.CanOpen(request.Right));
+        var rightProvider = _providers.ResolveSingle(request.Right);
         if (rightProvider is null)
             return TomixResult<DiffModelResult>.Fail(
                 code: "TOMIX_NO_PROVIDER",

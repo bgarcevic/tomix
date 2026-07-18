@@ -1,7 +1,7 @@
 using System.CommandLine;
+using Spectre.Console;
 using Tomix.App.Init;
 using Tomix.Cli.Output;
-using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
 

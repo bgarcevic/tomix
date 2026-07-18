@@ -1,5 +1,5 @@
-using Tomix.Core.Models;
 using Microsoft.AnalysisServices.Tabular;
+using Tomix.Core.Models;
 
 namespace Tomix.Provider.Tom.Tests;
 

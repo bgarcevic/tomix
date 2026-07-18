@@ -22,13 +22,15 @@ public sealed class RemoveRefreshPolicyHandler
             _providers, request.Model, options, "incremental-refresh",
             (mutator, _, _) =>
             {
+                var policies = MutationCapabilities.RequireRefreshPolicies(mutator);
+
                 // Capture the policy-generated partitions before removal: they stay on the
                 // table and hold real data, so the CLI warns about them.
                 var remaining = request.Revert
                     ? null
-                    : mutator.GetRefreshPolicy(request.Table)?.PolicyPartitions;
+                    : policies.GetRefreshPolicy(request.Table)?.PolicyPartitions;
 
-                var mutation = mutator.RemoveRefreshPolicy(request.Table, request.IfExists);
+                var mutation = policies.RemoveRefreshPolicy(request.Table, request.IfExists);
 
                 return Task.FromResult<(bool, string, Func<MutationOutcome, RemoveRefreshPolicyResult>)>((
                     mutation.Changed,

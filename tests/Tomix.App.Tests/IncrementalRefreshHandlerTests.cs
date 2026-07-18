@@ -73,6 +73,18 @@ public sealed class IncrementalRefreshHandlerTests
         Assert.Equal(10, result.Data.RollingWindowPeriods);
     }
 
+    [Fact]
+    public async Task Show_SessionWithoutRefreshPolicyCapability_ReturnsMutationUnsupported()
+    {
+        // A mutation session that does not implement IRefreshPolicyMutationSession must map to
+        // the same diagnostic the old default interface members produced.
+        var result = await new ShowRefreshPolicyHandler([new StubMutationProvider(new NoPolicyCapabilitySession())])
+            .HandleAsync(new ShowRefreshPolicyRequest(new ModelReference("any"), "Sales"), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_MUTATION_UNSUPPORTED", result.Diagnostics[0].Code);
+    }
+
     // ---- set (validation-only, before MutationRunner) ----
 
     [Fact]
@@ -398,7 +410,7 @@ public sealed class IncrementalRefreshHandlerTests
             Profile: null,
             Workspace: null);
 
-    private sealed class StubMutationProvider(StubMutationSession session) : IModelProvider
+    private sealed class StubMutationProvider(IModelSession session) : IModelProvider
     {
         public bool CanOpen(ModelReference reference) => true;
         public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken __)
@@ -406,7 +418,7 @@ public sealed class IncrementalRefreshHandlerTests
     }
 
     private sealed class StubMutationSession(RefreshPolicyInfo? policy)
-        : IModelSession, IModelMutationSession
+        : IModelSession, IModelMutationSession, IRefreshPolicyMutationSession
     {
         public bool ThrowNotFound { get; init; }
         public string SourcePath => "";
@@ -418,6 +430,26 @@ public sealed class IncrementalRefreshHandlerTests
 
         public RefreshPolicyInfo? GetRefreshPolicy(string table)
             => ThrowNotFound ? throw new ObjectNotFoundException($"Table not found: {table}") : policy;
+
+        public RefreshPolicySetResult SetRefreshPolicy(RefreshPolicySetRequest request) => throw new NotSupportedException();
+        public ModelObjectMutationResult RemoveRefreshPolicy(string table, bool ifExists = false) => throw new NotSupportedException();
+
+        public ModelObjectMutationResult AddObject(ModelObjectAddRequest request) => throw new NotSupportedException();
+        public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request) => throw new NotSupportedException();
+        public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request) => throw new NotSupportedException();
+        public ModelReplaceResult ReplaceText(ModelReplaceRequest request) => throw new NotSupportedException();
+        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
+            => Task.FromResult(new ModelExportResult("stub", "stub"));
+    }
+
+    private sealed class NoPolicyCapabilitySession : IModelSession, IModelMutationSession
+    {
+        public string SourcePath => "";
+        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
+            => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
+        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
+            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         public ModelObjectMutationResult AddObject(ModelObjectAddRequest request) => throw new NotSupportedException();
         public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request) => throw new NotSupportedException();

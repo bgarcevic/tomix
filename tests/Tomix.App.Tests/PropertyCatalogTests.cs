@@ -36,15 +36,15 @@ public sealed class PropertyCatalogTests
     public void Project_ToleratesNullAndEmptyPropertyBags()
     {
         foreach (var kind in AllKinds)
-        foreach (var bag in new IReadOnlyDictionary<string, string>?[] { null, new Dictionary<string, string>() })
-        {
-            var obj = Leaf(kind) with { Properties = bag };
-            foreach (var (key, value) in ModelPropertyCatalog.Project(obj))
+            foreach (var bag in new IReadOnlyDictionary<string, string>?[] { null, new Dictionary<string, string>() })
             {
-                Assert.True(value is "" or false or 0 || key == "name",
-                    $"{kind}.{key} projected {value ?? "null"} from an absent bag; expected \"\"/false/0");
+                var obj = Leaf(kind) with { Properties = bag };
+                foreach (var (key, value) in ModelPropertyCatalog.Project(obj))
+                {
+                    Assert.True(value is "" or false or 0 || key == "name",
+                        $"{kind}.{key} projected {value ?? "null"} from an absent bag; expected \"\"/false/0");
+                }
             }
-        }
     }
 
     [Fact]

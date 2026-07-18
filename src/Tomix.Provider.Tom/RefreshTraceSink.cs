@@ -287,7 +287,7 @@ internal sealed class RefreshTraceSink : IDisposable
             return "";
 
         var match = _knownTables
-            .Where(t => text.IndexOf(t, StringComparison.Ordinal) >= 0)
+            .Where(t => text.Contains(t, StringComparison.Ordinal))
             .OrderByDescending(t => t.Length)
             .FirstOrDefault();
         return match ?? "";

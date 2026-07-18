@@ -18,7 +18,7 @@ public sealed class LsModelHandler
         LsModelRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
 
         if (provider is null)
             return TomixResult<LsModelResult>.Fail(

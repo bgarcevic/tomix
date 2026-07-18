@@ -10,33 +10,6 @@ public interface IModelMutationSession
 
     ModelReplaceResult ReplaceText(ModelReplaceRequest request);
 
-    /// <summary>
-    /// Applies pre-computed DAX rewrites to expression-bearing properties (rename reference
-    /// fixup). Each edit replaces one property's full text; the caller computed the new text
-    /// from exact reference spans, so the provider only routes it to the right object property.
-    /// </summary>
-    ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
-        => throw new NotSupportedException("This provider does not support expression rewriting.");
-
-    /// <summary>
-    /// Returns the table's incremental refresh policy with validation issues attached, or null
-    /// when the table exists but has no policy. Throws <see cref="ObjectNotFoundException"/>
-    /// when the table is missing.
-    /// </summary>
-    RefreshPolicyInfo? GetRefreshPolicy(string table)
-        => throw new NotSupportedException("This provider does not support refresh policies.");
-
-    /// <summary>
-    /// Creates or edits the table's incremental refresh policy. Throws
-    /// <see cref="RefreshPolicyValidationException"/> when validation errors exist and the
-    /// request did not pass Force.
-    /// </summary>
-    RefreshPolicySetResult SetRefreshPolicy(RefreshPolicySetRequest request)
-        => throw new NotSupportedException("This provider does not support refresh policies.");
-
-    ModelObjectMutationResult RemoveRefreshPolicy(string table, bool ifExists = false)
-        => throw new NotSupportedException("This provider does not support refresh policies.");
-
     Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,

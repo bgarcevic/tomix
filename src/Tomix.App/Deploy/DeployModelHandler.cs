@@ -33,7 +33,7 @@ public sealed class DeployModelHandler
                 exitCode: 2,
                 hint: "Specify a model path or use --recent.");
 
-        var provider = _providers.FirstOrDefault(p => p.CanOpen(request.Model));
+        var provider = _providers.ResolveSingle(request.Model);
         if (provider is null)
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",

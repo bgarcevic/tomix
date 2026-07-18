@@ -204,46 +204,46 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
         {
             case AuthMethod.Interactive:
             case AuthMethod.DeviceCode:
-            {
-                var app = await EnsurePublicAppAsync(state.TenantId).ConfigureAwait(false);
-                var account = (await app.GetAccountsAsync().ConfigureAwait(false)).FirstOrDefault()
-                    ?? throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
-                try
                 {
-                    var result = await app.AcquireTokenSilent(scopes, account)
-                        .ExecuteAsync(cancellationToken).ConfigureAwait(false);
-                    return new AccessToken(result.AccessToken, result.ExpiresOn);
+                    var app = await EnsurePublicAppAsync(state.TenantId).ConfigureAwait(false);
+                    var account = (await app.GetAccountsAsync().ConfigureAwait(false)).FirstOrDefault()
+                        ?? throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
+                    try
+                    {
+                        var result = await app.AcquireTokenSilent(scopes, account)
+                            .ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                        return new AccessToken(result.AccessToken, result.ExpiresOn);
+                    }
+                    catch (MsalUiRequiredException)
+                    {
+                        throw new AuthenticationRequiredException("Session expired. Run 'tx auth login'.");
+                    }
                 }
-                catch (MsalUiRequiredException)
-                {
-                    throw new AuthenticationRequiredException("Session expired. Run 'tx auth login'.");
-                }
-            }
 
             case AuthMethod.ServicePrincipalSecret:
             case AuthMethod.ServicePrincipalCertificate:
-            {
-                if (_confidentialApp is not null)
                 {
-                    var cached = await _confidentialApp.AcquireTokenForClient(scopes)
+                    if (_confidentialApp is not null)
+                    {
+                        var cached = await _confidentialApp.AcquireTokenForClient(scopes)
+                            .ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                        return new AccessToken(cached.AccessToken, cached.ExpiresOn);
+                    }
+
+                    var options = _credentialStore.Load(method, endpoint)
+                        ?? throw new AuthenticationRequiredException(
+                            "Service-principal token expired and no saved credentials are available for silent renewal. Run 'tx auth login' again (pipe the secret via '--password -' or use --password-file).");
+                    var app = await EnsureConfidentialAppAsync(options, method == AuthMethod.ServicePrincipalCertificate).ConfigureAwait(false);
+                    var result = await app.AcquireTokenForClient(scopes)
                         .ExecuteAsync(cancellationToken).ConfigureAwait(false);
-                    return new AccessToken(cached.AccessToken, cached.ExpiresOn);
+                    return new AccessToken(result.AccessToken, result.ExpiresOn);
                 }
 
-                var options = _credentialStore.Load(method, endpoint)
-                    ?? throw new AuthenticationRequiredException(
-                        "Service-principal token expired and no saved credentials are available for silent renewal. Run 'tx auth login' again (pipe the secret via '--password -' or use --password-file).");
-                var app = await EnsureConfidentialAppAsync(options, method == AuthMethod.ServicePrincipalCertificate).ConfigureAwait(false);
-                var result = await app.AcquireTokenForClient(scopes)
-                    .ExecuteAsync(cancellationToken).ConfigureAwait(false);
-                return new AccessToken(result.AccessToken, result.ExpiresOn);
-            }
-
             case AuthMethod.ManagedIdentity:
-            {
-                var result = await ManagedIdentityAsync(endpoint, state.ClientId, cancellationToken).ConfigureAwait(false);
-                return new AccessToken(result.AccessToken, result.ExpiresOn);
-            }
+                {
+                    var result = await ManagedIdentityAsync(endpoint, state.ClientId, cancellationToken).ConfigureAwait(false);
+                    return new AccessToken(result.AccessToken, result.ExpiresOn);
+                }
 
             default:
                 throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");

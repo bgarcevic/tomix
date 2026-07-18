@@ -1,10 +1,10 @@
 using System.CommandLine;
+using Spectre.Console;
 using Tomix.App.Auth;
 using Tomix.App.State;
 using Tomix.Auth;
 using Tomix.Cli.Output;
 using Tomix.Core.Authentication;
-using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
 

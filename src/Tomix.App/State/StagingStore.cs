@@ -62,7 +62,7 @@ public sealed class StagingStore
             var workingRoot = Path.Combine(modelDirectory, "working");
             Directory.CreateDirectory(workingRoot);
 
-            var provider = providers.FirstOrDefault(p => p.CanOpen(source))
+            var provider = providers.ResolveSingle(source)
                 ?? throw new InvalidOperationException($"No provider can open model: {source.Value}");
 
             await using var session = await provider.OpenAsync(source, cancellationToken);

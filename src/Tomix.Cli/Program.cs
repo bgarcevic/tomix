@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using System.Reflection;
 using System.Text;
+using Spectre.Console;
 using Tomix.App.Auth;
 using Tomix.App.Config;
 using Tomix.App.Connect;
@@ -13,10 +14,9 @@ using Tomix.Core.Configuration;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Vertipaq;
-using Tomix.Provider.Tom;
 using Tomix.Provider.Tmdl;
+using Tomix.Provider.Tom;
 using Tomix.Provider.Vpax;
-using Spectre.Console;
 
 namespace Tomix.Cli;
 
@@ -111,6 +111,17 @@ internal static class Program
                     "Fix the model source and retry; the message lists what could not be loaded.")],
                 parseResult.GetValue(GlobalOptions.ErrorFormat));
             return 2;
+        }
+        catch (AmbiguousModelProviderException ex)
+        {
+            ErrorOutput.Write(
+                [new TomixDiagnostic(
+                    "TOMIX_PROVIDER_AMBIGUOUS",
+                    DiagnosticSeverity.Error,
+                    ex.Message,
+                    "Report this at https://github.com/bgarcevic/tomix-cli/issues.")],
+                parseResult.GetValue(GlobalOptions.ErrorFormat));
+            return 1;
         }
         catch (Exception ex)
         {

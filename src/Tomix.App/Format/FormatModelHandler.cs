@@ -4,6 +4,7 @@ using Tomix.Core.Models;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Format;
+
 public sealed class FormatModelHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;

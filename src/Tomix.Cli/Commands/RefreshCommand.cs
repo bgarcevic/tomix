@@ -1,13 +1,13 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
+using Spectre.Console;
 using Tomix.App.Refresh;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
-using Spectre.Console;
 using RefreshTableResult = Tomix.Core.Models.RefreshTableResult;
 
 namespace Tomix.Cli.Commands;
@@ -540,5 +540,6 @@ internal sealed class NonDisposingTextWriter : TextWriter
     protected override void Dispose(bool disposing)
     {
         // Intentionally do not dispose the shared inner writer (e.g. Console.Error).
+        base.Dispose(disposing);
     }
 }

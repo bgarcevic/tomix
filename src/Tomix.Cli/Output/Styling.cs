@@ -5,14 +5,14 @@ namespace Tomix.Cli.Output;
 
 internal static class Palette
 {
-    public static readonly Color Sage   = new(0x3E, 0x92, 0x87);
-    public static readonly Color Lav    = new(0x8E, 0x7B, 0xB8);
+    public static readonly Color Sage = new(0x3E, 0x92, 0x87);
+    public static readonly Color Lav = new(0x8E, 0x7B, 0xB8);
     public static readonly Color Terra = new(0xB5, 0x80, 0x5C);
     public static readonly Color Harbor = new(0x4E, 0x8A, 0xB5);
-    public static readonly Color Moss   = new(0x5C, 0x9D, 0x52);
-    public static readonly Color Amber  = new(0xB5, 0x83, 0x2F);
-    public static readonly Color Rose   = new(0xC2, 0x5E, 0x5E);
-    public static readonly Color Slate  = new(0x76, 0x80, 0x89);
+    public static readonly Color Moss = new(0x5C, 0x9D, 0x52);
+    public static readonly Color Amber = new(0xB5, 0x83, 0x2F);
+    public static readonly Color Rose = new(0xC2, 0x5E, 0x5E);
+    public static readonly Color Slate = new(0x76, 0x80, 0x89);
 }
 
 internal static class Styling

@@ -92,14 +92,14 @@ internal static class TomRemoveCascade
         }
 
         foreach (var role in model.Roles)
-        foreach (var permission in role.TablePermissions)
-        {
-            if (permission.ColumnPermissions.FirstOrDefault(cp => cp.Column == column) is { } columnPermission)
+            foreach (var permission in role.TablePermissions)
             {
-                permission.ColumnPermissions.Remove(columnPermission);
-                removed.Add($"column permission in role '{role.Name}'");
+                if (permission.ColumnPermissions.FirstOrDefault(cp => cp.Column == column) is { } columnPermission)
+                {
+                    permission.ColumnPermissions.Remove(columnPermission);
+                    removed.Add($"column permission in role '{role.Name}'");
+                }
             }
-        }
 
         RemoveVariations(model, v => v.DefaultColumn == column, removed);
         RemoveTranslations(model, column, removed);
@@ -156,11 +156,11 @@ internal static class TomRemoveCascade
     private static void RemoveVariations(Model model, Func<Variation, bool> dangles, List<string> removed)
     {
         foreach (var column in model.Tables.SelectMany(t => t.Columns))
-        foreach (var variation in column.Variations.Where(dangles).ToList())
-        {
-            column.Variations.Remove(variation);
-            removed.Add($"variation on {Dax(column)}");
-        }
+            foreach (var variation in column.Variations.Where(dangles).ToList())
+            {
+                column.Variations.Remove(variation);
+                removed.Add($"variation on {Dax(column)}");
+            }
     }
 
     private static void RemoveTranslations(Model model, MetadataObject root, List<string> removed)

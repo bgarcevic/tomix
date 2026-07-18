@@ -1,8 +1,8 @@
 using System.CommandLine;
+using Spectre.Console;
 using Tomix.App.Doctor;
 using Tomix.Cli.Output;
 using Tomix.Core.Doctor;
-using Spectre.Console;
 
 namespace Tomix.Cli.Commands;
 

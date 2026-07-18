@@ -10,7 +10,11 @@ public class VpaxRoundTripTests : IDisposable
 
     private readonly VpaxVertipaqAnalyzer _analyzer = new(tokenProvider: null, version: "test");
 
-    public void Dispose() => Directory.Delete(_directory, recursive: true);
+    public void Dispose()
+    {
+        Directory.Delete(_directory, recursive: true);
+        GC.SuppressFinalize(this);
+    }
 
     [Fact]
     public async Task Import_reads_back_an_exported_package()

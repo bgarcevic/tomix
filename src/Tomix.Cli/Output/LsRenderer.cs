@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Spectre.Console;
 using Tomix.App.Ls;
 using Tomix.Core.Models;
-using Spectre.Console;
 
 namespace Tomix.Cli.Output;
 
