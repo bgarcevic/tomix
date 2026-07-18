@@ -66,9 +66,10 @@ Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 Discover: `ls`, `get`, `find`, `deps`
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
 formatter APIs), `script` (run C# scripts against a model)
-Connect: `connect`, `deploy`, `refresh`, `incremental-refresh` (manage refresh
-policies), `query` (run DAX/DMV queries against a live model), `load`, `save`,
-`auth`, `session`
+Connect: `connect` (interactive workspace/model pickers with `--remote`,
+reconnect to a previous target with `--recent`), `deploy`, `refresh`,
+`incremental-refresh` (manage refresh policies), `query` (run DAX/DMV queries
+against a live model), `load`, `save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
 `vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
@@ -76,6 +77,12 @@ staged, then committed or discarded), `interactive`
 
 `tx <command> --help` shows options and examples. `tx doctor` checks your
 environment when something seems off.
+
+Secrets never travel on the command line or in environment variables.
+`tx auth login` takes a service-principal secret from a masked prompt, a file
+(`--password-file`), or stdin — in CI:
+`printf '%s' "$SECRET" | tx auth login -u $APP_ID -t $TENANT --password -`.
+Saved credentials renew silently on Windows, macOS, and Linux.
 
 ## Scripting
 
@@ -124,8 +131,9 @@ of `tx doctor` attached is genuinely useful at this stage.
 
 ## Contributing
 
-Build and test with `dotnet build && dotnet test`, then
-`dotnet run --project src/Tomix.Cli -- doctor`. The architecture is documented
+Build and test with `dotnet build && dotnet test`, then run the CLI from
+source with `./tx doctor` (`.\tx.ps1 doctor` on Windows) — no install step,
+always reflects your working tree. The architecture is documented
 in `CONTEXT.md` files throughout the tree — start with
 [`src/Tomix.Cli/CONTEXT.md`](src/Tomix.Cli/CONTEXT.md). Color and output
 conventions live in [`docs/cli-color-strategy.md`](docs/cli-color-strategy.md).
