@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Tomix.Core.Authentication;
+using Tomix.Core.Configuration;
 
 namespace Tomix.Auth;
 
@@ -46,7 +47,7 @@ internal sealed class AuthStateStore
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(_path, JsonSerializer.Serialize(state, SerializerOptions));
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(state, SerializerOptions));
     }
 
     public bool Delete()

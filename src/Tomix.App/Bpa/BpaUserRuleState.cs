@@ -69,7 +69,7 @@ public sealed class BpaUserRuleState
         {
             DisabledRuleIDs = ids.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()
         };
-        File.WriteAllText(_path, JsonSerializer.Serialize(payload, WriteOptions));
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(payload, WriteOptions));
     }
 
     private sealed class Payload

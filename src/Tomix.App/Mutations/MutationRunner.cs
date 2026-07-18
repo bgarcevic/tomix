@@ -23,6 +23,9 @@ public static class MutationRunner
         if (begin.Error is { } error)
             return TomixResult<TResult>.Fail(error.Code, error.Message, error.ExitCode);
 
+        // The staging handle holds the per-model lock; release it on every exit path.
+        using var stagingHandle = begin.Context?.Staging;
+
         if (begin.Mode == MutationMode.Revert)
         {
             if (!stagingStore.Discard(model))

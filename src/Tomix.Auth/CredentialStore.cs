@@ -40,7 +40,7 @@ internal sealed class CredentialStore
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllBytes(_path, encrypted);
+        AtomicFile.WriteAllBytes(_path, encrypted);
     }
 
     public AuthLoginOptions? Load(AuthMethod method, string? endpoint)

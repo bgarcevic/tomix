@@ -41,6 +41,9 @@ public sealed class BpaRunHandler
         if (begin.Error is { } error)
             return TomixResult<BpaRunResult>.Fail(error.Code, error.Message, error.ExitCode);
 
+        // The staging handle holds the per-model lock; release it on every exit path.
+        using var stagingHandle = begin.Context?.Staging;
+
         if (begin.Mode == MutationMode.Revert)
         {
             stagingStore.Discard(request.Model);

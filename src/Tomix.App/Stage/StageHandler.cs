@@ -19,7 +19,16 @@ public sealed class StageHandler
 
     public TomixResult<StageStatusResult> Status(ModelReference source)
     {
-        var info = _staging.TryLoad(source);
+        StagingInfo? info;
+        try
+        {
+            info = _staging.TryLoad(source);
+        }
+        catch (StagingManifestCorruptException ex)
+        {
+            return CorruptManifest<StageStatusResult>(ex);
+        }
+
         if (info is null)
             return TomixResult<StageStatusResult>.Ok(new StageStatusResult(
                 Staged: false, source.Value, WorkingCopy: null, Serialization: null,
@@ -40,15 +49,22 @@ public sealed class StageHandler
 
     public TomixResult<StageListResult> List()
     {
-        var entries = _staging.List()
-            .Select(info => new StageListEntry(
-                info.Manifest.Source,
-                info.Manifest.WorkingCopy,
-                info.Manifest.Ops.Count,
-                info.Manifest.UpdatedUtc,
-                info.IsCurrentSession))
-            .ToList();
-        return TomixResult<StageListResult>.Ok(new StageListResult(entries));
+        try
+        {
+            var entries = _staging.List()
+                .Select(info => new StageListEntry(
+                    info.Manifest.Source,
+                    info.Manifest.WorkingCopy,
+                    info.Manifest.Ops.Count,
+                    info.Manifest.UpdatedUtc,
+                    info.IsCurrentSession))
+                .ToList();
+            return TomixResult<StageListResult>.Ok(new StageListResult(entries));
+        }
+        catch (StagingManifestCorruptException ex)
+        {
+            return CorruptManifest<StageListResult>(ex);
+        }
     }
 
     public TomixResult<StageDiscardResult> Discard(ModelReference source, bool all)
@@ -68,7 +84,16 @@ public sealed class StageHandler
         bool force,
         CancellationToken cancellationToken)
     {
-        var info = _staging.TryLoad(source);
+        StagingInfo? info;
+        try
+        {
+            info = _staging.TryLoad(source);
+        }
+        catch (StagingManifestCorruptException ex)
+        {
+            return CorruptManifest<StageCommitResult>(ex);
+        }
+
         if (info is null)
             return TomixResult<StageCommitResult>.Fail(
                 "TOMIX_STAGE_NOTHING_TO_COMMIT", $"Nothing staged to commit for {source.Value}.", 1);
@@ -150,4 +175,9 @@ public sealed class StageHandler
             manifest.Source, null, remoteDeployed,
             deployServer, deployDatabase, deployDurationMs, manifest.Ops.Count));
     }
+
+    // Every stage command must surface a corrupt manifest as the documented diagnostic
+    // (exit 2 + discard hint), not as an unhandled exception from Program's catch-all.
+    private static TomixResult<T> CorruptManifest<T>(StagingManifestCorruptException ex)
+        => TomixResult<T>.Fail("TOMIX_STAGE_MANIFEST_CORRUPT", ex.Message, 2);
 }

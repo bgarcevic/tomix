@@ -91,6 +91,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | `TOMIX_STAGE_OPTIONS_CONFLICT` | 2 | Conflicting stage options (`--revert` combined with `--save`, `--save-to`, or `--stage`). |
 | `TOMIX_STAGE_SAVE_CONFLICT` | 2 | Conflicting save options (e.g. `--save` and `--stage` together). |
 | `TOMIX_STAGE_NOTHING_STAGED` | 1 | `--revert` called with no staged mutation for the model. |
+| `TOMIX_STAGE_MANIFEST_CORRUPT` | 2 | A staged manifest exists but no longer parses (torn write, manual edit). Run `tx stage discard` to reset staging for the model. |
 
 ## Save Codes (`TOMIX_SAVE_*`)
 

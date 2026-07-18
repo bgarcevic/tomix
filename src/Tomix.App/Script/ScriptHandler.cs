@@ -54,6 +54,9 @@ public sealed class ScriptHandler
         if (begin.Error is { } error)
             return TomixResult<ScriptRunResult>.Fail(error.Code, error.Message, error.ExitCode);
 
+        // The staging handle holds the per-model lock; release it on every exit path.
+        using var stagingHandle = begin.Context?.Staging;
+
         if (begin.Mode == MutationMode.Revert)
         {
             stagingStore.Discard(request.Model);

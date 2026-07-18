@@ -45,7 +45,7 @@ public sealed class TomixConfigStore
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(_path, JsonSerializer.Serialize(values, SerializerOptions));
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(values, SerializerOptions));
     }
 
     private static Dictionary<string, string> NewMap()

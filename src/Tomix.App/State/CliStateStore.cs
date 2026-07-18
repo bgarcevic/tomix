@@ -53,7 +53,19 @@ public sealed class CliStateStore
         if (string.IsNullOrWhiteSpace(json))
             return NewProfileMap();
 
-        var profiles = JsonSerializer.Deserialize<Dictionary<string, CliProfile>>(json);
+        Dictionary<string, CliProfile>? profiles;
+        try
+        {
+            profiles = JsonSerializer.Deserialize<Dictionary<string, CliProfile>>(json);
+        }
+        catch (JsonException ex)
+        {
+            // Profiles are user-authored; silently resetting them would lose data, so
+            // surface the corruption instead of self-healing.
+            throw new InvalidOperationException(
+                $"Profiles file is corrupt: {ProfilesFile}. Fix or delete it, then re-create profiles with 'tx profile set'.", ex);
+        }
+
         return profiles is null
             ? NewProfileMap()
             : new Dictionary<string, CliProfile>(profiles, StringComparer.OrdinalIgnoreCase);
@@ -62,7 +74,7 @@ public sealed class CliStateStore
     public void SaveProfiles(IDictionary<string, CliProfile> profiles)
     {
         Directory.CreateDirectory(_configDirectory);
-        File.WriteAllText(ProfilesFile, JsonSerializer.Serialize(profiles, SerializerOptions));
+        AtomicFile.WriteAllText(ProfilesFile, JsonSerializer.Serialize(profiles, SerializerOptions));
     }
 
     public IReadOnlyList<RecentConnection> LoadRecentConnections()
@@ -106,7 +118,7 @@ public sealed class CliStateStore
             entries.RemoveRange(MaxRecentConnections, entries.Count - MaxRecentConnections);
 
         Directory.CreateDirectory(_configDirectory);
-        File.WriteAllText(RecentConnectionsFile, JsonSerializer.Serialize(entries, SerializerOptions));
+        AtomicFile.WriteAllText(RecentConnectionsFile, JsonSerializer.Serialize(entries, SerializerOptions));
     }
 
     internal static string RecentKey(CliConnectionState state)
@@ -123,15 +135,25 @@ public sealed class CliStateStore
             return null;
 
         var json = File.ReadAllText(CurrentSessionFile);
-        return string.IsNullOrWhiteSpace(json)
-            ? null
-            : JsonSerializer.Deserialize<CliConnectionState>(json);
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<CliConnectionState>(json);
+        }
+        catch (JsonException)
+        {
+            // A session is re-creatable with 'tx connect'; a corrupt file must not
+            // brick every command, so treat it as "no active session".
+            return null;
+        }
     }
 
     public void SaveCurrentSession(CliConnectionState state)
     {
         Directory.CreateDirectory(SessionsDirectory);
-        File.WriteAllText(CurrentSessionFile, JsonSerializer.Serialize(state, SerializerOptions));
+        AtomicFile.WriteAllText(CurrentSessionFile, JsonSerializer.Serialize(state, SerializerOptions));
     }
 
     public void ClearCurrentSession()

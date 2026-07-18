@@ -114,6 +114,11 @@ public static class MutationLifecycle
         {
             handle = await stagingStore.GetOrCreateAsync(source, connection, providers, cancellationToken);
         }
+        catch (StagingManifestCorruptException ex)
+        {
+            return new MutationBegin(null, new MutationError(
+                "TOMIX_STAGE_MANIFEST_CORRUPT", ex.Message, 2));
+        }
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or IOException)
         {
             return new MutationBegin(null, new MutationError(
