@@ -137,3 +137,8 @@ _NCrunch*
 
 /references
 /tools-packages/
+
+# Docs site build output and tooling (Zensical / uv)
+site/
+.cache/
+.venv/

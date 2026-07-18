@@ -1,0 +1,126 @@
+# Validate
+
+Commands for checking model quality — locally, against a live model, and in
+CI. See [Output & scripting](../guides/scripting.md#ci) for the CI-specific
+flags.
+
+## `bpa` — Best Practice Analyzer
+
+```
+tx bpa run [model] [options]
+tx bpa rules <subcommand>
+```
+
+`bpa run` evaluates the model against a rule collection and reports findings
+by severity; `--fix` applies auto-fixes where the rule provides one
+(`FixExpression`).
+
+| Option | Description |
+|--------|-------------|
+| `-r, --rules <file>` | Path(s) or URL(s) to BPA rule file(s) in JSON format. |
+| `--ruleset <name>` | Standard ruleset: `standard`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
+| `--rule <id>` | Run only specific rule(s) by ID. |
+| `--path <path>` | Limit analysis to matched objects (literal names, wildcards, or paths). |
+| `--errors` / `--warnings` / `--info` | Show only rules of that severity (combinable). |
+| `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. |
+| `--fix` | Apply fix expressions to auto-fix violations where possible. |
+| `--save` / `--save-to <path>` | Persist the model after applying fixes. |
+| `--details` / `--full` | Show full guidance per rule / list every affected object. |
+| `--vpax <file>` / `--vpa-rules` | Load VertiPaq Analyzer stats from a `.vpax` / include built-in VPA-aware rules. |
+| `--no-model-rules` / `--no-defaults` | Exclude rules embedded in the model / the selected standard ruleset. |
+| `--ci <github\|vsts>` | Emit CI logging commands to stderr. |
+| `--trx <path>` | Write results as a VSTEST `.trx` file. |
+
+```sh
+tx bpa run
+tx bpa run --errors
+tx bpa run --fix --save
+```
+
+`bpa rules` manages rule collections:
+
+| Subcommand | Description |
+|------------|-------------|
+| `bpa rules list` | List BPA rules from all sources with status. |
+| `bpa rules init` | Create an empty BPA rules file at the resolved path. |
+| `bpa rules add` / `bpa rules set` / `bpa rules rm` | Add, update, or remove a rule. |
+| `bpa rules enable` / `bpa rules disable` | Re-enable or disable a built-in rule for the current user. |
+| `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
+
+The BPA gate also runs automatically on `deploy` and `save` (configured via
+`.te-bpa.json`; `--skip-bpa` to bypass, `--fix-bpa` to auto-fix first,
+`--bpa-rules` to point at specific rule files).
+
+## `validate` — DAX and relationship integrity
+
+```
+tx validate [model] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--ci <github\|vsts>` | Emit CI logging commands to stderr so findings annotate the PR. |
+| `--trx <path>` | Write results as a VSTEST `.trx` file. |
+| `--errors-only` | Only show errors. |
+| `--no-warnings` | Hide semantic-analyzer warnings. |
+| `--server-only` | Only show errors reported by the connected server. |
+| `--no-multiline` | Collapse multi-line cell content to a single line. Text output only. |
+
+```sh
+tx validate
+tx validate --ci github
+tx validate --trx results.trx
+```
+
+## `vertipaq` — storage statistics
+
+```
+tx vertipaq [table] [options]
+```
+
+VertiPaq Analyzer-style storage statistics for a live model, with `.vpax`
+export/import for offline analysis.
+
+| Option | Description |
+|--------|-------------|
+| `--tables` / `--columns` / `--relationships` / `--partitions` / `--all` | Which view(s) to show (`--columns` is the default). |
+| `--detail` | Expanded columns: data/dictionary/hierarchy size breakdown, encoding, segments. |
+| `--stats` | Model-level storage summary. |
+| `--top <n>` | Limit each view to the N largest rows. |
+| `--fields <list>` | Comma-separated fields to display (single view; text/csv only). |
+| `--export <file.vpax>` | Export statistics to a `.vpax` file. |
+| `--import <file.vpax>` | Analyze a previously exported `.vpax` offline (no connection needed). |
+| `--obfuscate` | Obfuscate names and expressions in the export; writes a private `.dict` dictionary. |
+| `--annotate` | Write statistics into the model as `Vertipaq_*` annotations (preview unless `--save`). |
+
+```sh
+tx vertipaq
+tx vertipaq Sales --detail
+tx vertipaq --stats --all --top 10
+tx vertipaq --export stats.vpax
+tx vertipaq --import stats.vpax --relationships
+```
+
+## `diff` — compare two models
+
+```
+tx diff <left> <right>
+```
+
+Compares two models (TMDL folders or `.bim` files) and shows structural
+differences. Exit codes are CI-friendly: `0` = identical, `1` = differences
+found, `2` = error.
+
+```sh
+tx diff ./v1.tmdl ./v2.tmdl
+tx diff ./v1.bim ./v2.bim --output-format json
+```
+
+## `doctor` — environment check
+
+```
+tx doctor
+```
+
+Checks whether the local tomix environment is ready. When filing a bug,
+attach its output.

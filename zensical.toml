@@ -1,0 +1,88 @@
+# Configuration for the documentation site, built with Zensical
+# (https://zensical.org). Local preview: uv run zensical serve
+
+[project]
+site_name = "tomix"
+site_description = "Open-source CLI for inspecting, validating, querying, testing, and deploying tabular semantic models."
+site_url = "https://bgarcevic.github.io/tomix-cli/"
+repo_url = "https://github.com/bgarcevic/tomix-cli"
+repo_name = "bgarcevic/tomix-cli"
+edit_uri = "edit/main/docs/"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Installation" = "getting-started/installation.md" },
+    { "Quickstart" = "getting-started/quickstart.md" },
+  ] },
+  { "Guides" = [
+    { "Connections & sessions" = "guides/connections.md" },
+    { "Editing & staging" = "guides/editing.md" },
+    { "Output & scripting" = "guides/scripting.md" },
+  ] },
+  { "Commands" = [
+    { "Overview" = "commands/index.md" },
+    { "Discover" = "commands/discover.md" },
+    { "Modify" = "commands/modify.md" },
+    { "Connect" = "commands/connect.md" },
+    { "Validate" = "commands/validate.md" },
+    { "Manage" = "commands/manage.md" },
+  ] },
+  { "Reference" = [
+    { "Error & exit codes" = "error-codes.md" },
+  ] },
+  { "Contributing" = [
+    { "How to contribute" = "contributing.md" },
+    { "CLI UX guidelines" = "cli-ux-guidelines.md" },
+    { "Color strategy" = "cli-color-strategy.md" },
+  ] },
+]
+
+[project.theme]
+features = [
+  "content.action.edit",
+  "content.code.copy",
+  "content.tabs.link",
+  "navigation.footer",
+  "navigation.instant",
+  "navigation.sections",
+  "navigation.tabs",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[project.theme.icon]
+logo = "material/table-large"
+repo = "fontawesome/brands/github"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "teal"
+accent = "teal"
+toggle.icon = "material/weather-night"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "teal"
+accent = "teal"
+toggle.icon = "material/weather-sunny"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.superfences]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true

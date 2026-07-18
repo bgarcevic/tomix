@@ -82,6 +82,12 @@ model, also look at how `set`/`rm` route changes through the staging flow
   print a hint, prompts never block in non-interactive contexts, and so on).
 - **Tests accompany behavior.** A PR that changes behavior without touching
   tests will be asked about it.
+- **Docs stay current.** If your PR adds or changes a command, an argument,
+  or an option, update the matching page under `docs/commands/`. The
+  command-surface snapshot test fails until you regenerate it
+  (`TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests`)
+  — treat that failure as the reminder to update the docs, not just the
+  snapshot.
 - **Scope.** Small, focused PRs merge fast. If you're planning something
   larger than a single command or fix, open an issue first so we agree on the
   approach before you spend the time.

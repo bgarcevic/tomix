@@ -25,13 +25,14 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 | Task | Go to | Read | Notes |
 |------|-------|------|-------|
-| Add or change a CLI command | `/src/Tomix.Cli`, `/src/Tomix.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers |
+| Add or change a CLI command | `/src/Tomix.Cli`, `/src/Tomix.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers. Update the matching page in `/docs/commands` and regenerate `CommandSurface.approved.txt` (`TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests`) |
 | Change command output or color styling | `/src/Tomix.Cli/Output` | `Output/CONTEXT.md`, `/docs/cli-color-strategy.md` | Use `Styling` helpers; do not hard-code ANSI |
 | Add domain types, diagnostics, paths, or result models | `/src/Tomix.Core` | `CONTEXT.md` | Core must stay dependency-light |
 | Change command output | `/src/Tomix.Cli/Output`, `/tests/Tomix.Cli.Tests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts (`GetLsParityTests`, `PropertyCatalogTests`) |
 | Add TMDL or TOM support | `/src/Tomix.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
 | Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
+| Change the docs site (pages, nav, theme) | `/docs`, `zensical.toml` | `docs/contributing.md` | Built with Zensical via uv; verify with `uv run zensical build --clean --strict` |
 | Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |
 | Change the color palette or message categories | `/src/Tomix.Cli/Output/Styling.cs` | `/docs/cli-color-strategy.md` | Update palette in one place only |
 
@@ -60,3 +61,4 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - Run CLI (dev, explicit): `dotnet run --project src/Tomix.Cli -- doctor`
 - Run JSON output (dev): `./tx doctor --output-format json`
 - Install/update global tool: `./scripts/install-dev.ps1` (Windows) or `./scripts/install-dev.sh` (macOS/Linux) — packs and installs `tx` globally so you can run `tx <command>` directly (re-run after each change to pick up edits)
+- Docs site (requires [uv](https://docs.astral.sh/uv/)): `uv run zensical serve` (live preview), `uv run zensical build --clean --strict` (what CI runs)
