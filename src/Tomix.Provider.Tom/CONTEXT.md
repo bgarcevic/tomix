@@ -8,6 +8,17 @@ Adapter around Microsoft Tabular Object Model.
 - Centralize TOM-specific logic.
 - Hide TOM implementation details from the rest of the codebase.
 
+## Mutation structure
+
+`TomModelMutator` is the public facade all sessions construct (`new TomModelMutator(database)`); it delegates to internal collaborators:
+
+- `TomObjectAdder` — the `AddObject` type dispatch and per-type builders, plus add-option validation.
+- `TomMutationTargetResolver` — path → object resolution (DAX forms, slash paths, container keywords, relationship endpoints); defines `TomResolvedObject`.
+- `TomPropertyApplier` — per-type property assignment, annotation handling, expression edits, and value parsers.
+- `TomTextReplacer` — model-wide text find/replace with previews.
+- `TomMutationPaths` — shared path/name/type normalization and the mutation-path regexes.
+- `TomRemoveCascade` — cascade collection for removals (remove dispatch stays on the facade).
+
 ## Cross-folder dependencies
 
 - Depends on `/src/Tomix.Core`.

@@ -23,6 +23,9 @@ Shared output wiring for all commands.
 - `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--plan`/`--runs` server-timings, query-plan, and benchmark summaries written to stderr).
+- `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.
+- `BpaRunView` / `BpaRunRenderer` — pure grouping/ordering logic, Spectre rendering, JSON projection, and CI annotation emission for `bpa run`.
+- `BpaRulesRenderer` — Spectre rendering and JSON projections for the `bpa rules` subcommands.
 - `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions.
 
 ## Color Strategy
@@ -48,5 +51,5 @@ Key rules:
 - Do not hand-roll JSON output; serialize through `JsonOutput`.
 - Do not add Spectre.Console usages outside this directory and `Commands/`.
 - Do not reference provider-specific types.
-- Keep `LsRenderer` and `QueryResultRenderer` as the only command-specific renderers factored into separate files.
+- Command-specific renderers live here as `<Command>Renderer` (plus an optional Spectre-free `<Command>View` for unit-testable layout logic); commands themselves must not contain Spectre table/grid rendering or JSON projections.
 - When adding new styling, extend `Styling.cs` — do not create per-command color constants.

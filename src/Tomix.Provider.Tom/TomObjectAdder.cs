@@ -1,6 +1,6 @@
-using System.Text.RegularExpressions;
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
+using static Tomix.Provider.Tom.TomMutationPaths;
 
 namespace Tomix.Provider.Tom;
 
@@ -10,8 +10,61 @@ namespace Tomix.Provider.Tom;
 /// and reports <c>Changed=true</c>. Builders honor <c>--if-not-exists</c> and the partition/data
 /// source options (mode, expression, columns, connection details).
 /// </summary>
-public sealed partial class TomModelMutator
+internal sealed class TomObjectAdder
 {
+    private readonly Database _database;
+
+    public TomObjectAdder(Database database) => _database = database;
+
+    public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
+    {
+        // Relationship paths ('Sales'[Key]->'Product'[Key]) carry quotes and brackets that
+        // NormalizePath/ObjectPath would mangle, so they are detected and routed up front.
+        if (TryResolveRelationshipPath(request) is { } relationshipPath)
+        {
+            ValidateAddOptions("relationship", "Relationship", request);
+            return AddRelationship(relationshipPath, request);
+        }
+
+        var (effectiveType, effectivePath) = ResolveTypeAndPath(request.Type, request.Path);
+        var type = NormalizeType(effectiveType);
+        if (type.Length > 0)
+            ValidateAddOptions(type, effectiveType!.Trim(), request);
+        var path = NormalizePath(effectivePath);
+
+        return type switch
+        {
+            "table" => AddTable(path, request),
+            "calctable" => AddCalcTable(path, request),
+            "calcgroup" => AddCalcGroup(path, request),
+            "measure" => AddMeasure(path, request),
+            "calccolumn" => AddCalcColumn(path, request),
+            "datacolumn" => AddDataColumn(path, request),
+            "hierarchy" => AddHierarchy(path, request),
+            "level" => AddLevel(path, request),
+            "calendar" => AddCalendar(path, request),
+            "calcitem" => AddCalcItem(path, request),
+            "kpi" => AddKpi(path, request),
+            "partition" => AddPartition(path, request, PartitionKind.M),
+            "mpartition" => AddPartition(path, request, PartitionKind.M),
+            "entitypartition" => AddPartition(path, request, PartitionKind.Entity),
+            "policyrangepartition" => AddPartition(path, request, PartitionKind.PolicyRange),
+            "expression" => AddExpression(path, request),
+            "function" => AddFunction(path, request),
+            "perspective" => AddPerspective(path, request),
+            "culture" => AddCulture(path, request),
+            "providerdatasource" => AddProviderDataSource(path, request),
+            "structureddatasource" => AddStructuredDataSource(path, request),
+            "role" => AddRole(path, request),
+            "tablepermission" => AddTablePermission(path, request),
+            "member" => AddMember(path, request),
+            "" => throw new ArgumentException(
+                $"No object type given for '{request.Path}'. Pass -t <type> or use a path keyword "
+                + "(e.g. 'tables/<Table>', 'tables/<Table>/measures/<Name>')."),
+            _ => throw new NotSupportedException($"Adding object type '{request.Type}' is not supported yet.")
+        };
+    }
+
     private enum PartitionKind
     {
         M,
@@ -61,6 +114,75 @@ public sealed partial class TomModelMutator
         }
     }
 
+    private Table? FindTable(string name) => TomMutationPaths.FindTable(_database.Model, name);
+
+    private ModelObjectMutationResult AddTable(string path, ModelObjectAddRequest request)
+    {
+        if (path.Contains('/'))
+            throw new InvalidOperationException($"Cannot add a Table at path '{request.Path}'. Check that -t matches the path shape.");
+
+        var existing = FindTable(path);
+        if (existing is not null)
+        {
+            if (request.IfNotExists)
+                return new ModelObjectMutationResult(existing.Name, Changed: false);
+
+            throw new InvalidOperationException($"Object already exists: {path}");
+        }
+
+        var table = new Table { Name = path };
+        table.Partitions.Add(new Partition
+        {
+            Name = path,
+            Mode = ParseMode(request.Mode),
+            Source = new MPartitionSource
+            {
+                Expression = request.PartitionExpression ?? "let Source = #table({}, {}) in Source"
+            }
+        });
+        AddColumns(table, request.Columns);
+        _database.Model.Tables.Add(table);
+
+        TomPropertyApplier.ApplyProperties(table, request.Properties);
+        return new ModelObjectMutationResult(table.Name, Changed: true);
+    }
+
+    private ModelObjectMutationResult AddMeasure(string path, ModelObjectAddRequest request)
+    {
+        var parts = SplitObjectPath(path);
+        if (parts.Count != 2)
+        {
+            throw parts.Count < 2
+                ? new InvalidOperationException(
+                    $"Measures require a table parent. Use 'tables/<Table>/measures/<Name>'. Path was '{request.Path}'.")
+                : new InvalidOperationException($"Cannot add a Measure at path '{request.Path}'. Expected '<Table>/<Measure>'.");
+        }
+
+        var table = FindTable(parts[0]) ??
+                    throw new InvalidOperationException($"Table not found: {parts[0]}");
+
+        var existing = table.Measures.FirstOrDefault(m => NameEquals(m.Name, parts[1]));
+        if (existing is not null)
+        {
+            if (request.IfNotExists)
+                return new ModelObjectMutationResult($"{table.Name}/{existing.Name}", Changed: false);
+
+            throw new InvalidOperationException($"Object already exists: {path}");
+        }
+
+        ThrowIfTableNamespaceCollision(table, parts[1], "measures");
+
+        var measure = new Measure
+        {
+            Name = parts[1],
+            Expression = request.Value ?? ""
+        };
+        table.Measures.Add(measure);
+
+        TomPropertyApplier.ApplyProperties(measure, request.Properties);
+        return new ModelObjectMutationResult($"{table.Name}/{measure.Name}", Changed: true);
+    }
+
     private ModelObjectMutationResult AddCalcTable(string path, ModelObjectAddRequest request)
     {
         if (path.Contains('/'))
@@ -82,7 +204,7 @@ public sealed partial class TomModelMutator
         });
         _database.Model.Tables.Add(table);
 
-        ApplyProperties(table, request.Properties);
+        TomPropertyApplier.ApplyProperties(table, request.Properties);
         return new ModelObjectMutationResult(table.Name, Changed: true);
     }
 
@@ -105,7 +227,7 @@ public sealed partial class TomModelMutator
         });
         _database.Model.Tables.Add(table);
 
-        ApplyProperties(table, request.Properties);
+        TomPropertyApplier.ApplyProperties(table, request.Properties);
         return new ModelObjectMutationResult(table.Name, Changed: true);
     }
 
@@ -125,7 +247,7 @@ public sealed partial class TomModelMutator
         };
         table.Columns.Add(column);
 
-        ApplyProperties(column, request.Properties);
+        TomPropertyApplier.ApplyProperties(column, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{column.Name}", Changed: true);
     }
 
@@ -146,7 +268,7 @@ public sealed partial class TomModelMutator
         };
         table.Columns.Add(column);
 
-        ApplyProperties(column, request.Properties);
+        TomPropertyApplier.ApplyProperties(column, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{column.Name}", Changed: true);
     }
 
@@ -166,7 +288,7 @@ public sealed partial class TomModelMutator
             hierarchy.Levels.Add(new Level { Name = seed.Name, Ordinal = 0, Column = seed });
         table.Hierarchies.Add(hierarchy);
 
-        ApplyProperties(hierarchy, request.Properties);
+        TomPropertyApplier.ApplyProperties(hierarchy, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{hierarchy.Name}", Changed: true);
     }
 
@@ -199,7 +321,7 @@ public sealed partial class TomModelMutator
         };
         hierarchy.Levels.Add(level);
 
-        ApplyProperties(level, request.Properties);
+        TomPropertyApplier.ApplyProperties(level, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{hierarchy.Name}/{level.Name}", Changed: true);
     }
 
@@ -214,7 +336,7 @@ public sealed partial class TomModelMutator
         var calendar = new Calendar { Name = name };
         table.Calendars.Add(calendar);
 
-        ApplyProperties(calendar, request.Properties);
+        TomPropertyApplier.ApplyProperties(calendar, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{calendar.Name}", Changed: true);
     }
 
@@ -241,7 +363,7 @@ public sealed partial class TomModelMutator
         };
         table.CalculationGroup.CalculationItems.Add(item);
 
-        ApplyProperties(item, request.Properties);
+        TomPropertyApplier.ApplyProperties(item, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{item.Name}", Changed: true);
     }
 
@@ -265,7 +387,7 @@ public sealed partial class TomModelMutator
             StatusExpression = "0"
         };
 
-        ApplyProperties(measure.KPI, request.Properties);
+        TomPropertyApplier.ApplyProperties(measure.KPI, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{measure.Name}", Changed: true);
     }
 
@@ -285,7 +407,7 @@ public sealed partial class TomModelMutator
         };
         table.Partitions.Add(partition);
 
-        ApplyProperties(partition, request.Properties);
+        TomPropertyApplier.ApplyProperties(partition, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{partition.Name}", Changed: true);
     }
 
@@ -363,7 +485,7 @@ public sealed partial class TomModelMutator
         };
         _database.Model.Expressions.Add(expression);
 
-        ApplyProperties(expression, request.Properties);
+        TomPropertyApplier.ApplyProperties(expression, request.Properties);
         return new ModelObjectMutationResult(expression.Name, Changed: true);
     }
 
@@ -382,7 +504,7 @@ public sealed partial class TomModelMutator
         };
         _database.Model.Functions.Add(function);
 
-        ApplyProperties(function, request.Properties);
+        TomPropertyApplier.ApplyProperties(function, request.Properties);
         return new ModelObjectMutationResult(function.Name, Changed: true);
     }
 
@@ -397,7 +519,7 @@ public sealed partial class TomModelMutator
         var perspective = new Perspective { Name = name };
         _database.Model.Perspectives.Add(perspective);
 
-        ApplyProperties(perspective, request.Properties);
+        TomPropertyApplier.ApplyProperties(perspective, request.Properties);
         return new ModelObjectMutationResult(perspective.Name, Changed: true);
     }
 
@@ -412,7 +534,7 @@ public sealed partial class TomModelMutator
         var culture = new Culture { Name = name };
         _database.Model.Cultures.Add(culture);
 
-        ApplyProperties(culture, request.Properties);
+        TomPropertyApplier.ApplyProperties(culture, request.Properties);
         return new ModelObjectMutationResult(culture.Name, Changed: true);
     }
 
@@ -435,7 +557,7 @@ public sealed partial class TomModelMutator
 
         _database.Model.DataSources.Add(dataSource);
 
-        ApplyProperties(dataSource, request.Properties);
+        TomPropertyApplier.ApplyProperties(dataSource, request.Properties);
         return new ModelObjectMutationResult(dataSource.Name, Changed: true);
     }
 
@@ -454,7 +576,7 @@ public sealed partial class TomModelMutator
         };
         _database.Model.DataSources.Add(dataSource);
 
-        ApplyProperties(dataSource, request.Properties);
+        TomPropertyApplier.ApplyProperties(dataSource, request.Properties);
         return new ModelObjectMutationResult(dataSource.Name, Changed: true);
     }
 
@@ -469,7 +591,7 @@ public sealed partial class TomModelMutator
         var role = new ModelRole { Name = name, ModelPermission = ModelPermission.Read };
         _database.Model.Roles.Add(role);
 
-        ApplyProperties(role, request.Properties);
+        TomPropertyApplier.ApplyProperties(role, request.Properties);
         return new ModelObjectMutationResult(role.Name, Changed: true);
     }
 
@@ -496,7 +618,7 @@ public sealed partial class TomModelMutator
         };
         role.TablePermissions.Add(permission);
 
-        ApplyProperties(permission, request.Properties);
+        TomPropertyApplier.ApplyProperties(permission, request.Properties);
         return new ModelObjectMutationResult($"{role.Name}/{permission.Name}", Changed: true);
     }
 
@@ -520,7 +642,7 @@ public sealed partial class TomModelMutator
         };
         role.Members.Add(member);
 
-        ApplyProperties(member, request.Properties);
+        TomPropertyApplier.ApplyProperties(member, request.Properties);
         return new ModelObjectMutationResult($"{role.Name}/{member.MemberName}", Changed: true);
     }
 
@@ -572,7 +694,7 @@ public sealed partial class TomModelMutator
         };
         _database.Model.Relationships.Add(relationship);
 
-        ApplyProperties(relationship, request.Properties);
+        TomPropertyApplier.ApplyProperties(relationship, request.Properties);
         return new ModelObjectMutationResult(RelationshipDisplay(relationship), Changed: true);
     }
 
@@ -583,47 +705,6 @@ public sealed partial class TomModelMutator
         return table.Columns.FirstOrDefault(c => c.Type != ColumnType.RowNumber && NameEquals(c.Name, columnName)) ??
                throw new InvalidOperationException($"Column not found: {table.Name}[{columnName}]");
     }
-
-    private static string RelationshipDisplay(SingleColumnRelationship relationship)
-        => $"{relationship.FromColumn.Table.Name}[{relationship.FromColumn.Name}] -> " +
-           $"{relationship.ToColumn.Table.Name}[{relationship.ToColumn.Name}]";
-
-    private static void ApplyRelationshipProperty(SingleColumnRelationship relationship, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                relationship.Name = value;
-                break;
-            case "isactive":
-                relationship.IsActive = ParseBool(value, displayName);
-                break;
-            case "crossfilteringbehavior":
-                relationship.CrossFilteringBehavior = ParseEnum<CrossFilteringBehavior>(value, displayName);
-                break;
-            case "fromcardinality":
-                relationship.FromCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
-                break;
-            case "tocardinality":
-                relationship.ToCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for relationships.");
-        }
-    }
-
-    private static TEnum ParseEnum<TEnum>(string value, string property) where TEnum : struct, Enum
-    {
-        if (Enum.TryParse<TEnum>(value.Trim(), ignoreCase: true, out var parsed))
-            return parsed;
-
-        throw new ArgumentException(
-            $"Value for '{property}' must be one of: {string.Join(", ", Enum.GetNames<TEnum>())}.");
-    }
-
-    // Accepts 'Table'[Column]->'Table'[Column] and Table[Column]->Table[Column] (whitespace tolerated).
-    [GeneratedRegex(@"^\s*(?:'(?<ft>[^']+)'|(?<ft>[^'\[\]]+?))\s*\[(?<fc>[^\]]+)\]\s*->\s*(?:'(?<tt>[^']+)'|(?<tt>[^'\[\]]+?))\s*\[(?<tc>[^\]]+)\]\s*$")]
-    private static partial Regex RelationshipPath();
 
     // --- shared helpers --------------------------------------------------------------------
 
@@ -724,195 +805,5 @@ public sealed partial class TomModelMutator
         if (!string.IsNullOrWhiteSpace(database))
             details.Address.Database = database;
         return details;
-    }
-
-    private static void ApplyNameDescription(string property, string value, string displayName, Action<string> setName, Action<string> setDescription)
-    {
-        switch (property)
-        {
-            case "name":
-                setName(value);
-                break;
-            case "description":
-                setDescription(value);
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for this object.");
-        }
-    }
-
-    private static void ApplyHierarchyProperty(Hierarchy hierarchy, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                hierarchy.Name = value;
-                break;
-            case "description":
-                hierarchy.Description = value;
-                break;
-            case "displayfolder":
-                hierarchy.DisplayFolder = value;
-                break;
-            case "ishidden":
-                hierarchy.IsHidden = ParseBool(value, displayName);
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for hierarchies.");
-        }
-    }
-
-    private static void ApplyLevelProperty(Level level, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                level.Name = value;
-                break;
-            case "description":
-                level.Description = value;
-                break;
-            case "ordinal":
-                level.Ordinal = ParseInt(value, displayName);
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for levels.");
-        }
-    }
-
-    private static void ApplyNamedExpressionProperty(NamedExpression expression, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                expression.Name = value;
-                break;
-            case "description":
-                expression.Description = value;
-                break;
-            case "expression":
-                expression.Expression = value;
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for expressions.");
-        }
-    }
-
-    private static void ApplyFunctionProperty(Function function, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                function.Name = value;
-                break;
-            case "description":
-                function.Description = value;
-                break;
-            case "expression":
-                function.Expression = value;
-                break;
-            case "ishidden":
-                function.IsHidden = ParseBool(value, displayName);
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for functions.");
-        }
-    }
-
-    private static void ApplyCalculationItemProperty(CalculationItem item, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                item.Name = value;
-                break;
-            case "description":
-                item.Description = value;
-                break;
-            case "expression":
-                item.Expression = value;
-                break;
-            case "ordinal":
-                item.Ordinal = ParseInt(value, displayName);
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for calculation items.");
-        }
-    }
-
-    private static void ApplyDataSourceProperty(DataSource dataSource, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                dataSource.Name = value;
-                break;
-            case "description":
-                dataSource.Description = value;
-                break;
-            case "connectionstring" when dataSource is ProviderDataSource provider:
-                provider.ConnectionString = value;
-                break;
-            case "provider" when dataSource is ProviderDataSource provider:
-                provider.Provider = value;
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for data sources.");
-        }
-    }
-
-    private static void ApplyKpiProperty(KPI kpi, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "description":
-                kpi.Description = value;
-                break;
-            case "targetexpression":
-                kpi.TargetExpression = value;
-                break;
-            case "targetformatstring":
-                kpi.TargetFormatString = value;
-                break;
-            case "statusexpression":
-                kpi.StatusExpression = value;
-                break;
-            case "trendexpression":
-                kpi.TrendExpression = value;
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for KPIs.");
-        }
-    }
-
-    private static void ApplyTablePermissionProperty(TablePermission permission, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-                permission.Name = value;
-                break;
-            case "filterexpression":
-                permission.FilterExpression = value;
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for table permissions.");
-        }
-    }
-
-    private static void ApplyMemberProperty(ModelRoleMember member, string property, string value, string displayName)
-    {
-        switch (property)
-        {
-            case "name":
-            case "membername":
-                member.MemberName = value;
-                break;
-            case "memberid":
-                member.MemberID = value;
-                break;
-            default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for role members.");
-        }
     }
 }

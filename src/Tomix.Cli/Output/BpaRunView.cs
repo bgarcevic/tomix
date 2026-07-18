@@ -11,6 +11,15 @@ internal static class BpaRunView
 {
     internal const int DefaultObjectCap = 10;
 
+    /// <summary>Display flags for the <c>bpa run</c> text output.</summary>
+    internal sealed record RunOptions(
+        bool NoMultiline,
+        bool Full,
+        bool Details,
+        bool Errors,
+        bool Warnings,
+        bool Info);
+
     /// <summary>One rule and every object that violated it, in display order.</summary>
     internal sealed record RuleGroup(
         string RuleId,
