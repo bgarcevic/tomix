@@ -135,6 +135,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -156,3 +158,20 @@ jobs:
             artifacts/packages/checksums.txt
           generate_release_notes: true
           draft: false
+
+      # NuGet publishing runs after the GitHub Release so a nuget.org outage can
+      # never block the binary channel. Both steps no-op when the secret is unset
+      # (forks); --skip-duplicate keeps tag re-runs idempotent.
+      - name: Setup .NET
+        if: env.NUGET_API_KEY != ''
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Push to NuGet
+        if: env.NUGET_API_KEY != ''
+        run: >
+          dotnet nuget push artifacts/packages/*.nupkg
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
