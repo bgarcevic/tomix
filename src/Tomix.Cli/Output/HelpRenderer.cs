@@ -20,7 +20,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "incremental-refresh"]),
         ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "vertipaq", "diff", "doctor"]),
-        ("Manage", ["config", "profile", "init", "completion", "stage"]),
+        ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
     ];
 
     internal static readonly string[] NotImplementedCommands = [];
@@ -166,6 +166,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx stage",
             "tx stage commit",
             "tx stage discard",
+        ],
+        ["update"] = [
+            "tx update --check",
+            "tx update",
+            "tx update --version 0.2.0 --yes",
         ],
     };
 

@@ -61,6 +61,24 @@ checksums included.
 Connecting to a locally running Power BI Desktop instance (`--local`) is
 Windows-only. Everything that operates on TMDL/BIM files works everywhere.
 
+### Updating
+
+```sh
+tx update --check   # preview: latest version + release notes, breaking changes flagged
+tx update           # update in place (standalone binary or dotnet global tool)
+```
+
+`tx update` detects how tx was installed: a standalone binary is replaced
+in place after checksum verification against the release's `checksums.txt`;
+a dotnet global tool runs `dotnet tool update -g Tomix.Cli`. `--check` always
+exits 0 — scripts should read `updateAvailable` from
+`tx update --check --output-format json`.
+
+tx also checks for new releases in the background at most once per 24 hours
+and prints a short notice on stderr when one is available. It never delays a
+command and is suppressed in CI and for JSON/CSV output. Opt out entirely with
+`tx config set updateCheck false` or `TOMIX_NO_UPDATE_CHECK=1`.
+
 ## Commands
 
 Discover: `ls`, `get`, `find`, `deps`
@@ -73,7 +91,8 @@ against a live model), `load`, `save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
 `vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
-staged, then committed or discarded)
+staged, then committed or discarded), `update` (self-update with
+release-notes preview)
 
 `tx <command> --help` shows options and examples. `tx doctor` checks your
 environment when something seems off.

@@ -257,6 +257,21 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | `TOMIX_CONFIG_CORRUPT` | 2 | `~/.tomix/config.json` exists but does not parse. Fix or delete the file, then re-create settings with `tx config set`. |
 | `TOMIX_UNEXPECTED` | 1 | An unexpected exception reached the top-level handler. The stack trace is only printed under `--debug`; with `--error-format json` it is embedded as a `detail` field in the envelope so stderr stays valid JSON. |
 
+## Update Codes (`TOMIX_UPDATE_*`)
+
+Emitted by `tx update` (see `docs/commands/manage.md`). `tx update --check` exits `0`
+whether or not an update is available; these codes cover failures only.
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_UPDATE_CHECK_FAILED` | 1 | Could not read the release list from api.github.com (network failure, or no releases published). |
+| `TOMIX_UPDATE_VERSION_NOT_FOUND` | 2 | `--version <v>` names a version that is not a published release. |
+| `TOMIX_UPDATE_UNSUPPORTED_INSTALL` | 2 | The running tx is not updatable in place (dev wrapper, or unrecognized install layout). |
+| `TOMIX_UPDATE_TOOL_FAILED` | 1 | `dotnet tool update -g Tomix.Cli` exited non-zero. |
+| `TOMIX_UPDATE_DOWNLOAD_FAILED` | 1 | The release asset or `checksums.txt` could not be downloaded. |
+| `TOMIX_UPDATE_CHECKSUM_MISMATCH` | 1 | The downloaded asset's SHA-256 does not match `checksums.txt`; nothing was installed. |
+| `TOMIX_UPDATE_APPLY_FAILED` | 1 | The binary swap failed (permissions, IO); the previous binary is restored. |
+
 ## Environment Variables
 
 The following `TOMIX_*` tokens are **environment variables**, not diagnostic codes:
@@ -267,6 +282,7 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 | `TOMIX_AUTH_TENANT` | Azure AD tenant id for service principal auth. |
 | `TOMIX_SESSION` | Session id for persisting the active model connection. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
+| `TOMIX_NO_UPDATE_CHECK` | Set (any value) to disable the throttled update check and notice. |
 | `TOMIX_POWERQUERY_FORMATTER_API` | Custom Power Query Formatter API endpoint URL. |
 
 ## Migration: Unified Mutation Error Codes

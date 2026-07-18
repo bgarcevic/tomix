@@ -215,6 +215,7 @@ internal static class Program
             new SessionCommand(services),
             new SetCommand(providers, services),
             new StageCommand(providers, services),
+            new UpdateCommand(version, releaseSource ?? UnavailableReleaseSource.Instance, services),
             new ValidateCommand(providers, services),
             new VertipaqCommand(providers, analyzer, services)
         };
@@ -243,6 +244,24 @@ internal static class Program
 
         public Task<IReadOnlyList<WorkspaceInfo>> ListWorkspacesAsync(CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<WorkspaceInfo>>([]);
+    }
+
+    /// <summary>Release source for contexts without network wiring (e.g. help-only test roots).</summary>
+    private sealed class UnavailableReleaseSource : IReleaseSource
+    {
+        public static readonly UnavailableReleaseSource Instance = new();
+
+        public Task<Tomix.Core.Update.ReleaseInfo?> GetLatestAsync(CancellationToken cancellationToken)
+            => Task.FromResult<Tomix.Core.Update.ReleaseInfo?>(null);
+
+        public Task<IReadOnlyList<Tomix.Core.Update.ReleaseInfo>> ListReleasesAsync(CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<Tomix.Core.Update.ReleaseInfo>>([]);
+
+        public Task<byte[]> DownloadAssetAsync(string version, string assetName, CancellationToken cancellationToken)
+            => throw new HttpRequestException("No release source is configured.");
+
+        public Task<string> DownloadChecksumsAsync(string version, CancellationToken cancellationToken)
+            => throw new HttpRequestException("No release source is configured.");
     }
 
     private static string ResolveVersion()

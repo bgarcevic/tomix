@@ -116,6 +116,21 @@ public sealed class ErrorCodeContractTests
         Assert.NotNull(result.Diagnostics.Single().Hint);
     }
 
+    // ── Update error codes ──────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("TOMIX_UPDATE_CHECK_FAILED")]
+    [InlineData("TOMIX_UPDATE_VERSION_NOT_FOUND")]
+    [InlineData("TOMIX_UPDATE_UNSUPPORTED_INSTALL")]
+    [InlineData("TOMIX_UPDATE_TOOL_FAILED")]
+    [InlineData("TOMIX_UPDATE_DOWNLOAD_FAILED")]
+    [InlineData("TOMIX_UPDATE_CHECKSUM_MISMATCH")]
+    [InlineData("TOMIX_UPDATE_APPLY_FAILED")]
+    public void UpdateErrorCodes_AreValidUppercaseSnakeCase(string code)
+    {
+        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
+    }
+
     // ── Deprecated/removed error codes (regression guard) ───────────────────
 
     /// <summary>

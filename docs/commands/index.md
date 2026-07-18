@@ -10,7 +10,7 @@ authoritative reference for the version you have installed.
 | [Modify](modify.md) | `add`, `set`, `mv`, `rm`, `replace`, `format`, `script`, `incremental-refresh` |
 | [Connect](connect.md) | `connect`, `deploy`, `refresh`, `load`, `save`, `auth`, `session` |
 | [Validate](validate.md) | `bpa`, `validate`, `vertipaq`, `diff`, `doctor` |
-| [Manage](manage.md) | `config`, `profile`, `init`, `completion`, `stage` |
+| [Manage](manage.md) | `config`, `profile`, `init`, `completion`, `stage`, `update` |
 
 ## Global options
 

@@ -534,6 +534,12 @@ Discard staged mutations without committing them
 Promote staged mutations onto the source (and workspace mirror)
   opt --force  Commit even if the source changed since staging began (overwrites it).
 
+# tx update
+Update tx to the latest release.
+  opt --check  Preview only: show the latest version and release notes without changing anything.
+  opt --version <version>  Update (or downgrade, with --yes) to a specific released version instead of the latest.
+  opt --output-format <output-format>  Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command.
+
 # tx validate
 Validate DAX expressions and relationship integrity (--ci for CI output, --trx for VSTEST)
   arg [model]  Path to model (if not using --model)

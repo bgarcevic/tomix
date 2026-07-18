@@ -1,7 +1,7 @@
 # Manage
 
-Housekeeping: configuration, profiles, model scaffolding, and shell
-integration.
+Housekeeping: configuration, profiles, model scaffolding, shell
+integration, and self-update.
 
 ## `config` — CLI configuration
 
@@ -90,3 +90,33 @@ tx stage             # staged mutations for the active model
 tx stage commit      # promote them onto the source (and workspace mirror)
 tx stage discard
 ```
+
+## `update` — self-update
+
+```
+tx update [--check] [--version <v>]
+```
+
+Updates tx to the latest GitHub release. Detects how tx was installed:
+a dotnet global tool runs `dotnet tool update -g Tomix.Cli`; a standalone
+binary (install.sh/install.ps1) downloads the release asset, verifies it
+against the published `checksums.txt`, and swaps the binary in place.
+
+| Option | Description |
+|--------|-------------|
+| `--check` | Preview only: latest version plus release notes for every version between installed and latest, with `[breaking]` flags. Exits 0 whether or not an update exists — scripts should read `updateAvailable` from `--output-format json`. |
+| `--version <v>` | Update (or downgrade, with `--yes`) to a specific released version. |
+
+The binary swap always asks for confirmation; pass `--yes` to skip (required
+when no TTY is available). Breaking releases are flagged from conventional-commit
+`!` markers and "breaking change" phrases in the release notes, plus any
+major-version bump.
+
+```sh
+tx update --check
+tx update
+tx update --version 0.2.0 --yes
+```
+
+Related: the throttled update notice printed after commands can be disabled
+with `tx config set updateCheck false` or `TOMIX_NO_UPDATE_CHECK=1`.
