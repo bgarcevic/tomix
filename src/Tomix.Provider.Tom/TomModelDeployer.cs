@@ -22,51 +22,56 @@ public static class TomModelDeployer
         var sw = Stopwatch.StartNew();
 
         var server = new TabularServer();
-        await ConnectAsync(server, request.Server, tokenProvider, cancellationToken).ConfigureAwait(false);
-
-        var targetName = string.IsNullOrWhiteSpace(request.Database)
-            ? sourceDatabase.Name ?? sourceDatabase.ID
-            : request.Database;
-
-        var existing = server.Databases.FindByName(targetName);
-        if (existing is not null && request.CreateOnly)
+        try
         {
-            server.Disconnect();
+            await ConnectAsync(server, request.Server, tokenProvider, cancellationToken).ConfigureAwait(false);
+
+            var targetName = string.IsNullOrWhiteSpace(request.Database)
+                ? sourceDatabase.Name ?? sourceDatabase.ID
+                : request.Database;
+
+            var existing = server.Databases.FindByName(targetName);
+            if (existing is not null && request.CreateOnly)
+            {
+                throw new InvalidOperationException(
+                    $"Model '{targetName}' already exists on '{request.Server}'. Remove --create-only to overwrite.");
+            }
+
+            var status = existing is not null ? "updated" : "created";
+
+            // Power BI rejects XMLA deploys that change a dataset's name ("you can't rename this
+            // dataset"), even a casing difference. When the target already exists, pin the deployed
+            // name to the existing dataset's actual name so createOrReplace is never treated as a
+            // rename. For new datasets, use the requested name.
+            var deployName = existing?.Name ?? targetName;
+
+            var clone = sourceDatabase.Clone();
+            clone.Name = deployName;
+
+            var dbJson = TabularJsonSerializer.SerializeDatabase(clone, new SerializeOptions());
+            var results = server.Execute(BuildCreateOrReplaceCommand(deployName, dbJson));
+
+            // AMO's Execute returns a result collection that may contain errors/warnings even
+            // when no exception is thrown. Surface them so deploys don't silently no-op.
+            var serverErrors = new List<string>();
+            XmlaResultHelper.ExtractMessages(results, serverErrors);
+            if (serverErrors.Count > 0)
+            {
+                var message = serverErrors.Count == 1
+                    ? serverErrors[0]
+                    : string.Join("; ", serverErrors);
+                throw new InvalidOperationException(message);
+            }
+
+            sw.Stop();
+            return new ModelDeployResult(request.Server, deployName, status, sw.ElapsedMilliseconds);
+        }
+        finally
+        {
+            if (server.Connected)
+                server.Disconnect();
             server.Dispose();
-            throw new InvalidOperationException(
-                $"Model '{targetName}' already exists on '{request.Server}'. Remove --create-only to overwrite.");
         }
-
-        var status = existing is not null ? "updated" : "created";
-
-        // Power BI rejects XMLA deploys that change a dataset's name ("you can't rename this
-        // dataset"), even a casing difference. When the target already exists, pin the deployed
-        // name to the existing dataset's actual name so createOrReplace is never treated as a
-        // rename. For new datasets, use the requested name.
-        var deployName = existing?.Name ?? targetName;
-
-        var clone = sourceDatabase.Clone();
-        clone.Name = deployName;
-
-        var dbJson = TabularJsonSerializer.SerializeDatabase(clone, new SerializeOptions());
-        var results = server.Execute(BuildCreateOrReplaceCommand(deployName, dbJson));
-
-        // AMO's Execute returns a result collection that may contain errors/warnings even
-        // when no exception is thrown. Surface them so deploys don't silently no-op.
-        var serverErrors = new List<string>();
-        XmlaResultHelper.ExtractMessages(results, serverErrors);
-        if (serverErrors.Count > 0)
-        {
-            var message = serverErrors.Count == 1
-                ? serverErrors[0]
-                : string.Join("; ", serverErrors);
-            throw new InvalidOperationException(message);
-        }
-
-        sw.Stop();
-        server.Disconnect();
-        server.Dispose();
-        return new ModelDeployResult(request.Server, deployName, status, sw.ElapsedMilliseconds);
     }
 
     public static string GenerateScript(Database sourceDatabase, ModelDeployRequest request)

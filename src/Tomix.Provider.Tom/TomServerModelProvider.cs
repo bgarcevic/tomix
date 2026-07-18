@@ -24,7 +24,19 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
     public async Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
     {
         var server = await ConnectServerAsync(reference, cancellationToken).ConfigureAwait(false);
-        return new TomServerModelSession(server, ResolveDatabase(server, reference.Database), reference, _tokenProvider);
+        try
+        {
+            return new TomServerModelSession(server, ResolveDatabase(server, reference.Database), reference, _tokenProvider);
+        }
+        catch
+        {
+            // The session owns the server once constructed; until then a failed database
+            // resolution must not leak the live connection.
+            if (server.Connected)
+                server.Disconnect();
+            server.Dispose();
+            throw;
+        }
     }
 
     public bool CanList(ModelReference endpoint) => endpoint.IsRemote;
@@ -60,24 +72,31 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
     private async Task<TabularServer> ConnectServerAsync(ModelReference reference, CancellationToken cancellationToken)
     {
         var server = new TabularServer();
-
-        if (!reference.IsLocalInstance)
+        try
         {
-            if (_tokenProvider is null)
-                throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
-
-            var token = await _tokenProvider.GetTokenAsync(reference.Value, cancellationToken).ConfigureAwait(false);
-            server.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
-            server.OnAccessTokenExpired = _ =>
+            if (!reference.IsLocalInstance)
             {
-                var refreshed = _tokenProvider.GetTokenAsync(reference.Value, cancellationToken)
-                    .ConfigureAwait(false).GetAwaiter().GetResult();
-                return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
-            };
-        }
+                if (_tokenProvider is null)
+                    throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
 
-        server.Connect(BuildConnectionString(reference));
-        return server;
+                var token = await _tokenProvider.GetTokenAsync(reference.Value, cancellationToken).ConfigureAwait(false);
+                server.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
+                server.OnAccessTokenExpired = _ =>
+                {
+                    var refreshed = _tokenProvider.GetTokenAsync(reference.Value, cancellationToken)
+                        .ConfigureAwait(false).GetAwaiter().GetResult();
+                    return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
+                };
+            }
+
+            server.Connect(BuildConnectionString(reference));
+            return server;
+        }
+        catch
+        {
+            server.Dispose();
+            throw;
+        }
     }
 
     internal static string BuildConnectionString(ModelReference reference)
