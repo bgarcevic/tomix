@@ -15,7 +15,13 @@ internal static class ErrorOutput
         WriteIndented = true
     };
 
-    public static void Write(IReadOnlyList<TomixDiagnostic> diagnostics, string? format)
+    /// <summary>
+    /// Renders diagnostics on stderr in the requested error format. <paramref name="detail"/>
+    /// carries free-form debug text (e.g. a stack trace under <c>--debug</c>); in JSON mode it
+    /// is embedded as a <c>detail</c> field so stderr stays one valid JSON document, never
+    /// appended as raw text after the envelope.
+    /// </summary>
+    public static void Write(IReadOnlyList<TomixDiagnostic> diagnostics, string? format, string? detail = null)
     {
         if (string.Equals(format, OutputFormats.Json, StringComparison.OrdinalIgnoreCase))
         {
@@ -29,6 +35,8 @@ internal static class ErrorOutput
                 ["severity"] = error?.Severity.ToString(),
                 ["hint"] = error?.Hint
             };
+            if (detail is not null)
+                errorObj["detail"] = detail;
 
             Console.Error.WriteLine(JsonSerializer.Serialize(errorObj, Options));
             return;
@@ -53,5 +61,9 @@ internal static class ErrorOutput
             if (!string.IsNullOrEmpty(diagnostic.Hint))
                 errConsole.MarkupLine($"  {Styling.Guidance($"→ {diagnostic.Hint}")}");
         }
+
+        // Plain write: stack traces contain characters Spectre would treat as markup.
+        if (detail is not null)
+            Console.Error.WriteLine(detail);
     }
 }

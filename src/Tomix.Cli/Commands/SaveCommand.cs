@@ -79,7 +79,7 @@ internal sealed class SaveCommand : ICommandModule
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
-            if (!CommandOutput.TryValidateFormat(formatValue, "save", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "save", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
             var outputPath = parseResult.GetValue(outputPathOption);

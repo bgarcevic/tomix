@@ -31,7 +31,7 @@ internal sealed class SessionCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, "session list", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "session list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(new SessionHandler().List(), format, RenderList);
@@ -45,7 +45,7 @@ internal sealed class SessionCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, "session clear", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "session clear", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(
@@ -75,7 +75,7 @@ internal sealed class SessionCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, "session prune", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "session prune", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(
@@ -91,7 +91,7 @@ internal sealed class SessionCommand : ICommandModule
     private static int RenderShow(ParseResult parseResult)
     {
         var format = GlobalOptions.OutputFormatValue(parseResult);
-        if (!CommandOutput.TryValidateFormat(format, "session", OutputFormats.Text, OutputFormats.Json))
+        if (!CommandOutput.TryValidateFormat(parseResult, format, "session", OutputFormats.Text, OutputFormats.Json))
             return 2;
 
         return CommandOutput.Render(new SessionHandler().Show(), format, RenderShowResult);

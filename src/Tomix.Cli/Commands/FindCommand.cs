@@ -68,7 +68,7 @@ internal sealed class FindCommand : ICommandModule
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
 
-            if (!CommandOutput.TryValidateFormat(formatValue, "find", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "find", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             if (!RecentConnections.TryGetSource(

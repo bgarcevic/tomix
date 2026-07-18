@@ -114,4 +114,22 @@ public sealed class OutputFormatRejectionTests
         Assert.Empty(result.Errors);
         Assert.DoesNotContain("does not support --output-format", stderr);
     }
+
+    [Fact]
+    public void UnsupportedFormat_UsesJsonEnvelope_WhenErrorFormatJson()
+    {
+        var (exitCode, stderr, _) = Invoke("session", "--output-format", "csv", "--error-format", "json");
+
+        Assert.Equal(2, exitCode);
+        Assert.Contains("\"code\": \"TOMIX_OUTPUT_FORMAT_UNSUPPORTED\"", stderr);
+    }
+
+    [Fact]
+    public void InvalidFormat_UsesJsonEnvelope_WhenErrorFormatJson()
+    {
+        var (exitCode, stderr, _) = Invoke("session", "--output-format", "yaml", "--error-format", "json");
+
+        Assert.Equal(2, exitCode);
+        Assert.Contains("\"code\": \"TOMIX_INVALID_OUTPUT_FORMAT\"", stderr);
+    }
 }

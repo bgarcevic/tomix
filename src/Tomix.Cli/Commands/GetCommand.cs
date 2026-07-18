@@ -56,7 +56,7 @@ internal sealed class GetCommand : ICommandModule
             var query = parseResult.GetValue(queryOption);
             var typeValue = parseResult.GetValue(typeOption);
 
-            if (!CommandOutput.TryValidateFormat(formatValue, "get", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv, OutputFormats.Tmdl, OutputFormats.Bim, OutputFormats.Tmsl))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "get", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv, OutputFormats.Tmdl, OutputFormats.Bim, OutputFormats.Tmsl))
                 return 2;
 
             ModelObjectKind? type = null;

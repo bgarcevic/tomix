@@ -41,7 +41,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         show.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "incremental-refresh show", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var reference = new ActiveModelResolver().ResolveReference(
@@ -169,7 +169,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         set.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "incremental-refresh set", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var reference = new ActiveModelResolver().ResolveReference(
@@ -275,7 +275,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         rm.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "incremental-refresh rm", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh rm", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var table = parseResult.GetValue(tableArgument) ?? "";
@@ -347,7 +347,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         apply.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "incremental-refresh apply", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh apply", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var table = parseResult.GetValue(tableArgument) ?? "";

@@ -107,7 +107,7 @@ internal sealed class LsCommand : ICommandModule
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 
-            if (!CommandOutput.TryValidateFormat(formatValue, "ls", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "ls", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
             ModelObjectKind? type = null;

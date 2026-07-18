@@ -85,7 +85,7 @@ internal sealed class DepsCommand : ICommandModule
             var downstreamOnly = downstreamRequested && !upstreamRequested;
             var deep = parseResult.GetValue(deepOption);
 
-            if (!CommandOutput.TryValidateFormat(formatValue, "deps", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "deps", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             ModelObjectKind? type = null;

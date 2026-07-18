@@ -97,7 +97,7 @@ internal sealed class ReplaceCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "replace", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "replace", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var pattern = parseResult.GetValue(patternArgument) ?? "";

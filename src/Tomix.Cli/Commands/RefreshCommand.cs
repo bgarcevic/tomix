@@ -92,7 +92,7 @@ internal sealed class RefreshCommand : ICommandModule
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!CommandOutput.TryValidateFormat(format, "refresh", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "refresh", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
             var type = parseResult.GetValue(typeOption) ?? "automatic";

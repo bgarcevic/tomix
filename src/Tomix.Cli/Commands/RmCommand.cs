@@ -86,7 +86,7 @@ internal sealed class RmCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "rm", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "rm", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var typeValue = parseResult.GetValue(typeOption);

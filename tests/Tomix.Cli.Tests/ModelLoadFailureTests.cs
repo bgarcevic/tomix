@@ -38,7 +38,41 @@ public sealed class ModelLoadFailureTests
         var (exitCode, stderr) = Invoke("ls", "explode");
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("Unhandled exception", stderr);
+        Assert.Contains("Unexpected error: boom", stderr);
+        Assert.DoesNotContain("at Tomix", stderr); // no stack trace without --debug
+    }
+
+    [Fact]
+    public void UnexpectedException_UsesJsonEnvelope_WhenErrorFormatJson()
+    {
+        var (exitCode, stderr) = Invoke("ls", "explode", "--error-format", "json");
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("\"code\": \"TOMIX_UNEXPECTED\"", stderr);
+        Assert.DoesNotContain("at Tomix", stderr);
+    }
+
+    [Fact]
+    public void UnexpectedException_PrintsStackTrace_UnderDebug()
+    {
+        var (exitCode, stderr) = Invoke("ls", "explode", "--debug");
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("Unexpected error: boom", stderr);
+        Assert.Contains("InvalidOperationException", stderr); // full exception under --debug
+    }
+
+    [Fact]
+    public void UnexpectedException_DebugWithJsonErrorFormat_KeepsStderrValidJson()
+    {
+        var (exitCode, stderr) = Invoke("ls", "explode", "--error-format", "json", "--debug");
+
+        Assert.Equal(1, exitCode);
+        // The stack trace rides inside the envelope's "detail" field; stderr must stay
+        // one parseable JSON document for automation even in the debugging scenario.
+        using var doc = System.Text.Json.JsonDocument.Parse(stderr);
+        Assert.Equal("TOMIX_UNEXPECTED", doc.RootElement.GetProperty("code").GetString());
+        Assert.Contains("InvalidOperationException", doc.RootElement.GetProperty("detail").GetString());
     }
 
     private static (int ExitCode, string Stderr) Invoke(params string[] args)

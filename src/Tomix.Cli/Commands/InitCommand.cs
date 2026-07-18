@@ -55,7 +55,7 @@ internal sealed class InitCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "init", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "init", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var outputPath = parseResult.GetValue(outputPathArgument) ??

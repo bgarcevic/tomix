@@ -37,7 +37,7 @@ internal sealed class DiffCommand : ICommandModule
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!CommandOutput.TryValidateFormat(formatValue, "diff", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "diff", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var left = parseResult.GetValue(leftArgument) ?? "";

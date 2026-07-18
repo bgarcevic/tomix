@@ -43,7 +43,7 @@ internal sealed class StageCommand : ICommandModule
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!CommandOutput.TryValidateFormat(format, "stage commit", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "stage commit", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             if (!TryResolveModel(parseResult, out var reference, out var recentExit))
@@ -72,7 +72,7 @@ internal sealed class StageCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, "stage list", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "stage list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             return CommandOutput.Render(new StageHandler().List(), format, RenderList);
@@ -94,7 +94,7 @@ internal sealed class StageCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, "stage discard", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "stage discard", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var all = parseResult.GetValue(allOption);
@@ -111,7 +111,7 @@ internal sealed class StageCommand : ICommandModule
     private static int RenderStatus(ParseResult parseResult)
     {
         var format = GlobalOptions.OutputFormatValue(parseResult);
-        if (!CommandOutput.TryValidateFormat(format, "stage", OutputFormats.Text, OutputFormats.Json))
+        if (!CommandOutput.TryValidateFormat(parseResult, format, "stage", OutputFormats.Text, OutputFormats.Json))
             return 2;
 
         if (!TryResolveModel(parseResult, out var reference, out var recentExit))

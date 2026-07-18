@@ -96,7 +96,7 @@ internal sealed class SetCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "set", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var typeValue = parseResult.GetValue(typeOption);

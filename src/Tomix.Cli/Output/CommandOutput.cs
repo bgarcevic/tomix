@@ -1,3 +1,6 @@
+using System.CommandLine;
+using Tomix.Cli.Commands;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Results;
 
 namespace Tomix.Cli.Output;
@@ -14,28 +17,47 @@ internal static class CommandOutput
     /// Returns <c>false</c> so the command can exit with code 2 (invalid arguments).
     /// </summary>
     public static bool TryValidateFormat(string format)
-    {
-        if (OutputFormats.IsValid(format))
-            return true;
-
-        Console.Error.WriteLine("Invalid --output-format value. Expected: auto, text, json, csv, tmsl, bim, or tmdl.");
-        return false;
-    }
+        => ValidateFormatValue(format, errorFormat: null);
 
     /// <summary>
     /// Like <see cref="TryValidateFormat(string)"/>, but additionally rejects formats the command
     /// cannot render (instead of silently falling back to text). <c>auto</c> is always accepted.
     /// </summary>
     public static bool TryValidateFormat(string format, string commandName, params string[] supported)
+        => ValidateFormat(format, errorFormat: null, commandName, supported);
+
+    /// <summary>Overload that honors the command's <c>--error-format</c> value.</summary>
+    public static bool TryValidateFormat(ParseResult parseResult, string format, string commandName, params string[] supported)
+        => ValidateFormat(format, parseResult.GetValue(GlobalOptions.ErrorFormat), commandName, supported);
+
+    private static bool ValidateFormatValue(string format, string? errorFormat)
     {
-        if (!TryValidateFormat(format))
+        if (OutputFormats.IsValid(format))
+            return true;
+
+        ErrorOutput.Write(
+            [new TomixDiagnostic(
+                "TOMIX_INVALID_OUTPUT_FORMAT",
+                DiagnosticSeverity.Error,
+                "Invalid --output-format value. Expected: auto, text, json, csv, tmsl, bim, or tmdl.")],
+            errorFormat);
+        return false;
+    }
+
+    private static bool ValidateFormat(string format, string? errorFormat, string commandName, string[] supported)
+    {
+        if (!ValidateFormatValue(format, errorFormat))
             return false;
 
         if (format is OutputFormats.Auto || supported.Contains(format, StringComparer.OrdinalIgnoreCase))
             return true;
 
-        Console.Error.WriteLine(
-            $"'tx {commandName}' does not support --output-format {format}. Supported: {string.Join(", ", supported)}.");
+        ErrorOutput.Write(
+            [new TomixDiagnostic(
+                "TOMIX_OUTPUT_FORMAT_UNSUPPORTED",
+                DiagnosticSeverity.Error,
+                $"'tx {commandName}' does not support --output-format {format}. Supported: {string.Join(", ", supported)}.")],
+            errorFormat);
         return false;
     }
 

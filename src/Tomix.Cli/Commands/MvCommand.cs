@@ -91,7 +91,7 @@ internal sealed class MvCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(formatValue, "mv", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "mv", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);

@@ -92,7 +92,7 @@ internal sealed class VertipaqCommand : ICommandModule
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
 
-            if (!CommandOutput.TryValidateFormat(
+            if (!CommandOutput.TryValidateFormat(parseResult, 
                     formatValue, "vertipaq", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 

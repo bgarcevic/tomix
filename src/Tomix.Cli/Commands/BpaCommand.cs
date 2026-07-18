@@ -192,7 +192,7 @@ internal sealed class BpaCommand : ICommandModule
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!CommandOutput.TryValidateFormat(format, "bpa run", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "bpa run", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var ruleFiles = parseResult.GetValue(rulesOption);
@@ -325,7 +325,7 @@ internal sealed class BpaCommand : ICommandModule
         listCommand.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, "bpa rules list", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "bpa rules list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var modelPath = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
@@ -437,7 +437,7 @@ internal sealed class BpaCommand : ICommandModule
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             var result = new BpaRulesDisableHandler().Handle(
@@ -518,7 +518,7 @@ internal sealed class BpaCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            if (!CommandOutput.TryValidateFormat(format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
+            if (!CommandOutput.TryValidateFormat(parseResult, format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
             if (!RecentConnections.TryGetSource(
