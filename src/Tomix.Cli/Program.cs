@@ -29,8 +29,27 @@ internal static class Program
         Console.InputEncoding = Encoding.UTF8;
 
         var services = AppServices.Create();
-        var config = services.ConfigStore.Load();
-        var noColorEnv = Environment.GetEnvironmentVariable("NO_COLOR") is not null;
+        IDictionary<string, string> config;
+        try
+        {
+            config = services.ConfigStore.Load();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Config loads before argument parsing, so the top-level exception handler
+            // cannot catch this. A corrupt config must still fail with the actionable
+            // message, not an unhandled stack trace.
+            ErrorOutput.Write(
+                [new TomixDiagnostic(
+                    "TOMIX_CONFIG_CORRUPT",
+                    DiagnosticSeverity.Error,
+                    ex.Message,
+                    "Fix or delete the file, then re-create settings with 'tx config set'.")],
+                format: null);
+            return 2;
+        }
+        // Per https://no-color.org: only a non-empty value disables color.
+        var noColorEnv = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
         var noColorCfg = config.TryGetValue(ConfigKeys.NoColor, out var noColor) && bool.TryParse(noColor, out var noColorEnabled) && noColorEnabled;
         if (noColorEnv || noColorCfg)
             AnsiConsole.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
@@ -172,7 +191,7 @@ internal static class Program
             new DeployCommand(providers, services),
             new DepsCommand(providers, services),
             new DiffCommand(providers),
-            new DoctorCommand(version),
+            new DoctorCommand(version, services.ConfigDirectory),
             new FindCommand(providers, services),
             new FormatCommand(providers, formatter, services),
             new GetCommand(providers, services),

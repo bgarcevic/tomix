@@ -478,7 +478,7 @@ public sealed class IncrementalRefreshHandlerTests
             => Task.FromResult<IModelSession>(session);
     }
 
-    private sealed class StubApplySession(Exception? throwOnApply = null) : IModelSession, IModelRefreshSession
+    private sealed class StubApplySession(Exception? throwOnApply = null) : IModelSession, IModelRefreshSession, IRefreshPolicyApplySession
     {
         public bool ApplyCalled { get; private set; }
         public string SourcePath => "";

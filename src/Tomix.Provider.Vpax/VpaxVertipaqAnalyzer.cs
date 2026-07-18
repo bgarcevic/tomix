@@ -4,7 +4,6 @@ using Dax.Vpax.Tools;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Vertipaq;
-using Tomix.Provider.Tom;
 using AsAccessToken = Microsoft.AnalysisServices.AccessToken;
 
 namespace Tomix.Provider.Vpax;
@@ -169,7 +168,7 @@ public sealed class VpaxVertipaqAnalyzer : IVertipaqAnalyzer
     private async Task<(string ConnectionString, AsAccessToken? AccessToken, Func<AsAccessToken, AsAccessToken>? OnTokenExpired)>
         BuildConnectionAsync(ModelReference model, CancellationToken cancellationToken)
     {
-        var connectionString = $"Data Source={TomModelDeployer.ResolveEndpoint(model.Value)}";
+        var connectionString = $"Data Source={ModelReference.NormalizeEndpoint(model.Value)}";
         if (!string.IsNullOrWhiteSpace(model.Database))
             connectionString += $";Initial Catalog={model.Database}";
 

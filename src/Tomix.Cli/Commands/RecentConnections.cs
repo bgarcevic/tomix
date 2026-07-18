@@ -85,6 +85,29 @@ internal static class RecentConnections
             : new ActiveModelResolver(() => source.RecentEntry);
 
     /// <summary>
+    /// The standard model-resolution prologue in one call: applies the --recent override via
+    /// <see cref="TryGetSource"/>, then resolves the triple to a <see cref="Tomix.Core.Models.ModelReference"/>.
+    /// Use the two-step form only when the command also needs the intermediate
+    /// <see cref="ModelSource"/> (e.g. for sync targets).
+    /// </summary>
+    public static bool TryResolveModel(
+        ParseResult parseResult,
+        string? explicitModel,
+        CliStateStore store,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Tomix.Core.Models.ModelReference? reference,
+        out int exitCode)
+    {
+        if (!TryGetSource(parseResult, explicitModel, store, out var source, out exitCode))
+        {
+            reference = null;
+            return false;
+        }
+
+        reference = CreateResolver(source, store).ResolveReference(source.Model, source.Database, source.Server);
+        return true;
+    }
+
+    /// <summary>
     /// The session source a handler that resolves in the App layer (refresh, deploy) should use
     /// for <paramref name="source"/>: the picked --recent entry, or null to read the active session.
     /// </summary>

@@ -77,14 +77,13 @@ internal sealed class GetCommand : ICommandModule
                 type = parsed;
             }
 
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var reference,
                     out var recentExit))
                 return recentExit;
-            var reference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Loading model...",

@@ -69,15 +69,13 @@ internal sealed class LsCommand : ICommandModule
         {
             var firstValue = parseResult.GetValue(pathArgument);
             var secondValue = parseResult.GetValue(modelArgument);
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult),
                     _services.State,
-                    out var source,
+                    out var activeReference,
                     out var recentExit))
                 return recentExit;
-
-            var activeReference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
 
             // Canonical order is `ls [path-filter] [model]`, matching `get <path> [model]`.

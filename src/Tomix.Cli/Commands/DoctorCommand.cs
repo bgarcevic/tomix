@@ -10,7 +10,13 @@ internal sealed class DoctorCommand : ICommandModule
 {
     private readonly string _version;
 
-    public DoctorCommand(string version) => _version = version;
+    private readonly string _configDirectory;
+
+    public DoctorCommand(string version, string configDirectory)
+    {
+        _version = version;
+        _configDirectory = configDirectory;
+    }
 
     public Command Build()
     {
@@ -28,7 +34,7 @@ internal sealed class DoctorCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "doctor", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new DoctorHandler().Handle(_version);
+            var result = new DoctorHandler(_configDirectory).Handle(_version);
             return CommandOutput.Render(result, formatValue, Render);
         });
 

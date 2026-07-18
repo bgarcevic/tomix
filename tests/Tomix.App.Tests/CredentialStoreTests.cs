@@ -75,6 +75,7 @@ public sealed class CredentialStoreTests : IDisposable
         // Regression guard for the removed env-var renewal path: even with the old variable
         // set in the process environment, an expired SP login with no saved credentials must
         // ask for a fresh 'tx auth login' instead of silently using the env secret.
+        var original = Environment.GetEnvironmentVariable("TOMIX_AUTH_CLIENT_SECRET");
         Environment.SetEnvironmentVariable("TOMIX_AUTH_CLIENT_SECRET", "env-secret");
         try
         {
@@ -97,7 +98,7 @@ public sealed class CredentialStoreTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("TOMIX_AUTH_CLIENT_SECRET", null);
+            Environment.SetEnvironmentVariable("TOMIX_AUTH_CLIENT_SECRET", original);
         }
     }
 }

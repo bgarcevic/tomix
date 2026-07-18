@@ -176,9 +176,10 @@ public sealed class StagingStore
         if (string.IsNullOrWhiteSpace(json))
             return null;
 
+        StagingManifest? manifest;
         try
         {
-            return JsonSerializer.Deserialize<StagingManifest>(json);
+            manifest = JsonSerializer.Deserialize<StagingManifest>(json);
         }
         catch (JsonException ex)
         {
@@ -186,6 +187,14 @@ public sealed class StagingStore
             // TOMIX_STAGE_MANIFEST_CORRUPT with the discard recovery path.
             throw new StagingManifestCorruptException(manifestFile, ex);
         }
+
+        if (manifest is { Version: > StagingManifest.CurrentVersion })
+            throw new StagingManifestCorruptException(
+                $"Staged manifest was written by a newer tomix (version {manifest.Version}, " +
+                $"this build reads up to {StagingManifest.CurrentVersion}): {manifestFile}. " +
+                "Upgrade tomix, or run 'tx stage discard' to reset staging for this model.");
+
+        return manifest;
     }
 
     /// <summary>
@@ -304,11 +313,19 @@ public sealed class StagingStore
     }
 }
 
-/// <summary>Thrown when a staged manifest exists but no longer parses (torn write, manual edit).</summary>
+/// <summary>
+/// Thrown when a staged manifest exists but cannot be used: it no longer parses (torn write,
+/// manual edit) or was written by a newer tomix.
+/// </summary>
 public sealed class StagingManifestCorruptException : InvalidOperationException
 {
     public StagingManifestCorruptException(string manifestFile, Exception inner)
         : base($"Staged manifest is corrupt: {manifestFile}. Run 'tx stage discard' to reset staging for this model.", inner)
+    {
+    }
+
+    public StagingManifestCorruptException(string message)
+        : base(message)
     {
     }
 }
@@ -325,7 +342,18 @@ public sealed record StagingManifest(
     DateTimeOffset CreatedUtc,
     DateTimeOffset UpdatedUtc,
     string? SourceFingerprint,
-    IReadOnlyList<StagedOp> Ops);
+    IReadOnlyList<StagedOp> Ops)
+{
+    /// <summary>Bump when the manifest shape changes incompatibly.</summary>
+    public const int CurrentVersion = 1;
+
+    /// <summary>
+    /// Schema version of the persisted manifest. Files written before versioning carry no
+    /// field and deserialize to the default, which is correct: they are version 1. A file
+    /// from a NEWER tomix is rejected on read instead of being silently misread.
+    /// </summary>
+    public int Version { get; init; } = CurrentVersion;
+}
 
 public sealed record StagingWorkspace(string Server, string? Database);
 

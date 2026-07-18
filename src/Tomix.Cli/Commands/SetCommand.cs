@@ -123,14 +123,13 @@ internal sealed class SetCommand : ICommandModule
             IReadOnlyList<ModelPropertyAssignment> assignments = string.IsNullOrWhiteSpace(query)
                 ? Array.Empty<ModelPropertyAssignment>()
                 : [new ModelPropertyAssignment(query, value ?? "")];
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var reference,
                     out var recentExit))
                 return recentExit;
-            var reference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var label = MutationSpinnerLabel.For(
                 parseResult.GetValue(saveOption),
                 parseResult.GetValue(saveToOption),

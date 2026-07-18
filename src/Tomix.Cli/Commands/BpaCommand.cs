@@ -204,19 +204,19 @@ internal sealed class BpaCommand : ICommandModule
             var ruleFiles = parseResult.GetValue(rulesOption);
             var ruleIds = parseResult.GetValue(ruleOption);
 
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var model,
                     out var recentExit))
                 return recentExit;
 
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
-                () => new BpaRunHandler(_providers, _services.Mutations, _services.BpaRules).HandleAsync(
+                () => new BpaRunHandler(_providers, _services.Mutations, _services.BpaRules, _services.ConfigDirectory).HandleAsync(
                     new BpaRunRequest(
-                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
+                        model,
                         ruleFiles,
                         parseResult.GetValue(noDefaultsOption),
                         parseResult.GetValue(pathOption),
@@ -402,7 +402,7 @@ internal sealed class BpaCommand : ICommandModule
             new Option<string?>("--fix-expression") { Description = "Dynamic LINQ fix expression" },
             new Option<bool>("--save") { Description = "Save model after adding rule" }
         };
-        command.SetAction(_ => UnsupportedRulesAction("add"));
+        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "add"));
         return command;
     }
 
@@ -425,7 +425,7 @@ internal sealed class BpaCommand : ICommandModule
             valueOption,
             new Option<bool>("--save") { Description = "Save model after updating rule" }
         };
-        command.SetAction(_ => UnsupportedRulesAction("set"));
+        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "set"));
         return command;
     }
 
@@ -437,7 +437,7 @@ internal sealed class BpaCommand : ICommandModule
             OptionalModelArgument(),
             new Option<bool>("--save") { Description = "Save model after removing rule" }
         };
-        command.SetAction(_ => UnsupportedRulesAction("rm"));
+        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "rm"));
         return command;
     }
 
@@ -510,14 +510,13 @@ internal sealed class BpaCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var model,
                     out var recentExit))
                 return recentExit;
-            var model = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
 
             var result = await new BpaRulesIgnoreHandler(_providers, _services.Mutations).HandleAsync(
                 new BpaRulesIgnoreRequest(
@@ -544,9 +543,10 @@ internal sealed class BpaCommand : ICommandModule
         {
             new Option<bool>("--force") { Description = "Overwrite an existing rules file" }
         };
-        command.SetAction(_ => UnsupportedRulesAction("init"));
+        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "init"));
         return command;
     }
+
 
     private static Argument<string?> OptionalModelArgument()
         => new("model")
@@ -555,9 +555,15 @@ internal sealed class BpaCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
 
-    private static int UnsupportedRulesAction(string command)
+    private static int UnsupportedRulesAction(System.CommandLine.ParseResult parseResult, string command)
     {
-        Console.Error.WriteLine($"Command 'bpa rules {command}' is not implemented yet.");
+        ErrorOutput.Write(
+            [new Tomix.Core.Diagnostics.TomixDiagnostic(
+                "TOMIX_NOT_IMPLEMENTED",
+                Tomix.Core.Diagnostics.DiagnosticSeverity.Error,
+                $"Command 'bpa rules {command}' is not implemented yet.",
+                "Edit the rules file directly, or follow https://github.com/bgarcevic/tomix-cli/issues for progress.")],
+            parseResult.GetValue(GlobalOptions.ErrorFormat));
         return 1;
     }
 }

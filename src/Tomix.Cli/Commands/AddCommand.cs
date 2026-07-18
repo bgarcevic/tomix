@@ -196,19 +196,18 @@ internal sealed class AddCommand : ICommandModule
             var value = InputValueResolver.Resolve(parsed.PrimaryValue, file);
             IReadOnlyList<ModelPropertyAssignment> properties = parsed.Properties;
 
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var reference,
                     out var recentExit))
                 return recentExit;
-            var reference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var label = MutationSpinnerLabel.For(
-                parseResult.GetValue(saveOption),
-                parseResult.GetValue(saveToOption),
-                parseResult.GetValue(stageOption),
-                parseResult.GetValue(revertOption));
+    parseResult.GetValue(saveOption),
+    parseResult.GetValue(saveToOption),
+    parseResult.GetValue(stageOption),
+    parseResult.GetValue(revertOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,

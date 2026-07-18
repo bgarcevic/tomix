@@ -18,7 +18,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - `/src/Tomix.Core` - Core abstractions, diagnostics, results, and shared domain types
 - `/src/Tomix.Provider.*` - Model providers for TOM and TMDL
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
-- `/samples` - Sample models, rules, tests, and CI workflows
+- `/samples` - Sample models used by tests and documentation
 - `/docs` - CLI UX guidelines, color strategy, error codes, and detailed contributor context
 
 ## Routing

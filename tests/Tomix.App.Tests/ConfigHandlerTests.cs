@@ -72,6 +72,25 @@ public sealed class ConfigHandlerTests
     }
 
     [Fact]
+    public void Load_CorruptJson_ThrowsActionableError()
+    {
+        NewHandler(out var path);
+        try
+        {
+            File.WriteAllText(path, "{ not json");
+
+            var ex = Assert.Throws<InvalidOperationException>(() => new TomixConfigStore(path).Load());
+
+            Assert.Contains(path, ex.Message);
+            Assert.Contains("tx config set", ex.Message);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Set_ThenGet_RoundTripsValue()
     {
         var handler = NewHandler(out var path);

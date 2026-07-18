@@ -18,6 +18,8 @@ jobs:
             rid: linux-x64
           - os: windows-latest
             rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -26,10 +28,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore
       # Formatting is platform-independent; verify on one leg to keep CI fast.
       - run: dotnet format --verify-no-changes --no-restore
         if: matrix.os == 'ubuntu-latest'
-      # The warning baseline is zero (analyzer levels in .editorconfig); keep it that way.
-      - run: dotnet build -m:1 --configuration Release --no-restore -warnaserror
+      # The warning baseline is zero and enforced everywhere via TreatWarningsAsErrors
+      # in Directory.Build.props, so local builds fail the same way CI does.
+      - run: dotnet build -m:1 --configuration Release --no-restore
       - run: dotnet test -m:1 --configuration Release --no-build

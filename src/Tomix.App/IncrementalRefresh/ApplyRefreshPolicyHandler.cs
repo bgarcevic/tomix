@@ -50,7 +50,7 @@ public sealed class ApplyRefreshPolicyHandler
         try
         {
             await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
-            if (session is not IModelRefreshSession refresher)
+            if (session is not IRefreshPolicyApplySession refresher)
                 return TomixResult<RefreshPolicyApplyResult>.Fail(
                     "TOMIX_REFRESH_POLICY_UNSUPPORTED",
                     $"Provider session does not support applying refresh policies: {target.Value}",

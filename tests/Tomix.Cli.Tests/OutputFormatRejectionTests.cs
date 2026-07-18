@@ -26,7 +26,7 @@ public sealed class OutputFormatRejectionTests
             "connect" => new ConnectCommand(NoProviders, FakeWorkspaceCatalog.Empty, () => null, TestServices.Create()),
             "deploy" => new DeployCommand(NoProviders, TestServices.Create()),
             "diff" => new DiffCommand(NoProviders),
-            "doctor" => new DoctorCommand("0.0.0-test"),
+            "doctor" => new DoctorCommand("0.0.0-test", TestServices.Create().ConfigDirectory),
             "format" => new FormatCommand(NoProviders, new CompositeExpressionFormatterClient([]), TestServices.Create()),
             "get" => new GetCommand(NoProviders, TestServices.Create()),
             "init" => new InitCommand(),

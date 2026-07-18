@@ -74,6 +74,31 @@ public sealed class AtomicStateTests : IDisposable
     }
 
     [Fact]
+    public void StagingStore_ManifestFromNewerTomix_IsRejectedWithUpgradeHint()
+    {
+        var store = new StagingStore(_dir, "test-session");
+        var source = new ModelReference(Path.Combine(_dir, "model"));
+
+        PlantManifest(store, source, $$"""
+            {
+              "Version": {{StagingManifest.CurrentVersion + 1}},
+              "SessionId": "test-session",
+              "Source": "/model",
+              "SourceKind": "local",
+              "Serialization": "tmdl",
+              "WorkingCopy": "/tmp/working",
+              "CreatedUtc": "2026-01-01T00:00:00Z",
+              "UpdatedUtc": "2026-01-01T00:00:00Z",
+              "Ops": []
+            }
+            """);
+
+        var ex = Assert.Throws<StagingManifestCorruptException>(() => store.TryLoad(source));
+        Assert.Contains("newer tomix", ex.Message);
+        Assert.Contains("stage discard", ex.Message);
+    }
+
+    [Fact]
     public async Task StageHandler_CorruptManifest_SurfacesDiagnosticFromEveryCommand()
     {
         var store = new StagingStore(_dir, "test-session");

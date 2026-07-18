@@ -3,7 +3,6 @@ using Tomix.App.Diagnostics;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Bpa;
-using Tomix.Core.Configuration;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -14,12 +13,18 @@ public sealed class BpaRunHandler
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly MutationStores _stores;
     private readonly BpaUserRuleState _userRules;
+    private readonly string _configDirectory;
 
-    public BpaRunHandler(IEnumerable<IModelProvider> providers, MutationStores stores, BpaUserRuleState userRules)
+    public BpaRunHandler(
+        IEnumerable<IModelProvider> providers,
+        MutationStores stores,
+        BpaUserRuleState userRules,
+        string configDirectory)
     {
         _providers = providers.ToList();
         _stores = stores;
         _userRules = userRules;
+        _configDirectory = configDirectory;
     }
 
     public async Task<TomixResult<BpaRunResult>> HandleAsync(
@@ -142,7 +147,7 @@ public sealed class BpaRunHandler
         });
     }
 
-    private static async Task<(IReadOnlyList<BpaRule> Rules, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
+    private async Task<(IReadOnlyList<BpaRule> Rules, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
         BpaRunRequest request,
         ModelSnapshot snapshot,
         CancellationToken cancellationToken)
@@ -169,7 +174,7 @@ public sealed class BpaRunHandler
             }
         }
 
-        var userRulesPath = Path.Combine(TomixPaths.ConfigDirectory, "bpa-rules.json");
+        var userRulesPath = Path.Combine(_configDirectory, "bpa-rules.json");
         if (File.Exists(userRulesPath))
         {
             var userRules = BpaRuleLoader.LoadFromFile(userRulesPath);

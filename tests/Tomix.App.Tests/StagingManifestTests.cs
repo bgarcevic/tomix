@@ -101,5 +101,29 @@ public sealed class StagingManifestTests
         Assert.Null(deserialized.SourceEndpoint);
         Assert.Null(deserialized.SourceDatabase);
         Assert.Equal("local", deserialized.SourceKind);
+        // A manifest written before versioning IS version 1; it must never be rejected.
+        Assert.Equal(StagingManifest.CurrentVersion, deserialized.Version);
+    }
+
+    [Fact]
+    public void StagingManifest_Serializes_WithCurrentVersion()
+    {
+        var manifest = new StagingManifest(
+            SessionId: "s1",
+            Source: "/home/user/model.tmdl",
+            SourceKind: "local",
+            SourceEndpoint: null,
+            SourceDatabase: null,
+            Workspace: null,
+            Serialization: "tmdl",
+            WorkingCopy: "/tmp/working",
+            CreatedUtc: DateTimeOffset.UtcNow,
+            UpdatedUtc: DateTimeOffset.UtcNow,
+            SourceFingerprint: null,
+            Ops: []);
+
+        var json = JsonSerializer.Serialize(manifest);
+
+        Assert.Contains($"\"Version\":{StagingManifest.CurrentVersion}", json);
     }
 }

@@ -11,7 +11,7 @@ All colors are chosen for readability on both dark and light terminal background
 | Title   | Sage    | `#3E9287` | `MyCli`                    | App names, section headers   |
 | Command | Default | —         | `mycli build`              | Commands (bold, no color)    |
 | Option  | Lav     | `#8E7BB8` | `--project`                | Flags and options            |
-| Value   | Sand    | `#B08440` | `api-service`              | IDs, names, literals         |
+| Value   | Terra   | `#B5805C` | `api-service`              | IDs, names, literals         |
 | Path    | Harbor  | `#4E8AB5` | `./src/api-service`        | Files and folders            |
 | Success | Moss    | `#5C9D52` | `OK Project initialized`   | Completed actions            |
 | Warning | Amber   | `#B5832F` | `WARN Config not found`    | Recoverable issues           |
@@ -31,7 +31,7 @@ internal static class Palette
 {
     public static readonly Color Sage   = new(0x3E, 0x92, 0x87);
     public static readonly Color Lav    = new(0x8E, 0x7B, 0xB8);
-    public static readonly Color Sand   = new(0xB0, 0x84, 0x40);
+    public static readonly Color Terra  = new(0xB5, 0x80, 0x5C);
     public static readonly Color Harbor = new(0x4E, 0x8A, 0xB5);
     public static readonly Color Moss   = new(0x5C, 0x9D, 0x52);
     public static readonly Color Amber  = new(0xB5, 0x83, 0x2F);
@@ -84,7 +84,8 @@ All output helpers live in `src/Tomix.Cli/Output/Styling.cs`. Use these instead 
 | `Styling.Error(text)`                   | Rose bold                                |
 | `Styling.Muted(text)`                   | Slate                                    |
 | `Styling.Path(text)`                    | Harbor                                   |
-| `Styling.Value(text)`                   | Sand                                     |
+| `Styling.Value(text)`                   | Terra                                    |
+| `Styling.Option(text)`                  | Lav                                      |
 | `Styling.KeyValue(label, value)`        | Bold label + plain value                 |
 | `Styling.Guidance(text)`                | Slate                                    |
 | `Styling.MarkupEscape(text)`            | Escapes `[` and `]` for Spectre markup  |

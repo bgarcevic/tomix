@@ -72,11 +72,11 @@ internal sealed class ValidateCommand : ICommandModule
 
             var errorsOnly = parseResult.GetValue(errorsOnlyOption);
 
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var model,
                     out var recentExit))
                 return recentExit;
 
@@ -84,7 +84,7 @@ internal sealed class ValidateCommand : ICommandModule
                 "Validating model...",
                 () => new ValidateModelHandler(_providers).HandleAsync(
                     new ValidateModelRequest(
-                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
+                        model,
                         errorsOnly,
                         parseResult.GetValue(noWarningsOption) || errorsOnly,
                         parseResult.GetValue(serverOnlyOption)),

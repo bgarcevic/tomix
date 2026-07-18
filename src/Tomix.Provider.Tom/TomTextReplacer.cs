@@ -31,221 +31,129 @@ internal sealed class TomTextReplacer
             operations.Select(o => o.Preview).ToList());
     }
 
+    /// <summary>
+    /// Single model walk; each object yields the property sites belonging to the requested
+    /// scope. Under scope "all" the previews therefore group by object, not by property kind.
+    /// </summary>
     private IEnumerable<ReplaceOperation> BuildReplaceOperations(ModelReplaceRequest request)
     {
         var scope = NormalizeReplaceScope(request.Scope);
 
-        if (scope is "all" or "names")
-        {
-            foreach (var operation in BuildNameReplaceOperations(request))
-                yield return operation;
-        }
-
-        if (scope is "all" or "expressions")
-        {
-            foreach (var operation in BuildExpressionReplaceOperations(request))
-                yield return operation;
-        }
-
-        if (scope is "all" or "descriptions")
-        {
-            foreach (var operation in BuildDescriptionReplaceOperations(request))
-                yield return operation;
-        }
-
-        if (scope is "all" or "displayfolders")
-        {
-            foreach (var operation in BuildDisplayFolderReplaceOperations(request))
-                yield return operation;
-        }
-
-        if (scope is "all" or "formatstrings")
-        {
-            foreach (var operation in BuildFormatStringReplaceOperations(request))
-                yield return operation;
-        }
-
         // Annotations are explicit-only: values are often tool-generated JSON, so a blanket
         // '--in all' replace must not rewrite them.
-        if (scope is "annotations")
-        {
-            foreach (var operation in BuildAnnotationReplaceOperations(request))
-                yield return operation;
-        }
-    }
+        bool In(string candidate) => scope == candidate || (scope == "all" && candidate != "annotations");
 
-    private IEnumerable<ReplaceOperation> BuildAnnotationReplaceOperations(ModelReplaceRequest request)
-    {
-        foreach (var (path, annotations) in EnumerateAnnotationOwners())
+        ReplaceOperation Op(string path, string property, string? value, Action<string> apply)
+            => ReplaceProperty(path, property, value, apply, request);
+
+        IEnumerable<ReplaceOperation> AnnotationOps(string path, IEnumerable<Annotation> annotations)
         {
             foreach (var annotation in annotations)
             {
-                var value = annotation;
-                yield return ReplaceProperty(
-                    path, $"Annotation:{annotation.Name}", annotation.Value, v => value.Value = v, request);
+                var target = annotation;
+                yield return Op(path, $"Annotation:{annotation.Name}", target.Value, v => target.Value = v);
             }
         }
-    }
 
-    private IEnumerable<(string Path, IEnumerable<Annotation> Annotations)> EnumerateAnnotationOwners()
-    {
-        yield return (".", _database.Model.Annotations);
-
-        foreach (var table in _database.Model.Tables)
+        if (In("annotations"))
         {
-            var tablePath = Segment(table.Name);
-            yield return (tablePath, table.Annotations);
-
-            foreach (var measure in table.Measures)
-                yield return ($"{tablePath}/{Segment(measure.Name)}", measure.Annotations);
-
-            foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
-                yield return ($"{tablePath}/{Segment(column.Name)}", column.Annotations);
-
-            foreach (var hierarchy in table.Hierarchies)
-                yield return ($"{tablePath}/{Segment(hierarchy.Name)}", hierarchy.Annotations);
-
-            foreach (var partition in table.Partitions)
-                yield return ($"{tablePath}/Partitions/{Segment(partition.Name)}", partition.Annotations);
+            foreach (var op in AnnotationOps(".", _database.Model.Annotations))
+                yield return op;
         }
 
-        foreach (var role in _database.Model.Roles)
-            yield return ($"Roles/{Segment(role.Name)}", role.Annotations);
-    }
-
-    private IEnumerable<ReplaceOperation> BuildNameReplaceOperations(ModelReplaceRequest request)
-    {
         foreach (var table in _database.Model.Tables)
         {
             var tablePath = Segment(table.Name);
-
-            yield return ReplaceProperty(tablePath, "Name", table.Name, value => table.Name = value, request);
+            if (In("names"))
+                yield return Op(tablePath, "Name", table.Name, v => table.Name = v);
+            if (In("descriptions"))
+                yield return Op(tablePath, "Description", table.Description, v => table.Description = v);
+            if (In("annotations"))
+            {
+                foreach (var op in AnnotationOps(tablePath, table.Annotations))
+                    yield return op;
+            }
 
             foreach (var measure in table.Measures)
             {
-                var measurePath = $"{tablePath}/{Segment(measure.Name)}";
-                yield return ReplaceProperty(measurePath, "Name", measure.Name, value => measure.Name = value, request);
+                var path = $"{tablePath}/{Segment(measure.Name)}";
+                if (In("names"))
+                    yield return Op(path, "Name", measure.Name, v => measure.Name = v);
+                if (In("expressions"))
+                    yield return Op(path, "Expression", measure.Expression, v => measure.Expression = v);
+                if (In("descriptions"))
+                    yield return Op(path, "Description", measure.Description, v => measure.Description = v);
+                if (In("displayfolders"))
+                    yield return Op(path, "DisplayFolder", measure.DisplayFolder, v => measure.DisplayFolder = v);
+                if (In("formatstrings"))
+                    yield return Op(path, "FormatString", measure.FormatString, v => measure.FormatString = v);
+                if (In("annotations"))
+                {
+                    foreach (var op in AnnotationOps(path, measure.Annotations))
+                        yield return op;
+                }
             }
 
             foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
             {
-                var columnPath = $"{tablePath}/{Segment(column.Name)}";
-                yield return ReplaceProperty(columnPath, "Name", column.Name, value => column.Name = value, request);
+                var path = $"{tablePath}/{Segment(column.Name)}";
+                if (In("names"))
+                    yield return Op(path, "Name", column.Name, v => column.Name = v);
+                if (In("expressions") && column is CalculatedColumn calculated)
+                    yield return Op(path, "Expression", calculated.Expression, v => calculated.Expression = v);
+                if (In("descriptions"))
+                    yield return Op(path, "Description", column.Description, v => column.Description = v);
+                if (In("displayfolders"))
+                    yield return Op(path, "DisplayFolder", column.DisplayFolder, v => column.DisplayFolder = v);
+                if (In("formatstrings"))
+                    yield return Op(path, "FormatString", column.FormatString, v => column.FormatString = v);
+                if (In("annotations"))
+                {
+                    foreach (var op in AnnotationOps(path, column.Annotations))
+                        yield return op;
+                }
             }
 
             foreach (var hierarchy in table.Hierarchies)
             {
-                var hierarchyPath = $"{tablePath}/{Segment(hierarchy.Name)}";
-                yield return ReplaceProperty(hierarchyPath, "Name", hierarchy.Name, value => hierarchy.Name = value, request);
-            }
-        }
-
-        foreach (var role in _database.Model.Roles)
-        {
-            var rolePath = $"Roles/{Segment(role.Name)}";
-            yield return ReplaceProperty(rolePath, "Name", role.Name, value => role.Name = value, request);
-        }
-    }
-
-    private IEnumerable<ReplaceOperation> BuildExpressionReplaceOperations(ModelReplaceRequest request)
-    {
-        foreach (var table in _database.Model.Tables)
-        {
-            var tablePath = Segment(table.Name);
-            foreach (var measure in table.Measures)
-            {
-                var measurePath = $"{tablePath}/{Segment(measure.Name)}";
-                yield return ReplaceProperty(measurePath, "Expression", measure.Expression, value => measure.Expression = value, request);
-            }
-
-            foreach (var column in table.Columns.OfType<CalculatedColumn>())
-            {
-                var columnPath = $"{tablePath}/{Segment(column.Name)}";
-                yield return ReplaceProperty(columnPath, "Expression", column.Expression, value => column.Expression = value, request);
+                var path = $"{tablePath}/{Segment(hierarchy.Name)}";
+                if (In("names"))
+                    yield return Op(path, "Name", hierarchy.Name, v => hierarchy.Name = v);
+                if (In("descriptions"))
+                    yield return Op(path, "Description", hierarchy.Description, v => hierarchy.Description = v);
+                if (In("displayfolders"))
+                    yield return Op(path, "DisplayFolder", hierarchy.DisplayFolder, v => hierarchy.DisplayFolder = v);
+                if (In("annotations"))
+                {
+                    foreach (var op in AnnotationOps(path, hierarchy.Annotations))
+                        yield return op;
+                }
             }
 
             foreach (var partition in table.Partitions)
             {
-                var partitionPath = $"{tablePath}/Partitions/{Segment(partition.Name)}";
-                if (partition.Source is MPartitionSource source)
-                    yield return ReplaceProperty(partitionPath, "Expression", source.Expression, value => source.Expression = value, request);
-            }
-        }
-    }
-
-    private IEnumerable<ReplaceOperation> BuildDescriptionReplaceOperations(ModelReplaceRequest request)
-    {
-        foreach (var table in _database.Model.Tables)
-        {
-            var tablePath = Segment(table.Name);
-            yield return ReplaceProperty(tablePath, "Description", table.Description, value => table.Description = value, request);
-
-            foreach (var measure in table.Measures)
-            {
-                var measurePath = $"{tablePath}/{Segment(measure.Name)}";
-                yield return ReplaceProperty(measurePath, "Description", measure.Description, value => measure.Description = value, request);
-            }
-
-            foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
-            {
-                var columnPath = $"{tablePath}/{Segment(column.Name)}";
-                yield return ReplaceProperty(columnPath, "Description", column.Description, value => column.Description = value, request);
-            }
-
-            foreach (var hierarchy in table.Hierarchies)
-            {
-                var hierarchyPath = $"{tablePath}/{Segment(hierarchy.Name)}";
-                yield return ReplaceProperty(hierarchyPath, "Description", hierarchy.Description, value => hierarchy.Description = value, request);
+                var path = $"{tablePath}/Partitions/{Segment(partition.Name)}";
+                if (In("expressions") && partition.Source is MPartitionSource source)
+                    yield return Op(path, "Expression", source.Expression, v => source.Expression = v);
+                if (In("annotations"))
+                {
+                    foreach (var op in AnnotationOps(path, partition.Annotations))
+                        yield return op;
+                }
             }
         }
 
         foreach (var role in _database.Model.Roles)
         {
-            var rolePath = $"Roles/{Segment(role.Name)}";
-            yield return ReplaceProperty(rolePath, "Description", role.Description, value => role.Description = value, request);
-        }
-    }
-
-    private IEnumerable<ReplaceOperation> BuildDisplayFolderReplaceOperations(ModelReplaceRequest request)
-    {
-        foreach (var table in _database.Model.Tables)
-        {
-            var tablePath = Segment(table.Name);
-            foreach (var measure in table.Measures)
+            var path = $"Roles/{Segment(role.Name)}";
+            if (In("names"))
+                yield return Op(path, "Name", role.Name, v => role.Name = v);
+            if (In("descriptions"))
+                yield return Op(path, "Description", role.Description, v => role.Description = v);
+            if (In("annotations"))
             {
-                var measurePath = $"{tablePath}/{Segment(measure.Name)}";
-                yield return ReplaceProperty(measurePath, "DisplayFolder", measure.DisplayFolder, value => measure.DisplayFolder = value, request);
-            }
-
-            foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
-            {
-                var columnPath = $"{tablePath}/{Segment(column.Name)}";
-                yield return ReplaceProperty(columnPath, "DisplayFolder", column.DisplayFolder, value => column.DisplayFolder = value, request);
-            }
-
-            foreach (var hierarchy in table.Hierarchies)
-            {
-                var hierarchyPath = $"{tablePath}/{Segment(hierarchy.Name)}";
-                yield return ReplaceProperty(hierarchyPath, "DisplayFolder", hierarchy.DisplayFolder, value => hierarchy.DisplayFolder = value, request);
-            }
-        }
-    }
-
-    private IEnumerable<ReplaceOperation> BuildFormatStringReplaceOperations(ModelReplaceRequest request)
-    {
-        foreach (var table in _database.Model.Tables)
-        {
-            var tablePath = Segment(table.Name);
-            foreach (var measure in table.Measures)
-            {
-                var measurePath = $"{tablePath}/{Segment(measure.Name)}";
-                yield return ReplaceProperty(measurePath, "FormatString", measure.FormatString, value => measure.FormatString = value, request);
-            }
-
-            foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
-            {
-                var columnPath = $"{tablePath}/{Segment(column.Name)}";
-                yield return ReplaceProperty(columnPath, "FormatString", column.FormatString, value => column.FormatString = value, request);
+                foreach (var op in AnnotationOps(path, role.Annotations))
+                    yield return op;
             }
         }
     }

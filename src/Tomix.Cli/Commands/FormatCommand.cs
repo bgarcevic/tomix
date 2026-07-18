@@ -126,11 +126,11 @@ internal sealed class FormatCommand : ICommandModule
 
             var expression = InputValueResolver.Resolve(parseResult.GetValue(expressionOption));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var model,
                     out var recentExit))
                 return recentExit;
 
@@ -138,7 +138,7 @@ internal sealed class FormatCommand : ICommandModule
                 "Formatting...",
                 () => new FormatModelHandler(_providers, _formatter, _services.Mutations).HandleAsync(
                     new FormatModelRequest(
-                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
+                        model,
                         expression,
                         parseResult.GetValue(pathOption),
                         parseResult.GetValue(langOption) ?? "",

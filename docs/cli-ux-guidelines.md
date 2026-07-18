@@ -69,8 +69,8 @@ the bottom for where each concern lives.
   semantic roles only. Never hard-code ANSI or markup in commands.
 - Disable color when: stdout/stderr is not a TTY (check each stream separately),
   `NO_COLOR` is set and non-empty, `TERM=dumb`, `--no-color`/config says so.
-  [tomix: config handled in Program.cs; NO_COLOR + TERM are gaps — verify what
-  Spectre detects natively before adding checks.]
+  [tomix: NO_COLOR (non-empty) and config are handled in Program.cs; Spectre
+  detects `TERM=dumb` and redirected output natively.]
 - No spinners or animations when not a TTY (CI logs fill with frames otherwise).
 - Don't print internals only the authors understand; debug detail belongs behind
   `--verbose`, not in default stderr.

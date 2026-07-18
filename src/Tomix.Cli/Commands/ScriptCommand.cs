@@ -119,14 +119,19 @@ internal sealed class ScriptCommand : ICommandModule
             var explicitModel = GlobalOptions.ModelValue(parseResult)
                 ?? parseResult.GetValue(modelArgument)
                 ?? CollectModelArgument("script");
-            if (!RecentConnections.TryGetSource(parseResult, explicitModel, _services.State, out var source, out var recentExit))
+            if (!RecentConnections.TryResolveModel(
+                    parseResult,
+                    explicitModel,
+                    _services.State,
+                    out var model,
+                    out var recentExit))
                 return recentExit;
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Running script...",
                 () => new ScriptHandler(_providers, _services.Mutations).HandleAsync(
                     new ScriptRunRequest(
-                        RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server),
+                        model,
                         scriptFiles,
                         expressions,
                         parseResult.GetValue(dryRunOption),

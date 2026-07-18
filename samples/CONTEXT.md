@@ -1,6 +1,12 @@
 # samples
 
-Small sample models, rules, tests, and CI examples.
+Small sample models used by tests and documentation.
+
+## Contents
+
+- `basic-tmdl/` — minimal TMDL folder model (3 tables, 4 measures); the primary test fixture.
+- `basic-tmdl.bim` — the same model as a single BIM file.
+- `Artificial Intelligence Sample.*` — a PBIP project (report + semantic model) for realistic-scale scenarios.
 
 ## Responsibilities
 
@@ -24,5 +30,4 @@ Small sample models, rules, tests, and CI examples.
 
 ## Naming
 
-- Use kebab-case folder names.
-- Example: `basic-bim`, `basic-tmdl`, `github-actions`.
+- Use kebab-case folder names for new samples (e.g. `basic-tmdl`).

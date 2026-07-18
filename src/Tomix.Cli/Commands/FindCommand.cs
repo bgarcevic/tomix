@@ -78,14 +78,13 @@ internal sealed class FindCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "find", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _services.State,
-                    out var source,
+                    out var reference,
                     out var recentExit))
                 return recentExit;
-            var reference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var result = await CliSpinner.RunAsync(
                 "Searching...",
                 () => new FindModelHandler(_providers).HandleAsync(

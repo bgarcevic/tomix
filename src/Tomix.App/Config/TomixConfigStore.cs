@@ -28,7 +28,18 @@ public sealed class TomixConfigStore
         if (string.IsNullOrWhiteSpace(json))
             return NewMap();
 
-        var data = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+        Dictionary<string, string>? data;
+        try
+        {
+            data = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+        }
+        catch (JsonException ex)
+        {
+            // Config is user-authored; silently resetting it would lose settings, so
+            // surface the corruption instead of self-healing (same policy as profiles).
+            throw new InvalidOperationException(
+                $"Config file is corrupt: {_path}. Fix or delete it, then re-create settings with 'tx config set'.", ex);
+        }
 
         return data is null
             ? NewMap()

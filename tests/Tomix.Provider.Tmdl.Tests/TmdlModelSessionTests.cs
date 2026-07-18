@@ -84,6 +84,7 @@ public sealed class TmdlModelSessionTests
     [Theory]
     [InlineData(typeof(IModelQuerySession))]
     [InlineData(typeof(IModelRefreshSession))]
+    [InlineData(typeof(IRefreshPolicyApplySession))]
     public void TmdlModelSession_DoesNotImplementLiveServerCapability(Type capability)
         => Assert.False(capability.IsAssignableFrom(typeof(TmdlModelSession)),
             $"a file-backed TMDL session must not claim {capability.Name}");

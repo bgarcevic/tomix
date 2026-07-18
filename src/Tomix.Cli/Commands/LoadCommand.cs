@@ -36,14 +36,13 @@ internal sealed class LoadCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var path = parseResult.GetValue(modelArgument);
-            if (!RecentConnections.TryGetSource(
+            if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? path,
                     _services.State,
-                    out var source,
+                    out var reference,
                     out var recentExit))
                 return recentExit;
-            var reference = RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server);
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
 

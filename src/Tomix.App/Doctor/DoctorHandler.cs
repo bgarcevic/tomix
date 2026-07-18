@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Tomix.Core.Configuration;
 using Tomix.Core.Doctor;
 using Tomix.Core.Results;
 
@@ -7,6 +6,14 @@ namespace Tomix.App.Doctor;
 
 public sealed class DoctorHandler
 {
+    private readonly string _configDirectory;
+
+    /// <param name="configDirectory">
+    /// The resolved config directory from the composition root, so doctor reports the same
+    /// location every other command uses instead of re-reading the environment.
+    /// </param>
+    public DoctorHandler(string configDirectory) => _configDirectory = configDirectory;
+
     public TomixResult<DoctorResult> Handle(string version)
     {
         var checks = new List<DoctorCheck>();
@@ -21,7 +28,7 @@ public sealed class DoctorHandler
             Status: DoctorCheckStatus.Pass,
             Message: RuntimeInformation.OSDescription));
 
-        var configDirectory = TomixPaths.ConfigDirectory;
+        var configDirectory = _configDirectory;
 
         try
         {
