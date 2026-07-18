@@ -95,6 +95,16 @@ public sealed class MutationLifecycleSyncTests
     }
 
     [Fact]
+    public async Task SyncAsync_PropagatesCancellation_InsteadOfWarning()
+    {
+        // Ctrl-C during a sync must reach the top-level exit-130 handler, not be
+        // downgraded to a "sync failed" warning.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => WorkspaceSync.SyncAsync(
+                new CancellingDeploySession(), SyncTarget, force: false, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task BeginAsync_ResolvesSyncTarget_ForInPlaceSave()
     {
         var begin = await MutationLifecycle.BeginAsync(
@@ -156,6 +166,14 @@ public sealed class MutationLifecycleSyncTests
 
             throw new InvalidOperationException("Deploy failed for test purposes.");
         }
+
+        public string GenerateScript(ModelDeployRequest request) => "";
+    }
+
+    private sealed class CancellingDeploySession : IModelDeploySession
+    {
+        public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
+            => throw new OperationCanceledException();
 
         public string GenerateScript(ModelDeployRequest request) => "";
     }

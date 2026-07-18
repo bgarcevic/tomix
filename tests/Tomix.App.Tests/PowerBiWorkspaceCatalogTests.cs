@@ -82,8 +82,39 @@ public sealed class PowerBiWorkspaceCatalogTests
         Assert.Contains("500", ex.Message);
     }
 
+    [Fact]
+    public async Task ListWorkspaces_HttpTimeout_ReportsFailureNotCancellation()
+    {
+        // HttpClient's Timeout raises TaskCanceledException with the invocation token unset;
+        // that must surface as an API failure, not propagate as a cancellation (exit 130).
+        var handler = new ThrowingHandler(new TaskCanceledException("timeout"));
+        var catalog = new PowerBiWorkspaceCatalog(new HttpClient(handler), new FakeTokenProvider("tok"), Endpoint);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => catalog.ListWorkspacesAsync(CancellationToken.None));
+        Assert.Contains("timed out", ex.Message);
+    }
+
+    [Fact]
+    public async Task ListWorkspaces_UserCancellation_StillPropagates()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var handler = new ThrowingHandler(new TaskCanceledException("canceled"));
+        var catalog = new PowerBiWorkspaceCatalog(new HttpClient(handler), new FakeTokenProvider("tok"), Endpoint);
+
+        await Assert.ThrowsAsync<TaskCanceledException>(
+            () => catalog.ListWorkspacesAsync(cts.Token));
+    }
+
     private static HttpResponseMessage Json(HttpStatusCode status, string body)
         => new(status) { Content = new StringContent(body) };
+
+    private sealed class ThrowingHandler(Exception exception) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromException<HttpResponseMessage>(exception);
+    }
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
     {

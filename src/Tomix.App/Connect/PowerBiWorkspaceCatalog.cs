@@ -53,7 +53,21 @@ public sealed class PowerBiWorkspaceCatalog : IWorkspaceCatalog
                 HttpMethod.Get, $"{_endpoint}?%24top={_pageSize}&%24skip={skip}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // HttpClient's Timeout surfaces as TaskCanceledException; without the invocation
+                // token set, this is an endpoint timeout — an API failure, not a user interrupt
+                // (which must keep propagating to the exit-130 path).
+                throw new InvalidOperationException(
+                    $"Power BI API request timed out after {_httpClient.Timeout.TotalSeconds:0} seconds listing workspaces.");
+            }
+
+            using var _ = response;
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)

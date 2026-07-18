@@ -36,7 +36,7 @@ internal static class WorkspaceSync
 
             return (true, targetLabel, null);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, targetLabel,
                 $"Workspace sync failed: {ex.Message} "

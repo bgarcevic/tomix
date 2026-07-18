@@ -52,7 +52,22 @@ public sealed class PowerQueryFormatterApiClient : IExpressionFormatterClient
 
             return ParseResponse(body, request.Expression);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Genuine cancellation (Ctrl-C): propagate to the exit-130 path.
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // HttpClient's Timeout also surfaces as TaskCanceledException; without the
+            // invocation token set, this is an endpoint timeout — a formatter failure,
+            // not a user interrupt.
+            return new ExpressionFormatResponse(
+                false,
+                request.Expression,
+                [$"Power Query formatter request timed out after {_httpClient.Timeout.TotalSeconds:0} seconds."]);
+        }
+        catch (Exception ex)
         {
             return new ExpressionFormatResponse(
                 false,
