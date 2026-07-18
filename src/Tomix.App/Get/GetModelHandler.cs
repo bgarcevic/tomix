@@ -1,3 +1,4 @@
+using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
@@ -25,35 +26,38 @@ public sealed class GetModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        await using var session = await provider.OpenAsync(request.Model, cancellationToken);
-        var snapshot = await session.GetSnapshotAsync(cancellationToken);
-        var matches = ModelObjectLookup.Find(snapshot, request.Path, request.Type).ToList();
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+        {
+            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
+            var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            var matches = ModelObjectLookup.Find(snapshot, request.Path, request.Type).ToList();
 
-        if (matches.Count == 0)
-            return TomixResult<GetModelResult>.Fail(
-                code: "TOMIX_OBJECT_NOT_FOUND",
-                message: ModelObjectLookup.NotFoundMessage(request.Path),
-                exitCode: 1,
-                hint: "Run 'tx ls' to list available objects, or 'tx ls Sa*' to filter.");
+            if (matches.Count == 0)
+                return TomixResult<GetModelResult>.Fail(
+                    code: "TOMIX_OBJECT_NOT_FOUND",
+                    message: ModelObjectLookup.NotFoundMessage(request.Path),
+                    exitCode: 1,
+                    hint: "Run 'tx ls' to list available objects, or 'tx ls Sa*' to filter.");
 
-        if (matches.Count > 1)
-            return TomixResult<GetModelResult>.Fail(
-                code: "TOMIX_OBJECT_AMBIGUOUS",
-                message: AmbiguousMatchMessage.For(request.Path, matches),
-                exitCode: 1,
-                hint: AmbiguousMatchMessage.Hint);
+            if (matches.Count > 1)
+                return TomixResult<GetModelResult>.Fail(
+                    code: "TOMIX_OBJECT_AMBIGUOUS",
+                    message: AmbiguousMatchMessage.For(request.Path, matches),
+                    exitCode: 1,
+                    hint: AmbiguousMatchMessage.Hint);
 
-        var obj = matches[0];
-        var properties = ModelPropertyCatalog.Project(obj);
+            var obj = matches[0];
+            var properties = ModelPropertyCatalog.Project(obj);
 
-        if (!string.IsNullOrWhiteSpace(request.Query))
-            properties = ProjectSingleProperty(properties, request.Query);
+            if (!string.IsNullOrWhiteSpace(request.Query))
+                properties = ProjectSingleProperty(properties, request.Query);
 
-        return TomixResult<GetModelResult>.Ok(new GetModelResult(
-            ModelObjectProjection.KindLabel(obj.Kind),
-            obj.Path,
-            properties,
-            obj));
+            return TomixResult<GetModelResult>.Ok(new GetModelResult(
+                ModelObjectProjection.KindLabel(obj.Kind),
+                obj.Path,
+                properties,
+                obj));
+        });
     }
 
     private static IReadOnlyDictionary<string, object?> ProjectSingleProperty(

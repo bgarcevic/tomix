@@ -1,5 +1,4 @@
 using Tomix.App.Diagnostics;
-using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
 using Tomix.Core.Properties;
@@ -27,7 +26,7 @@ public sealed class LsModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        try
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
             await using var session = await provider.OpenAsync(request.Model, cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
@@ -43,19 +42,6 @@ public sealed class LsModelHandler
 
             return TomixResult<LsModelResult>.Ok(
                 new LsModelResult(snapshot.Name, snapshot.CompatibilityLevel, matches));
-        }
-        catch (AuthenticationRequiredException ex)
-        {
-            return TomixResult<LsModelResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
-                hint: "Run 'tx auth login' to authenticate, or use --auth spn for service principal.");
-        }
-        catch (Exception ex) when (request.Model.IsRemote && ex is not OperationCanceledException)
-        {
-            return TomixResult<LsModelResult>.Fail(
-                "TOMIX_CONNECT_FAILED",
-                RemoteConnectError.Describe(request.Model.Value, ex),
-                exitCode: 1,
-                hint: "Verify the server URL and credentials.");
-        }
+        });
     }
 }

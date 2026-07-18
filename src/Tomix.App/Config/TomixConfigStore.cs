@@ -16,6 +16,8 @@ public sealed class TomixConfigStore
 
     public TomixConfigStore(string path) => _path = path;
 
+    public string FilePath => _path;
+
     public IDictionary<string, string> Load()
     {
         if (!File.Exists(_path))

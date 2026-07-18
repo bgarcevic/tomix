@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
@@ -42,37 +43,40 @@ public sealed class FindModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        await using var session = await provider.OpenAsync(request.Model, cancellationToken);
-        var snapshot = await session.GetSnapshotAsync(cancellationToken);
-
-        var matches = new List<FindMatch>();
-        foreach (var obj in ModelObjectProjection.Flatten(snapshot).Where(IsSearchableByDefault))
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
-            foreach (var (field, value) in SearchFields(obj, request.Scope))
+            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
+            var snapshot = await session.GetSnapshotAsync(cancellationToken);
+
+            var matches = new List<FindMatch>();
+            foreach (var obj in ModelObjectProjection.Flatten(snapshot).Where(IsSearchableByDefault))
             {
-                if (value is null || !TryMatch(
+                foreach (var (field, value) in SearchFields(obj, request.Scope))
+                {
+                    if (value is null || !TryMatch(
+                            value,
+                            request.Pattern,
+                            request.Regex,
+                            request.CaseSensitive,
+                            out var matchedText,
+                            out var line,
+                            out var position))
+                        continue;
+
+                    matches.Add(new FindMatch(
+                        obj.Path,
+                        ModelObjectProjection.KindLabel(obj.Kind),
+                        obj.Name,
+                        field,
+                        matchedText,
                         value,
-                        request.Pattern,
-                        request.Regex,
-                        request.CaseSensitive,
-                        out var matchedText,
-                        out var line,
-                        out var position))
-                    continue;
-
-                matches.Add(new FindMatch(
-                    obj.Path,
-                    ModelObjectProjection.KindLabel(obj.Kind),
-                    obj.Name,
-                    field,
-                    matchedText,
-                    value,
-                    line,
-                    position));
+                        line,
+                        position));
+                }
             }
-        }
 
-        return TomixResult<FindModelResult>.Ok(new FindModelResult(request.Pattern, matches));
+            return TomixResult<FindModelResult>.Ok(new FindModelResult(request.Pattern, matches));
+        });
     }
 
     private static bool IsSearchableByDefault(ModelObject obj)

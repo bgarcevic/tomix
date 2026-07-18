@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using Tomix.App.Diagnostics;
 using Tomix.App.Mutations;
 using Tomix.App.State;
-using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -80,72 +79,64 @@ public sealed class ScriptHandler
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
-            var summary = await session.GetSummaryAsync(cancellationToken);
-            var snapshot = await session.GetSnapshotAsync(cancellationToken);
-
-            if (request.DryRun)
+            // NotSupported/IO stay outside the guard so a remote failure of either kind keeps
+            // reporting TOMIX_CONNECT_FAILED, exactly as the previous flat catch order did.
+            return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
             {
-                stopwatch.Stop();
-                return TomixResult<ScriptRunResult>.Ok(DryRun(summary.Name, inputs));
-            }
+                await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
+                var summary = await session.GetSummaryAsync(cancellationToken);
+                var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
-            if (session is not IModelMutationSession mutator)
-                return TomixResult<ScriptRunResult>.Fail(
-                    "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
-                    $"Provider cannot mutate model: {context.EffectiveModel.Value}");
-
-            var messages = new List<ScriptMessage>();
-            for (var i = 0; i < inputs.Count; i++)
-            {
-                var input = inputs[i];
-                if (!ScriptExpressionEvaluator.TryEvaluate(snapshot, summary, input.Code, out var result, out var compileError, out var runtimeError))
+                if (request.DryRun)
                 {
                     stopwatch.Stop();
-                    return TomixResult<ScriptRunResult>.Ok(
-                        ScriptRunResult.Failed(
-                            summary.Name,
-                            (int)stopwatch.ElapsedMilliseconds,
-                            input.Source,
-                            i + 1,
-                            compileError is null ? [] : [compileError],
-                            runtimeError,
-                            messages),
-                        exitCode: 1);
+                    return TomixResult<ScriptRunResult>.Ok(DryRun(summary.Name, inputs));
                 }
 
-                if (result is not null)
-                    messages.Add(result);
-            }
+                if (session is not IModelMutationSession mutator)
+                    return TomixResult<ScriptRunResult>.Fail(
+                        "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
+                        $"Provider cannot mutate model: {context.EffectiveModel.Value}");
 
-            var outcome = await MutationLifecycle.CompleteAsync(
-                mutator, context, "script", $"script ({inputs.Count} inputs)", cancellationToken);
-            stopwatch.Stop();
+                var messages = new List<ScriptMessage>();
+                for (var i = 0; i < inputs.Count; i++)
+                {
+                    var input = inputs[i];
+                    if (!ScriptExpressionEvaluator.TryEvaluate(snapshot, summary, input.Code, out var result, out var compileError, out var runtimeError))
+                    {
+                        stopwatch.Stop();
+                        return TomixResult<ScriptRunResult>.Ok(
+                            ScriptRunResult.Failed(
+                                summary.Name,
+                                (int)stopwatch.ElapsedMilliseconds,
+                                input.Source,
+                                i + 1,
+                                compileError is null ? [] : [compileError],
+                                runtimeError,
+                                messages),
+                            exitCode: 1);
+                    }
 
-            return TomixResult<ScriptRunResult>.Ok(
-                ScriptRunResult.Executed(
-                    summary.Name,
-                    (int)stopwatch.ElapsedMilliseconds,
-                    inputs,
-                    messages,
-                    outcome.Saved,
-                    outcome.Staged,
-                    outcome.Synced,
-                    outcome.SyncTarget,
-                    outcome.SyncWarning));
-        }
-        catch (AuthenticationRequiredException ex)
-        {
-            return TomixResult<ScriptRunResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
-                hint: "Run 'tx auth login' to authenticate, or use --auth spn for service principal.");
-        }
-        catch (Exception ex) when (request.Model.IsRemote && ex is not OperationCanceledException)
-        {
-            return TomixResult<ScriptRunResult>.Fail(
-                "TOMIX_CONNECT_FAILED",
-                RemoteConnectError.Describe(request.Model.Value, ex),
-                exitCode: 1,
-                hint: "Verify the server URL and credentials.");
+                    if (result is not null)
+                        messages.Add(result);
+                }
+
+                var outcome = await MutationLifecycle.CompleteAsync(
+                    mutator, context, "script", $"script ({inputs.Count} inputs)", cancellationToken);
+                stopwatch.Stop();
+
+                return TomixResult<ScriptRunResult>.Ok(
+                    ScriptRunResult.Executed(
+                        summary.Name,
+                        (int)stopwatch.ElapsedMilliseconds,
+                        inputs,
+                        messages,
+                        outcome.Saved,
+                        outcome.Staged,
+                        outcome.Synced,
+                        outcome.SyncTarget,
+                        outcome.SyncWarning));
+            });
         }
         catch (NotSupportedException ex)
         {

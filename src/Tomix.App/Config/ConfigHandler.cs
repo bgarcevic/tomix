@@ -13,6 +13,16 @@ public sealed class ConfigHandler
 
     public ConfigHandler(TomixConfigStore store) => _store = store;
 
+    public TomixResult<ConfigInitResult> Init(bool force)
+    {
+        var created = force || !File.Exists(_store.FilePath);
+
+        if (created)
+            _store.Save(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+        return TomixResult<ConfigInitResult>.Ok(new ConfigInitResult(_store.FilePath, created));
+    }
+
     public TomixResult<ConfigListResult> List()
     {
         var sorted = _store.Load()

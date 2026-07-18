@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Tomix.App.Diagnostics;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Bpa;
@@ -65,77 +66,80 @@ public sealed class BpaRunHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
-        var snapshot = await session.GetSnapshotAsync(cancellationToken);
-
-        IReadOnlyList<BpaRule> rules;
-        IReadOnlyList<string> loadDiagnostics;
-        try
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
-            (rules, loadDiagnostics) = await LoadRulesAsync(request, snapshot, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
-        {
-            return TomixResult<BpaRunResult>.Fail(
-                "TOMIX_BPA_RULES_LOAD_FAILED",
-                ex.Message,
-                exitCode: 2);
-        }
+            await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
+            var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
-        var userDisabled = _userRules.GetDisabled().ToList();
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        var engine = new BpaEngine();
-        var result = engine.Evaluate(snapshot, new BpaEngineOptions(
-            rules,
-            request.PathFilter,
-            request.RuleIds,
-            userDisabled));
-        sw.Stop();
-
-        var runResult = result with
-        {
-            DurationMs = sw.ElapsedMilliseconds,
-            RuleLoadDiagnostics = loadDiagnostics.Count > 0 ? loadDiagnostics : null
-        };
-
-        if (request.Fix && runResult.Violations.Any(v => v.CanFix))
-        {
-            if (session is not IModelMutationSession mutationSession)
-                return TomixResult<BpaRunResult>.Fail(
-                    "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
-                    $"Provider cannot mutate model: {context.EffectiveModel.Value}");
-
-            var fixer = new BpaFixer();
-            var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules);
-
-            runResult = runResult with
+            IReadOnlyList<BpaRule> rules;
+            IReadOnlyList<string> loadDiagnostics;
+            try
             {
-                FixesApplied = fixResult.FixesApplied,
-                FixesSkipped = fixResult.FixesSkipped,
-                FixErrors = fixResult.Errors.Count > 0
-                    ? fixResult.Errors.Select(e => $"[{e.RuleId}] {e.ObjectPath}: {e.Reason}").ToList()
-                    : null
+                (rules, loadDiagnostics) = await LoadRulesAsync(request, snapshot, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
+            {
+                return TomixResult<BpaRunResult>.Fail(
+                    "TOMIX_BPA_RULES_LOAD_FAILED",
+                    ex.Message,
+                    exitCode: 2);
+            }
+
+            var userDisabled = _userRules.GetDisabled().ToList();
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var engine = new BpaEngine();
+            var result = engine.Evaluate(snapshot, new BpaEngineOptions(
+                rules,
+                request.PathFilter,
+                request.RuleIds,
+                userDisabled));
+            sw.Stop();
+
+            var runResult = result with
+            {
+                DurationMs = sw.ElapsedMilliseconds,
+                RuleLoadDiagnostics = loadDiagnostics.Count > 0 ? loadDiagnostics : null
             };
 
-            if (fixResult.FixesApplied > 0 && context.Mode is MutationMode.Save or MutationMode.Stage)
+            if (request.Fix && runResult.Violations.Any(v => v.CanFix))
             {
-                var outcome = await MutationLifecycle.CompleteAsync(
-                    mutationSession, context, "bpa-fix",
-                    $"bpa-fix {fixResult.FixesApplied} violations", cancellationToken);
+                if (session is not IModelMutationSession mutationSession)
+                    return TomixResult<BpaRunResult>.Fail(
+                        "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
+                        $"Provider cannot mutate model: {context.EffectiveModel.Value}");
+
+                var fixer = new BpaFixer();
+                var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules);
 
                 runResult = runResult with
                 {
-                    Saved = outcome.Saved,
-                    Staged = outcome.Staged,
-                    Synced = outcome.Synced,
-                    SyncTarget = outcome.SyncTarget,
-                    SyncWarning = outcome.SyncWarning
+                    FixesApplied = fixResult.FixesApplied,
+                    FixesSkipped = fixResult.FixesSkipped,
+                    FixErrors = fixResult.Errors.Count > 0
+                        ? fixResult.Errors.Select(e => $"[{e.RuleId}] {e.ObjectPath}: {e.Reason}").ToList()
+                        : null
                 };
-            }
-        }
 
-        return TomixResult<BpaRunResult>.Ok(runResult, exitCode: ShouldFail(runResult, failOnSeverity) ? 1 : 0);
+                if (fixResult.FixesApplied > 0 && context.Mode is MutationMode.Save or MutationMode.Stage)
+                {
+                    var outcome = await MutationLifecycle.CompleteAsync(
+                        mutationSession, context, "bpa-fix",
+                        $"bpa-fix {fixResult.FixesApplied} violations", cancellationToken);
+
+                    runResult = runResult with
+                    {
+                        Saved = outcome.Saved,
+                        Staged = outcome.Staged,
+                        Synced = outcome.Synced,
+                        SyncTarget = outcome.SyncTarget,
+                        SyncWarning = outcome.SyncWarning
+                    };
+                }
+            }
+
+            return TomixResult<BpaRunResult>.Ok(runResult, exitCode: ShouldFail(runResult, failOnSeverity) ? 1 : 0);
+        });
     }
 
     private static async Task<(IReadOnlyList<BpaRule> Rules, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(

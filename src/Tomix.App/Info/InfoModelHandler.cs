@@ -1,5 +1,4 @@
 using Tomix.App.Diagnostics;
-using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -25,29 +24,11 @@ public sealed class InfoModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        try
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
             await using var session = await provider.OpenAsync(request.Model, cancellationToken);
             var summary = await session.GetSummaryAsync(cancellationToken);
             return TomixResult<InfoModelResult>.Ok(new InfoModelResult(summary));
-        }
-        catch (InvalidOperationException ex)
-            when (request.Model.IsRemote && ex.Message.Contains("Database not found on endpoint"))
-        {
-            return TomixResult<InfoModelResult>.Fail("TOMIX_DATABASE_NOT_FOUND", ex.Message, exitCode: 1);
-        }
-        catch (AuthenticationRequiredException ex)
-        {
-            return TomixResult<InfoModelResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
-                hint: "Run 'tx auth login' to authenticate, or use --auth spn for service principal.");
-        }
-        catch (Exception ex) when (request.Model.IsRemote && ex is not OperationCanceledException)
-        {
-            return TomixResult<InfoModelResult>.Fail(
-                "TOMIX_CONNECT_FAILED",
-                RemoteConnectError.Describe(request.Model.Value, ex),
-                exitCode: 1,
-                hint: "Verify the server URL and credentials.");
-        }
+        });
     }
 }

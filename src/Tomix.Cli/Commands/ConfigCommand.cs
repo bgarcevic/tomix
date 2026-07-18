@@ -35,12 +35,13 @@ internal sealed class ConfigCommand : ICommandModule
 
         command.SetAction(parseResult =>
         {
-            Directory.CreateDirectory(_services.ConfigDirectory);
-            if (parseResult.GetValue(forceOption) || !File.Exists(_services.ConfigFilePath))
-                File.WriteAllText(_services.ConfigFilePath, "{\n}\n");
+            var formatValue = GlobalOptions.OutputFormatValue(parseResult);
 
-            AnsiConsole.MarkupLine(Styling.Path(_services.ConfigFilePath));
-            return 0;
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "config init", OutputFormats.Text, OutputFormats.Json))
+                return 2;
+
+            var result = new ConfigHandler(_services.ConfigStore).Init(parseResult.GetValue(forceOption));
+            return CommandOutput.Render(result, formatValue, RenderInit);
         });
 
         return command;
@@ -104,6 +105,9 @@ internal sealed class ConfigCommand : ICommandModule
 
         return command;
     }
+
+    private static void RenderInit(ConfigInitResult result)
+        => AnsiConsole.MarkupLine(Styling.Path(result.Path));
 
     private static void RenderList(ConfigListResult result)
     {

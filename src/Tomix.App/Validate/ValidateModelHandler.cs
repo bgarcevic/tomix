@@ -3,7 +3,6 @@ using Tomix.App.Dax;
 using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
 using Tomix.App.Mutations;
-using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -28,39 +27,36 @@ public sealed class ValidateModelHandler
                 exitCode: 2);
 
         var stopwatch = Stopwatch.StartNew();
-        LocalIssues issues;
         try
         {
-            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
-            var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+            {
+                await using var session = await provider.OpenAsync(request.Model, cancellationToken);
+                var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
-            issues = request.ServerOnly
-                ? new LocalIssues([], [])
-                : ValidateLocal(snapshot);
-        }
-        catch (AuthenticationRequiredException ex)
-        {
-            return TomixResult<ValidateModelResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
-                hint: "Run 'tx auth login' to authenticate, or use --auth spn for service principal.");
-        }
-        catch (Exception ex) when (request.Model.IsRemote && ex is not OperationCanceledException)
-        {
-            return TomixResult<ValidateModelResult>.Fail(
-                "TOMIX_CONNECT_FAILED",
-                RemoteConnectError.Describe(request.Model.Value, ex),
-                exitCode: 1,
-                hint: "Verify the server URL and credentials.");
+                var issues = request.ServerOnly
+                    ? new LocalIssues([], [])
+                    : ValidateLocal(snapshot);
+                return Complete(request, stopwatch, issues);
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // A local model that cannot even be loaded (e.g. TMDL with unresolvable references)
-            // is a validation failure, not a crash. Auth and remote-connect failures above stay
-            // diagnostics: they describe the connection, not the model.
-            issues = new LocalIssues(
+            // is a validation failure, not a crash. Auth and remote-connect failures in the guard
+            // stay diagnostics: they describe the connection, not the model.
+            var issues = new LocalIssues(
                 [new ValidationIssue("TOMIX_MODEL_LOAD_FAILED", ex.Message, request.Model.Value, Expression: null)],
                 []);
+            return Complete(request, stopwatch, issues);
         }
+    }
 
+    private static TomixResult<ValidateModelResult> Complete(
+        ValidateModelRequest request,
+        Stopwatch stopwatch,
+        LocalIssues issues)
+    {
         stopwatch.Stop();
 
         var result = new ValidateModelResult(

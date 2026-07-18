@@ -1,3 +1,4 @@
+using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -30,53 +31,56 @@ public sealed class DepsModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        await using var session = await provider.OpenAsync(request.Model, cancellationToken);
-        var snapshot = await session.GetSnapshotAsync(cancellationToken);
-        var graph = DependencyGraph.FromSnapshot(snapshot);
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+        {
+            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
+            var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            var graph = DependencyGraph.FromSnapshot(snapshot);
 
-        if (request.Unused)
+            if (request.Unused)
+                return TomixResult<DepsModelResult>.Ok(new DepsModelResult(
+                    Path: "",
+                    Type: "",
+                    Upstream: [],
+                    Downstream: [],
+                    Unused: graph.Unused(request.HiddenOnly)));
+
+            var targetMatches = ModelObjectLookup.Find(snapshot, request.Path!, request.Type).ToList();
+
+            if (targetMatches.Count == 0)
+                return TomixResult<DepsModelResult>.Fail(
+                    code: "TOMIX_OBJECT_NOT_FOUND",
+                    message: ModelObjectLookup.NotFoundMessage(request.Path!),
+                    exitCode: 1,
+                    hint: "Run 'tx ls' to list available objects, or 'tx ls Sa*' to filter.");
+
+            if (targetMatches.Count > 1)
+                return TomixResult<DepsModelResult>.Fail(
+                    code: "TOMIX_OBJECT_AMBIGUOUS",
+                    message: AmbiguousMatchMessage.For(request.Path!, targetMatches),
+                    exitCode: 1,
+                    hint: AmbiguousMatchMessage.Hint);
+
+            var target = targetMatches[0];
+            var maxDepth = request.MaxDepth > 0 ? request.MaxDepth : int.MaxValue;
+
+            var upstream = request.Deep
+                ? graph.Deep(target, upstream: true, maxDepth)
+                : graph.DirectUpstream(target);
+            var downstream = request.Deep
+                ? graph.Deep(target, upstream: false, maxDepth)
+                : graph.DirectDownstream(target);
+
+            if (request.UpstreamOnly)
+                downstream = [];
+            if (request.DownstreamOnly)
+                upstream = [];
+
             return TomixResult<DepsModelResult>.Ok(new DepsModelResult(
-                Path: "",
-                Type: "",
-                Upstream: [],
-                Downstream: [],
-                Unused: graph.Unused(request.HiddenOnly)));
-
-        var targetMatches = ModelObjectLookup.Find(snapshot, request.Path!, request.Type).ToList();
-
-        if (targetMatches.Count == 0)
-            return TomixResult<DepsModelResult>.Fail(
-                code: "TOMIX_OBJECT_NOT_FOUND",
-                message: ModelObjectLookup.NotFoundMessage(request.Path!),
-                exitCode: 1,
-                hint: "Run 'tx ls' to list available objects, or 'tx ls Sa*' to filter.");
-
-        if (targetMatches.Count > 1)
-            return TomixResult<DepsModelResult>.Fail(
-                code: "TOMIX_OBJECT_AMBIGUOUS",
-                message: AmbiguousMatchMessage.For(request.Path!, targetMatches),
-                exitCode: 1,
-                hint: AmbiguousMatchMessage.Hint);
-
-        var target = targetMatches[0];
-        var maxDepth = request.MaxDepth > 0 ? request.MaxDepth : int.MaxValue;
-
-        var upstream = request.Deep
-            ? graph.Deep(target, upstream: true, maxDepth)
-            : graph.DirectUpstream(target);
-        var downstream = request.Deep
-            ? graph.Deep(target, upstream: false, maxDepth)
-            : graph.DirectDownstream(target);
-
-        if (request.UpstreamOnly)
-            downstream = [];
-        if (request.DownstreamOnly)
-            upstream = [];
-
-        return TomixResult<DepsModelResult>.Ok(new DepsModelResult(
-            target.Path,
-            ModelObjectProjection.KindLabel(target.Kind),
-            upstream,
-            downstream));
+                target.Path,
+                ModelObjectProjection.KindLabel(target.Kind),
+                upstream,
+                downstream));
+        });
     }
 }

@@ -12,6 +12,7 @@
     <Project Path="tests/Tomix.App.Tests/Tomix.App.Tests.csproj" />
     <Project Path="tests/Tomix.Cli.Tests/Tomix.Cli.Tests.csproj" />
     <Project Path="tests/Tomix.Core.Tests/Tomix.Core.Tests.csproj" />
+    <Project Path="tests/Tomix.Provider.Tmdl.Tests/Tomix.Provider.Tmdl.Tests.csproj" />
     <Project Path="tests/Tomix.Provider.Tom.Tests/Tomix.Provider.Tom.Tests.csproj" />
     <Project Path="tests/Tomix.Provider.Vpax.Tests/Tomix.Provider.Vpax.Tests.csproj" />
   </Folder>

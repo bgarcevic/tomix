@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Tomix.App.Diagnostics;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -65,44 +66,47 @@ public sealed class BpaRulesListHandler
                 exitCode: 2);
         }
 
-        // When a model is supplied, rules listed in its model-level ignore annotation are disabled.
-        var disabled = await ReadDisabledRuleIdsAsync(request.Model, cancellationToken).ConfigureAwait(false);
-
-        var allRules = rules.Select(r =>
+        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
-            var isDisabled = disabled.Contains(r.Rule.Id);
-            return new BpaRuleInfo(
-                r.Source,
-                Status: isDisabled ? "disabled" : "active",
-                r.Rule.Id,
-                r.Rule.Name,
-                r.Rule.Category,
-                r.Rule.Severity,
-                string.Join(", ", r.Rule.Scope),
-                r.Rule.Description,
-                r.Rule.Expression,
-                r.Rule.FixExpression,
-                Enabled: !isDisabled);
-        }).ToList();
+            // When a model is supplied, rules listed in its model-level ignore annotation are disabled.
+            var disabled = await ReadDisabledRuleIdsAsync(request.Model, cancellationToken).ConfigureAwait(false);
 
-        var filteredRules = (request.DisabledOnly, request.IgnoredOnly, request.All) switch
-        {
-            (true, _, _) => allRules.Where(r => !r.Enabled).ToList(),
-            (_, true, _) => allRules.Where(r => !r.Enabled).ToList(),
-            (_, _, true) => allRules,
-            _ => allRules.Where(r => r.Enabled).ToList()
-        };
+            var allRules = rules.Select(r =>
+            {
+                var isDisabled = disabled.Contains(r.Rule.Id);
+                return new BpaRuleInfo(
+                    r.Source,
+                    Status: isDisabled ? "disabled" : "active",
+                    r.Rule.Id,
+                    r.Rule.Name,
+                    r.Rule.Category,
+                    r.Rule.Severity,
+                    string.Join(", ", r.Rule.Scope),
+                    r.Rule.Description,
+                    r.Rule.Expression,
+                    r.Rule.FixExpression,
+                    Enabled: !isDisabled);
+            }).ToList();
 
-        var disabledCount = allRules.Count(r => !r.Enabled);
-        var result = new BpaRulesListResult(
-            filteredRules,
-            new BpaRulesSummary(
-                Total: allRules.Count,
-                Active: allRules.Count - disabledCount,
-                Disabled: disabledCount,
-                Ignored: 0));
+            var filteredRules = (request.DisabledOnly, request.IgnoredOnly, request.All) switch
+            {
+                (true, _, _) => allRules.Where(r => !r.Enabled).ToList(),
+                (_, true, _) => allRules.Where(r => !r.Enabled).ToList(),
+                (_, _, true) => allRules,
+                _ => allRules.Where(r => r.Enabled).ToList()
+            };
 
-        return TomixResult<BpaRulesListResult>.Ok(result);
+            var disabledCount = allRules.Count(r => !r.Enabled);
+            var result = new BpaRulesListResult(
+                filteredRules,
+                new BpaRulesSummary(
+                    Total: allRules.Count,
+                    Active: allRules.Count - disabledCount,
+                    Disabled: disabledCount,
+                    Ignored: 0));
+
+            return TomixResult<BpaRulesListResult>.Ok(result);
+        });
     }
 
     private async Task<IReadOnlySet<string>> ReadDisabledRuleIdsAsync(

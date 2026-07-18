@@ -1,3 +1,4 @@
+using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
@@ -32,20 +33,27 @@ public sealed class DiffModelHandler
                 exitCode: 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
-        await using var leftSession = await leftProvider.OpenAsync(request.Left, cancellationToken);
-        await using var rightSession = await rightProvider.OpenAsync(request.Right, cancellationToken);
+        // Nested guards so a connection failure is attributed to the side that actually failed.
+        return await ProviderConnectionGuard.RunAsync(request.Left, async () =>
+        {
+            await using var leftSession = await leftProvider.OpenAsync(request.Left, cancellationToken);
+            var leftSnapshot = await leftSession.GetSnapshotAsync(cancellationToken);
 
-        var leftSnapshot = await leftSession.GetSnapshotAsync(cancellationToken);
-        var rightSnapshot = await rightSession.GetSnapshotAsync(cancellationToken);
+            return await ProviderConnectionGuard.RunAsync(request.Right, async () =>
+            {
+                await using var rightSession = await rightProvider.OpenAsync(request.Right, cancellationToken);
+                var rightSnapshot = await rightSession.GetSnapshotAsync(cancellationToken);
 
-        var changes = Compare(leftSnapshot, rightSnapshot);
-        var summary = new DiffSummary(
-            Added: changes.Count(c => c.Action == "added"),
-            Removed: changes.Count(c => c.Action == "removed"),
-            Modified: changes.Count(c => c.Action == "modified"));
-        var result = new DiffModelResult(changes.Count > 0, summary, changes);
+                var changes = Compare(leftSnapshot, rightSnapshot);
+                var summary = new DiffSummary(
+                    Added: changes.Count(c => c.Action == "added"),
+                    Removed: changes.Count(c => c.Action == "removed"),
+                    Modified: changes.Count(c => c.Action == "modified"));
+                var result = new DiffModelResult(changes.Count > 0, summary, changes);
 
-        return TomixResult<DiffModelResult>.Ok(result, result.HasChanges ? 1 : 0);
+                return TomixResult<DiffModelResult>.Ok(result, result.HasChanges ? 1 : 0);
+            });
+        });
     }
 
     private static IReadOnlyList<DiffChange> Compare(ModelSnapshot left, ModelSnapshot right)

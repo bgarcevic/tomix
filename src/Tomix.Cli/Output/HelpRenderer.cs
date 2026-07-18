@@ -14,17 +14,16 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     /// </summary>
     public override bool ClearsParseErrors => true;
 
-    private static readonly (string Heading, string[] Commands)[] RootSections =
+    internal static readonly (string Heading, string[] Commands)[] RootSections =
     [
-        ("Discover", ["ls", "get", "find", "deps"]),
+        ("Discover", ["ls", "get", "find", "deps", "query"]),
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "incremental-refresh"]),
         ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "interactive"]),
     ];
 
-    private static readonly string[] NotImplementedCommands =
-        ["query"];
+    internal static readonly string[] NotImplementedCommands = [];
 
     private static readonly Dictionary<string, string[]> CommandExamples = new(StringComparer.Ordinal)
     {
@@ -46,6 +45,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["deps"] = [
             "tx deps \"Table[Measure]\"",
             "tx deps tables/Sales --downstream",
+        ],
+        ["query"] = [
+            "tx query -q \"EVALUATE Sales\"",
+            "tx query --file query.dax --limit 10",
+            "tx query -q \"EVALUATE VALUES(Sales[Region])\" --output-format json",
         ],
         ["add"] = [
             "tx add tables/Sales/measures/Revenue -i \"CALCULATE(SUM(Sales[Amount]))\"",
@@ -197,29 +201,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(Styling.Title("Global options:"));
 
-        var globalOptions = new (string Flags, string Description)[]
-        {
-            ("-h, /h, -?, /?, --help", "Show help and usage information"),
-            ("--version", "Show version information"),
-            ("-m, --model <model>", "Path to semantic model (TMDL folder, .bim file, or TE folder)"),
-            ("--output-format <output-format>", "Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command."),
-            ("--error-format <error-format>", "Stderr format for errors/warnings/hints: text (default) or json. Other values fall back to text."),
-            ("-s, --server <server>", "Workspace name or endpoint (e.g., MyWorkspace, powerbi://..., asazure://..., localhost)"),
-            ("-d, --database <database>", "Semantic model name on the workspace"),
-            ("--local", "Connect to a locally running Power BI Desktop instance (Windows only)"),
-            ("--auth <auth>", "Auth method: auto, interactive, spn, managed-identity (default: auto)"),
-            ("--recent <recent>", "Use a recently used model. No value = interactive picker, N = Nth most recent (1 = last used)."),
-            ("--debug", "Enable debug logging to stderr (connection strings, auth flow, timing)"),
-            ("--non-interactive", "Disable all interactive prompts. Fail with an actionable error if required input is missing.")
-        };
-
-        var globalFlagsWidth = globalOptions.Max(o => o.Flags.Length) + 2;
-        foreach (var (flags, desc) in globalOptions)
-        {
-            var styled = StyleOptionLabel(flags);
-            var padding = new string(' ', globalFlagsWidth - flags.Length);
-            AnsiConsole.MarkupLine($"  {styled}{padding}{Styling.MarkupEscape(desc)}");
-        }
+        // Derived from the actual root options (help/version plus the recursive globals) so the
+        // root help can never drift from what the parser accepts.
+        WriteOptionRows(root.Options
+            .Where(option => !option.Hidden)
+            .Select(option => (FormatOptionAliases(option), option.Description ?? "")));
 
         AnsiConsole.WriteLine();
         WriteSectionedCommands(root);
@@ -244,6 +230,19 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         {
             AnsiConsole.MarkupLine(Styling.Title("Not yet implemented:"));
             WriteCommandRows(notImplemented.Select(name => subcommandMap[name]).ToList());
+            AnsiConsole.WriteLine();
+        }
+
+        // Safety net: a registered command missing from RootSections must still show up in help
+        // rather than silently vanishing.
+        var listed = RootSections.SelectMany(section => section.Commands)
+            .Concat(NotImplementedCommands)
+            .ToHashSet(StringComparer.Ordinal);
+        var unlisted = root.Subcommands.Where(sc => !listed.Contains(sc.Name)).ToList();
+        if (unlisted.Count > 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Title("Other:"));
+            WriteCommandRows(unlisted);
             AnsiConsole.WriteLine();
         }
     }
@@ -440,7 +439,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         var joined = string.Join(", ", sorted);
 
         if (option is { ValueType: not null } && option.ValueType != typeof(bool) && option.ValueType != typeof(bool?)
-            && option is not HelpOption)
+            && option is not HelpOption and not VersionOption)
         {
             var valueName = option.Name.TrimStart('-');
             joined += $" <{valueName}>";
