@@ -70,7 +70,10 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
                 identity.ExpiresOn));
 
             if (options.Method is AuthMethod.ServicePrincipalSecret or AuthMethod.ServicePrincipalCertificate)
+            {
                 _credentialStore.Save(options);
+                _messageWriter($"Service-principal credentials saved for silent renewal: {_credentialStore.StorageDescription}. Use --save false to skip.");
+            }
         }
         return identity;
     }
@@ -227,10 +230,9 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
                     return new AccessToken(cached.AccessToken, cached.ExpiresOn);
                 }
 
-                var options = ServicePrincipalFromEnvironment(state, method, endpoint)
-                    ?? _credentialStore.Load(method, endpoint)
+                var options = _credentialStore.Load(method, endpoint)
                     ?? throw new AuthenticationRequiredException(
-                        "Service-principal token expired and credentials are not available for silent renewal. Set TOMIX_AUTH_CLIENT_SECRET (or TOMIX_AUTH_CERTIFICATE), then retry.");
+                        "Service-principal token expired and no saved credentials are available for silent renewal. Run 'tx auth login' again (pipe the secret via '--password -' or use --password-file).");
                 var app = await EnsureConfidentialAppAsync(options, method == AuthMethod.ServicePrincipalCertificate).ConfigureAwait(false);
                 var result = await app.AcquireTokenForClient(scopes)
                     .ExecuteAsync(cancellationToken).ConfigureAwait(false);
@@ -324,7 +326,8 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
         else
         {
             if (string.IsNullOrWhiteSpace(options.ClientSecret))
-                throw new AuthenticationRequiredException("Service-principal sign-in requires a client secret (--password/-p).");
+                throw new AuthenticationRequiredException(
+                    "Service-principal sign-in requires a client secret (pipe it via '--password -' or use --password-file).");
 
             builder = builder.WithClientSecret(options.ClientSecret);
         }
@@ -420,29 +423,6 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
         => options.Method == AuthMethod.ManagedIdentity
             ? "managed-identity"
             : string.IsNullOrWhiteSpace(options.ClientId) ? "service-principal" : $"app:{options.ClientId}";
-
-    private static AuthLoginOptions? ServicePrincipalFromEnvironment(AuthState? state, AuthMethod method, string endpoint)
-    {
-        var clientId = state?.ClientId ?? Environment.GetEnvironmentVariable("TOMIX_AUTH_CLIENT_ID");
-        var tenant = state?.TenantId ?? Environment.GetEnvironmentVariable("TOMIX_AUTH_TENANT");
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(tenant))
-            return null;
-
-        if (method == AuthMethod.ServicePrincipalCertificate)
-        {
-            var certificatePath = Environment.GetEnvironmentVariable("TOMIX_AUTH_CERTIFICATE");
-            return string.IsNullOrWhiteSpace(certificatePath)
-                ? null
-                : new AuthLoginOptions(method, endpoint, tenant, clientId,
-                    CertificatePath: certificatePath,
-                    CertificatePassword: Environment.GetEnvironmentVariable("TOMIX_AUTH_CERTIFICATE_PASSWORD"));
-        }
-
-        var secret = Environment.GetEnvironmentVariable("TOMIX_AUTH_CLIENT_SECRET");
-        return string.IsNullOrWhiteSpace(secret)
-            ? null
-            : new AuthLoginOptions(method, endpoint, tenant, clientId, ClientSecret: secret);
-    }
 
     private static string StorageLabel =>
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "OS keystore (DPAPI)"

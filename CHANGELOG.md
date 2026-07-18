@@ -10,6 +10,11 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- **Secrets are no longer accepted on the command line or from environment variables** (enforcing the policy in docs/cli-ux-guidelines.md). `tx auth login --password <value>` and `--certificate-password <value>` now reject any value other than the `-` stdin sentinel; the `AZURE_CLIENT_SECRET` / `TOMIX_AUTH_CLIENT_SECRET` / `TOMIX_AUTH_CERTIFICATE` / `TOMIX_AUTH_CERTIFICATE_PASSWORD` environment fallbacks are removed (the non-secret `TOMIX_AUTH_CLIENT_ID` / `TOMIX_AUTH_TENANT` remain). New intake channels: `--password-file` / `--certificate-password-file`, and a masked interactive prompt when a service-principal login omits the secret on a TTY. CI usage: `printf '%s' "$SECRET" | tx auth login -u $APP_ID -t $TENANT --password -`.
+- Service-principal silent renewal now works on macOS/Linux: credentials saved by `tx auth login` (default `--save true`) are stored in an owner-only (0600) file under the auth directory, replacing the removed environment-variable renewal path. Windows keeps DPAPI encryption. A file whose permissions allow group/other access is refused at load. Use `--save false` to opt out of persistence.
+
 - Remote model support: `connect`, mutate (`add`/`set`/`rm`/`mv`/`replace`), `deploy` over XMLA.
 - BPA engine rewritten with Dynamic-LINQ (70 bundled rules), structured diagnostics, ignore/disable, external rule collections.
 - Project renamed `mdl-cli` → `tomix-cli` (`tx` command); MinVer-based versioning and CI automation added.

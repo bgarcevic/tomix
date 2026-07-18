@@ -5,7 +5,7 @@ namespace Tomix.App.Refresh;
 /// <param name="Model">Raw --model value (local path or remote endpoint). Null = use active session.</param>
 /// <param name="Server">Explicit -s/--server override.</param>
 /// <param name="Database">Explicit -d/--database override.</param>
-/// <param name="Auth">--auth hint (auto/interactive/spn/env/managed-identity); resolved by the provider via token.</param>
+/// <param name="Auth">--auth hint (auto/interactive/spn/managed-identity); resolved by the provider via token.</param>
 /// <param name="RefreshType">full, dataonly, automatic, calculate, clearvalues, defragment, add.</param>
 /// <param name="Tables">--table (repeatable). Null/empty = whole model.</param>
 /// <param name="Partitions">--partition (repeatable, Table.Partition). Requires <see cref="Tables"/> null/empty.</param>

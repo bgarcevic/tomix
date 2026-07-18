@@ -186,6 +186,9 @@ Emitted by `incremental-refresh` (show/set/rm/apply).
 |------|------|---------|
 | `TOMIX_AUTH_FAILED` | 1 | Authentication failed (invalid credentials, token expired, etc.). |
 | `TOMIX_AUTH_REQUIRED` | 1 | Authentication is required but no credentials were provided. |
+| `TOMIX_AUTH_SECRET_REQUIRED` | 2 | A service-principal login needs a secret and none was provided: no source given, empty stdin under `--password -`, an empty secret file, or an empty interactive prompt. |
+| `TOMIX_AUTH_SECRET_SOURCE_CONFLICT` | 2 | `--password -` and `--password-file` (or the certificate-password equivalents) were combined; choose one. |
+| `TOMIX_AUTH_SECRET_FILE_NOT_FOUND` | 2 | The `--password-file` / `--certificate-password-file` path does not exist. |
 
 ## Script Codes (`TOMIX_SCRIPT_*`)
 
@@ -260,9 +263,6 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 |----------|-------------|
 | `TOMIX_AUTH_CLIENT_ID` | Azure AD client id for service principal auth. |
 | `TOMIX_AUTH_TENANT` | Azure AD tenant id for service principal auth. |
-| `TOMIX_AUTH_CLIENT_SECRET` | Azure AD client secret for service principal auth. |
-| `TOMIX_AUTH_CERTIFICATE` | Path to a certificate for service principal auth. |
-| `TOMIX_AUTH_CERTIFICATE_PASSWORD` | Password for the auth certificate. |
 | `TOMIX_SESSION` | Session id for persisting the active model connection. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
 | `TOMIX_POWERQUERY_FORMATTER_API` | Custom Power Query Formatter API endpoint URL. |

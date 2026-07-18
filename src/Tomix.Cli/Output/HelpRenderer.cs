@@ -207,7 +207,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             ("-s, --server <server>", "Workspace name or endpoint (e.g., MyWorkspace, powerbi://..., asazure://..., localhost)"),
             ("-d, --database <database>", "Semantic model name on the workspace"),
             ("--local", "Connect to a locally running Power BI Desktop instance (Windows only)"),
-            ("--auth <auth>", "Auth method: auto, interactive, spn, env, managed-identity (default: auto)"),
+            ("--auth <auth>", "Auth method: auto, interactive, spn, managed-identity (default: auto)"),
             ("--recent <recent>", "Use a recently used model. No value = interactive picker, N = Nth most recent (1 = last used)."),
             ("--debug", "Enable debug logging to stderr (connection strings, auth flow, timing)"),
             ("--non-interactive", "Disable all interactive prompts. Fail with an actionable error if required input is missing.")

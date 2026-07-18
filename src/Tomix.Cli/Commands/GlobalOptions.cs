@@ -39,7 +39,7 @@ internal static class GlobalOptions
 
     public static readonly Option<string?> Auth = new("--auth")
     {
-        Description = "Auth method: auto, interactive, spn, env, managed-identity (default: auto)",
+        Description = "Auth method: auto, interactive, spn, managed-identity (default: auto)",
         Recursive = true
     };
 

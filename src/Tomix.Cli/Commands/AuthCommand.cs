@@ -27,14 +27,18 @@ internal sealed class AuthCommand : ICommandModule
     {
         var usernameOption = new Option<string?>("--username") { Description = "Service-principal application (client) id" };
         usernameOption.Aliases.Add("-u");
-        var passwordOption = new Option<string?>("--password") { Description = "Service-principal client secret (reads from AZURE_CLIENT_SECRET env var; pass '-' to read from stdin)" };
+        var passwordOption = new Option<string?>("--password") { Description = "Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file." };
         passwordOption.Aliases.Add("-p");
+        AddStdinSentinelValidator(passwordOption, "--password", "--password-file");
+        var passwordFileOption = new Option<string?>("--password-file") { Description = "Path to a file containing the service-principal client secret (trailing newline ignored)" };
         var tenantOption = new Option<string?>("--tenant") { Description = "Tenant id or domain (required for service principal)" };
         tenantOption.Aliases.Add("-t");
         var identityOption = new Option<bool>("--identity") { Description = "Sign in with a managed identity (Azure-hosted; use --username for user-assigned)" };
         identityOption.Aliases.Add("-I");
         var certificateOption = new Option<string?>("--certificate") { Description = "Path to certificate file (PEM or PKCS12) for service principal auth" };
-        var certificatePasswordOption = new Option<string?>("--certificate-password") { Description = "Password for the certificate file" };
+        var certificatePasswordOption = new Option<string?>("--certificate-password") { Description = "Certificate password source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --certificate-password-file." };
+        AddStdinSentinelValidator(certificatePasswordOption, "--certificate-password", "--certificate-password-file");
+        var certificatePasswordFileOption = new Option<string?>("--certificate-password-file") { Description = "Path to a file containing the certificate password (trailing newline ignored)" };
         var deviceCodeOption = new Option<bool>("--device-code") { Description = "Use the device-code flow instead of a local browser" };
         var clientIdOption = new Option<string?>("--client-id") { Description = "Override the Azure AD client id used for interactive/device-code sign-in" };
         var saveOption = new Option<bool?>("--save") { Description = "Persist service principal credentials for silent reuse (default: true). Use --save false for one-shot login." };
@@ -42,10 +46,12 @@ internal sealed class AuthCommand : ICommandModule
         {
             usernameOption,
             passwordOption,
+            passwordFileOption,
             tenantOption,
             identityOption,
             certificateOption,
             certificatePasswordOption,
+            certificatePasswordFileOption,
             deviceCodeOption,
             clientIdOption,
             saveOption
@@ -57,20 +63,56 @@ internal sealed class AuthCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "auth login", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
             var username = parseResult.GetValue(usernameOption);
-            var password = parseResult.GetValue(passwordOption)
-                ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_SECRET")
-                ?? Environment.GetEnvironmentVariable("TOMIX_AUTH_CLIENT_SECRET");
-            if (password == "-")
-                password = Console.In.ReadLine();
             var tenant = parseResult.GetValue(tenantOption);
             var certificate = parseResult.GetValue(certificateOption);
             var useIdentity = parseResult.GetValue(identityOption);
             var useDeviceCode = parseResult.GetValue(deviceCodeOption);
 
-            var method = ResolveMethod(useIdentity, certificate, username, password, useDeviceCode);
+            // The method is resolved from which identity inputs are present; the secret
+            // itself is resolved afterwards so an interactive login can be prompted for it.
+            var method = ResolveMethod(useIdentity, certificate, username, useDeviceCode);
             var endpoint = parseResult.GetValue(GlobalOptions.Server)
                 ?? new CliStateStore().LoadCurrentSession()?.Server;
+
+            string? password = null;
+            if (method == AuthMethod.ServicePrincipalSecret)
+            {
+                var resolution = AuthSecretResolver.Resolve(
+                    parseResult.GetValue(passwordOption),
+                    parseResult.GetValue(passwordFileOption),
+                    "--password", "--password-file",
+                    Console.In.ReadLine,
+                    InteractionGate.CanPrompt(parseResult, format)
+                        ? () => PromptSecret("Client secret")
+                        : null);
+
+                if (resolution.ErrorCode is not null)
+                    return WriteSecretError(resolution.ErrorCode, resolution.ErrorMessage!, errorFormat);
+
+                password = resolution.Secret;
+                if (password is null)
+                    return WriteSecretError(
+                        "TOMIX_AUTH_SECRET_REQUIRED",
+                        "A client secret is required. Pipe it via '--password -', point to it with --password-file, or run interactively to be prompted.",
+                        errorFormat);
+            }
+
+            string? certificatePassword = null;
+            if (method == AuthMethod.ServicePrincipalCertificate)
+            {
+                var resolution = AuthSecretResolver.Resolve(
+                    parseResult.GetValue(certificatePasswordOption),
+                    parseResult.GetValue(certificatePasswordFileOption),
+                    "--certificate-password", "--certificate-password-file",
+                    Console.In.ReadLine);
+
+                if (resolution.ErrorCode is not null)
+                    return WriteSecretError(resolution.ErrorCode, resolution.ErrorMessage!, errorFormat);
+
+                certificatePassword = resolution.Secret;
+            }
 
             var options = new AuthLoginOptions(
                 method,
@@ -79,7 +121,7 @@ internal sealed class AuthCommand : ICommandModule
                 ClientId: IsServicePrincipal(method) || method == AuthMethod.ManagedIdentity ? username : null,
                 ClientSecret: password,
                 CertificatePath: certificate,
-                CertificatePassword: parseResult.GetValue(certificatePasswordOption),
+                CertificatePassword: certificatePassword,
                 Save: parseResult.GetValue(saveOption) ?? true);
 
             var authenticator = CreateAuthenticator(parseResult.GetValue(clientIdOption), tenant);
@@ -134,15 +176,46 @@ internal sealed class AuthCommand : ICommandModule
         return command;
     }
 
-    internal static AuthMethod ResolveMethod(bool useIdentity, string? certificate, string? username, string? password, bool useDeviceCode)
+    internal static AuthMethod ResolveMethod(bool useIdentity, string? certificate, string? username, bool useDeviceCode)
     {
         if (useIdentity)
             return AuthMethod.ManagedIdentity;
         if (!string.IsNullOrWhiteSpace(certificate))
             return AuthMethod.ServicePrincipalCertificate;
-        if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
+        if (!string.IsNullOrWhiteSpace(username))
             return AuthMethod.ServicePrincipalSecret;
         return useDeviceCode ? AuthMethod.DeviceCode : AuthMethod.Interactive;
+    }
+
+    /// <summary>
+    /// Rejects any argv value other than the '-' stdin sentinel: secret values on the command
+    /// line leak into shell history and process listings (docs/cli-ux-guidelines.md).
+    /// </summary>
+    private static void AddStdinSentinelValidator(Option<string?> option, string optionName, string fileOptionName)
+        => option.Validators.Add(result =>
+        {
+            var value = result.GetValueOrDefault<string?>();
+            if (value is not null && value != "-")
+                result.AddError(
+                    $"{optionName} does not accept a secret value on the command line. "
+                    + $"Pass '-' to read from stdin or use {fileOptionName}.");
+        });
+
+    private static string PromptSecret(string label)
+    {
+        var errConsole = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+        return errConsole.Prompt(new TextPrompt<string>($"{label}:").Secret());
+    }
+
+    private static int WriteSecretError(string code, string message, string? errorFormat)
+    {
+        ErrorOutput.Write(
+            [new Core.Diagnostics.TomixDiagnostic(
+                code,
+                Core.Diagnostics.DiagnosticSeverity.Error,
+                message)],
+            errorFormat);
+        return 2;
     }
 
     private static bool IsServicePrincipal(AuthMethod method)
