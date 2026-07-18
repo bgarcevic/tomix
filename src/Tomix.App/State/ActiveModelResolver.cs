@@ -6,11 +6,6 @@ public sealed class ActiveModelResolver
 {
     private readonly Func<CliConnectionState?> _loadSession;
 
-    public ActiveModelResolver()
-        : this(() => new CliStateStore().LoadCurrentSession())
-    {
-    }
-
     public ActiveModelResolver(CliStateStore store)
         : this(() => store.LoadCurrentSession())
     {

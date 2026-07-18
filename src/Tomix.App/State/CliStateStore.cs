@@ -9,11 +9,6 @@ public sealed class CliStateStore
 
     private readonly string _configDirectory;
 
-    public CliStateStore()
-        : this(TomixPaths.ConfigDirectory)
-    {
-    }
-
     public CliStateStore(string configDirectory) => _configDirectory = configDirectory;
 
     public const int MaxRecentConnections = 20;

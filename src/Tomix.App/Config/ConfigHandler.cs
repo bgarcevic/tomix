@@ -11,11 +11,6 @@ public sealed class ConfigHandler
 {
     private readonly TomixConfigStore _store;
 
-    public ConfigHandler()
-        : this(new TomixConfigStore())
-    {
-    }
-
     public ConfigHandler(TomixConfigStore store) => _store = store;
 
     public TomixResult<ConfigListResult> List()

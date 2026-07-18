@@ -5,10 +5,15 @@ namespace Tomix.App.Tests;
 
 public sealed class SetModelPropertyHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task HandleAsync_Fails_WhenNoPropertyGiven()
     {
-        var handler = new SetModelPropertyHandler([]);
+        var handler = new SetModelPropertyHandler([], TestStores);
         var result = await handler.HandleAsync(
             NewRequest(properties: [], revert: false),
             CancellationToken.None);
@@ -22,7 +27,7 @@ public sealed class SetModelPropertyHandlerTests
     public async Task HandleAsync_Fails_WhenRevertCombinedWithAssignment()
     {
         // A -q/-i next to --revert must hard-error instead of silently dropping the assignment.
-        var handler = new SetModelPropertyHandler([]);
+        var handler = new SetModelPropertyHandler([], TestStores);
         var result = await handler.HandleAsync(
             NewRequest(properties: [new ModelPropertyAssignment("description", "x")], revert: true),
             CancellationToken.None);

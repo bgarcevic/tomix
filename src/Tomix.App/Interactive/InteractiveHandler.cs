@@ -7,11 +7,6 @@ public sealed class InteractiveHandler
 {
     private readonly CliStateStore _store;
 
-    public InteractiveHandler()
-        : this(new CliStateStore())
-    {
-    }
-
     public InteractiveHandler(CliStateStore store) => _store = store;
 
     public TomixResult<InteractiveStartResult> Start(InteractiveStartRequest request)

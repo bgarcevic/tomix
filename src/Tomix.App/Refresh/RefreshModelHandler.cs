@@ -18,11 +18,6 @@ public sealed class RefreshModelHandler
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly Func<CliConnectionState?> _resolveSession;
 
-    public RefreshModelHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, () => new CliStateStore().LoadCurrentSession())
-    {
-    }
-
     public RefreshModelHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
     {
         _providers = providers.ToList();

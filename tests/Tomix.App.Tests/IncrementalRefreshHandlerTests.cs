@@ -8,6 +8,11 @@ namespace Tomix.App.Tests;
 
 public sealed class IncrementalRefreshHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     private const string ValidSourceExpression =
         "let Source = Src, Filtered = Table.SelectRows(Source, each [Date] >= RangeStart and [Date] < RangeEnd) in Filtered";
 
@@ -90,7 +95,7 @@ public sealed class IncrementalRefreshHandlerTests
     [Fact]
     public async Task Set_NoOptions_ReturnsNoOptionsError()
     {
-        var result = await new SetRefreshPolicyHandler([]).HandleAsync(
+        var result = await new SetRefreshPolicyHandler([], TestStores).HandleAsync(
             NewSetRequest(), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -101,7 +106,7 @@ public sealed class IncrementalRefreshHandlerTests
     [Fact]
     public async Task Set_RevertWithOptions_ReturnsConflict()
     {
-        var result = await new SetRefreshPolicyHandler([]).HandleAsync(
+        var result = await new SetRefreshPolicyHandler([], TestStores).HandleAsync(
             NewSetRequest(revert: true, incrementalPeriods: 3), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -209,7 +214,7 @@ public sealed class IncrementalRefreshHandlerTests
             var providers = new IModelProvider[] { new TmdlModelProvider() };
             var reference = new ModelReference(model);
 
-            var setResult = await new SetRefreshPolicyHandler(providers).HandleAsync(
+            var setResult = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
                 NewSetRequest(reference,
                     rollingWindowPeriods: 10, rollingWindowGranularity: "year",
                     incrementalPeriods: 3, incrementalGranularity: "day",
@@ -227,7 +232,7 @@ public sealed class IncrementalRefreshHandlerTests
             Assert.Equal(10, showResult.Data!.RollingWindowPeriods);
             Assert.Equal("Year", showResult.Data.RollingWindowGranularity);
 
-            var rmResult = await new RemoveRefreshPolicyHandler(providers).HandleAsync(
+            var rmResult = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
                 new RemoveRefreshPolicyRequest(reference, "Sales", IfExists: false,
                     Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
                 CancellationToken.None);
@@ -252,7 +257,7 @@ public sealed class IncrementalRefreshHandlerTests
         try
         {
             var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var result = await new SetRefreshPolicyHandler(providers).HandleAsync(
+            var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
                 NewSetRequest(new ModelReference(model),
                     rollingWindowPeriods: 10, rollingWindowGranularity: "year",
                     incrementalPeriods: 3, incrementalGranularity: "day",
@@ -275,7 +280,7 @@ public sealed class IncrementalRefreshHandlerTests
         try
         {
             var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var result = await new SetRefreshPolicyHandler(providers).HandleAsync(
+            var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
                 NewSetRequest(new ModelReference(model),
                     rollingWindowPeriods: 10, rollingWindowGranularity: "year",
                     incrementalPeriods: 3, incrementalGranularity: "day",
@@ -298,7 +303,7 @@ public sealed class IncrementalRefreshHandlerTests
         try
         {
             var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var result = await new SetRefreshPolicyHandler(providers).HandleAsync(
+            var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
                 NewSetRequest(new ModelReference(model),
                     rollingWindowPeriods: 10, rollingWindowGranularity: "year",
                     incrementalPeriods: 3, incrementalGranularity: "day",
@@ -326,7 +331,7 @@ public sealed class IncrementalRefreshHandlerTests
             var providers = new IModelProvider[] { new TmdlModelProvider() };
             // The sample's Sales table has no policy; rm without --if-exists must emit the
             // documented code, not the generic TOMIX_MUTATION_FAILED.
-            var result = await new RemoveRefreshPolicyHandler(providers).HandleAsync(
+            var result = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
                 new RemoveRefreshPolicyRequest(new ModelReference(model), "Sales", IfExists: false,
                     Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
                 CancellationToken.None);

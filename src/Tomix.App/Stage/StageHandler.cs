@@ -10,11 +10,6 @@ public sealed class StageHandler
 {
     private readonly StagingStore _staging;
 
-    public StageHandler()
-        : this(new StagingStore())
-    {
-    }
-
     public StageHandler(StagingStore staging) => _staging = staging;
 
     public TomixResult<StageStatusResult> Status(ModelReference source)

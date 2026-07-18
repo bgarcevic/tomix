@@ -15,12 +15,6 @@ public sealed class ReplaceModelTextHandler
         _stores = stores;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public ReplaceModelTextHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, MutationStores.Ambient())
-    {
-    }
-
     public async Task<TomixResult<ReplaceModelTextResult>> HandleAsync(
         ReplaceModelTextRequest request,
         CancellationToken cancellationToken)

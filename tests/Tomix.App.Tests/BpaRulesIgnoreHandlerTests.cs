@@ -6,11 +6,16 @@ namespace Tomix.App.Tests;
 
 public sealed class BpaRulesIgnoreHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task Ignore_AddsRuleWritesCorrectKeyAndSaves()
     {
         var session = new CapturingSession(modelAnnotations: null);
-        var handler = new BpaRulesIgnoreHandler([new Provider(session)]);
+        var handler = new BpaRulesIgnoreHandler([new Provider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new BpaRulesIgnoreRequest(new ModelReference("any"), "RULE_A", Ignore: true, Save: true),
@@ -34,7 +39,7 @@ public sealed class BpaRulesIgnoreHandlerTests
         {
             [$"Annotation:{BpaIgnoreStore.LegacyKey}"] = "{\"RuleIDs\":[\"OLD_RULE\"]}"
         });
-        var handler = new BpaRulesIgnoreHandler([new Provider(session)]);
+        var handler = new BpaRulesIgnoreHandler([new Provider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new BpaRulesIgnoreRequest(new ModelReference("any"), "RULE_A", Ignore: true, Save: true),
@@ -58,7 +63,7 @@ public sealed class BpaRulesIgnoreHandlerTests
     public async Task Unignore_RuleNotPresent_NoChangeNoWrite()
     {
         var session = new CapturingSession(modelAnnotations: null);
-        var handler = new BpaRulesIgnoreHandler([new Provider(session)]);
+        var handler = new BpaRulesIgnoreHandler([new Provider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new BpaRulesIgnoreRequest(new ModelReference("any"), "RULE_A", Ignore: false, Save: true),
@@ -72,7 +77,7 @@ public sealed class BpaRulesIgnoreHandlerTests
     [Fact]
     public async Task Ignore_NonMutationProvider_Fails()
     {
-        var handler = new BpaRulesIgnoreHandler([new Provider(new ReadOnlySession())]);
+        var handler = new BpaRulesIgnoreHandler([new Provider(new ReadOnlySession())], TestStores);
 
         var result = await handler.HandleAsync(
             new BpaRulesIgnoreRequest(new ModelReference("any"), "RULE_A", Ignore: true),

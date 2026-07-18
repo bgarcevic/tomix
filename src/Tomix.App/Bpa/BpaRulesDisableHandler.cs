@@ -15,8 +15,7 @@ public sealed class BpaRulesDisableHandler
 {
     private readonly BpaUserRuleState _state;
 
-    public BpaRulesDisableHandler(BpaUserRuleState? state = null)
-        => _state = state ?? new BpaUserRuleState();
+    public BpaRulesDisableHandler(BpaUserRuleState state) => _state = state;
 
     public TomixResult<BpaRulesDisableResult> Handle(BpaRulesDisableRequest request)
     {

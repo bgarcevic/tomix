@@ -17,9 +17,8 @@ public sealed class BpaUserRuleState
 
     private readonly string _path;
 
-    /// <param name="configDirectory">Override the config directory (used by tests); defaults to <see cref="TomixPaths.ConfigDirectory"/>.</param>
-    public BpaUserRuleState(string? configDirectory = null)
-        => _path = Path.Combine(configDirectory ?? TomixPaths.ConfigDirectory, FileName);
+    public BpaUserRuleState(string configDirectory)
+        => _path = Path.Combine(configDirectory, FileName);
 
     /// <summary>The set of user-disabled rule IDs (empty when the file is absent or unreadable).</summary>
     public IReadOnlySet<string> GetDisabled()

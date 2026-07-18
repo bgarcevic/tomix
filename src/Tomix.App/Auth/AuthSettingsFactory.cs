@@ -10,10 +10,6 @@ namespace Tomix.App.Auth;
 /// </summary>
 public static class AuthSettingsFactory
 {
-    // M2 transitional: removed once the CLI passes the config it already loads.
-    public static MsalAuthSettings Resolve(string? clientIdOverride = null, string? tenant = null)
-        => Resolve(new TomixConfigStore().Load(), clientIdOverride, tenant);
-
     public static MsalAuthSettings Resolve(IDictionary<string, string> config, string? clientIdOverride = null, string? tenant = null)
     {
         var clientId = FirstNonEmpty(

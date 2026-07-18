@@ -7,11 +7,6 @@ public sealed class SessionHandler
 {
     private readonly CliStateStore _store;
 
-    public SessionHandler()
-        : this(new CliStateStore())
-    {
-    }
-
     public SessionHandler(CliStateStore store) => _store = store;
 
     public TomixResult<SessionShowResult> Show()

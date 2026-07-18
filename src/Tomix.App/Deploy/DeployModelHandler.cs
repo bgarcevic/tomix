@@ -21,14 +21,6 @@ public sealed class DeployModelHandler
         _resolveSession = sessionOverride ?? state.LoadCurrentSession;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public DeployModelHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, new CliStateStore()) { }
-
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public DeployModelHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
-        : this(providers, new CliStateStore(), resolveSession) { }
-
     public async Task<TomixResult<DeployModelResult>> HandleAsync(
         DeployModelRequest request,
         CancellationToken cancellationToken)

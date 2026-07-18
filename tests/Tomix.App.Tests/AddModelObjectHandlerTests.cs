@@ -5,10 +5,15 @@ namespace Tomix.App.Tests;
 
 public sealed class AddModelObjectHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task HandleAsync_NoProvider_ReturnsNoProviderError()
     {
-        var handler = new AddModelObjectHandler([]);
+        var handler = new AddModelObjectHandler([], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -32,7 +37,7 @@ public sealed class AddModelObjectHandlerTests
     [Fact]
     public async Task HandleAsync_NonMutationSession_ReturnsUnsupportedProviderError()
     {
-        var handler = new AddModelObjectHandler([new ReadOnlyProvider()]);
+        var handler = new AddModelObjectHandler([new ReadOnlyProvider()], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -56,7 +61,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_DryRun_ReturnsAddedPath()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -82,7 +87,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_WithSave_ReturnsSavedPath()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -108,7 +113,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_WithSaveTo_ReturnsSaveToPath()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -133,7 +138,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_WithProperties_PassesPropertiesToProvider()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var properties = new List<ModelPropertyAssignment>
         {
@@ -168,7 +173,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_IfNotExists_PassesFlagToProvider()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -189,14 +194,14 @@ public sealed class AddModelObjectHandlerTests
         Assert.True(addRequest.IfNotExists);
     }
 
-    // --stage materializes a working copy on disk; that end-to-end behavior is covered by the
-    // process-isolated StageCommandTests (which set TOMIX_CONFIG_DIR), not here.
+    // --stage materializes a working copy on disk; that end-to-end behavior is covered by
+    // MutationRunnerTests against an injected staging store, not here.
 
     [Fact]
     public async Task HandleAsync_RevertWithNothingStaged_Fails()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -223,7 +228,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_RevertWithSaveTo_ReturnsConflictError()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -252,7 +257,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_IfNotExistsNoOp_ReturnsExistingPath()
     {
         var session = new StubMutationSession { ReturnChanged = false };
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -279,7 +284,7 @@ public sealed class AddModelObjectHandlerTests
     {
         var session = new ThrowingMutationSession(
             new UnsupportedAddOptionException("--columns is not supported for type 'CalcGroup'. It applies to: Table."));
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -305,7 +310,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_NewSourceAndRangeFields_PassThroughToProvider()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -337,7 +342,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_UnsupportedMutation_ReturnsUnsupportedError()
     {
         var session = new ThrowingMutationSession(new NotSupportedException("bad op"));
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -361,7 +366,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_InvalidArgument_ReturnsInvalidValueError()
     {
         var session = new ThrowingMutationSession(new ArgumentException("bad arg"));
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -385,7 +390,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_InvalidOperation_ReturnsFailedError()
     {
         var session = new ThrowingMutationSession(new InvalidOperationException("fail"));
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -409,7 +414,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_SaveIOException_ReturnsSaveFailedError()
     {
         var session = new SaveThrowingMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -434,7 +439,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_ForceFlag_PassesForceToSave()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(
@@ -458,7 +463,7 @@ public sealed class AddModelObjectHandlerTests
     public async Task HandleAsync_SerializationFormat_PassesToSave()
     {
         var session = new StubMutationSession();
-        var handler = new AddModelObjectHandler([new StubProvider(session)]);
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
         var result = await handler.HandleAsync(
             new AddModelObjectRequest(

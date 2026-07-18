@@ -14,11 +14,6 @@ public sealed class TomixConfigStore
 
     private readonly string _path;
 
-    public TomixConfigStore()
-        : this(TomixPaths.ConfigFile)
-    {
-    }
-
     public TomixConfigStore(string path) => _path = path;
 
     public IDictionary<string, string> Load()

@@ -8,11 +8,6 @@ public sealed class ConnectHandler
 {
     private readonly CliStateStore _store;
 
-    public ConnectHandler()
-        : this(new CliStateStore())
-    {
-    }
-
     public ConnectHandler(CliStateStore store) => _store = store;
 
     public TomixResult<ConnectShowResult> Show()

@@ -24,11 +24,6 @@ public sealed class StagingStore
     private readonly string _configDirectory;
     private readonly string _sessionId;
 
-    public StagingStore()
-        : this(TomixPaths.ConfigDirectory, new CliStateStore().CurrentSessionId)
-    {
-    }
-
     public StagingStore(string configDirectory, string sessionId)
     {
         _configDirectory = configDirectory;

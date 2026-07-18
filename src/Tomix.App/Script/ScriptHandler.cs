@@ -22,12 +22,6 @@ public sealed class ScriptHandler
         _stores = stores;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public ScriptHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, MutationStores.Ambient())
-    {
-    }
-
     public async Task<TomixResult<ScriptRunResult>> HandleAsync(
         ScriptRunRequest request,
         CancellationToken cancellationToken)

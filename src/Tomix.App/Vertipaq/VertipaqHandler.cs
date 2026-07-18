@@ -19,12 +19,6 @@ public sealed class VertipaqHandler
         _stores = stores;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public VertipaqHandler(IEnumerable<IModelProvider> providers, IVertipaqAnalyzer analyzer)
-        : this(providers, analyzer, MutationStores.Ambient())
-    {
-    }
-
     public async Task<TomixResult<VertipaqResult>> HandleAsync(
         VertipaqRequest request,
         CancellationToken cancellationToken)

@@ -18,11 +18,6 @@ public sealed class QueryModelHandler
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly Func<CliConnectionState?> _resolveSession;
 
-    public QueryModelHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, () => new CliStateStore().LoadCurrentSession())
-    {
-    }
-
     public QueryModelHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
     {
         _providers = providers.ToList();

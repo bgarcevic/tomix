@@ -21,14 +21,6 @@ public sealed class FormatModelHandler
         _stores = stores;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public FormatModelHandler(
-        IEnumerable<IModelProvider> providers,
-        IExpressionFormatterClient formatter)
-        : this(providers, formatter, MutationStores.Ambient())
-    {
-    }
-
     public async Task<TomixResult<FormatModelResult>> HandleAsync(
         FormatModelRequest request,
         CancellationToken cancellationToken)

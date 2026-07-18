@@ -7,11 +7,6 @@ public sealed class ProfileHandler
 {
     private readonly CliStateStore _store;
 
-    public ProfileHandler()
-        : this(new CliStateStore())
-    {
-    }
-
     public ProfileHandler(CliStateStore store) => _store = store;
 
     public TomixResult<ProfileListResult> List()

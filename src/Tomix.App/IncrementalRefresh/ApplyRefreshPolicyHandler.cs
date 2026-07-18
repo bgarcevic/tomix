@@ -15,11 +15,6 @@ public sealed class ApplyRefreshPolicyHandler
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly Func<CliConnectionState?> _resolveSession;
 
-    public ApplyRefreshPolicyHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, () => new CliStateStore().LoadCurrentSession())
-    {
-    }
-
     public ApplyRefreshPolicyHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
     {
         _providers = providers.ToList();

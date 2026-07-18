@@ -11,6 +11,11 @@ namespace Tomix.App.Tests;
 /// </summary>
 public sealed class RemoveReferenceGuardTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task RemoveReferencedMeasure_Fails_WithoutMutating()
     {
@@ -91,7 +96,7 @@ public sealed class RemoveReferenceGuardTests
 
     private static Task<Core.Results.TomixResult<RemoveModelObjectResult>> Handle(
         StubSnapshotSession session, string path, bool force)
-        => new RemoveModelObjectHandler([new StubProvider(session)]).HandleAsync(
+        => new RemoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             new RemoveModelObjectRequest(
                 new ModelReference("model.bim"),
                 path, Type: null,

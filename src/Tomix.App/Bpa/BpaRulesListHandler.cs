@@ -48,12 +48,6 @@ public sealed class BpaRulesListHandler
         _userRules = userRules;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public BpaRulesListHandler(IEnumerable<IModelProvider>? providers = null)
-        : this(providers, new BpaUserRuleState())
-    {
-    }
-
     public async Task<TomixResult<BpaRulesListResult>> HandleAsync(
         BpaRulesListRequest request,
         CancellationToken cancellationToken)

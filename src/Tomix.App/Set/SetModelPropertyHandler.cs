@@ -15,12 +15,6 @@ public sealed class SetModelPropertyHandler
         _stores = stores;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public SetModelPropertyHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, MutationStores.Ambient())
-    {
-    }
-
     public async Task<TomixResult<SetModelPropertyResult>> HandleAsync(
         SetModelPropertyRequest request,
         CancellationToken cancellationToken)

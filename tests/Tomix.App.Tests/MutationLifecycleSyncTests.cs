@@ -110,7 +110,7 @@ public sealed class MutationLifecycleSyncTests
         var begin = await MutationLifecycle.BeginAsync(
             [], new ModelReference("/local/model"),
             new MutationOptions(Save: true, SaveTo: null, Stage: false, Revert: false, Serialization: "", Force: false),
-            new Tomix.App.State.StagingStore(), WorkspaceConnection(), CancellationToken.None);
+            new Tomix.App.State.StagingStore(Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"), WorkspaceConnection(), CancellationToken.None);
 
         Assert.NotNull(begin.Context!.SyncTarget);
     }
@@ -123,7 +123,7 @@ public sealed class MutationLifecycleSyncTests
         var begin = await MutationLifecycle.BeginAsync(
             [], new ModelReference("/local/model"),
             new MutationOptions(Save: false, SaveTo: "/elsewhere/copy", Stage: false, Revert: false, Serialization: "", Force: false),
-            new Tomix.App.State.StagingStore(), WorkspaceConnection(), CancellationToken.None);
+            new Tomix.App.State.StagingStore(Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"), WorkspaceConnection(), CancellationToken.None);
 
         Assert.Equal(MutationMode.Save, begin.Mode);
         Assert.Null(begin.Context!.SyncTarget);

@@ -5,10 +5,13 @@ namespace Tomix.App.Tests;
 
 public sealed class DeployModelHandlerTests
 {
+
+    private static Tomix.App.State.CliStateStore TestState => new(
+        Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"));
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenNoModelSpecified()
     {
-        var handler = new DeployModelHandler([new StubDeployProvider()]);
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference(""),
@@ -33,7 +36,7 @@ public sealed class DeployModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenNoProviderMatches()
     {
-        var handler = new DeployModelHandler([]);
+        var handler = new DeployModelHandler([], TestState);
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("missing.bim"),
@@ -57,7 +60,7 @@ public sealed class DeployModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenNoTargetServer()
     {
-        var handler = new DeployModelHandler([new StubDeployProvider()], () => null);
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState, () => null);
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("samples/basic-tmdl"),
@@ -81,7 +84,7 @@ public sealed class DeployModelHandlerTests
     [Fact]
     public async Task HandleAsync_GeneratesScript_WhenXmlaOutputIsDash()
     {
-        var handler = new DeployModelHandler([new StubDeployProvider()]);
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("samples/basic-tmdl"),
@@ -113,7 +116,7 @@ public sealed class DeployModelHandlerTests
         try
         {
             var scriptPath = Path.Combine(outputDir, "script.json");
-            var handler = new DeployModelHandler([new StubDeployProvider()]);
+            var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
             var result = await handler.HandleAsync(
                 new DeployModelRequest(
                     new ModelReference("samples/basic-tmdl"),
@@ -149,7 +152,7 @@ public sealed class DeployModelHandlerTests
         // fires at least one violation; that is required to reach the --fix-bpa branch, which
         // then fails because the deploy-only session cannot apply fixes.
         var session = new StubDeployOnlySession();
-        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)]);
+        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)], TestState);
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("samples/basic-tmdl"),
@@ -175,7 +178,7 @@ public sealed class DeployModelHandlerTests
     [Fact]
     public async Task HandleAsync_LetsModelLoadExceptionPropagate()
     {
-        var handler = new DeployModelHandler([new BrokenModelDeployProvider()], () => null);
+        var handler = new DeployModelHandler([new BrokenModelDeployProvider()], TestState, () => null);
 
         // The source model being unloadable is not a deploy failure: it must reach the CLI's
         // top-level TOMIX_MODEL_LOAD_FAILED handler instead of becoming TOMIX_DEPLOY_FAILED.

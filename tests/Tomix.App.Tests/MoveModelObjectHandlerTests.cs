@@ -11,6 +11,11 @@ namespace Tomix.App.Tests;
 /// </summary>
 public sealed class MoveModelObjectHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task DaxFormDestination_RenamesToLeafName_NotTheBracketString()
     {
@@ -128,7 +133,7 @@ public sealed class MoveModelObjectHandlerTests
             Save: false, SaveTo: null, Serialization: "", Force: false,
             Revert: true);
 
-        var result = await new MoveModelObjectHandler([new StubProvider(session)])
+        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores)
             .HandleAsync(request, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -137,7 +142,7 @@ public sealed class MoveModelObjectHandlerTests
 
     private static Task<Core.Results.TomixResult<MoveModelObjectResult>> Handle(
         StubSnapshotSession session, string source, string destination)
-        => new MoveModelObjectHandler([new StubProvider(session)]).HandleAsync(
+        => new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             new MoveModelObjectRequest(
                 new ModelReference("model.bim"),
                 source, destination, Type: null,

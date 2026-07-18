@@ -7,6 +7,11 @@ namespace Tomix.App.Tests;
 
 public sealed class VertipaqHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     private static readonly VertipaqModelStats Stats = NewStats();
 
     [Theory]
@@ -17,7 +22,7 @@ public sealed class VertipaqHandlerTests
     public async Task HandleAsync_RejectsConflictingOptions(
         string? import, string? export, bool obfuscate, bool annotate, bool save)
     {
-        var handler = new VertipaqHandler([], new StubAnalyzer());
+        var handler = new VertipaqHandler([], new StubAnalyzer(), TestStores);
         var result = await handler.HandleAsync(
             NewRequest(remote: true, import: import, export: export,
                 obfuscate: obfuscate, annotate: annotate, save: save),
@@ -32,7 +37,7 @@ public sealed class VertipaqHandlerTests
     public async Task HandleAsync_Import_ReadsTheVpaxFile()
     {
         var analyzer = new StubAnalyzer();
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: false, import: "stats.vpax"),
@@ -51,7 +56,7 @@ public sealed class VertipaqHandlerTests
         {
             ImportError = new VertipaqAnalysisException(VertipaqAnalysisKind.VpaxReadFailed, "bad file")
         };
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: false, import: "stats.vpax"),
@@ -65,7 +70,7 @@ public sealed class VertipaqHandlerTests
     [Fact]
     public async Task HandleAsync_Fails_WhenNoModelAndNoImport()
     {
-        var handler = new VertipaqHandler([], new StubAnalyzer());
+        var handler = new VertipaqHandler([], new StubAnalyzer(), TestStores);
         var result = await handler.HandleAsync(
             new VertipaqRequest(new ModelReference(""), null, null, null, null, false, false, false),
             CancellationToken.None);
@@ -78,7 +83,7 @@ public sealed class VertipaqHandlerTests
     [Fact]
     public async Task HandleAsync_RejectsLocalSource_WithoutRemoteSide()
     {
-        var handler = new VertipaqHandler([], new StubAnalyzer());
+        var handler = new VertipaqHandler([], new StubAnalyzer(), TestStores);
         var result = await handler.HandleAsync(
             NewRequest(remote: false),
             CancellationToken.None);
@@ -93,7 +98,7 @@ public sealed class VertipaqHandlerTests
     public async Task HandleAsync_AnalyzesRemotePrimary()
     {
         var analyzer = new StubAnalyzer();
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true),
@@ -109,7 +114,7 @@ public sealed class VertipaqHandlerTests
     {
         // connect --workspace with a local primary: reads must hit the live mirror endpoint.
         var analyzer = new StubAnalyzer();
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
         var remote = new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "SalesModel");
 
         var result = await handler.HandleAsync(
@@ -126,7 +131,7 @@ public sealed class VertipaqHandlerTests
     public async Task HandleAsync_Export_ReturnsPathsAndStats()
     {
         var analyzer = new StubAnalyzer { DictionaryPath = "stats.dict" };
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true, export: "stats.vpax", obfuscate: true),
@@ -142,7 +147,7 @@ public sealed class VertipaqHandlerTests
     public async Task HandleAsync_MapsAuthenticationRequired()
     {
         var analyzer = new StubAnalyzer { AnalyzeError = new AuthenticationRequiredException("login") };
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(NewRequest(remote: true), CancellationToken.None);
 
@@ -158,7 +163,7 @@ public sealed class VertipaqHandlerTests
         {
             AnalyzeError = new VertipaqAnalysisException(VertipaqAnalysisKind.ExtractionFailed, "dmv failed")
         };
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(NewRequest(remote: true), CancellationToken.None);
 
@@ -174,7 +179,7 @@ public sealed class VertipaqHandlerTests
         {
             ExportError = new VertipaqAnalysisException(VertipaqAnalysisKind.VpaxWriteFailed, "disk full")
         };
-        var handler = new VertipaqHandler([], analyzer);
+        var handler = new VertipaqHandler([], analyzer, TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true, export: "stats.vpax"),
@@ -188,7 +193,7 @@ public sealed class VertipaqHandlerTests
     [Fact]
     public async Task HandleAsync_TableFilter_SubsetsEverySection()
     {
-        var handler = new VertipaqHandler([], new StubAnalyzer());
+        var handler = new VertipaqHandler([], new StubAnalyzer(), TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true) with { TableFilter = "sales" },
@@ -205,7 +210,7 @@ public sealed class VertipaqHandlerTests
     [Fact]
     public async Task HandleAsync_TableFilter_FailsWithHint_WhenUnknown()
     {
-        var handler = new VertipaqHandler([], new StubAnalyzer());
+        var handler = new VertipaqHandler([], new StubAnalyzer(), TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true) with { TableFilter = "Nope" },
@@ -222,7 +227,7 @@ public sealed class VertipaqHandlerTests
     {
         var mutator = new RecordingMutationSession(notFoundPaths: ["'Product'"]);
         var handler = new VertipaqHandler(
-            [new StubMutationProvider(mutator)], new StubAnalyzer());
+            [new StubMutationProvider(mutator)], new StubAnalyzer(), TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true, annotate: true),
@@ -250,7 +255,7 @@ public sealed class VertipaqHandlerTests
     {
         var mutator = new RecordingMutationSession(notFoundPaths: []);
         var handler = new VertipaqHandler(
-            [new StubMutationProvider(mutator)], new StubAnalyzer());
+            [new StubMutationProvider(mutator)], new StubAnalyzer(), TestStores);
 
         var result = await handler.HandleAsync(
             NewRequest(remote: true, annotate: true),

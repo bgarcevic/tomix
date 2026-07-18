@@ -13,11 +13,16 @@ namespace Tomix.App.Tests;
 /// </summary>
 public sealed class RenameReferenceFixupTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task Set_RenameReferencedMeasure_RewritesReferences()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -37,7 +42,7 @@ public sealed class RenameReferenceFixupTests
         // Edits are planned against pre-rename paths, so they must be applied while those
         // paths still resolve.
         var session = NewSession();
-        await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -48,7 +53,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_RenameReferencedMeasure_DaxFormPath_RewritesReferences()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("'Sales'[Base]", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -60,7 +65,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_StrictRefs_PassesWhenEverythingIsFixable()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")], strictRefs: true),
             CancellationToken.None);
 
@@ -72,7 +77,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_NoFixRefs_WarnsWithoutRewriting()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")], fixRefs: false),
             CancellationToken.None);
 
@@ -87,7 +92,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_NoFixRefs_StrictRefs_FailsBeforeMutating()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest(
                 "Sales/Base", [new ModelPropertyAssignment("name", "NewName")],
                 strictRefs: true, fixRefs: false),
@@ -105,7 +110,7 @@ public sealed class RenameReferenceFixupTests
         // Role RLS filters are synthesized per-table in the snapshot and cannot be written
         // back as one property, so they stay a warning.
         var session = SessionWithRlsReference();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -118,7 +123,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_RlsReference_StrictRefs_FailsBeforeMutating()
     {
         var session = SessionWithRlsReference();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")], strictRefs: true),
             CancellationToken.None);
 
@@ -131,7 +136,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_RenameUnreferencedMeasure_ReportsNothing()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Derived", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -144,7 +149,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_NonNameProperty_SkipsReferenceCheck()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("description", "x")]),
             CancellationToken.None);
 
@@ -158,7 +163,7 @@ public sealed class RenameReferenceFixupTests
     {
         // DAX resolves names case-insensitively; rewriting would only churn casing.
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "BASE")]),
             CancellationToken.None);
 
@@ -171,7 +176,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Mv_RenameReferencedMeasure_RewritesReferences()
     {
         var session = NewSession();
-        var result = await new MoveModelObjectHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             MvRequest("Sales/Base", "Sales/NewName"),
             CancellationToken.None);
 
@@ -185,7 +190,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Mv_NoFixRefs_WarnsWithoutRewriting()
     {
         var session = NewSession();
-        var result = await new MoveModelObjectHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             MvRequest("Sales/Base", "Sales/NewName", fixRefs: false),
             CancellationToken.None);
 
@@ -198,7 +203,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Mv_NoFixRefs_StrictRefs_FailsBeforeMutating()
     {
         var session = NewSession();
-        var result = await new MoveModelObjectHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             MvRequest("Sales/Base", "Sales/NewName", strictRefs: true, fixRefs: false),
             CancellationToken.None);
 
@@ -225,7 +230,7 @@ public sealed class RenameReferenceFixupTests
                 Detail: null, Expression: "[Sales] * 2", Description: null, Hidden: false, SourceColumn: null, Children: [])
         ]));
 
-        var result = await new SetModelPropertyHandler([new StubProvider(session)]).HandleAsync(
+        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
             SetRequest("'Sales'[Sales]", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 

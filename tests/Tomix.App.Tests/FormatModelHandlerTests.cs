@@ -5,11 +5,16 @@ namespace Tomix.App.Tests;
 
 public sealed class FormatModelHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task HandleAsync_InlineDax_UsesFormatterOptions()
     {
         var formatter = new RecordingFormatter();
-        var handler = new FormatModelHandler([], formatter);
+        var handler = new FormatModelHandler([], formatter, TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(
@@ -41,7 +46,7 @@ public sealed class FormatModelHandlerTests
     {
         var session = new StubSession(Snapshot());
         var formatter = new RecordingFormatter();
-        var handler = new FormatModelHandler([new StubProvider(session)], formatter);
+        var handler = new FormatModelHandler([new StubProvider(session)], formatter, TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(
@@ -74,7 +79,7 @@ public sealed class FormatModelHandlerTests
     public async Task HandleAsync_WholeModelDefault_FormatsMeasuresOnly()
     {
         var formatter = new RecordingFormatter();
-        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], formatter);
+        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], formatter, TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(
@@ -102,7 +107,7 @@ public sealed class FormatModelHandlerTests
     public async Task HandleAsync_PowerQueryLanguage_FormatsPartitions()
     {
         var formatter = new RecordingFormatter();
-        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], formatter);
+        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], formatter, TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(
@@ -130,7 +135,7 @@ public sealed class FormatModelHandlerTests
     public async Task HandleAsync_ObjectPathNotFound_ReturnsObjectNotFoundCode()
     {
         var handler = new FormatModelHandler(
-            [new StubProvider(new StubSession(Snapshot()))], new RecordingFormatter());
+            [new StubProvider(new StubSession(Snapshot()))], new RecordingFormatter(), TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(
@@ -154,7 +159,7 @@ public sealed class FormatModelHandlerTests
     public async Task HandleAsync_ObjectPathAmbiguous_ReturnsAmbiguousCode()
     {
         var handler = new FormatModelHandler(
-            [new StubProvider(new StubSession(AmbiguousSnapshot()))], new RecordingFormatter());
+            [new StubProvider(new StubSession(AmbiguousSnapshot()))], new RecordingFormatter(), TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(
@@ -178,7 +183,7 @@ public sealed class FormatModelHandlerTests
     public async Task HandleAsync_ForceFlag_PassesForceToSave()
     {
         var session = new StubSession(Snapshot());
-        var handler = new FormatModelHandler([new StubProvider(session)], new RecordingFormatter());
+        var handler = new FormatModelHandler([new StubProvider(session)], new RecordingFormatter(), TestStores);
 
         var result = await handler.HandleAsync(
             new FormatModelRequest(

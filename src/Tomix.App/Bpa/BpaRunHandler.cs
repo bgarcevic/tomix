@@ -21,12 +21,6 @@ public sealed class BpaRunHandler
         _userRules = userRules;
     }
 
-    // M2 transitional: removed once the CLI threads stores from the composition root.
-    public BpaRunHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, MutationStores.Ambient(), new BpaUserRuleState())
-    {
-    }
-
     public async Task<TomixResult<BpaRunResult>> HandleAsync(
         BpaRunRequest request,
         CancellationToken cancellationToken)

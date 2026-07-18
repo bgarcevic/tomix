@@ -5,10 +5,15 @@ namespace Tomix.App.Tests;
 
 public sealed class RemoveModelObjectHandlerTests
 {
+
+    private static Tomix.App.Mutations.MutationStores TestStores => new(
+        new Tomix.App.State.StagingStore(
+            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
+        () => null);
     [Fact]
     public async Task HandleAsync_IfExistsOnMissingObject_ReportsNotRemovedWithReason()
     {
-        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: false))]);
+        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: false))], TestStores);
 
         var result = await handler.HandleAsync(Request("Sales/Nope", ifExists: true), CancellationToken.None);
 
@@ -22,7 +27,7 @@ public sealed class RemoveModelObjectHandlerTests
     [Fact]
     public async Task HandleAsync_Removed_ReportsPath()
     {
-        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))]);
+        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))], TestStores);
 
         var result = await handler.HandleAsync(Request("Sales/Old", ifExists: false), CancellationToken.None);
 
@@ -34,7 +39,7 @@ public sealed class RemoveModelObjectHandlerTests
     [Fact]
     public async Task HandleAsync_RevertWithNothingStaged_Fails()
     {
-        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))]);
+        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))], TestStores);
 
         var result = await handler.HandleAsync(
             Request("Sales/Old", ifExists: false) with

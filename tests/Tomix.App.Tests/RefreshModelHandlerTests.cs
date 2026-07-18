@@ -9,7 +9,7 @@ public sealed class RefreshModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenRefreshTypeUnknown()
     {
-        var handler = new RefreshModelHandler([new StubRefreshProvider(new StubRefreshSession())]);
+        var handler = new RefreshModelHandler([new StubRefreshProvider(new StubRefreshSession())], () => null);
         var result = await handler.HandleAsync(
             Request(refreshType: "bogus"),
             progress: null,
@@ -24,7 +24,7 @@ public sealed class RefreshModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenBothTablesAndPartitionsPassed()
     {
-        var handler = new RefreshModelHandler([new StubRefreshProvider(new StubRefreshSession())]);
+        var handler = new RefreshModelHandler([new StubRefreshProvider(new StubRefreshSession())], () => null);
         var result = await handler.HandleAsync(
             Request(tables: ["Sales"], partitions: [new TablePartition("Sales", "Internet")]),
             progress: null,
@@ -39,7 +39,7 @@ public sealed class RefreshModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenPartitionValueMalformed()
     {
-        var handler = new RefreshModelHandler([new StubRefreshProvider(new StubRefreshSession())]);
+        var handler = new RefreshModelHandler([new StubRefreshProvider(new StubRefreshSession())], () => null);
         var result = await handler.HandleAsync(
             Request(partitions: [new TablePartition("Sales", "")]),
             progress: null,
