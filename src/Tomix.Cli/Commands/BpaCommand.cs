@@ -119,7 +119,6 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Emit CI logging commands to stderr: vsts or github"
         };
 
-        // TODO: --trx is parsed but not yet implemented for bpa run (see ValidateCommand.WriteTrx).
         var trxOption = new Option<string?>("--trx")
         {
             Description = "Write results as a VSTEST .trx file to the specified path"
@@ -240,7 +239,13 @@ internal sealed class BpaCommand : ICommandModule
             var ci = parseResult.GetValue(ciOption);
 
             if (result.Data is not null)
+            {
+                var trx = parseResult.GetValue(trxOption);
+                if (!string.IsNullOrWhiteSpace(trx))
+                    TrxWriter.Write(trx, "tx bpa run", BpaRunRenderer.ToTrxTests(result.Data));
+
                 BpaRunRenderer.EmitCi(ci, result.Data.Violations);
+            }
 
             if (!string.IsNullOrWhiteSpace(ci))
                 return result.ExitCode;

@@ -461,14 +461,13 @@ public class ConnectPlanHandlerTests
     }
 
     // A non-XMLA scheme like http:// contains '/', so it classifies as a local model path and
-    // fails at validation (no provider) rather than at the defensive invalid-target check —
-    // same as the pre-refactor flow.
+    // fails at validation (no provider); bare names normalize to powerbi:// endpoints. Every
+    // planned target is therefore openable by some provider — there is no dead-end outcome.
     [Fact]
     public void Plan_NonXmlaScheme_ClassifiesAsLocalModelPath()
     {
         var plan = ConnectPlanHandler.Plan(Request(server: "http://not-an-xmla-endpoint"));
 
-        Assert.Null(plan.InvalidTarget);
         Assert.NotNull(plan.Target?.Model);
     }
 

@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.Xml.Linq;
 using Spectre.Console;
 using Tomix.App;
 using Tomix.App.State;
@@ -96,7 +95,7 @@ internal sealed class ValidateCommand : ICommandModule
             {
                 var trx = parseResult.GetValue(trxOption);
                 if (!string.IsNullOrWhiteSpace(trx))
-                    WriteTrx(trx, result.Data);
+                    TrxWriter.Write(trx, "tx validate", ValidateRenderer.ToTrxTests(result.Data));
 
                 ValidateRenderer.EmitCi(parseResult.GetValue(ciOption), result.Data);
             }
@@ -187,18 +186,4 @@ internal sealed class ValidateCommand : ICommandModule
         AnsiConsole.Write(table);
     }
 
-    private static void WriteTrx(string path, ValidateModelResult result)
-    {
-        var fullPath = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(directory))
-            Directory.CreateDirectory(directory);
-
-        var doc = new XDocument(
-            new XElement("TestRun",
-                new XAttribute("name", "tx validate"),
-                new XElement("ResultSummary",
-                    new XAttribute("outcome", result.Valid ? "Passed" : "Failed"))));
-        doc.Save(fullPath);
-    }
 }

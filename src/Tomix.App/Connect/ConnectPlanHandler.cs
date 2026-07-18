@@ -1,4 +1,3 @@
-using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Connect;
@@ -171,17 +170,10 @@ public sealed class ConnectPlanHandler
         // folder/.bim paths) are returned unchanged.
         var workspace = NormalizeWorkspaceTarget(model, r.WorkspaceValue);
 
-        // A bare server that is neither a remote endpoint nor a local model path can never be
-        // opened by any provider (the TOM server provider requires a remote endpoint; file/TMDL
-        // providers require a path). Reject it here instead of storing a dead-end connection.
-        if (!string.IsNullOrWhiteSpace(remoteServer) && !ModelReference.IsRemoteEndpoint(remoteServer))
-        {
-            return Outcome(r, reinterpreted, invalidTarget: new TomixDiagnostic(
-                "TOMIX_CONNECT_INVALID_TARGET",
-                DiagnosticSeverity.Error,
-                $"Not a recognized server endpoint or model path: '{remoteServer}'",
-                Hint: "Pass a workspace name (e.g. MyWorkspace), a workspace URL (powerbi://...), an Analysis Services endpoint (asazure://...), a local TMDL folder or .bim path, or use --local for a running Power BI Desktop instance."));
-        }
+        // Note: every value classified as a server here is openable — anything containing a
+        // path separator classifies as a local model path above, and NormalizeEndpoint turns
+        // the remaining bare names into powerbi:// (or localhost) endpoints — so there is no
+        // dead-end "neither endpoint nor path" case to reject.
 
         // Validate by opening before storing: local model paths always, and remote XMLA
         // endpoints when a dataset is given (so the CLI opens that specific catalog, not the
@@ -222,9 +214,8 @@ public sealed class ConnectPlanHandler
         bool showCurrent = false,
         string? usageError = null,
         ConnectInteractionRequired? interactionRequired = null,
-        TomixDiagnostic? invalidTarget = null,
         ConnectTarget? target = null)
-        => new(request, need, reinterpreted, showCurrent, usageError, interactionRequired, invalidTarget, target);
+        => new(request, need, reinterpreted, showCurrent, usageError, interactionRequired, target);
 
     // Detects `tx connect -w model.bim`, where the ZeroOrOne -w option greedily consumed the model
     // path as its value while the server argument stayed empty. Reinterpreted by Plan as a local
@@ -303,7 +294,7 @@ public sealed record ConnectPlanRequest(
 /// One planning pass. <see cref="Request"/> is the input with any internal rewrites applied
 /// (reinterpreted -w, --local reshuffle) — the CLI folds prompt answers into it and re-plans.
 /// Exactly one of <see cref="Need"/>, <see cref="ShowCurrent"/>, <see cref="UsageError"/>,
-/// <see cref="InteractionRequired"/>, <see cref="InvalidTarget"/>, or <see cref="Target"/> is set.
+/// <see cref="InteractionRequired"/>, or <see cref="Target"/> is set.
 /// <see cref="ReinterpretedWorkspaceValue"/> may accompany any outcome on the pass that rewrote it.
 /// </summary>
 public sealed record ConnectPlanResult(
@@ -313,7 +304,6 @@ public sealed record ConnectPlanResult(
     bool ShowCurrent,
     string? UsageError,
     ConnectInteractionRequired? InteractionRequired,
-    TomixDiagnostic? InvalidTarget,
     ConnectTarget? Target);
 
 public enum ConnectNeedKind

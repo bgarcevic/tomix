@@ -26,6 +26,7 @@ Shared output wiring for all commands.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--plan`/`--runs` server-timings, query-plan, and benchmark summaries written to stderr).
 - `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.
 - `CiAnnotations` — shared `--ci github`/`--ci vsts` logging-command syntax; callers project results into `CiAnnotation`s.
+- `TrxWriter` — shared `--trx` VSTEST file writer for `validate` and `bpa run`; callers project results into `TrxWriter.TrxTest`s (projections live on `ValidateRenderer`/`BpaRunRenderer`).
 - `BpaRunView` / `BpaRunRenderer` — pure grouping/ordering logic, Spectre rendering, JSON projection, and CI annotation emission for `bpa run`.
 - `ValidateRenderer` — CI annotation emission for `validate` (error-level only; issues carry no severity).
 - `BpaRulesRenderer` — Spectre rendering and JSON projections for the `bpa rules` subcommands.

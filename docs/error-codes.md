@@ -238,7 +238,6 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | `TOMIX_MODEL_LOAD_FAILED` | 2 | A provider matched the model but its source could not be loaded (unparsable TMDL/BIM, unresolvable references, unreadable file). The provider's message describes what failed; the command never ran. |
 | `TOMIX_NO_MODEL` | 2 | No model reference was provided and none could be inferred. |
 | `TOMIX_CONNECT_FAILED` | 1 | `connect` failed to establish a session. |
-| `TOMIX_CONNECT_INVALID_TARGET` | 1 | `connect` was given a server that is neither a remote endpoint nor a local model path. |
 | `TOMIX_INTERACTIVE_REQUIRED` | 1 | An interactive-only flow (`connect --remote`, a valueless `-w`) was invoked without a TTY (e.g. `--non-interactive`, `--quiet`, redirected input, or json/csv output). Pass the workspace/model explicitly. |
 | `TOMIX_REMOTE_LIST_FAILED` | 1 | Listing workspaces or models failed (Power BI REST or XMLA error) during an interactive `connect`. |
 | `TOMIX_DATABASE_NOT_FOUND` | 1 | The database/model name was not found on the server. |

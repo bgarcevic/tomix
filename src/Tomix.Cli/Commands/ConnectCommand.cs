@@ -99,6 +99,10 @@ internal sealed class ConnectCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "connect", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            // Effective stderr format: explicit --error-format wins, else JSON output implies JSON errors.
+            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat)
+                ?? (OutputFormats.IsJson(format) ? OutputFormats.Json : null);
+
             var handler = new ConnectHandler(_services.State);
             if (GlobalOptions.RecentSpecified(parseResult))
             {
@@ -241,12 +245,6 @@ internal sealed class ConnectCommand : ICommandModule
             if (plan.ShowCurrent)
                 return CommandOutput.Render(handler.Show(), format, ConnectRenderer.RenderShow);
 
-            if (plan.InvalidTarget is { } invalidTarget)
-            {
-                ErrorOutput.Write(new[] { invalidTarget }, format);
-                return 1;
-            }
-
             var target = plan.Target!;
             var model = target.Model;
             var remoteServer = target.RemoteServer;
@@ -267,7 +265,7 @@ internal sealed class ConnectCommand : ICommandModule
 
                 if (!infoResult.Success)
                 {
-                    ErrorOutput.Write(infoResult.Diagnostics, null);
+                    ErrorOutput.Write(infoResult.Diagnostics, errorFormat);
                     return infoResult.ExitCode == 0 ? 1 : infoResult.ExitCode;
                 }
 
@@ -289,20 +287,9 @@ internal sealed class ConnectCommand : ICommandModule
                             parseResult.GetValue(GlobalOptions.Yes),
                             parseResult.GetValue(GlobalOptions.NonInteractive)))
                         {
-                            handler.Set(new ConnectSetRequest(
-                                remoteServer,
-                                database,
-                                model,
-                                target.Auth,
-                                Local: model is not null || target.Local,
-                                target.Profile,
-                                Workspace: null,
-                                WorkspaceFormat: null,
-                                WorkspaceAuth: null));
-
-                            ConnectRenderer.RenderConnectedModel(infoResult.Data!, format, model, remoteServer, database, workspace: null);
-                            AnsiConsole.MarkupLine(Styling.Warning("Workspace setup cancelled."));
-                            return 0;
+                            ErrConsole().MarkupLine(Styling.Guidance(
+                                "Aborted; connection unchanged. Re-run without -w to connect without the workspace, or pass --force to overwrite it."));
+                            return 1;
                         }
                     }
                     else if (probe.Status == ConnectWorkspaceProbeStatus.Unreachable)
@@ -410,7 +397,10 @@ internal sealed class ConnectCommand : ICommandModule
 
             if (!infoResult.Success)
             {
-                ErrorOutput.Write(infoResult.Diagnostics, null);
+                ErrorOutput.Write(
+                    infoResult.Diagnostics,
+                    parseResult.GetValue(GlobalOptions.ErrorFormat)
+                        ?? (OutputFormats.IsJson(format) ? OutputFormats.Json : null));
                 return infoResult.ExitCode == 0 ? 1 : infoResult.ExitCode;
             }
 
@@ -492,7 +482,7 @@ internal sealed class ConnectCommand : ICommandModule
     private static int RenderWorkspaceOptionError(string message)
     {
         ErrConsole().MarkupLine(Styling.Error(Styling.MarkupEscape(message)));
-        return 1;
+        return 2;
     }
 
     // An interactive-only flow (--remote, valueless -w) was invoked without a usable TTY. Emit the
