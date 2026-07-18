@@ -24,7 +24,10 @@ public static class TomixPaths
     }
 
     /// <summary>The local preferences file, <c>~/.tomix/config.json</c>.</summary>
-    public static string ConfigFile => Path.Combine(ConfigDirectory, "config.json");
+    public static string ConfigFile => ConfigFileIn(ConfigDirectory);
+
+    /// <summary>The preferences file inside an explicit config directory.</summary>
+    public static string ConfigFileIn(string configDirectory) => Path.Combine(configDirectory, "config.json");
 
     /// <summary>The directory holding the MSAL token cache and auth metadata, <c>~/.tomix/auth</c>.</summary>
     public static string AuthDirectory => Path.Combine(ConfigDirectory, "auth");

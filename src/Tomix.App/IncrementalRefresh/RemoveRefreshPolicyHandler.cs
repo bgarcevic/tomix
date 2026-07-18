@@ -7,9 +7,19 @@ namespace Tomix.App.IncrementalRefresh;
 public sealed class RemoveRefreshPolicyHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public RemoveRefreshPolicyHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public RemoveRefreshPolicyHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<RemoveRefreshPolicyResult>> HandleAsync(
         RemoveRefreshPolicyRequest request,
@@ -19,7 +29,7 @@ public sealed class RemoveRefreshPolicyHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "incremental-refresh",
+            _providers, request.Model, options, "incremental-refresh", _stores,
             (mutator, _, _) =>
             {
                 var policies = MutationCapabilities.RequireRefreshPolicies(mutator);

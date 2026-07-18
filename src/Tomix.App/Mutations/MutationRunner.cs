@@ -11,12 +11,13 @@ public static class MutationRunner
         ModelReference model,
         MutationOptions options,
         string command,
+        MutationStores stores,
         Func<IModelMutationSession, IModelSession, MutationContext, Task<(bool Changed, string Summary, Func<MutationOutcome, TResult> BuildResult)>> mutate,
         TResult revertResult,
         CancellationToken cancellationToken)
     {
-        var stagingStore = new StagingStore();
-        var connection = new CliStateStore().LoadCurrentSession();
+        var stagingStore = stores.Staging;
+        var connection = stores.ResolveSession();
 
         var begin = await MutationLifecycle.BeginAsync(
             providers, model, options, stagingStore, connection, cancellationToken);

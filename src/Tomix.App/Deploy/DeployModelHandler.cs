@@ -11,16 +11,23 @@ namespace Tomix.App.Deploy;
 public sealed class DeployModelHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly CliStateStore _state;
     private readonly Func<CliConnectionState?> _resolveSession;
 
-    public DeployModelHandler(IEnumerable<IModelProvider> providers)
-        : this(providers, () => new CliStateStore().LoadCurrentSession()) { }
-
-    public DeployModelHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
+    public DeployModelHandler(IEnumerable<IModelProvider> providers, CliStateStore state, Func<CliConnectionState?>? sessionOverride = null)
     {
         _providers = providers.ToList();
-        _resolveSession = resolveSession;
+        _state = state;
+        _resolveSession = sessionOverride ?? state.LoadCurrentSession;
     }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
+    public DeployModelHandler(IEnumerable<IModelProvider> providers)
+        : this(providers, new CliStateStore()) { }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
+    public DeployModelHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
+        : this(providers, new CliStateStore(), resolveSession) { }
 
     public async Task<TomixResult<DeployModelResult>> HandleAsync(
         DeployModelRequest request,
@@ -56,7 +63,7 @@ public sealed class DeployModelHandler
                 $"Provider cannot deploy model: {request.Model.Value}",
                 exitCode: 1);
 
-        var (server, database) = ResolveTarget(request, _resolveSession);
+        var (server, database) = ResolveTarget(request, _state, _resolveSession);
 
         if (string.IsNullOrWhiteSpace(server))
             return TomixResult<DeployModelResult>.Fail(
@@ -227,14 +234,13 @@ public sealed class DeployModelHandler
     }
 
     private static (string? server, string? database) ResolveTarget(
-        DeployModelRequest request, Func<CliConnectionState?> resolveSession)
+        DeployModelRequest request, CliStateStore store, Func<CliConnectionState?> resolveSession)
     {
         if (!string.IsNullOrWhiteSpace(request.Server))
             return (request.Server, request.Database);
 
         if (!string.IsNullOrWhiteSpace(request.Profile))
         {
-            var store = new CliStateStore();
             var profiles = store.LoadProfiles();
             if (profiles.TryGetValue(request.Profile, out var profile))
                 return (profile.Server, profile.Database ?? request.Database);

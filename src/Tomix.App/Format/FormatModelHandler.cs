@@ -9,13 +9,24 @@ public sealed class FormatModelHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly IExpressionFormatterClient _formatter;
+    private readonly MutationStores _stores;
 
     public FormatModelHandler(
         IEnumerable<IModelProvider> providers,
-        IExpressionFormatterClient formatter)
+        IExpressionFormatterClient formatter,
+        MutationStores stores)
     {
         _providers = providers.ToList();
         _formatter = formatter;
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
+    public FormatModelHandler(
+        IEnumerable<IModelProvider> providers,
+        IExpressionFormatterClient formatter)
+        : this(providers, formatter, MutationStores.Ambient())
+    {
     }
 
     public async Task<TomixResult<FormatModelResult>> HandleAsync(
@@ -32,7 +43,7 @@ public sealed class FormatModelHandler
         if (!string.IsNullOrWhiteSpace(request.Path))
         {
             return await MutationRunner.RunAsync(
-                _providers, request.Model, options, "format",
+                _providers, request.Model, options, "format", _stores,
                 async (mutator, session, _) =>
                 {
                     var snapshot = await session.GetSnapshotAsync(cancellationToken);
@@ -73,7 +84,7 @@ public sealed class FormatModelHandler
         }
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "format",
+            _providers, request.Model, options, "format", _stores,
             async (mutator, session, _) =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);

@@ -11,9 +11,21 @@ namespace Tomix.App.Bpa;
 public sealed class BpaRunHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
+    private readonly BpaUserRuleState _userRules;
 
+    public BpaRunHandler(IEnumerable<IModelProvider> providers, MutationStores stores, BpaUserRuleState userRules)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+        _userRules = userRules;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public BpaRunHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient(), new BpaUserRuleState())
+    {
+    }
 
     public async Task<TomixResult<BpaRunResult>> HandleAsync(
         BpaRunRequest request,
@@ -33,8 +45,8 @@ public sealed class BpaRunHandler
             request.Serialization,
             request.Force,
             request.NoSync);
-        var stagingStore = new StagingStore();
-        var connection = new CliStateStore().LoadCurrentSession();
+        var stagingStore = _stores.Staging;
+        var connection = _stores.ResolveSession();
 
         var begin = await MutationLifecycle.BeginAsync(
             _providers, request.Model, options, stagingStore, connection, cancellationToken);
@@ -76,7 +88,7 @@ public sealed class BpaRunHandler
                 exitCode: 2);
         }
 
-        var userDisabled = new BpaUserRuleState().GetDisabled().ToList();
+        var userDisabled = _userRules.GetDisabled().ToList();
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var engine = new BpaEngine();

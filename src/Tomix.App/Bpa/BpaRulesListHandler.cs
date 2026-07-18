@@ -40,9 +40,19 @@ public sealed record BpaRuleInfo(
 public sealed class BpaRulesListHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly BpaUserRuleState _userRules;
 
+    public BpaRulesListHandler(IEnumerable<IModelProvider>? providers, BpaUserRuleState userRules)
+    {
+        _providers = providers?.ToList() ?? [];
+        _userRules = userRules;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public BpaRulesListHandler(IEnumerable<IModelProvider>? providers = null)
-        => _providers = providers?.ToList() ?? [];
+        : this(providers, new BpaUserRuleState())
+    {
+    }
 
     public async Task<TomixResult<BpaRulesListResult>> HandleAsync(
         BpaRulesListRequest request,
@@ -106,7 +116,7 @@ public sealed class BpaRulesListHandler
         CancellationToken cancellationToken)
     {
         // User-level disables apply regardless of model; model-level ignores add to them.
-        var disabled = new HashSet<string>(new BpaUserRuleState().GetDisabled(), StringComparer.OrdinalIgnoreCase);
+        var disabled = new HashSet<string>(_userRules.GetDisabled(), StringComparer.OrdinalIgnoreCase);
 
         if (model is null)
             return disabled;

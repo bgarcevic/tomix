@@ -8,9 +8,19 @@ namespace Tomix.App.Mv;
 public sealed class MoveModelObjectHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public MoveModelObjectHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public MoveModelObjectHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<MoveModelObjectResult>> HandleAsync(
         MoveModelObjectRequest request,
@@ -24,7 +34,7 @@ public sealed class MoveModelObjectHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "mv",
+            _providers, request.Model, options, "mv", _stores,
             async (mutator, session, _) =>
             {
                 // A rename alone doesn't rewrite DAX that references the old name. Plan the

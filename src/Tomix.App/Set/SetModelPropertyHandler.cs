@@ -7,9 +7,19 @@ namespace Tomix.App.Set;
 public sealed class SetModelPropertyHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public SetModelPropertyHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public SetModelPropertyHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<SetModelPropertyResult>> HandleAsync(
         SetModelPropertyRequest request,
@@ -33,7 +43,7 @@ public sealed class SetModelPropertyHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "set",
+            _providers, request.Model, options, "set", _stores,
             async (mutator, session, _) =>
             {
                 // A rename alone doesn't rewrite DAX that references the old name. Plan the

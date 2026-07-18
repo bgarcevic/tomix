@@ -7,9 +7,19 @@ namespace Tomix.App.Add;
 public sealed class AddModelObjectHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public AddModelObjectHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public AddModelObjectHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<AddModelObjectResult>> HandleAsync(
         AddModelObjectRequest request,
@@ -19,7 +29,7 @@ public sealed class AddModelObjectHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "add",
+            _providers, request.Model, options, "add", _stores,
             async (mutator, _, _) =>
             {
                 var mutation = mutator.AddObject(new ModelObjectAddRequest(

@@ -10,11 +10,19 @@ public sealed class VertipaqHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly IVertipaqAnalyzer _analyzer;
+    private readonly MutationStores _stores;
 
-    public VertipaqHandler(IEnumerable<IModelProvider> providers, IVertipaqAnalyzer analyzer)
+    public VertipaqHandler(IEnumerable<IModelProvider> providers, IVertipaqAnalyzer analyzer, MutationStores stores)
     {
         _providers = providers.ToList();
         _analyzer = analyzer;
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
+    public VertipaqHandler(IEnumerable<IModelProvider> providers, IVertipaqAnalyzer analyzer)
+        : this(providers, analyzer, MutationStores.Ambient())
+    {
     }
 
     public async Task<TomixResult<VertipaqResult>> HandleAsync(
@@ -153,7 +161,7 @@ public sealed class VertipaqHandler
             request.Save, SaveTo: null, Stage: false, Revert: false, Serialization: "", Force: true);
 
         return MutationRunner.RunAsync(
-            _providers, request.Model, options, "vertipaq",
+            _providers, request.Model, options, "vertipaq", _stores,
             (mutator, _, _) =>
             {
                 var annotated = 0;

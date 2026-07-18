@@ -14,9 +14,19 @@ namespace Tomix.App.Script;
 public sealed class ScriptHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public ScriptHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public ScriptHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<ScriptRunResult>> HandleAsync(
         ScriptRunRequest request,
@@ -46,8 +56,8 @@ public sealed class ScriptHandler
             request.Serialization ?? "",
             request.Force,
             request.NoSync);
-        var stagingStore = new StagingStore();
-        var connection = new CliStateStore().LoadCurrentSession();
+        var stagingStore = _stores.Staging;
+        var connection = _stores.ResolveSession();
 
         var begin = await MutationLifecycle.BeginAsync(
             _providers, request.Model, options, stagingStore, connection, cancellationToken);

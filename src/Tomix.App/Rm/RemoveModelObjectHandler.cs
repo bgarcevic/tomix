@@ -7,9 +7,19 @@ namespace Tomix.App.Rm;
 public sealed class RemoveModelObjectHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public RemoveModelObjectHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public RemoveModelObjectHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<RemoveModelObjectResult>> HandleAsync(
         RemoveModelObjectRequest request,
@@ -25,7 +35,7 @@ public sealed class RemoveModelObjectHandler
             request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "rm",
+            _providers, request.Model, options, "rm", _stores,
             async (mutator, session, _) =>
             {
                 // A removal cannot be fixed up like a rename — the referenced object is gone.

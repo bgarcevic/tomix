@@ -7,9 +7,19 @@ namespace Tomix.App.Replace;
 public sealed class ReplaceModelTextHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public ReplaceModelTextHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public ReplaceModelTextHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<ReplaceModelTextResult>> HandleAsync(
         ReplaceModelTextRequest request,
@@ -31,7 +41,7 @@ public sealed class ReplaceModelTextHandler
             request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "replace",
+            _providers, request.Model, options, "replace", _stores,
             async (mutator, _, context) =>
             {
                 var persist = context.Mode is MutationMode.Save or MutationMode.Stage;

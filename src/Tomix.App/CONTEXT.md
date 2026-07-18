@@ -19,6 +19,7 @@ Application use cases and command handlers.
 ## Rules
 
 - Do not write console output directly.
+- Stateful filesystem-backed stores (`CliStateStore`, `StagingStore`, `TomixConfigStore`, `BpaUserRuleState`) are built once as `AppServices` by the CLI composition root (`Program.Main`) and injected into handlers; handlers must not construct them ambiently. Mutation handlers receive them as `Mutations/MutationStores`.
 - Keep provider-specific details behind interfaces.
 - One command should usually have one handler.
 - Formatting behavior uses external formatter APIs:

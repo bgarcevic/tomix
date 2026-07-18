@@ -35,9 +35,19 @@ public sealed record BpaRulesIgnoreResult(
 public sealed class BpaRulesIgnoreHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly MutationStores _stores;
 
+    public BpaRulesIgnoreHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    {
+        _providers = providers.ToList();
+        _stores = stores;
+    }
+
+    // M2 transitional: removed once the CLI threads stores from the composition root.
     public BpaRulesIgnoreHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(providers, MutationStores.Ambient())
+    {
+    }
 
     public async Task<TomixResult<BpaRulesIgnoreResult>> HandleAsync(
         BpaRulesIgnoreRequest request,
@@ -52,7 +62,7 @@ public sealed class BpaRulesIgnoreHandler
             request.Serialization, request.Force, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "bpa-ignore",
+            _providers, request.Model, options, "bpa-ignore", _stores,
             async (mutator, session, _) =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
