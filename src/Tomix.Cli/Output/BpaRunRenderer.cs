@@ -91,6 +91,7 @@ internal static class BpaRunRenderer
             AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes applied:", result.FixesApplied.ToString())}");
             if (result.FixesSkipped > 0)
                 AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes skipped:", result.FixesSkipped.ToString())}");
+            RenderDestructiveSkipped(result);
             if (result.Saved is true or string)
                 AnsiConsole.MarkupLine($"  {Styling.Success("Model saved.")}");
             else if (result.Staged == true)
@@ -101,9 +102,11 @@ internal static class BpaRunRenderer
             else if (result.SyncWarning is not null)
                 AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(result.SyncWarning))}");
         }
-        else if (result.FixesSkipped > 0)
+        else
         {
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes skipped:", result.FixesSkipped.ToString())}");
+            if (result.FixesSkipped > 0)
+                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes skipped:", result.FixesSkipped.ToString())}");
+            RenderDestructiveSkipped(result);
         }
 
         if (result.FixErrors is { Count: > 0 })
@@ -121,6 +124,14 @@ internal static class BpaRunRenderer
                 ? "Run with --full to list every affected object, or --rule <ID> to focus a single rule."
                 : "Run  bpa run --details  for guidance, or  --rule <ID>  to focus a single rule."));
         }
+    }
+
+    private static void RenderDestructiveSkipped(BpaRunResult result)
+    {
+        if (result.DestructiveFixesSkipped > 0)
+            AnsiConsole.MarkupLine(
+                $"  {Styling.KeyValue("Destructive fixes skipped:", result.DestructiveFixesSkipped.ToString())}"
+                + Styling.Muted(" — deletes objects; rerun with  --fix --allow-delete  to apply"));
     }
 
     /// <summary>
@@ -256,6 +267,7 @@ internal static class BpaRunRenderer
             invalidCompatibilityRules = result.InvalidCompatibilityRules,
             fixesApplied = result.FixesApplied,
             fixesSkipped = result.FixesSkipped,
+            destructiveFixesSkipped = result.DestructiveFixesSkipped,
             fixErrors = result.FixErrors ?? Array.Empty<string>(),
             ruleLoadDiagnostics = result.RuleLoadDiagnostics ?? Array.Empty<string>(),
             saved = result.Saved,

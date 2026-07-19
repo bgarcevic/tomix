@@ -110,7 +110,7 @@ public sealed class BpaFixerTests
     }
 
     [Fact]
-    public void ApplyFixes_DeleteViolation()
+    public void ApplyFixes_DeleteViolation_SkippedByDefault()
     {
         var session = new StubMutationSession();
         var fixer = new BpaFixer();
@@ -130,9 +130,69 @@ public sealed class BpaFixerTests
 
         var result = fixer.ApplyFixes(session, violations, rules);
 
+        Assert.Equal(0, result.FixesApplied);
+        Assert.Equal(1, result.DestructiveFixesSkipped);
+        Assert.Empty(result.Errors);
+        Assert.Null(session.LastRemovedPath);
+    }
+
+    [Fact]
+    public void ApplyFixes_DeleteViolation_AppliedWithAllowDelete()
+    {
+        var session = new StubMutationSession();
+        var fixer = new BpaFixer();
+
+        var rules = new List<BpaRule>
+        {
+            new("UNNECESSARY_COL", "Remove", "Performance", BpaSeverity.Warning,
+                ["Column"], FixExpression: "Delete()")
+        };
+
+        var violations = new List<BpaViolation>
+        {
+            new("UNNECESSARY_COL", "Remove", "Performance", BpaSeverity.Warning,
+                "Column", "'Table'[Col]", "Table/Col",
+                CanFix: true, ObjectKind: ModelObjectKind.Column)
+        };
+
+        var result = fixer.ApplyFixes(session, violations, rules, allowDelete: true);
+
         Assert.Equal(1, result.FixesApplied);
+        Assert.Equal(0, result.DestructiveFixesSkipped);
         Assert.Equal("Table/Col", session.LastRemovedPath);
         Assert.Equal(ModelObjectKind.Column, session.LastRemovedKind);
+    }
+
+    [Fact]
+    public void ApplyFixes_MixedFixes_AppliesPropertySetsAndGatesDeletes()
+    {
+        var session = new StubMutationSession();
+        var fixer = new BpaFixer();
+
+        var rules = new List<BpaRule>
+        {
+            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning,
+                ["Column"], FixExpression: "IsHidden = true"),
+            new("UNNECESSARY_COL", "Remove", "Maintenance", BpaSeverity.Warning,
+                ["Column"], FixExpression: "Delete()")
+        };
+
+        var violations = new List<BpaViolation>
+        {
+            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning,
+                "Column", "'Orders'[CustomerId]", "Orders/CustomerId",
+                CanFix: true, ObjectKind: ModelObjectKind.Column),
+            new("UNNECESSARY_COL", "Remove", "Maintenance", BpaSeverity.Warning,
+                "Column", "'Table'[Col]", "Table/Col",
+                CanFix: true, ObjectKind: ModelObjectKind.Column)
+        };
+
+        var result = fixer.ApplyFixes(session, violations, rules);
+
+        Assert.Equal(1, result.FixesApplied);
+        Assert.Equal(1, result.DestructiveFixesSkipped);
+        Assert.Equal("Orders/CustomerId", session.LastSetPath);
+        Assert.Null(session.LastRemovedPath);
     }
 
     [Fact]

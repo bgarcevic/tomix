@@ -15,6 +15,7 @@ public sealed record BpaRunResult(
     long DurationMs = 0,
     int FixesApplied = 0,
     int FixesSkipped = 0,
+    int DestructiveFixesSkipped = 0,
     IReadOnlyList<string>? FixErrors = null,
     object? Saved = null,
     bool? Staged = null,

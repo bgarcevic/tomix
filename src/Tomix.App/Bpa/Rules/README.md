@@ -1,7 +1,8 @@
 # Bundled BPA rules
 
-`bpa-rules.json` is the default Best Practice Analyzer rule set used by `tx bpa` when no other
-ruleset is selected.
+`bpa-rules.json` is the bundled Best Practice Analyzer rule catalog. The default `standard`
+ruleset used by `tx bpa` is a curated high-signal subset of this catalog (see `CuratedRuleIds` in
+`BpaRuleLoader`); `--ruleset full` selects the entire catalog.
 
 ## Provenance & license
 

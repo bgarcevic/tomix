@@ -80,7 +80,7 @@ public sealed class BpaReferencedByTests
             Table("Facts", Measure("Total", "Facts", "SUM ( 'A'[Dup] )"))
         ]);
 
-        var rule = BpaRuleLoader.LoadDefaultRules().Single(r => r.Id == "UNNECESSARY_COLUMNS");
+        var rule = BpaRuleLoader.LoadBundledCatalog().Single(r => r.Id == "UNNECESSARY_COLUMNS");
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions([rule]));
 
         var paths = result.Violations.Select(v => v.ObjectPath).OrderBy(p => p).ToArray();

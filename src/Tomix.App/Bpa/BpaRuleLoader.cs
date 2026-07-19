@@ -7,6 +7,7 @@ namespace Tomix.App.Bpa;
 public sealed class BpaRuleLoader
 {
     public const string StandardRuleset = "standard";
+    public const string FullRuleset = "full";
 
     private const string BundledRulesFileName = "bpa-rules.json";
     private const string MicrosoftRulesUrl = "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/BestPracticeRules/BPARules.json";
@@ -23,11 +24,56 @@ public sealed class BpaRuleLoader
     public static IReadOnlyList<string> KnownRulesets { get; } =
     [
         StandardRuleset,
+        FullRuleset,
         "microsoft",
         "microsoft-it",
         "microsoft-ja",
         "microsoft-es"
     ];
+
+    /// <summary>
+    /// The curated subset of the bundled catalog that makes up the <c>standard</c> ruleset:
+    /// rules that catch broken/dangerous models, expensive-at-scale patterns, and a small core of
+    /// consumer-experience checks. Style-opinion and "consider…" advisory rules stay out of the
+    /// default so every finding is significant; use <c>--ruleset full</c> for the whole catalog.
+    /// </summary>
+    private static readonly HashSet<string> CuratedRuleIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Correctness / error prevention
+        "DATA_COLUMNS_MUST_HAVE_A_SOURCE_COLUMN",
+        "EXPRESSION_RELIANT_OBJECTS_MUST_HAVE_AN_EXPRESSION",
+        "RELATIONSHIP_COLUMNS_SAME_DATA_TYPE",
+        "AVOID_THE_USERELATIONSHIP_FUNCTION_AND_RLS_AGAINST_THE_SAME_TABLE",
+        "AVOID_INVALID_NAME_CHARACTERS",
+        "OBJECTS_SHOULD_NOT_START_OR_END_WITH_A_SPACE",
+        "FIX_REFERENTIAL_INTEGRITY_VIOLATIONS",
+        "SET_ISAVAILABLEINMDX_TO_TRUE_ON_NECESSARY_COLUMNS",
+
+        // High-impact performance
+        "AVOID_FLOATING_POINT_DATA_TYPES",
+        "AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS",
+        "MANY-TO-MANY_RELATIONSHIPS_SHOULD_BE_SINGLE-DIRECTION",
+        "AVOID_USING_MANY-TO-MANY_RELATIONSHIPS_ON_TABLES_USED_FOR_DYNAMIC_ROW_LEVEL_SECURITY",
+        "ISAVAILABLEINMDX_FALSE_NONATTRIBUTE_COLUMNS",
+        "MODEL_SHOULD_HAVE_A_DATE_TABLE",
+        "DATE/CALENDAR_TABLES_SHOULD_BE_MARKED_AS_A_DATE_TABLE",
+        "REMOVE_AUTO-DATE_TABLE",
+        "REDUCE_USAGE_OF_LONG-LENGTH_COLUMNS_WITH_HIGH_CARDINALITY",
+
+        // DAX quality
+        "DAX_COLUMNS_FULLY_QUALIFIED",
+        "DAX_MEASURES_UNQUALIFIED",
+        "USE_THE_DIVIDE_FUNCTION_FOR_DIVISION",
+        "AVOID_USING_THE_IFERROR_FUNCTION",
+        "FILTER_MEASURE_VALUES_BY_COLUMNS",
+        "EVALUATEANDLOG_SHOULD_NOT_BE_USED_IN_PRODUCTION_MODELS",
+
+        // Consumer experience
+        "PROVIDE_FORMAT_STRING_FOR_MEASURES",
+        "HIDE_FOREIGN_KEYS",
+        "NUMERIC_COLUMN_SUMMARIZE_BY",
+        "MONTH_(AS_A_STRING)_MUST_BE_SORTED"
+    };
 
     public static IReadOnlyList<BpaRule> LoadFromFile(string path)
     {
@@ -41,7 +87,8 @@ public sealed class BpaRuleLoader
     public static IReadOnlyList<BpaRule> LoadFromJson(string json)
         => ParseRules(json);
 
-    public static IReadOnlyList<BpaRule> LoadDefaultRules()
+    /// <summary>The entire bundled rule catalog (the <c>full</c> ruleset), unfiltered.</summary>
+    public static IReadOnlyList<BpaRule> LoadBundledCatalog()
         => LoadBundledRules();
 
     public static Task<IReadOnlyList<BpaRule>> LoadDefaultRulesAsync(CancellationToken cancellationToken)
@@ -53,6 +100,9 @@ public sealed class BpaRuleLoader
     {
         var source = ResolveRulesetSource(ruleset);
         if (source == StandardRuleset)
+            return LoadBundledRules().Where(r => CuratedRuleIds.Contains(r.Id)).ToList();
+
+        if (source == FullRuleset)
             return LoadBundledRules();
 
         return await LoadFromSourceAsync(source, cancellationToken).ConfigureAwait(false);
@@ -115,9 +165,13 @@ public sealed class BpaRuleLoader
             : ruleset.Trim();
 
         if (key.Equals("default", StringComparison.OrdinalIgnoreCase)
-            || key.Equals("bundled", StringComparison.OrdinalIgnoreCase)
             || key.Equals(StandardRuleset, StringComparison.OrdinalIgnoreCase))
             return StandardRuleset;
+
+        if (key.Equals(FullRuleset, StringComparison.OrdinalIgnoreCase)
+            || key.Equals("all", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("bundled", StringComparison.OrdinalIgnoreCase))
+            return FullRuleset;
 
         return key.ToLowerInvariant() switch
         {

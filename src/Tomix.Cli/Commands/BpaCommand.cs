@@ -77,6 +77,11 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Apply fix expressions to auto-fix violations where possible"
         };
 
+        var allowDeleteOption = new Option<bool>("--allow-delete")
+        {
+            Description = "With --fix: also apply destructive Delete() fixes that remove model objects"
+        };
+
         var saveOption = new Option<bool>("--save")
         {
             Description = "Save model back to source after applying fixes"
@@ -175,6 +180,7 @@ internal sealed class BpaCommand : ICommandModule
             vpaRulesOption,
             failOnOption,
             fixOption,
+            allowDeleteOption,
             saveOption,
             saveToOption,
             serializationOption,
@@ -222,6 +228,7 @@ internal sealed class BpaCommand : ICommandModule
                         parseResult.GetValue(pathOption),
                         ruleIds,
                         parseResult.GetValue(fixOption),
+                        parseResult.GetValue(allowDeleteOption),
                         parseResult.GetValue(rulesetOption),
                         parseResult.GetValue(failOnOption),
                         parseResult.GetValue(saveOption),

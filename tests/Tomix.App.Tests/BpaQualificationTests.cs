@@ -55,7 +55,7 @@ public sealed class BpaQualificationTests
     [Fact]
     public void AllBundledRules_EvaluateWithoutErrorAndReportTrueCount()
     {
-        var rules = BpaRuleLoader.LoadDefaultRules();
+        var rules = BpaRuleLoader.LoadBundledCatalog();
         Assert.True(rules.Count >= 60, $"expected the full bundled ruleset, got {rules.Count}");
 
         var result = new BpaEngine().Evaluate(SalesModel(), new BpaEngineOptions(rules));

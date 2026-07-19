@@ -41,6 +41,7 @@ public sealed class BpaJsonContractTests
         DurationMs: 12,
         FixesApplied: 1,
         FixesSkipped: 2,
+        DestructiveFixesSkipped: 3,
         FixErrors: ["fix failed"],
         Saved: true,
         Staged: null,
@@ -59,6 +60,7 @@ public sealed class BpaJsonContractTests
         Assert.Equal(0, root.GetProperty("invalidCompatibilityRules").GetInt32());
         Assert.Equal(1, root.GetProperty("fixesApplied").GetInt32());
         Assert.Equal(2, root.GetProperty("fixesSkipped").GetInt32());
+        Assert.Equal(3, root.GetProperty("destructiveFixesSkipped").GetInt32());
         Assert.Equal("fix failed", root.GetProperty("fixErrors")[0].GetString());
         Assert.Equal("could not load extra.json", root.GetProperty("ruleLoadDiagnostics")[0].GetString());
         Assert.True(root.GetProperty("saved").GetBoolean());

@@ -9,11 +9,13 @@ public sealed partial class BpaFixer
     public BpaFixResult ApplyFixes(
         IModelMutationSession session,
         IReadOnlyList<BpaViolation> violations,
-        IReadOnlyList<BpaRule> rules)
+        IReadOnlyList<BpaRule> rules,
+        bool allowDelete = false)
     {
         var ruleMap = rules.ToDictionary(r => r.Id, StringComparer.OrdinalIgnoreCase);
         var applied = 0;
         var skipped = 0;
+        var destructiveSkipped = 0;
         var errors = new List<BpaFixError>();
 
         foreach (var violation in violations.Where(v => v.CanFix))
@@ -29,6 +31,14 @@ public sealed partial class BpaFixer
 
             if (fixExpr.Equals("Delete()", StringComparison.OrdinalIgnoreCase))
             {
+                // Delete() removes model objects and reference tracking cannot see report-layer
+                // or external consumers, so destructive fixes are opt-in.
+                if (!allowDelete)
+                {
+                    destructiveSkipped++;
+                    continue;
+                }
+
                 ApplyDelete(session, violation, ref applied, ref skipped, errors);
                 continue;
             }
@@ -44,7 +54,7 @@ public sealed partial class BpaFixer
             }
         }
 
-        return new BpaFixResult(applied, skipped, errors);
+        return new BpaFixResult(applied, skipped, destructiveSkipped, errors);
     }
 
     private static void ApplyDelete(
@@ -141,6 +151,7 @@ public sealed partial class BpaFixer
 public sealed record BpaFixResult(
     int FixesApplied,
     int FixesSkipped,
+    int DestructiveFixesSkipped,
     IReadOnlyList<BpaFixError> Errors);
 
 public sealed record BpaFixError(

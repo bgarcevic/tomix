@@ -115,7 +115,7 @@ Create an empty BPA rules file at the resolved path
 # tx bpa rules list
 List BPA rules from all sources with status
   arg [model]  Path to model
-  opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-defaults  Suppress built-in rules from output
   opt --ignored  Show only ignored rules
   opt --disabled  Show only disabled rules
@@ -151,13 +151,14 @@ Remove a rule from the model's ignore list
 Run BPA rules against a model (--fix to auto-fix)
   arg [model]  Path to model (if not using --model)
   opt --rules, -r <rules>  Path(s) or URL(s) to BPA rule file(s) in JSON format
-  opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-model-rules  Exclude BPA rules embedded in the model's annotations
   opt --no-defaults  Exclude the selected standard BPA ruleset
   opt --vpax <vpax>  Load VertiPaq Analyzer stats from a .vpax file to enable VPA-aware rules
   opt --vpa-rules  Include built-in VPA-aware rules
   opt --fail-on <fail-on>  Failure threshold: error (default) or warning
   opt --fix  Apply fix expressions to auto-fix violations where possible
+  opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
   opt --save  Save model back to source after applying fixes
   opt --save-to <save-to>  Save model to a different path after applying fixes
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)

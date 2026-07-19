@@ -15,15 +15,21 @@ tx bpa rules <subcommand>
 by severity; `--fix` applies auto-fixes where the rule provides one
 (`FixExpression`).
 
+The default `standard` ruleset is a curated high-signal subset of the bundled
+catalog — rules that catch broken models, expensive-at-scale patterns, and a
+small core of consumer-experience checks. Use `--ruleset full` for the entire
+bundled catalog (including style and advisory rules).
+
 | Option | Description |
 |--------|-------------|
 | `-r, --rules <file>` | Path(s) or URL(s) to BPA rule file(s) in JSON format. |
-| `--ruleset <name>` | Standard ruleset: `standard`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
+| `--ruleset <name>` | Standard ruleset: `standard` (curated default), `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
 | `--rule <id>` | Run only specific rule(s) by ID. |
 | `--path <path>` | Limit analysis to matched objects (literal names, wildcards, or paths). |
 | `--errors` / `--warnings` / `--info` | Show only rules of that severity (combinable). |
 | `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. |
-| `--fix` | Apply fix expressions to auto-fix violations where possible. |
+| `--fix` | Apply fix expressions to auto-fix violations where possible. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
+| `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. |
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
 | `--vpax <file>` / `--vpa-rules` | Load VertiPaq Analyzer stats from a `.vpax` / include built-in VPA-aware rules. |
@@ -49,7 +55,9 @@ tx bpa run --fix --save
 
 The BPA gate also runs automatically on `deploy` and `save` (configured via
 `.te-bpa.json`; `--skip-bpa` to bypass, `--fix-bpa` to auto-fix first,
-`--bpa-rules` to point at specific rule files).
+`--bpa-rules` to point at specific rule files). The gate never applies
+destructive `Delete()` fixes — those are only available via
+`bpa run --fix --allow-delete`.
 
 ## `validate` — DAX and relationship integrity
 

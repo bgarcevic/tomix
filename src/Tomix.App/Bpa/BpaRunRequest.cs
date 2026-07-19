@@ -9,6 +9,7 @@ public sealed record BpaRunRequest(
     string? PathFilter = null,
     IReadOnlyList<string>? RuleIds = null,
     bool Fix = false,
+    bool AllowDelete = false,
     string? Ruleset = null,
     string? FailOn = null,
     bool Save = false,

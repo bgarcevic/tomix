@@ -115,12 +115,13 @@ public sealed class BpaRunHandler
                         $"Provider cannot mutate model: {context.EffectiveModel.Value}");
 
                 var fixer = new BpaFixer();
-                var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules);
+                var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules, request.AllowDelete);
 
                 runResult = runResult with
                 {
                     FixesApplied = fixResult.FixesApplied,
                     FixesSkipped = fixResult.FixesSkipped,
+                    DestructiveFixesSkipped = fixResult.DestructiveFixesSkipped,
                     FixErrors = fixResult.Errors.Count > 0
                         ? fixResult.Errors.Select(e => $"[{e.RuleId}] {e.ObjectPath}: {e.Reason}").ToList()
                         : null

@@ -12,7 +12,7 @@ namespace Tomix.App.Tests;
 public sealed class BpaRuleCoverageTests
 {
     private static BpaRule BundledRule(string id)
-        => BpaRuleLoader.LoadDefaultRules().Single(r => r.Id == id);
+        => BpaRuleLoader.LoadBundledCatalog().Single(r => r.Id == id);
 
     private static string[] Flagged(BpaRule rule, ModelSnapshot snapshot)
         => new BpaEngine()
