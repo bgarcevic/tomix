@@ -16,6 +16,10 @@ Application use cases and command handlers.
 - Receives provider implementations through Core abstractions; never references concrete provider projects.
 - Must not depend on `/src/Tomix.Cli`.
 - Must not depend on console or command-line libraries.
+- Cross-feature composition is allowed when a use case intentionally reuses another application
+  capability. Keep those dependencies acyclic; if reuse grows beyond direct orchestration or a
+  handler starts serving as a general-purpose service, extract the shared behavior into a clearly
+  named capability or shared folder instead of expanding command-to-command coupling.
 
 ## Rules
 
