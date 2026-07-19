@@ -29,12 +29,22 @@ public static class BpaModelRuleLoader
         string? baseDirectory,
         bool allowExternal,
         CancellationToken cancellationToken)
+        => await LoadAsync(
+            modelProperties, baseDirectory, allowExternal, httpClient: null, cancellationToken);
+
+    public static async Task<Outcome> LoadAsync(
+        IReadOnlyDictionary<string, string>? modelProperties,
+        string? baseDirectory,
+        bool allowExternal,
+        HttpClient? httpClient,
+        CancellationToken cancellationToken)
     {
         var collections = new List<BpaRuleCollection>();
         var diagnostics = new List<string>();
 
         LoadEmbedded(modelProperties, collections, diagnostics);
-        await LoadExternalAsync(modelProperties, baseDirectory, allowExternal, collections, diagnostics, cancellationToken)
+        await LoadExternalAsync(
+                modelProperties, baseDirectory, allowExternal, collections, diagnostics, httpClient, cancellationToken)
             .ConfigureAwait(false);
 
         return new Outcome(collections, diagnostics);
@@ -67,6 +77,7 @@ public static class BpaModelRuleLoader
         bool allowExternal,
         List<BpaRuleCollection> collections,
         List<string> diagnostics,
+        HttpClient? httpClient,
         CancellationToken cancellationToken)
     {
         var json = Annotation(properties, ExternalFilesKey);
@@ -104,7 +115,9 @@ public static class BpaModelRuleLoader
                         continue;
                     }
 
-                    var remote = await BpaRuleLoader.LoadFromSourceAsync(entry, cancellationToken).ConfigureAwait(false);
+                    var remote = await BpaRuleLoader
+                        .LoadFromSourceAsync(entry, httpClient, cancellationToken)
+                        .ConfigureAwait(false);
                     if (remote.Count > 0)
                         collections.Add(new BpaRuleCollection(BpaRuleSourceKind.External, entry, remote));
                     continue;

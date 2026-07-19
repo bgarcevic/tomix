@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Tomix.App.Dax;
-using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -19,26 +19,18 @@ public sealed class ValidateModelHandler
         ValidateModelRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.ResolveSingle(request.Model);
-        if (provider is null)
-            return TomixResult<ValidateModelResult>.Fail(
-                "TOMIX_NO_PROVIDER",
-                $"No provider can open model: {request.Model.Value}",
-                exitCode: 2);
-
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+            return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
             {
-                await using var session = await provider.OpenAsync(request.Model, cancellationToken);
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
                 var issues = request.ServerOnly
                     ? new LocalIssues([], [])
                     : ValidateLocal(snapshot);
                 return Complete(request, stopwatch, issues);
-            });
+            }, noProviderMessage: null, noProviderHint: null, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

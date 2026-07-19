@@ -48,10 +48,22 @@ public sealed class ProviderConnectionGuardTests
     public async Task RunAsync_RemoteDatabaseNotFound_MapsToDatabaseNotFound()
     {
         var result = await ProviderConnectionGuard.RunAsync(
-            RemoteRef, () => Throwing(new InvalidOperationException("Database not found on endpoint 'x'.")));
+            RemoteRef, () => Throwing(new ModelConnectionException(
+                ModelConnectionFailureKind.DatabaseNotFound,
+                "Database not found on endpoint 'x'.")));
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_DATABASE_NOT_FOUND", result.Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public async Task RunAsync_DoesNotClassifyDatabaseFromExceptionMessage()
+    {
+        var result = await ProviderConnectionGuard.RunAsync(
+            RemoteRef, () => Throwing(new InvalidOperationException("Database not found on endpoint 'x'.")));
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_CONNECT_FAILED", result.Diagnostics[0].Code);
     }
 
     [Fact]

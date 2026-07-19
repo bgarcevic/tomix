@@ -1,4 +1,4 @@
-using Tomix.App.Diagnostics;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -21,25 +21,16 @@ public sealed class ShowRefreshPolicyHandler
         ShowRefreshPolicyRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.ResolveSingle(request.Model);
-        if (provider is null)
-            return TomixResult<RefreshPolicyInfo>.Fail(
-                "TOMIX_NO_PROVIDER",
-                $"No provider can open model: {request.Model.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
-
         // Open + read inside the try: for a remote endpoint OpenAsync can throw on auth or
         // connection setup, and those must surface as actionable diagnostics rather than an
         // unhandled exception. (A local ModelLoadException is left to the top-level handler,
         // mirroring the other read commands.)
-        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+        return await ModelSessionRunner.RunAsync(_providers, request.Model, session =>
         {
             // ObjectNotFound/NotSupported stay inside the guard so they keep their specific
             // diagnostics even on remote models, as the previous flat catch order guaranteed.
             try
             {
-                await using var session = await provider.OpenAsync(request.Model, cancellationToken);
                 if (session is not IModelMutationSession mutator)
                     return TomixResult<RefreshPolicyInfo>.Fail(
                         "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
@@ -64,6 +55,6 @@ public sealed class ShowRefreshPolicyHandler
             {
                 return TomixResult<RefreshPolicyInfo>.Fail("TOMIX_MUTATION_UNSUPPORTED", ex.Message);
             }
-        });
+        }, cancellationToken);
     }
 }

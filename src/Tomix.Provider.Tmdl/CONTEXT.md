@@ -26,5 +26,5 @@ Provider for TMDL folder-based semantic models.
 ## Test
 
 ```bash
-dotnet test tests/Tomix.Provider.Tests
+dotnet test tests/Tomix.Provider.Tmdl.Tests
 ```

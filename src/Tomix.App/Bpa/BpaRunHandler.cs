@@ -14,17 +14,20 @@ public sealed class BpaRunHandler
     private readonly MutationStores _stores;
     private readonly BpaUserRuleState _userRules;
     private readonly string _configDirectory;
+    private readonly HttpClient? _httpClient;
 
     public BpaRunHandler(
         IEnumerable<IModelProvider> providers,
         MutationStores stores,
         BpaUserRuleState userRules,
-        string configDirectory)
+        string configDirectory,
+        HttpClient? httpClient = null)
     {
         _providers = providers.ToList();
         _stores = stores;
         _userRules = userRules;
         _configDirectory = configDirectory;
+        _httpClient = httpClient;
     }
 
     public async Task<TomixResult<BpaRunResult>> HandleAsync(
@@ -161,7 +164,9 @@ public sealed class BpaRunHandler
             var label = string.IsNullOrWhiteSpace(request.Ruleset) ? BpaRuleLoader.StandardRuleset : request.Ruleset;
             collections.Add(new BpaRuleCollection(
                 BpaRuleSourceKind.Machine, label,
-                await BpaRuleLoader.LoadRulesetAsync(request.Ruleset, cancellationToken).ConfigureAwait(false)));
+                await BpaRuleLoader
+                    .LoadRulesetAsync(request.Ruleset, _httpClient, cancellationToken)
+                    .ConfigureAwait(false)));
         }
 
         if (request.RulesFiles is not null)
@@ -171,7 +176,9 @@ public sealed class BpaRunHandler
                 if (!string.IsNullOrWhiteSpace(file))
                     collections.Add(new BpaRuleCollection(
                         BpaRuleSourceKind.User, file,
-                        await BpaRuleLoader.LoadFromSourceAsync(file, cancellationToken).ConfigureAwait(false)));
+                        await BpaRuleLoader
+                            .LoadFromSourceAsync(file, _httpClient, cancellationToken)
+                            .ConfigureAwait(false)));
             }
         }
 
@@ -189,6 +196,7 @@ public sealed class BpaRunHandler
                 snapshot.Properties,
                 ModelBaseDirectory(request.Model),
                 request.AllowExternalRules,
+                _httpClient,
                 cancellationToken).ConfigureAwait(false);
 
             collections.AddRange(model.Collections);

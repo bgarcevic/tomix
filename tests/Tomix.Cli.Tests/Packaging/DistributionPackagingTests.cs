@@ -8,15 +8,18 @@ public sealed class DistributionPackagingTests
 
     private static string FindRepositoryRoot()
     {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null)
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
         {
-            if (File.Exists(Path.Combine(dir, "global.json")) || File.Exists(Path.Combine(dir, ".git", "HEAD")))
-                return dir;
-            dir = Directory.GetParent(dir)?.FullName;
+            if (File.Exists(Path.Combine(directory.FullName, "Tomix.slnx")))
+                return directory.FullName;
+
+            directory = directory.Parent;
         }
-        return AppContext.BaseDirectory;
+
+        throw new DirectoryNotFoundException("Could not locate the repository root from the test output directory.");
     }
+
     private static readonly string[] RequiredRuntimeIdentifiers =
     [
         "win-x64",

@@ -27,7 +27,7 @@ src/Tomix.App        Application handlers: one handler per operation.
 src/Tomix.Core       Domain model, provider abstractions.
 src/Tomix.Provider.* Model providers (TMDL folders, TOM/XMLA).
 src/Tomix.Auth       Authentication and credential caching.
-tests/               Tomix.Cli.Tests and Tomix.App.Tests, mirroring the source tree.
+tests/               Core, App, CLI, TOM, TMDL, and VPAX test projects.
 ```
 
 Each directory has a `CONTEXT.md` describing its responsibilities and

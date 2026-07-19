@@ -1,28 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\Tomix.Auth\Tomix.Auth.csproj" />
     <ProjectReference Include="..\Tomix.Core\Tomix.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dax.Formatter" Version="1.2.0" />
-    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.2" />
+    <PackageReference Include="Dax.Formatter" />
+    <PackageReference Include="System.Linq.Dynamic.Core" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Bpa\Rules\bpa-rules.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <TargetPath>Bpa\Rules\bpa-rules.json</TargetPath>
-    </None>
+    <EmbeddedResource Include="Bpa\Rules\bpa-rules.json" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Tomix.App.Tests" />

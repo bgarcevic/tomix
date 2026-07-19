@@ -20,6 +20,10 @@ catalog — rules that catch broken models, expensive-at-scale patterns, and a
 small core of consumer-experience checks. Use `--ruleset full` for the entire
 bundled catalog (including style and advisory rules).
 
+The bundled catalog is embedded in the application and cannot be overridden by
+placing a file beside the executable. Use `--rules`, model rule annotations, or
+the `bpa rules` commands for explicit customization.
+
 | Option | Description |
 |--------|-------------|
 | `-r, --rules <file>` | Path(s) or URL(s) to BPA rule file(s) in JSON format. |

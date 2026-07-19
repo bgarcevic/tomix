@@ -1,5 +1,6 @@
 using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
 using Tomix.Core.Results;
@@ -17,23 +18,16 @@ public sealed class DiffModelHandler
         DiffModelRequest request,
         CancellationToken cancellationToken)
     {
+        // Resolve both sides before opening either one so invalid input never performs connection work.
         var leftProvider = _providers.ResolveSingle(request.Left);
         if (leftProvider is null)
-            return TomixResult<DiffModelResult>.Fail(
-                code: "TOMIX_NO_PROVIDER",
-                message: $"No provider can open model: {request.Left.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
+            return NoProvider(request.Left);
 
         var rightProvider = _providers.ResolveSingle(request.Right);
         if (rightProvider is null)
-            return TomixResult<DiffModelResult>.Fail(
-                code: "TOMIX_NO_PROVIDER",
-                message: $"No provider can open model: {request.Right.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
+            return NoProvider(request.Right);
 
-        // Nested guards so a connection failure is attributed to the side that actually failed.
+        // Nested guards attribute connection failures to the side that actually failed.
         return await ProviderConnectionGuard.RunAsync(request.Left, async () =>
         {
             await using var leftSession = await leftProvider.OpenAsync(request.Left, cancellationToken);
@@ -55,6 +49,13 @@ public sealed class DiffModelHandler
             });
         });
     }
+
+    private static TomixResult<DiffModelResult> NoProvider(ModelReference model)
+        => TomixResult<DiffModelResult>.Fail(
+            "TOMIX_NO_PROVIDER",
+            $"No provider can open model: {model.Value}",
+            exitCode: 2,
+            hint: ModelSessionRunner.DefaultNoProviderHint);
 
     private static IReadOnlyList<DiffChange> Compare(ModelSnapshot left, ModelSnapshot right)
     {

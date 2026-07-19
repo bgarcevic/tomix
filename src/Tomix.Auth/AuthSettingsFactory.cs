@@ -1,16 +1,17 @@
-using Tomix.App.Config;
-using Tomix.Auth;
 using Tomix.Core.Configuration;
 
-namespace Tomix.App.Auth;
+namespace Tomix.Auth;
 
 /// <summary>
-/// Resolves Azure AD client settings. Precedence: explicit override → environment variable →
-/// local config → built-in default.
+/// Resolves Azure AD client settings. Precedence: explicit override, environment variable,
+/// local configuration, then the built-in default.
 /// </summary>
 public static class AuthSettingsFactory
 {
-    public static MsalAuthSettings Resolve(IDictionary<string, string> config, string? clientIdOverride = null, string? tenant = null)
+    public static MsalAuthSettings Resolve(
+        IDictionary<string, string> config,
+        string? clientIdOverride = null,
+        string? tenant = null)
     {
         var clientId = FirstNonEmpty(
             clientIdOverride,

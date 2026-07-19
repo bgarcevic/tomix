@@ -111,7 +111,9 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
     {
         if (!string.IsNullOrWhiteSpace(database))
             return server.Databases.FindByName(database)
-                ?? throw new InvalidOperationException($"Database not found on endpoint: {database}");
+                ?? throw new ModelConnectionException(
+                    ModelConnectionFailureKind.DatabaseNotFound,
+                    $"Database not found on endpoint: {database}");
 
         return server.Databases.Count switch
         {

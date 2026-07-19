@@ -42,11 +42,16 @@ public sealed class BpaRulesListHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly BpaUserRuleState _userRules;
+    private readonly HttpClient? _httpClient;
 
-    public BpaRulesListHandler(IEnumerable<IModelProvider>? providers, BpaUserRuleState userRules)
+    public BpaRulesListHandler(
+        IEnumerable<IModelProvider>? providers,
+        BpaUserRuleState userRules,
+        HttpClient? httpClient = null)
     {
         _providers = providers?.ToList() ?? [];
         _userRules = userRules;
+        _httpClient = httpClient;
     }
 
     public async Task<TomixResult<BpaRulesListResult>> HandleAsync(
@@ -56,7 +61,7 @@ public sealed class BpaRulesListHandler
         IReadOnlyList<LoadedRule> rules;
         try
         {
-            rules = await LoadRulesAsync(request, cancellationToken).ConfigureAwait(false);
+            rules = await LoadRulesAsync(request, _httpClient, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
         {
@@ -131,6 +136,7 @@ public sealed class BpaRulesListHandler
 
     private static async Task<IReadOnlyList<LoadedRule>> LoadRulesAsync(
         BpaRulesListRequest request,
+        HttpClient? httpClient,
         CancellationToken cancellationToken)
     {
         var rules = new List<LoadedRule>();
@@ -140,13 +146,17 @@ public sealed class BpaRulesListHandler
             var source = string.IsNullOrWhiteSpace(request.Ruleset)
                 ? BpaRuleLoader.StandardRuleset
                 : request.Ruleset;
-            rules.AddRange((await BpaRuleLoader.LoadRulesetAsync(request.Ruleset, cancellationToken).ConfigureAwait(false))
+            rules.AddRange((await BpaRuleLoader
+                    .LoadRulesetAsync(request.Ruleset, httpClient, cancellationToken)
+                    .ConfigureAwait(false))
                 .Select(rule => new LoadedRule(source, rule)));
         }
 
         if (!string.IsNullOrWhiteSpace(request.RulesFile))
         {
-            rules.AddRange((await BpaRuleLoader.LoadFromSourceAsync(request.RulesFile, cancellationToken).ConfigureAwait(false))
+            rules.AddRange((await BpaRuleLoader
+                    .LoadFromSourceAsync(request.RulesFile, httpClient, cancellationToken)
+                    .ConfigureAwait(false))
                 .Select(rule => new LoadedRule("custom", rule)));
         }
 

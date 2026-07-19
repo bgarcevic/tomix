@@ -1,4 +1,4 @@
-using Tomix.App.Diagnostics;
+using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
 using Tomix.Core.Properties;
@@ -17,18 +17,8 @@ public sealed class LsModelHandler
         LsModelRequest request,
         CancellationToken cancellationToken)
     {
-        var provider = _providers.ResolveSingle(request.Model);
-
-        if (provider is null)
-            return TomixResult<LsModelResult>.Fail(
-                code: "TOMIX_NO_PROVIDER",
-                message: $"No provider can open model: {request.Model.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
-
-        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
         {
-            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
             var matches = ModelObjectSelector
@@ -42,6 +32,6 @@ public sealed class LsModelHandler
 
             return TomixResult<LsModelResult>.Ok(
                 new LsModelResult(snapshot.Name, snapshot.CompatibilityLevel, matches));
-        });
+        }, cancellationToken);
     }
 }

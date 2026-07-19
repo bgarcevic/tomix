@@ -228,7 +228,7 @@ internal sealed class AuthCommand : ICommandModule
 
     private MsalAuthenticator CreateAuthenticator(string? clientIdOverride, string? tenant)
         => new(
-            App.Auth.AuthSettingsFactory.Resolve(_services.ConfigStore.Load(), clientIdOverride, tenant),
+            AuthSettingsFactory.Resolve(_services.ConfigStore.Load(), clientIdOverride, tenant),
             messageWriter: Console.Error.WriteLine);
 
     private static void RenderLogin(AuthLoginResult result)

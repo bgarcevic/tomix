@@ -74,4 +74,39 @@ public sealed class BpaRuleLoaderTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public async Task LoadFromSourceAsync_Http_UsesSuppliedClient()
+    {
+        var handler = new RecordingHandler();
+        using var client = new HttpClient(handler);
+
+        var rules = await BpaRuleLoader.LoadFromSourceAsync(
+            "https://example.test/rules.json",
+            client,
+            CancellationToken.None);
+
+        Assert.True(handler.Called);
+        Assert.Contains(handler.UserAgent, value => value.Contains("tomix-cli", StringComparison.Ordinal));
+        Assert.Equal("REMOTE_RULE", Assert.Single(rules).Id);
+    }
+
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        public bool Called { get; private set; }
+        public IReadOnlyList<string> UserAgent { get; private set; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Called = true;
+            UserAgent = request.Headers.UserAgent.Select(value => value.ToString()).ToList();
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """[{"ID":"REMOTE_RULE","Name":"Remote","Category":"Custom","Severity":1,"Scope":"Model"}]""")
+            });
+        }
+    }
 }

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
-using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
 using Tomix.Core.Results;
@@ -34,18 +34,8 @@ public sealed class FindModelHandler
             }
         }
 
-        var provider = _providers.ResolveSingle(request.Model);
-
-        if (provider is null)
-            return TomixResult<FindModelResult>.Fail(
-                code: "TOMIX_NO_PROVIDER",
-                message: $"No provider can open model: {request.Model.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
-
-        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
         {
-            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
             var matches = new List<FindMatch>();
@@ -76,7 +66,7 @@ public sealed class FindModelHandler
             }
 
             return TomixResult<FindModelResult>.Ok(new FindModelResult(request.Pattern, matches));
-        });
+        }, cancellationToken);
     }
 
     private static bool IsSearchableByDefault(ModelObject obj)

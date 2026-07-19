@@ -1,4 +1,5 @@
 using Tomix.App.Add;
+using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Tests;
@@ -55,6 +56,48 @@ public sealed class AddModelObjectHandlerTests
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_MUTATION_UNSUPPORTED_PROVIDER", result.Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemoteAuthenticationFailure_ReturnsAuthRequired()
+    {
+        var handler = new AddModelObjectHandler(
+            [new ThrowingProvider(new AuthenticationRequiredException("login please"))],
+            TestStores);
+
+        var result = await handler.HandleAsync(
+            RequestFor(ModelReference.Remote("powerbi://api.powerbi.com/v1.0/myorg/Workspace", "Sales")),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_AUTH_REQUIRED", result.Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemoteConnectionFailure_ReturnsConnectFailed()
+    {
+        var handler = new AddModelObjectHandler(
+            [new ThrowingProvider(new TimeoutException("server unavailable"))],
+            TestStores);
+
+        var result = await handler.HandleAsync(
+            RequestFor(ModelReference.Remote("powerbi://api.powerbi.com/v1.0/myorg/Workspace", "Sales")),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_CONNECT_FAILED", result.Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Cancellation_Propagates()
+    {
+        var handler = new AddModelObjectHandler(
+            [new ThrowingProvider(new OperationCanceledException())],
+            TestStores);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => handler.HandleAsync(
+            RequestFor(ModelReference.Remote("powerbi://api.powerbi.com/v1.0/myorg/Workspace", "Sales")),
+            CancellationToken.None));
     }
 
     [Fact]
@@ -512,6 +555,27 @@ public sealed class AddModelObjectHandlerTests
         public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
             => Task.FromResult(_session);
     }
+
+    private sealed class ThrowingProvider(Exception error) : IModelProvider
+    {
+        public bool CanOpen(ModelReference reference) => true;
+
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
+            => Task.FromException<IModelSession>(error);
+    }
+
+    private static AddModelObjectRequest RequestFor(ModelReference model)
+        => new(
+            model,
+            "Sales/Revenue",
+            "Measure",
+            "SUM(Sales[Amount])",
+            [],
+            IfNotExists: false,
+            Save: false,
+            SaveTo: null,
+            Serialization: "",
+            Force: false);
 
     private sealed class StubMutationSession : IModelSession, IModelMutationSession
     {

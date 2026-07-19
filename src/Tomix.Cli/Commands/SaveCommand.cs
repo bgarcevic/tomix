@@ -13,11 +13,16 @@ internal sealed class SaveCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
 
     private readonly AppServices _services;
+    private readonly HttpClient? _httpClient;
 
-    public SaveCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public SaveCommand(
+        IReadOnlyList<IModelProvider> providers,
+        AppServices services,
+        HttpClient? httpClient = null)
     {
         _providers = providers;
         _services = services;
+        _httpClient = httpClient;
     }
 
     public Command Build()
@@ -116,7 +121,7 @@ internal sealed class SaveCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Saving model...",
-                () => new SaveModelHandler(_providers).HandleAsync(
+                () => new SaveModelHandler(_providers, _httpClient).HandleAsync(
                     new SaveModelRequest(
                         reference,
                         outputPath,

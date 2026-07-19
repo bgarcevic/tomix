@@ -19,8 +19,8 @@ of the MIT-licensed sql-bi VertiPaq-Analyzer libraries (`Dax.Model.Extractor`, `
   `Tomix.Core` types only.
 - This is a standalone service, not an `IModelSession` capability: extraction opens its own
   connection from a connection string, and `--import` needs no model at all.
-- Endpoint normalization and token handling mirror `TomServerModelProvider`
-  (`TomModelDeployer.ResolveEndpoint`, Core `AccessToken` -> AMO `AccessToken`).
+- Endpoint normalization and token handling mirror the TOM provider while remaining implemented
+  locally so this project keeps no production reference to `Tomix.Provider.Tom`.
 - Failures surface as `VertipaqAnalysisException` with a `VertipaqAnalysisKind`
   (never raw library exceptions) or `AuthenticationRequiredException`.
 
@@ -32,6 +32,6 @@ of the MIT-licensed sql-bi VertiPaq-Analyzer libraries (`Dax.Model.Extractor`, `
 
 ## Cross-folder dependencies
 
-- Depends on `Tomix.Core` (contract + DTOs) and `Tomix.Provider.Tom` (endpoint resolution).
+- Depends only on `Tomix.Core` among `Tomix.*` projects.
 - Consumed by `Tomix.Cli` (composition root) and, via `IVertipaqAnalyzer`, by `Tomix.App`.
 - Never referenced by `Tomix.Core` or `Tomix.App` directly.

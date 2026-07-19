@@ -77,6 +77,21 @@ public sealed class DiffModelHandlerTests
         Assert.Empty(changes);
     }
 
+    [Fact]
+    public async Task HandleAsync_RightHasNoProvider_DoesNotOpenLeft()
+    {
+        var provider = new LeftOnlyProvider(Snapshot(new Dictionary<string, string>()));
+        var handler = new DiffModelHandler([provider]);
+
+        var result = await handler.HandleAsync(
+            new DiffModelRequest(new ModelReference("left"), new ModelReference("right")),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_NO_PROVIDER", result.Diagnostics[0].Code);
+        Assert.Equal(0, provider.OpenCount);
+    }
+
     private static async Task<IReadOnlyList<DiffChange>> Diff(ModelSnapshot left, ModelSnapshot right)
     {
         var handler = new DiffModelHandler([new SnapshotProvider(left, right)]);
@@ -109,6 +124,19 @@ public sealed class DiffModelHandlerTests
         public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
             => Task.FromResult<IModelSession>(new SnapshotSession(
                 reference.Value == "left" ? left : right));
+    }
+
+    private sealed class LeftOnlyProvider(ModelSnapshot snapshot) : IModelProvider
+    {
+        public int OpenCount { get; private set; }
+
+        public bool CanOpen(ModelReference reference) => reference.Value == "left";
+
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
+        {
+            OpenCount++;
+            return Task.FromResult<IModelSession>(new SnapshotSession(snapshot));
+        }
     }
 
     private sealed class SnapshotSession(ModelSnapshot snapshot) : IModelSession

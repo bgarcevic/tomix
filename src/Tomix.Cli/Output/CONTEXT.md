@@ -24,6 +24,8 @@ Shared output wiring for all commands.
 - `TraceWriter` / `NonDisposingTextWriter` — shared `--trace` destination plumbing for `refresh` and `query`: resolves the option value (bare/`-` → stderr, otherwise file) and opens the writer; the wrapper keeps `using` scopes from disposing the process-shared `Console.Error`.
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--plan`/`--runs` server-timings, query-plan, and benchmark summaries written to stderr).
+- `GetRenderer`, `DepsRenderer`, `DeployRenderer`, `ScriptRenderer`, and `ValidateRenderer` —
+  complex command-specific text/table rendering and machine-output projections.
 - `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.
 - `CiAnnotations` — shared `--ci github`/`--ci vsts` logging-command syntax; callers project results into `CiAnnotation`s.
 - `TrxWriter` — shared `--trx` VSTEST file writer for `validate` and `bpa run`; callers project results into `TrxWriter.TrxTest`s (projections live on `ValidateRenderer`/`BpaRunRenderer`).
@@ -59,5 +61,7 @@ Key rules:
 - Do not hand-roll JSON output; serialize through `JsonOutput`.
 - Do not add Spectre.Console usages outside this directory and `Commands/`.
 - Do not reference provider-specific types.
-- Command-specific renderers live here as `<Command>Renderer` (plus an optional Spectre-free `<Command>View` for unit-testable layout logic); commands themselves must not contain Spectre table/grid rendering or JSON projections.
+- Command-specific renderers live here as `<Command>Renderer` (plus an optional Spectre-free
+  `<Command>View` for unit-testable layout logic). Commands may own prompts and trivial one-line
+  interaction, but must not contain tables, trees, multi-format serialization, or JSON projections.
 - When adding new styling, extend `Styling.cs` — do not create per-command color constants.

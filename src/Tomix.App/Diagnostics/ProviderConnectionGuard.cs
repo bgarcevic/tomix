@@ -23,8 +23,8 @@ public static class ProviderConnectionGuard
         {
             return await action();
         }
-        catch (InvalidOperationException ex)
-            when (model is { IsRemote: true } && ex.Message.Contains("Database not found on endpoint"))
+        catch (ModelConnectionException ex)
+            when (ex.Kind == ModelConnectionFailureKind.DatabaseNotFound)
         {
             return TomixResult<T>.Fail("TOMIX_DATABASE_NOT_FOUND", ex.Message, exitCode: 1);
         }

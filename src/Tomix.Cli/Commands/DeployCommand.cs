@@ -2,7 +2,6 @@ using System.CommandLine;
 using Spectre.Console;
 using Tomix.App;
 using Tomix.App.Deploy;
-using Tomix.App.Diff;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
@@ -14,11 +13,16 @@ internal sealed class DeployCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
 
     private readonly AppServices _services;
+    private readonly HttpClient? _httpClient;
 
-    public DeployCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public DeployCommand(
+        IReadOnlyList<IModelProvider> providers,
+        AppServices services,
+        HttpClient? httpClient = null)
     {
         _providers = providers;
         _services = services;
+        _httpClient = httpClient;
     }
 
     public Command Build()
@@ -165,7 +169,7 @@ internal sealed class DeployCommand : ICommandModule
             var spinnerLabel = dryRun ? "Previewing deployment..." : "Deploying model...";
             var result = await CliSpinner.RunAsync(
                 spinnerLabel,
-                () => new DeployModelHandler(_providers, _services.State).HandleAsync(
+                () => new DeployModelHandler(_providers, _services.State, httpClient: _httpClient).HandleAsync(
                     new DeployModelRequest(
                         reference,
                         server,
@@ -195,70 +199,10 @@ internal sealed class DeployCommand : ICommandModule
             return CommandOutput.Render(
                 result,
                 format,
-                data => Render(data, reference.Value));
+                data => DeployRenderer.Render(data, reference.Value));
         });
 
         return command;
     }
 
-    private static void Render(DeployModelResult result, string source)
-    {
-        if (result.Status == "script")
-        {
-            AnsiConsole.MarkupLine(Styling.KeyValue("Source:", source));
-            AnsiConsole.MarkupLine(Styling.KeyValue("Script:", result.ScriptPath ?? ""));
-            return;
-        }
-
-        if (result.Status == "dry-run")
-        {
-            var name = string.IsNullOrWhiteSpace(result.Database) ? source : result.Database;
-            AnsiConsole.MarkupLine(Styling.Value($"Dry run: {name} to {result.Server} / {result.Database}"));
-
-            if (result.Diff is not null)
-            {
-                if (!result.Diff.HasChanges)
-                {
-                    AnsiConsole.MarkupLine(Styling.Success("No changes — local and remote are identical."));
-                    return;
-                }
-
-                var s = result.Diff.Summary;
-                AnsiConsole.MarkupLine(Styling.Bold(
-                    $"{s.Added} added, {s.Removed} removed, {s.Modified} modified"));
-                AnsiConsole.WriteLine();
-
-                foreach (var change in result.Diff.Changes)
-                    RenderDiffChange(change);
-            }
-            else
-            {
-                AnsiConsole.MarkupLine(Styling.Muted("Remote target not reachable or not specified — showing deploy plan only."));
-            }
-
-            return;
-        }
-
-        var deployName = string.IsNullOrWhiteSpace(result.Database) ? source : result.Database;
-        AnsiConsole.MarkupLine(Styling.Value($"Deploying {deployName} to {result.Server} / {result.Database}..."));
-        AnsiConsole.MarkupLine(Styling.Success($"Deployed: {result.Status} ({result.DurationMs}ms)"));
-    }
-
-    private static void RenderDiffChange(DiffChange change)
-    {
-        switch (change.Action)
-        {
-            case "added":
-                AnsiConsole.MarkupLine($"  {Styling.Success("+")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                break;
-            case "removed":
-                AnsiConsole.MarkupLine($"  {Styling.Error("-")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                break;
-            case "modified":
-                AnsiConsole.MarkupLine($"  {Styling.Warning("~")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                AnsiConsole.MarkupLine($"    {Styling.Error($"- {change.OldValue}")}");
-                AnsiConsole.MarkupLine($"    {Styling.Success($"+ {change.NewValue}")}");
-                break;
-        }
-    }
 }

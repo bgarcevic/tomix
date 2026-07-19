@@ -21,7 +21,8 @@ CLI entry point for `tx`.
 ## Structure
 
 - `Commands/` - one `ICommandModule` per command. Each module builds its `Command`, parses input,
-  calls a handler, and renders the result. `Program` just registers every module on the root command.
+  calls a handler, selects an output renderer, and returns the exit code. Commands may render prompts
+  and trivial one-line messages; complex tables, trees, serialization, and projections live in `Output/`.
 - `Output/` - shared output wiring used by every command. See `Output/CONTEXT.md` for details.
   - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
   - `JsonOutput` - the single JSON serializer (the `--format json` contract).

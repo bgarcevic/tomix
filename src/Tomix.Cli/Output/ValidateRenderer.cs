@@ -1,3 +1,4 @@
+using Spectre.Console;
 using Tomix.App.Validate;
 
 namespace Tomix.Cli.Output;
@@ -8,6 +9,62 @@ namespace Tomix.Cli.Output;
 /// </summary>
 internal static class ValidateRenderer
 {
+    public static void Render(
+        ValidateModelResult result,
+        bool errorsOnly,
+        bool noMultiline,
+        bool includeBanner)
+    {
+        if (includeBanner)
+            AnsiConsole.MarkupLine(Styling.Value("Validating..."));
+        AnsiConsole.MarkupLine(Styling.Muted("Validating: (unnamed)"));
+        AnsiConsole.WriteLine();
+
+        if (result.Valid)
+        {
+            AnsiConsole.MarkupLine(Styling.Success("No validation errors found."));
+            if (errorsOnly || result.Warnings.Count == 0)
+                return;
+        }
+
+        var allRows = new List<(string Kind, string Message, string Object, string Line)>();
+
+        foreach (var error in result.Errors)
+        {
+            var message = noMultiline ? error.Message.ReplaceLineEndings(" ") : error.Message;
+            allRows.Add(("Error", message, error.ObjectName, error.Expression ?? ""));
+        }
+
+        if (!errorsOnly)
+        {
+            foreach (var warning in result.Warnings)
+            {
+                var message = noMultiline ? warning.Message.ReplaceLineEndings(" ") : warning.Message;
+                allRows.Add(("Warning", message, warning.ObjectName, warning.Expression ?? ""));
+            }
+        }
+
+        if (result.Errors.Count > 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Error("Errors"));
+            RenderTable(allRows.Where(row => row.Kind == "Error").ToList());
+        }
+
+        if (!errorsOnly && result.Warnings.Count > 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Warning("Warnings"));
+            RenderTable(allRows.Where(row => row.Kind == "Warning").ToList());
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Errors:", result.Errors.Count.ToString())}");
+
+        if (!errorsOnly)
+            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Warnings:", result.Warnings.Count.ToString())}");
+
+        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Anti-patterns:", "0")}");
+    }
+
     public static void EmitCi(string? ci, ValidateModelResult result)
     {
         if (result.Valid)
@@ -50,4 +107,20 @@ internal static class ValidateRenderer
         => string.IsNullOrEmpty(issue.Expression)
             ? issue.Message
             : $"{issue.Message}{Environment.NewLine}{issue.Expression}";
+
+    private static void RenderTable(IReadOnlyList<(string Kind, string Message, string Object, string Line)> rows)
+    {
+        if (rows.Count == 0)
+            return;
+
+        var table = Styling.NewTable("Message", "Object", "Line");
+
+        foreach (var row in rows)
+            table.AddRow(
+                Styling.MarkupEscape(row.Message),
+                Styling.MarkupEscape(row.Object),
+                Styling.MarkupEscape(row.Line));
+
+        AnsiConsole.Write(table);
+    }
 }

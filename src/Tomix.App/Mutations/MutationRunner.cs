@@ -1,3 +1,4 @@
+using Tomix.App.Diagnostics;
 using Tomix.App.State;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -7,6 +8,20 @@ namespace Tomix.App.Mutations;
 public static class MutationRunner
 {
     public static async Task<TomixResult<TResult>> RunAsync<TResult>(
+        IReadOnlyList<IModelProvider> providers,
+        ModelReference model,
+        MutationOptions options,
+        string command,
+        MutationStores stores,
+        Func<IModelMutationSession, IModelSession, MutationContext, Task<(bool Changed, string Summary, Func<MutationOutcome, TResult> BuildResult)>> mutate,
+        TResult revertResult,
+        CancellationToken cancellationToken)
+        => await ProviderConnectionGuard.RunAsync(
+            model,
+            () => RunCoreAsync(
+                providers, model, options, command, stores, mutate, revertResult, cancellationToken));
+
+    private static async Task<TomixResult<TResult>> RunCoreAsync<TResult>(
         IReadOnlyList<IModelProvider> providers,
         ModelReference model,
         MutationOptions options,

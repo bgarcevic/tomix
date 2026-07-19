@@ -56,7 +56,7 @@ internal static class Program
             AnsiConsole.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
 
         var tokenProvider = new MsalAuthenticator(
-            App.Auth.AuthSettingsFactory.Resolve(config),
+            AuthSettingsFactory.Resolve(config),
             messageWriter: Console.Error.WriteLine);
         IReadOnlyList<IModelProvider> providers =
             [new TmdlModelProvider(tokenProvider), new TomFileModelProvider(tokenProvider), new TomServerModelProvider(tokenProvider)];
@@ -74,7 +74,7 @@ internal static class Program
         var version = ResolveVersion();
         var root = BuildRootCommand(
             providers, formatter, version, services, workspaceCatalog, tokenProvider.CachedUsername,
-            new VpaxVertipaqAnalyzer(tokenProvider, version), releaseSource);
+            new VpaxVertipaqAnalyzer(tokenProvider, version), releaseSource, httpClient);
 
         if (args.Length == 0)
         {
@@ -174,7 +174,8 @@ internal static class Program
         IWorkspaceCatalog? workspaceCatalog = null,
         Func<string?>? cachedUsername = null,
         IVertipaqAnalyzer? analyzer = null,
-        IReleaseSource? releaseSource = null)
+        IReleaseSource? releaseSource = null,
+        HttpClient? httpClient = null)
     {
         analyzer ??= new VpaxVertipaqAnalyzer(tokenProvider: null, version);
         var root = new RootCommand("tx - CLI for semantic models");
@@ -185,7 +186,7 @@ internal static class Program
         {
             new AddCommand(providers, services),
             new AuthCommand(services),
-            new BpaCommand(providers, services),
+            new BpaCommand(providers, services, httpClient),
             new CompletionCommand(() => root.Subcommands.Select(command => command.Name).ToList()),
             new ConfigCommand(services),
             new ConnectCommand(
@@ -193,7 +194,7 @@ internal static class Program
                 workspaceCatalog ?? EmptyWorkspaceCatalog.Instance,
                 cachedUsername ?? (() => null),
                 services),
-            new DeployCommand(providers, services),
+            new DeployCommand(providers, services, httpClient),
             new DepsCommand(providers, services),
             new DiffCommand(providers),
             new DoctorCommand(version, services.ConfigDirectory, releaseSource),
@@ -210,7 +211,7 @@ internal static class Program
             new RefreshCommand(providers, services),
             new ReplaceCommand(providers, services),
             new RmCommand(providers, services),
-            new SaveCommand(providers, services),
+            new SaveCommand(providers, services, httpClient),
             new ScriptCommand(providers, services),
             new SessionCommand(services),
             new SetCommand(providers, services),

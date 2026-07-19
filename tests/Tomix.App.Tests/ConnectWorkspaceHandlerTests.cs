@@ -35,7 +35,11 @@ public class ConnectWorkspaceHandlerTests
     public async Task Probe_DatabaseNotFound_ReportsMissing()
     {
         var handler = new ConnectWorkspaceHandler(
-            [new StubRemoteProvider(summaryDatabaseName: null, openError: new InvalidOperationException("Database not found on endpoint: 'Sales'"))]);
+            [new StubRemoteProvider(
+                summaryDatabaseName: null,
+                openError: new ModelConnectionException(
+                    ModelConnectionFailureKind.DatabaseNotFound,
+                    "Database not found on endpoint: 'Sales'"))]);
 
         var probe = await handler.ProbeAsync(new ConnectWorkspaceProbeRequest(Workspace, "Sales"), CancellationToken.None);
 

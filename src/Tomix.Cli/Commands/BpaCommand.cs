@@ -13,11 +13,16 @@ internal sealed class BpaCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
 
     private readonly AppServices _services;
+    private readonly HttpClient? _httpClient;
 
-    public BpaCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public BpaCommand(
+        IReadOnlyList<IModelProvider> providers,
+        AppServices services,
+        HttpClient? httpClient = null)
     {
         _providers = providers;
         _services = services;
+        _httpClient = httpClient;
     }
 
     public Command Build()
@@ -220,7 +225,8 @@ internal sealed class BpaCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
-                () => new BpaRunHandler(_providers, _services.Mutations, _services.BpaRules, _services.ConfigDirectory).HandleAsync(
+                () => new BpaRunHandler(
+                    _providers, _services.Mutations, _services.BpaRules, _services.ConfigDirectory, _httpClient).HandleAsync(
                     new BpaRunRequest(
                         model,
                         ruleFiles,
@@ -364,7 +370,7 @@ internal sealed class BpaCommand : ICommandModule
                     parseResult.GetValue(GlobalOptions.Server));
             }
 
-            var result = await new BpaRulesListHandler(_providers, _services.BpaRules).HandleAsync(
+            var result = await new BpaRulesListHandler(_providers, _services.BpaRules, _httpClient).HandleAsync(
                 new BpaRulesListRequest(
                     Model: model,
                     All: parseResult.GetValue(allOption),

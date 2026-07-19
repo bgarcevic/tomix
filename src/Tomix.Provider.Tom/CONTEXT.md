@@ -35,5 +35,5 @@ Adapter around Microsoft Tabular Object Model.
 ## Test
 
 ```bash
-dotnet test tests/Tomix.Provider.Tests
+dotnet test tests/Tomix.Provider.Tom.Tests
 ```

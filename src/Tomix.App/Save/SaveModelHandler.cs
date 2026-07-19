@@ -9,9 +9,13 @@ namespace Tomix.App.Save;
 public sealed class SaveModelHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly HttpClient? _httpClient;
 
-    public SaveModelHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+    public SaveModelHandler(IEnumerable<IModelProvider> providers, HttpClient? httpClient = null)
+    {
+        _providers = providers.ToList();
+        _httpClient = httpClient;
+    }
 
     public async Task<TomixResult<SaveModelResult>> HandleAsync(
         SaveModelRequest request,
@@ -94,13 +98,21 @@ public sealed class SaveModelHandler
         IReadOnlyList<BpaRule> rules;
         try
         {
-            rules = await BpaRuleLoader.LoadRulesetAsync(null, cancellationToken).ConfigureAwait(false);
+            rules = await BpaRuleLoader
+                .LoadRulesetAsync(null, _httpClient, cancellationToken)
+                .ConfigureAwait(false);
             if (request.BpaRules is not null)
             {
                 foreach (var file in request.BpaRules)
                 {
                     if (!string.IsNullOrWhiteSpace(file))
-                        rules = [.. rules, .. await BpaRuleLoader.LoadFromSourceAsync(file, cancellationToken).ConfigureAwait(false)];
+                        rules =
+                        [
+                            .. rules,
+                            .. await BpaRuleLoader
+                                .LoadFromSourceAsync(file, _httpClient, cancellationToken)
+                                .ConfigureAwait(false)
+                        ];
                 }
             }
         }

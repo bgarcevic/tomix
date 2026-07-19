@@ -13,12 +13,18 @@ public sealed class DeployModelHandler
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly CliStateStore _state;
     private readonly Func<CliConnectionState?> _resolveSession;
+    private readonly HttpClient? _httpClient;
 
-    public DeployModelHandler(IEnumerable<IModelProvider> providers, CliStateStore state, Func<CliConnectionState?>? sessionOverride = null)
+    public DeployModelHandler(
+        IEnumerable<IModelProvider> providers,
+        CliStateStore state,
+        Func<CliConnectionState?>? sessionOverride = null,
+        HttpClient? httpClient = null)
     {
         _providers = providers.ToList();
         _state = state;
         _resolveSession = sessionOverride ?? state.LoadCurrentSession;
+        _httpClient = httpClient;
     }
 
     public async Task<TomixResult<DeployModelResult>> HandleAsync(
@@ -143,13 +149,21 @@ public sealed class DeployModelHandler
         IReadOnlyList<BpaRule> rules;
         try
         {
-            rules = await BpaRuleLoader.LoadRulesetAsync(null, cancellationToken).ConfigureAwait(false);
+            rules = await BpaRuleLoader
+                .LoadRulesetAsync(null, _httpClient, cancellationToken)
+                .ConfigureAwait(false);
             if (request.BpaRules is not null)
             {
                 foreach (var file in request.BpaRules)
                 {
                     if (!string.IsNullOrWhiteSpace(file))
-                        rules = [.. rules, .. await BpaRuleLoader.LoadFromSourceAsync(file, cancellationToken).ConfigureAwait(false)];
+                        rules =
+                        [
+                            .. rules,
+                            .. await BpaRuleLoader
+                                .LoadFromSourceAsync(file, _httpClient, cancellationToken)
+                                .ConfigureAwait(false)
+                        ];
                 }
             }
         }

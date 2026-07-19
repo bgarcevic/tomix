@@ -1,5 +1,5 @@
-using Tomix.App.Diagnostics;
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -22,18 +22,8 @@ public sealed class DepsModelHandler
                 message: "A dependency path is required unless --unused is specified.",
                 exitCode: 2);
 
-        var provider = _providers.ResolveSingle(request.Model);
-
-        if (provider is null)
-            return TomixResult<DepsModelResult>.Fail(
-                code: "TOMIX_NO_PROVIDER",
-                message: $"No provider can open model: {request.Model.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
-
-        return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
+        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
         {
-            await using var session = await provider.OpenAsync(request.Model, cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
             var graph = DependencyGraph.FromSnapshot(snapshot);
 
@@ -81,6 +71,6 @@ public sealed class DepsModelHandler
                 ModelObjectProjection.KindLabel(target.Kind),
                 upstream,
                 downstream));
-        });
+        }, cancellationToken);
     }
 }
