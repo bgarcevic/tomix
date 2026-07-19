@@ -1,5 +1,6 @@
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 
 namespace Tomix.Provider.Tom;
 
@@ -17,27 +18,27 @@ public static class TomModelSummarizer
     private const string PropTableDataCategory = "TableDataCategory";
     private const string PropTableHasRls = "TableHasRls";
     private const string PropTableIsCalc = "TableIsCalc";
-    private const string PropFromColumn = "FromColumn";
-    private const string PropToColumn = "ToColumn";
+    private const string PropFromColumn = PropertyBagKeys.FromColumn;
+    private const string PropToColumn = PropertyBagKeys.ToColumn;
     private const string PropFromTable = "FromTable";
     private const string PropToTable = "ToTable";
-    private const string PropFromCardinality = "FromCardinality";
-    private const string PropToCardinality = "ToCardinality";
-    private const string PropCrossFilteringBehavior = "CrossFilteringBehavior";
-    private const string PropIsActive = "IsActive";
+    private const string PropFromCardinality = PropertyBagKeys.FromCardinality;
+    private const string PropToCardinality = PropertyBagKeys.ToCardinality;
+    private const string PropCrossFilteringBehavior = PropertyBagKeys.CrossFilteringBehavior;
+    private const string PropIsActive = PropertyBagKeys.IsActive;
     private const string PropPartitionSourceType = "PartitionSourceType";
     private const string PropPartitionMode = "PartitionMode";
     private const string PropPartitionDataView = "DataView";
     private const string PropPartitionQueryGroup = "QueryGroup";
-    private const string PropRlsExpression = "RlsExpression";
+    private const string PropRlsExpression = PropertyBagKeys.RlsExpression;
     private const string PropUsedInRelationships = "UsedInRelationships";
     private const string PropDetailRowsExpression = "DetailRowsExpression";
     private const string PropFormatStringExpression = "FormatStringExpression";
     private const string PropLineageTag = "LineageTag";
     private const string PropKpi = "KPI";
-    private const string PropKpiTargetExpression = "KpiTargetExpression";
-    private const string PropKpiStatusExpression = "KpiStatusExpression";
-    private const string PropKpiTrendExpression = "KpiTrendExpression";
+    private const string PropKpiTargetExpression = PropertyBagKeys.KpiTargetExpression;
+    private const string PropKpiStatusExpression = PropertyBagKeys.KpiStatusExpression;
+    private const string PropKpiTrendExpression = PropertyBagKeys.KpiTrendExpression;
     private const string PropObjectType = "ObjectType";
     private const string PropUsedInHierarchies = "UsedInHierarchies";
     private const string PropUsedInVariations = "UsedInVariations";
@@ -115,6 +116,7 @@ public static class TomModelSummarizer
             [PropRowLevelSecurity] = rlsIndex.TryGetValue(table.Name, out var rls) ? string.Join("\n", rls) : "",
             [PropPerspectives] = perspectiveMembership.TryGetValue(table.Name, out var persp) ? string.Join("\n", persp) : "",
             [PropRefreshPolicy] = TomRefreshPolicyManager.Summarize(table),
+            [PropertyBagKeys.DefaultDetailRowsExpression] = table.DefaultDetailRowsDefinition?.Expression ?? "",
             [PropObjectType] = "Table"
         };
         AddAnnotations(tableProps, table.Annotations);

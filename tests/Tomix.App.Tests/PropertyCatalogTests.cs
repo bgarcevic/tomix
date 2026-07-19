@@ -60,11 +60,15 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Table,
         "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,defaultDetailRowsExpression")]
     [InlineData(ModelObjectKind.Measure,
-        "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,lineageTag")]
+        "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,kpiTargetExpression,kpiStatusExpression,kpiTrendExpression,lineageTag")]
     [InlineData(ModelObjectKind.Column,
         "name,description,sourceColumn,expression,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag")]
     [InlineData(ModelObjectKind.Partition,
         "name,description,expression,mode,dataView,queryGroup")]
+    [InlineData(ModelObjectKind.Relationship,
+        "name,fromColumn,toColumn,fromCardinality,toCardinality,crossFilteringBehavior,isActive")]
+    [InlineData(ModelObjectKind.Role,
+        "name,description,modelPermission,rlsExpression,members")]
     [InlineData(ModelObjectKind.Hierarchy,
         "name,description,isHidden,detail,expression")]
     public void For_PinsThePropertyContractPerKind(ModelObjectKind kind, string expectedKeys)
@@ -114,6 +118,64 @@ public sealed class PropertyCatalogTests
         var tableProjected = ModelPropertyCatalog.Project(table);
         Assert.Equal(1, tableProjected["columns"]);
         Assert.Equal(0, tableProjected["measures"]);
+    }
+
+    [Fact]
+    public void Project_AppendsAnnotationsAfterDescriptors_NameOrdered()
+    {
+        var measure = Leaf(ModelObjectKind.Measure) with
+        {
+            Properties = new Dictionary<string, string>
+            {
+                [PropertyBagKeys.FormatString] = "#,0",
+                [$"{PropertyBagKeys.AnnotationPrefix}Zeta"] = "z",
+                [$"{PropertyBagKeys.AnnotationPrefix}Alpha"] = "a"
+            }
+        };
+
+        var keys = ModelPropertyCatalog.Project(measure).Keys.ToList();
+        var descriptorKeys = ModelPropertyCatalog.For(ModelObjectKind.Measure).Select(d => d.JsonKey).ToList();
+
+        Assert.Equal([.. descriptorKeys, "annotation:Alpha", "annotation:Zeta"], keys);
+        Assert.Equal("a", ModelPropertyCatalog.Project(measure)["annotation:Alpha"]);
+        // Non-annotation bag keys must not leak into the projection as extra entries.
+        Assert.DoesNotContain(keys, k => k.Contains("FormatString", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Project_RelationshipAndRole_ReadBagAndDetail()
+    {
+        var relationship = Leaf(ModelObjectKind.Relationship) with
+        {
+            Properties = new Dictionary<string, string>
+            {
+                [PropertyBagKeys.FromColumn] = "Sales[CustomerId]",
+                [PropertyBagKeys.ToColumn] = "Customers[Id]",
+                [PropertyBagKeys.FromCardinality] = "Many",
+                [PropertyBagKeys.ToCardinality] = "One",
+                [PropertyBagKeys.CrossFilteringBehavior] = "OneDirection",
+                [PropertyBagKeys.IsActive] = "true"
+            }
+        };
+        var projected = ModelPropertyCatalog.Project(relationship);
+        Assert.Equal("Sales[CustomerId]", projected["fromColumn"]);
+        Assert.Equal("One", projected["toCardinality"]);
+        Assert.Equal(true, projected["isActive"]);
+
+        var member = Leaf(ModelObjectKind.RoleMember);
+        var role = Leaf(ModelObjectKind.Role) with
+        {
+            Detail = "Read",
+            Children = [member],
+            Properties = new Dictionary<string, string>
+            {
+                [PropertyBagKeys.RlsExpression] = "Sales: [Region] = \"EU\""
+            }
+        };
+        var roleProjected = ModelPropertyCatalog.Project(role);
+        Assert.Equal("Read", roleProjected["modelPermission"]);
+        Assert.Equal("Sales: [Region] = \"EU\"", roleProjected["rlsExpression"]);
+        Assert.Equal(1, roleProjected["members"]);
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public static class ModelPropertyCatalog
         new("hierarchies", "Hierarchies", o => Count(o, ModelObjectKind.Hierarchy)),
         new("partitions", "Partitions", o => Count(o, ModelObjectKind.Partition)),
         new("refreshPolicy", "RefreshPolicy", o => Bag(o, PropertyBagKeys.RefreshPolicy)),
-        new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", _ => "")
+        new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", o => Bag(o, PropertyBagKeys.DefaultDetailRowsExpression), Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Measure =
@@ -44,6 +44,9 @@ public static class ModelPropertyCatalog
         new("detailRowsExpression", "DetailRowsExpression", o => Bag(o, PropertyBagKeys.DetailRowsExpression), Diffable: true),
         new("formatStringExpression", "FormatStringExpression", o => Bag(o, PropertyBagKeys.FormatStringExpression), Diffable: true),
         new("kpi", "KPI", o => Bag(o, PropertyBagKeys.Kpi), Diffable: true),
+        new("kpiTargetExpression", "KpiTargetExpression", o => Bag(o, PropertyBagKeys.KpiTargetExpression), Diffable: true),
+        new("kpiStatusExpression", "KpiStatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Diffable: true),
+        new("kpiTrendExpression", "KpiTrendExpression", o => Bag(o, PropertyBagKeys.KpiTrendExpression), Diffable: true),
         new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag))
     ];
 
@@ -74,6 +77,30 @@ public static class ModelPropertyCatalog
         new("queryGroup", "QueryGroup", o => Bag(o, PropertyBagKeys.QueryGroup), Diffable: true)
     ];
 
+    private static readonly IReadOnlyList<PropertyDescriptor> Relationship =
+    [
+        Name(writable: false),
+        // Endpoints, cardinality, and active state are also encoded in the relationship's Detail
+        // string, which diff already compares in its fixed identity set — only properties absent
+        // from Detail are diffable here, so an edit is never reported twice.
+        new("fromColumn", "FromColumn", o => Bag(o, PropertyBagKeys.FromColumn)),
+        new("toColumn", "ToColumn", o => Bag(o, PropertyBagKeys.ToColumn)),
+        new("fromCardinality", "FromCardinality", o => Bag(o, PropertyBagKeys.FromCardinality)),
+        new("toCardinality", "ToCardinality", o => Bag(o, PropertyBagKeys.ToCardinality)),
+        new("crossFilteringBehavior", "CrossFilteringBehavior", o => Bag(o, PropertyBagKeys.CrossFilteringBehavior), Diffable: true),
+        new("isActive", "IsActive", o => Bag(o, PropertyBagKeys.IsActive) == "true")
+    ];
+
+    private static readonly IReadOnlyList<PropertyDescriptor> Role =
+    [
+        Name(writable: false),
+        Description(writable: false),
+        // ModelPermission is the role's Detail, which diff already compares — not diffable here.
+        new("modelPermission", "ModelPermission", o => o.Detail ?? ""),
+        new("rlsExpression", "RlsExpression", o => Bag(o, PropertyBagKeys.RlsExpression), Diffable: true),
+        new("members", "Members", o => Count(o, ModelObjectKind.RoleMember))
+    ];
+
     private static readonly IReadOnlyList<PropertyDescriptor> Generic =
     [
         Name(writable: false),
@@ -92,15 +119,31 @@ public static class ModelPropertyCatalog
         ModelObjectKind.Measure => Measure,
         ModelObjectKind.Column => Column,
         ModelObjectKind.Partition => Partition,
+        ModelObjectKind.Relationship => Relationship,
+        ModelObjectKind.Role => Role,
         _ => Generic
     };
 
-    /// <summary>Projects the object's full property set, ordered and keyed by JSON key.</summary>
+    /// <summary>
+    /// Projects the object's full property set, ordered and keyed by JSON key. Annotations from
+    /// the property bag are appended after the descriptors as <c>annotation:&lt;name&gt;</c>
+    /// entries (name-ordered); they appear in JSON and text output, while CSV stays limited to
+    /// the fixed descriptor columns.
+    /// </summary>
     public static IReadOnlyDictionary<string, object?> Project(ModelObject obj)
     {
         var properties = new Dictionary<string, object?>();
         foreach (var descriptor in For(obj.Kind))
             properties[descriptor.JsonKey] = descriptor.Value(obj);
+
+        if (obj.Properties is null)
+            return properties;
+
+        foreach (var (key, value) in obj.Properties
+                     .Where(p => p.Key.StartsWith(PropertyBagKeys.AnnotationPrefix, StringComparison.Ordinal))
+                     .OrderBy(p => p.Key, StringComparer.Ordinal))
+            properties[$"annotation:{key[PropertyBagKeys.AnnotationPrefix.Length..]}"] = value;
+
         return properties;
     }
 

@@ -76,7 +76,7 @@ internal static class RenameFixup
     /// per-table in the snapshot and have no single writable property, so they stay warnings.
     /// </summary>
     private static bool IsFixable(ModelObjectKind kind)
-        => kind is ModelObjectKind.Measure or ModelObjectKind.Column
+        => kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
             or ModelObjectKind.CalculationItem or ModelObjectKind.Partition;
 
     public static async Task<RenameFixupPlan> PlanAsync(

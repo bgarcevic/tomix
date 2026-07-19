@@ -113,6 +113,9 @@ internal static class TomPropertyApplier
             case Partition { Source: CalculatedPartitionSource source } when isMainExpression:
                 source.Expression = edit.Value;
                 break;
+            case Table { DefaultDetailRowsDefinition: { } detailRows } when edit.Property == "DefaultDetailRowsExpression":
+                detailRows.Expression = edit.Value;
+                break;
             default:
                 throw new NotSupportedException(
                     $"Cannot rewrite '{edit.Property}' on {target.GetType().Name} ({edit.Path}).");

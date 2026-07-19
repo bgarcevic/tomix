@@ -11,8 +11,8 @@ public readonly record struct DaxSite(string Property, string Expression);
 /// Yields every DAX-bearing string attached to a model object so dependency analysis can scan
 /// beyond a measure's main <see cref="ModelObject.Expression"/>. This mirrors Tabular Editor's set
 /// of <c>DAXProperty</c> values: detail-rows, format-string and KPI expressions on measures,
-/// calculated column / calculation item expressions, calculated-table DAX (carried on the
-/// partition), and role RLS filters.
+/// default detail-rows expressions on tables, calculated column / calculation item expressions,
+/// calculated-table DAX (carried on the partition), and role RLS filters.
 /// </summary>
 public static class DaxExpressions
 {
@@ -38,6 +38,13 @@ public static class DaxExpressions
     {
         switch (obj.Kind)
         {
+            // A table's default detail-rows (drillthrough) DAX.
+            case ModelObjectKind.Table:
+                var detailRows = obj.Property("DefaultDetailRowsExpression");
+                if (!string.IsNullOrWhiteSpace(detailRows))
+                    yield return new DaxSite("DefaultDetailRowsExpression", detailRows!);
+                break;
+
             case ModelObjectKind.Measure:
                 if (!string.IsNullOrWhiteSpace(obj.Expression))
                     yield return new DaxSite("Expression", obj.Expression!);

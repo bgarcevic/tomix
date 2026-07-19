@@ -34,9 +34,18 @@ tx get <path> [model] [options]
 | `-q, --query <property>` | Query a specific property (e.g. `-q expression`, `-q formatString`). |
 | `-t, --type <type>` | Disambiguate when the path matches multiple table-children. |
 
+Each object kind has its own property set: measures include `expression`,
+`formatString`, `detailRowsExpression`, and the KPI expressions; relationships
+include their endpoint columns, cardinality, `crossFilteringBehavior`, and
+`isActive`; roles include `modelPermission` and `rlsExpression`. Object
+annotations are appended as `annotation:<name>` entries in text and JSON
+output (CSV keeps the fixed per-kind columns).
+
 ```sh
 tx get "Sales/Total Sales"
 tx get "Sales/Total Sales" -q expression
+tx get "Sales/Total Sales" -q annotation:PBI_FormatHint
+tx get "Relationships/rel-customers"
 tx get Sales --output-format tmdl    # the object as TMDL
 ```
 

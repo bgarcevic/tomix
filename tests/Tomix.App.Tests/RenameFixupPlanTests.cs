@@ -100,6 +100,27 @@ public sealed class RenameFixupPlanTests
     }
 
     [Fact]
+    public async Task ColumnRename_RewritesTableDefaultDetailRows()
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                Column("Amount", "Sales/Amount"),
+                Table("Digest", new Dictionary<string, string>
+                {
+                    ["DefaultDetailRowsExpression"] = "SELECTCOLUMNS(Sales, \"A\", Sales[Amount])"
+                }),
+            ],
+            "Sales/Amount", "Net");
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("Digest", edit.Path);
+        Assert.Equal("DefaultDetailRowsExpression", edit.Property);
+        Assert.Equal("SELECTCOLUMNS(Sales, \"A\", 'Sales'[Net])", edit.Value);
+        Assert.Empty(plan.UnfixablePaths);
+    }
+
+    [Fact]
     public async Task CaseOnlyRename_PlansNothing()
     {
         var plan = await Plan(
@@ -120,8 +141,13 @@ public sealed class RenameFixupPlanTests
             new StubSession(new ModelSnapshot("M", 1601, objects)),
             path, type: null, newName, CancellationToken.None);
 
-    private static ModelObject Table(string name)
+    private static ModelObject Table(string name, IReadOnlyDictionary<string, string>? properties = null)
         => new(name, ModelObjectKind.Table, name,
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
+            Children: [], Properties: properties);
+
+    private static ModelObject Column(string name, string path)
+        => new(name, ModelObjectKind.Column, path,
             Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []);
 
     private static ModelObject Measure(
