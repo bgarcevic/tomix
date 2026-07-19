@@ -76,19 +76,6 @@ Manage BPA rule collections
   opt --rules-file <rules-file>  Path to a BPA rules JSON file
   opt --model-rules  Operate on rules embedded in the model annotation instead of a file
 
-# tx bpa rules add
-Add a new BPA rule
-  arg <id>  Rule ID
-  arg [model]  Path to model
-  opt --name <name>  Rule display name
-  opt --expression <expression>  Dynamic LINQ expression
-  opt --scope <scope>  Comma-separated scopes
-  opt --category <category>  Rule category
-  opt --severity <severity>  Severity: 1, 2, or 3
-  opt --description <description>  Rule description
-  opt --fix-expression <fix-expression>  Dynamic LINQ fix expression
-  opt --save  Save model after adding rule
-
 # tx bpa rules disable
 Disable a built-in BPA rule for the current user
   arg <rule-id>  Rule ID
@@ -108,10 +95,6 @@ Add a rule to the model's ignore list
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
 
-# tx bpa rules init
-Create an empty BPA rules file at the resolved path
-  opt --force  Overwrite an existing rules file
-
 # tx bpa rules list
 List BPA rules from all sources with status
   arg [model]  Path to model
@@ -121,20 +104,6 @@ List BPA rules from all sources with status
   opt --disabled  Show only disabled rules
   opt --no-multiline  Collapse multi-line cell content in text output
   opt --all  Show all rules including disabled and ignored
-
-# tx bpa rules rm
-Remove a BPA rule
-  arg <rule-id>  Rule ID to remove
-  arg [model]  Path to model
-  opt --save  Save model after removing rule
-
-# tx bpa rules set
-Update a BPA rule's properties
-  arg <rule-id>  Rule ID to update
-  arg [model]  Path to model
-  opt -q <q>  Property: name, expression, scope, category, severity, description, fixExpression
-  opt -i <i>  New value
-  opt --save  Save model after updating rule
 
 # tx bpa rules unignore
 Remove a rule from the model's ignore list
@@ -370,8 +339,8 @@ Move or rename a model object
   opt --save  Persist this command's mutation to the source location
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
-  opt --strict-refs  Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail).
-  opt --no-fix-refs  Do not rewrite DAX references to the renamed object; warn instead.
+  opt --strict-refs  Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail).
+  opt --no-fix-refs  Do not rewrite DAX references to the renamed or moved object; warn instead.
 
 # tx profile
 Manage named connection profiles for quick environment switching

@@ -145,6 +145,28 @@ internal static class TomRemoveCascade
         return removed;
     }
 
+    /// <summary>Cleanup for removing the relationship itself (the caller detaches it).</summary>
+    public static IReadOnlyList<string> ForRelationship(SingleColumnRelationship relationship)
+    {
+        var removed = new List<string>();
+        RemoveVariations(relationship.Model, v => v.Relationship == relationship, removed);
+        return removed;
+    }
+
+    public static IReadOnlyList<string> ForLevel(Level level)
+    {
+        var removed = new List<string>();
+        RemoveTranslations(level.Hierarchy.Table.Model, level, removed);
+        return removed;
+    }
+
+    public static IReadOnlyList<string> ForCalculationItem(CalculationItem item)
+    {
+        var removed = new List<string>();
+        RemoveTranslations(item.CalculationGroup.Table.Model, item, removed);
+        return removed;
+    }
+
     private static void RemoveRelationship(Model model, SingleColumnRelationship relationship, List<string> removed)
     {
         // Variations (auto date/time) bind to a relationship and dangle when it goes.

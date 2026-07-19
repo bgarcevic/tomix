@@ -397,70 +397,12 @@ internal sealed class BpaCommand : ICommandModule
                 BpaRulesRenderer.ToListJson);
         });
 
-        rulesCommand.Subcommands.Add(BuildRulesAddCommand());
         rulesCommand.Subcommands.Add(BuildRulesFlagCommand("disable", "Disable a built-in BPA rule for the current user"));
         rulesCommand.Subcommands.Add(BuildRulesFlagCommand("enable", "Re-enable a previously disabled built-in BPA rule"));
         rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("ignore", "Add a rule to the model's ignore list", ignore: true));
-        rulesCommand.Subcommands.Add(BuildRulesInitCommand());
         rulesCommand.Subcommands.Add(listCommand);
-        rulesCommand.Subcommands.Add(BuildRulesRemoveCommand());
-        rulesCommand.Subcommands.Add(BuildRulesSetCommand());
         rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("unignore", "Remove a rule from the model's ignore list", ignore: false));
         return rulesCommand;
-    }
-
-    private static Command BuildRulesAddCommand()
-    {
-        var command = new Command("add", "Add a new BPA rule")
-        {
-            new Argument<string>("id") { Description = "Rule ID" },
-            OptionalModelArgument(),
-            new Option<string?>("--name") { Description = "Rule display name" },
-            new Option<string?>("--expression") { Description = "Dynamic LINQ expression" },
-            new Option<string?>("--scope") { Description = "Comma-separated scopes" },
-            new Option<string?>("--category") { Description = "Rule category" },
-            new Option<string?>("--severity") { Description = "Severity: 1, 2, or 3" },
-            new Option<string?>("--description") { Description = "Rule description" },
-            new Option<string?>("--fix-expression") { Description = "Dynamic LINQ fix expression" },
-            new Option<bool>("--save") { Description = "Save model after adding rule" }
-        };
-        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "add"));
-        return command;
-    }
-
-    private static Command BuildRulesSetCommand()
-    {
-        var queryOption = new Option<string?>("-q")
-        {
-            Description = "Property: name, expression, scope, category, severity, description, fixExpression"
-        };
-        var valueOption = new Option<string?>("-i")
-        {
-            Description = "New value"
-        };
-
-        var command = new Command("set", "Update a BPA rule's properties")
-        {
-            new Argument<string>("rule-id") { Description = "Rule ID to update" },
-            OptionalModelArgument(),
-            queryOption,
-            valueOption,
-            new Option<bool>("--save") { Description = "Save model after updating rule" }
-        };
-        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "set"));
-        return command;
-    }
-
-    private static Command BuildRulesRemoveCommand()
-    {
-        var command = new Command("rm", "Remove a BPA rule")
-        {
-            new Argument<string>("rule-id") { Description = "Rule ID to remove" },
-            OptionalModelArgument(),
-            new Option<bool>("--save") { Description = "Save model after removing rule" }
-        };
-        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "rm"));
-        return command;
     }
 
     private Command BuildRulesFlagCommand(string name, string description)
@@ -559,33 +501,10 @@ internal sealed class BpaCommand : ICommandModule
         return command;
     }
 
-    private static Command BuildRulesInitCommand()
-    {
-        var command = new Command("init", "Create an empty BPA rules file at the resolved path")
-        {
-            new Option<bool>("--force") { Description = "Overwrite an existing rules file" }
-        };
-        command.SetAction(parseResult => UnsupportedRulesAction(parseResult, "init"));
-        return command;
-    }
-
-
     private static Argument<string?> OptionalModelArgument()
         => new("model")
         {
             Description = "Path to model",
             Arity = ArgumentArity.ZeroOrOne
         };
-
-    private static int UnsupportedRulesAction(System.CommandLine.ParseResult parseResult, string command)
-    {
-        ErrorOutput.Write(
-            [new Tomix.Core.Diagnostics.TomixDiagnostic(
-                "TOMIX_NOT_IMPLEMENTED",
-                Tomix.Core.Diagnostics.DiagnosticSeverity.Error,
-                $"Command 'bpa rules {command}' is not implemented yet.",
-                "Edit the rules file directly, or follow https://github.com/bgarcevic/tomix-cli/issues for progress.")],
-            parseResult.GetValue(GlobalOptions.ErrorFormat));
-        return 1;
-    }
 }

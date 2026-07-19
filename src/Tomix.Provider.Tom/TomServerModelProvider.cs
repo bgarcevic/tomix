@@ -125,7 +125,7 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
 }
 
 internal sealed class TomServerModelSession : IModelSession, IModelExportSession, IModelMutationSession,
-    IExpressionRewriteSession, IRefreshPolicyMutationSession, IModelDeploySession, IModelRefreshSession, IRefreshPolicyApplySession, IModelQuerySession
+    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IModelRefreshSession, IRefreshPolicyApplySession, IModelQuerySession
 {
     private readonly TabularServer _server;
     private readonly TabularDatabase _database;
@@ -179,6 +179,9 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
 
     public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
         => new TomModelMutator(_database).RemoveObject(request);
+
+    public ModelObjectMutationResult MoveObject(ModelObjectMoveRequest request)
+        => new TomModelMutator(_database).MoveObject(request);
 
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
         => new TomModelMutator(_database).ReplaceText(request);

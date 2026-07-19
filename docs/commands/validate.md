@@ -38,6 +38,7 @@ the `bpa rules` commands for explicit customization.
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
 | `--vpax <file>` / `--vpa-rules` | Load VertiPaq Analyzer stats from a `.vpax` / include built-in VPA-aware rules. |
 | `--no-model-rules` / `--no-defaults` | Exclude rules embedded in the model / the selected standard ruleset. |
+| `--allow-external-rules` | Also load remote (URL) rule files referenced by the model's rule annotations. Skipped by default so a model file cannot make `tx` fetch arbitrary URLs. |
 | `--ci <github\|vsts>` | Emit CI logging commands to stderr. |
 | `--trx <path>` | Write results as a VSTEST `.trx` file. |
 
@@ -52,8 +53,6 @@ tx bpa run --fix --save
 | Subcommand | Description |
 |------------|-------------|
 | `bpa rules list` | List BPA rules from all sources with status. |
-| `bpa rules init` | Create an empty BPA rules file at the resolved path. |
-| `bpa rules add` / `bpa rules set` / `bpa rules rm` | Add, update, or remove a rule. |
 | `bpa rules enable` / `bpa rules disable` | Re-enable or disable a built-in rule for the current user. |
 | `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
 

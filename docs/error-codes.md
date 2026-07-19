@@ -166,6 +166,7 @@ Emitted by `incremental-refresh` (show/set/rm/apply).
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_REFRESH_POLICY_NOT_FOUND` | 1 | `show`/`rm`/`apply` targeted a table that has no incremental refresh policy. |
+| `TOMIX_REFRESH_POLICY_NO_OPTIONS` | 2 | `set` called without any policy option (and without `--revert`); pass at least one, e.g. `--rolling-window-periods`. |
 | `TOMIX_REFRESH_POLICY_INVALID` | 1 | `set` produced validation errors (missing range parameters, source expression not referencing RangeStart/RangeEnd, incoherent granularity/periods, incompatible compatibility level) and `--force` was not passed. |
 | `TOMIX_REFRESH_POLICY_UNSUPPORTED` | 2 | `apply` targeted a session that is not XMLA-backed (partition generation runs on the server). |
 | `TOMIX_REFRESH_POLICY_APPLY_FAILED` | 1 | The server rejected the `apply` operation. |
@@ -178,8 +179,6 @@ Emitted by `incremental-refresh` (show/set/rm/apply).
 |------|------|---------|
 | `TOMIX_VERTIPAQ_UNSUPPORTED_SOURCE` | 2 | The source is a local model definition (TMDL/BIM) with no live storage engine; connect to a deployed model or use `--import`. |
 | `TOMIX_VERTIPAQ_OPTIONS_CONFLICT` | 2 | Conflicting options: `--import` with `--export` or `--annotate`, `--obfuscate` without `--export`, or `--save` without `--annotate`. |
-| `TOMIX_VERTIPAQ_INVALID_FIELDS` | 2 | An unknown `--fields` token for the selected view, or `--fields` used with multiple views. |
-| `TOMIX_VERTIPAQ_INVALID_TOP` | 2 | `--top` was not a positive integer. |
 | `TOMIX_VERTIPAQ_TABLE_NOT_FOUND` | 1 | The positional table filter matched no table in the statistics. |
 | `TOMIX_VERTIPAQ_FAILED` | 1 | Statistics extraction against the live engine failed. |
 | `TOMIX_VPAX_READ_FAILED` | 2 | The `--import` file is missing, unreadable, or not a valid statistics package. |
@@ -261,7 +260,7 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
 | `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |
 | `TOMIX_UNKNOWN_OPTION` | 2 | An unrecognized `--option` would have been bound to a positional argument (e.g. a typo'd flag). Put `--` before positional values that must start with `-`. |
-| `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` called for an unsupported object type or operation (e.g. moving between parents). |
+| `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` across tables called with an unsupported path shape; a cross-table move needs a `Table/Measure` source and destination. Moving a non-measure across tables surfaces as `TOMIX_MUTATION_UNSUPPORTED` from the provider. |
 | `TOMIX_MOVE_INVALID_PATH` | 2 | `mv` source or destination is missing an object name (empty path, trailing `/`). |
 | `TOMIX_MOVE_NOOP` | 1 | `mv` source and destination are identical; nothing to rename. |
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
@@ -270,7 +269,6 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_INVALID_OUTPUT_FORMAT` | 2 | `--output-format` value is not one of: auto, text, json, csv, tmsl, bim, tmdl. |
 | `TOMIX_OUTPUT_FORMAT_UNSUPPORTED` | 2 | The command cannot render the requested `--output-format`; the message lists the formats it supports. |
-| `TOMIX_NOT_IMPLEMENTED` | 1 | The command is a placeholder that is not implemented yet (`bpa rules add/set/rm/init`). |
 | `TOMIX_CONFIG_CORRUPT` | 2 | `~/.tomix/config.json` exists but does not parse. Fix or delete the file, then re-create settings with `tx config set`. |
 | `TOMIX_UNEXPECTED` | 1 | An unexpected exception reached the top-level handler. The stack trace is only printed under `--debug`; with `--error-format json` it is embedded as a `detail` field in the envelope so stderr stays valid JSON. |
 

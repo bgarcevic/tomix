@@ -136,10 +136,10 @@ public sealed class RenameFixupPlanTests
     }
 
     private static async Task<RenameFixupPlan> Plan(
-        IReadOnlyList<ModelObject> objects, string path, string newName)
+        IReadOnlyList<ModelObject> objects, string path, string newName, string? newTable = null)
         => await RenameFixup.PlanAsync(
             new StubSession(new ModelSnapshot("M", 1601, objects)),
-            path, type: null, newName, CancellationToken.None);
+            path, type: null, newName, newTable, CancellationToken.None);
 
     private static ModelObject Table(string name, IReadOnlyDictionary<string, string>? properties = null)
         => new(name, ModelObjectKind.Table, name,

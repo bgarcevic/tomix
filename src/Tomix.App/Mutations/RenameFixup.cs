@@ -79,11 +79,18 @@ internal static class RenameFixup
         => kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
             or ModelObjectKind.CalculationItem or ModelObjectKind.Partition;
 
+    /// <summary>
+    /// Plans the rewrites a rename — and, when <paramref name="newTable"/> is given, a move to
+    /// that table — requires. A move breaks only fully-qualified references
+    /// (<c>'OldTable'[Measure]</c>); unqualified <c>[Measure]</c> references stay valid, so
+    /// move-only plans skip sites without a qualified reference.
+    /// </summary>
     public static async Task<RenameFixupPlan> PlanAsync(
         IModelSession session,
         string path,
         ModelObjectKind? type,
         string newName,
+        string? newTable,
         CancellationToken cancellationToken)
     {
         var snapshot = await session.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
@@ -102,7 +109,8 @@ internal static class RenameFixup
 
         // Case-only renames break nothing (DAX resolves names case-insensitively), and there is
         // no point rewriting references just to change their casing.
-        if (string.Equals(target.Name, newName, StringComparison.OrdinalIgnoreCase))
+        var nameUnchanged = string.Equals(target.Name, newName, StringComparison.OrdinalIgnoreCase);
+        if (nameUnchanged && newTable is null)
             return RenameFixupPlan.Empty;
 
         var edits = new List<ModelExpressionEdit>();
@@ -111,6 +119,9 @@ internal static class RenameFixup
 
         foreach (var site in DependencyGraph.FromSnapshot(snapshot).SitesReferencing(target))
         {
+            if (nameUnchanged && !site.References.Any(r => r.FullyQualified))
+                continue;
+
             if (!IsFixable(site.Source.Kind))
             {
                 if (!unfixablePaths.Contains(site.Source.Path))
@@ -122,7 +133,7 @@ internal static class RenameFixup
                 site.Source.Path,
                 site.Source.Kind,
                 site.Property,
-                Rewrite(site, target, newName)));
+                Rewrite(site, target, newName, newTable)));
             if (!fixedPaths.Contains(site.Source.Path))
                 fixedPaths.Add(site.Source.Path);
         }
@@ -142,14 +153,16 @@ internal static class RenameFixup
     /// Rebuilds one expression with every reference to <paramref name="target"/> replaced by its
     /// new-name form, splicing by span from last to first so earlier offsets stay valid.
     /// </summary>
-    private static string Rewrite(ReferenceSite site, ModelObject target, string newName)
+    private static string Rewrite(ReferenceSite site, ModelObject target, string newName, string? newTable)
     {
         var text = new StringBuilder(site.Expression);
         foreach (var reference in site.References.OrderByDescending(r => r.Start))
         {
             var replacement = target.Kind == ModelObjectKind.Table
                 ? reference.Object is { } child ? $"{QuoteTable(newName)}{Bracket(child)}" : QuoteTable(newName)
-                : reference.FullyQualified ? $"{QuoteTable(TableOf(target))}{Bracket(newName)}" : Bracket(newName);
+                : reference.FullyQualified
+                    ? $"{QuoteTable(newTable ?? TableOf(target))}{Bracket(newName)}"
+                    : Bracket(newName);
 
             text.Remove(reference.Start, reference.End - reference.Start + 1);
             text.Insert(reference.Start, replacement);

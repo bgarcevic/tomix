@@ -32,7 +32,7 @@ public sealed class TomFileModelProvider : IModelProvider
 }
 
 internal sealed class TomFileModelSession : IModelSession, IModelExportSession, IModelMutationSession,
-    IExpressionRewriteSession, IRefreshPolicyMutationSession, IModelDeploySession
+    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession
 {
     private readonly string _path;
     private readonly IAccessTokenProvider? _tokenProvider;
@@ -86,6 +86,9 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
 
     public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
         => new TomModelMutator(GetDatabase()).RemoveObject(request);
+
+    public ModelObjectMutationResult MoveObject(ModelObjectMoveRequest request)
+        => new TomModelMutator(GetDatabase()).MoveObject(request);
 
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
         => new TomModelMutator(GetDatabase()).ReplaceText(request);

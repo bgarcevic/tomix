@@ -71,13 +71,65 @@ public sealed class MoveModelObjectHandlerTests
     }
 
     [Fact]
-    public async Task CrossParentMove_Fails_WithoutMutating()
+    public async Task CrossTableMove_WithoutMoveCapability_Fails_WithoutMutating()
     {
         var session = NewSession();
         var result = await Handle(session, "Sales/Base", "Other/Base2");
 
         Assert.False(result.Success);
+        Assert.Equal("TOMIX_MUTATION_UNSUPPORTED", result.Diagnostics[0].Code);
+        Assert.False(session.SetPropertyCalled);
+    }
+
+    [Fact]
+    public async Task CrossTableMove_CallsMoveObject_NotSetProperty()
+    {
+        var session = NewMoveSession();
+        var result = await Handle(session, "Sales/Base", "Metrics/Base");
+
+        Assert.True(result.Success);
+        Assert.NotNull(session.LastMove);
+        Assert.Equal("Metrics", session.LastMove!.NewParent);
+        Assert.Equal("Base", session.LastMove.NewName);
+        Assert.False(session.SetPropertyCalled);
+        Assert.Equal("Metrics/Base", result.Data!.To);
+    }
+
+    [Fact]
+    public async Task CrossTableMove_WithRename_PassesNewNameToMoveObject()
+    {
+        var session = NewMoveSession();
+        var result = await Handle(session, "Sales/Base", "Metrics/Renamed");
+
+        Assert.True(result.Success);
+        Assert.Equal("Metrics", session.LastMove!.NewParent);
+        Assert.Equal("Renamed", session.LastMove.NewName);
+    }
+
+    [Fact]
+    public async Task CrossTableMove_RewritesQualifiedReference_LeavesUnqualifiedAlone()
+    {
+        // Qualified's DAX names the home table ('Sales'[Base]) and breaks on move; Derived's
+        // unqualified [Base] stays valid and must not be touched or reported.
+        var session = NewMoveSession();
+        var result = await Handle(session, "Sales/Base", "Metrics/Base");
+
+        Assert.True(result.Success);
+        var edit = Assert.Single(session.LastRewrites!);
+        Assert.Equal("Sales/Qualified", edit.Path);
+        Assert.Equal("'Metrics'[Base] + 0", edit.Value);
+        Assert.Equal(["Sales/Qualified"], result.Data!.FixedReferences);
+    }
+
+    [Fact]
+    public async Task CrossTableMove_DeepDestination_IsUnsupported()
+    {
+        var session = NewMoveSession();
+        var result = await Handle(session, "Sales/Base", "Other/Sub/Base2");
+
+        Assert.False(result.Success);
         Assert.Equal("TOMIX_MOVE_UNSUPPORTED", result.Diagnostics[0].Code);
+        Assert.Null(session.LastMove);
         Assert.False(session.SetPropertyCalled);
     }
 
@@ -149,6 +201,23 @@ public sealed class MoveModelObjectHandlerTests
                 Save: false, SaveTo: null, Serialization: "", Force: false),
             CancellationToken.None);
 
+    /// <summary>Move-capable session over Sales with an extra measure whose DAX references
+    /// Base fully qualified — the one reference shape a cross-table move breaks.</summary>
+    private static MoveCapableStubSession NewMoveSession()
+        => new(new ModelSnapshot("M", 1601,
+        [
+            new ModelObject("Sales", ModelObjectKind.Table, "Sales",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Metrics", ModelObjectKind.Table, "Metrics",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Base", ModelObjectKind.Measure, "Sales/Base",
+                Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Derived", ModelObjectKind.Measure, "Sales/Derived",
+                Detail: null, Expression: "[Base] * 2", Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Qualified", ModelObjectKind.Measure, "Sales/Qualified",
+                Detail: null, Expression: "'Sales'[Base] + 0", Description: null, Hidden: false, SourceColumn: null, Children: [])
+        ]));
+
     /// <summary>Two measures on table Sales: Derived's DAX references Base via [Base].</summary>
     private static StubSnapshotSession NewSession()
         => new(new ModelSnapshot("M", 1601,
@@ -173,7 +242,23 @@ public sealed class MoveModelObjectHandlerTests
             => Task.FromResult<IModelSession>(_session);
     }
 
-    private sealed class StubSnapshotSession : IModelSession, IModelMutationSession, IExpressionRewriteSession
+    private sealed class MoveCapableStubSession : StubSnapshotSession, IObjectMoveSession
+    {
+        public MoveCapableStubSession(ModelSnapshot snapshot)
+            : base(snapshot)
+        {
+        }
+
+        public ModelObjectMoveRequest? LastMove { get; private set; }
+
+        public ModelObjectMutationResult MoveObject(ModelObjectMoveRequest request)
+        {
+            LastMove = request;
+            return new ModelObjectMutationResult($"{request.NewParent}/{request.NewName}", Changed: true);
+        }
+    }
+
+    private class StubSnapshotSession : IModelSession, IModelMutationSession, IExpressionRewriteSession
     {
         private readonly ModelSnapshot _snapshot;
 
@@ -214,8 +299,13 @@ public sealed class MoveModelObjectHandlerTests
         public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
             => new(0, []);
 
+        public IReadOnlyList<ModelExpressionEdit>? LastRewrites { get; private set; }
+
         public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
-            => new(edits.Count);
+        {
+            LastRewrites = edits;
+            return new(edits.Count);
+        }
 
         public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
             => Task.FromResult(new ModelExportResult(outputPath ?? "/local/model", serialization));

@@ -73,11 +73,11 @@ internal sealed class MvCommand : ICommandModule
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var strictRefsOption = new Option<bool>("--strict-refs")
         {
-            Description = "Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)."
+            Description = "Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail)."
         };
         var noFixRefsOption = new Option<bool>("--no-fix-refs")
         {
-            Description = "Do not rewrite DAX references to the renamed object; warn instead."
+            Description = "Do not rewrite DAX references to the renamed or moved object; warn instead."
         };
 
         var command = new Command("mv", "Move or rename a model object")
@@ -164,7 +164,7 @@ internal sealed class MvCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Renamed: {result.Moved} -> {result.To}")));
+        AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Moved: {result.Moved} -> {result.To}")));
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
         else if (result.Saved is false)

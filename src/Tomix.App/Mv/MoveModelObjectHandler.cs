@@ -31,20 +31,28 @@ public sealed class MoveModelObjectHandler
             _providers, request.Model, options, "mv", _stores,
             async (mutator, session, _) =>
             {
-                // A rename alone doesn't rewrite DAX that references the old name. Plan the
-                // rewrites while the model is intact; by default apply them (before the rename,
-                // so every path in the plan still resolves), otherwise warn — or fail under
-                // --strict-refs. Case-only renames break nothing and plan empty.
-                var fixup = plan.CaseOnly
+                // A rename or move alone doesn't rewrite DAX that references the old name. Plan
+                // the rewrites while the model is intact; by default apply them (before the
+                // mutation, so every path in the plan still resolves), otherwise warn — or fail
+                // under --strict-refs. Case-only renames break nothing and plan empty; a move
+                // breaks only fully-qualified references, which the plan filters to.
+                var fixup = plan.NewParent is null && plan.CaseOnly
                     ? RenameFixupPlan.Empty
                     : await RenameFixup.PlanAsync(
-                        session, request.Source, request.Type, plan.NewName, cancellationToken);
+                        session, request.Source, request.Type, plan.NewName, plan.NewParent, cancellationToken);
                 var broken = RenameReferences.Apply(mutator, fixup, request.FixRefs, request.StrictRefs);
 
-                mutator.SetProperty(new ModelObjectSetRequest(
-                    request.Source,
-                    [new ModelPropertyAssignment("name", plan.NewName)],
-                    request.Type));
+                if (plan.NewParent is { } newParent)
+                    MutationCapabilities.RequireObjectMove(mutator).MoveObject(new ModelObjectMoveRequest(
+                        request.Source,
+                        request.Type,
+                        newParent,
+                        plan.NewName));
+                else
+                    mutator.SetProperty(new ModelObjectSetRequest(
+                        request.Source,
+                        [new ModelPropertyAssignment("name", plan.NewName)],
+                        request.Type));
 
                 return (true, $"mv {request.Source} -> {request.Destination}",
                     outcome => new MoveModelObjectResult(
@@ -62,16 +70,18 @@ public sealed class MoveModelObjectHandler
 internal sealed record RenamePlanError(string Code, string Message, int ExitCode, string? Hint = null);
 
 /// <summary>
-/// The rename derived from mv's source/destination arguments. Both paths go through the same
-/// quote- and DAX-aware parsing the mutation resolver uses, so a leaf name keeps its apostrophes
-/// and a <c>'Table'[Child]</c> destination yields <c>Child</c> — not the whole bracket string.
+/// The rename — or, when <paramref name="NewParent"/> is set, the cross-table move — derived
+/// from mv's source/destination arguments. Both paths go through the same quote- and DAX-aware
+/// parsing the mutation resolver uses, so a leaf name keeps its apostrophes and a
+/// <c>'Table'[Child]</c> destination yields <c>Child</c> — not the whole bracket string.
 /// </summary>
 internal sealed record RenamePlan(
     string NewName,
     bool CaseOnly,
     string SourceDisplay,
     string DestinationDisplay,
-    RenamePlanError? Error)
+    RenamePlanError? Error,
+    string? NewParent = null)
 {
     public static RenamePlan Create(string source, string destination)
     {
@@ -89,12 +99,24 @@ internal sealed record RenamePlan(
             return Fail("TOMIX_MOVE_INVALID_PATH", "Destination path is missing an object name.", 2);
 
         if (!sourceParts.SkipLast(1).SequenceEqual(destinationParts.SkipLast(1), StringComparer.OrdinalIgnoreCase))
-            return Fail(
-                "TOMIX_MOVE_UNSUPPORTED",
-                "Moving objects between parents is not supported yet.",
-                1,
-                "mv renames in place, so source and destination must share the same parent, "
-                + "written in the same form (e.g. 'Sales/Old Name' 'Sales/New Name').");
+        {
+            // Parents differ: a cross-table move. Only measures can move (the provider
+            // enforces that); the plan just needs a 'Table/Name' destination to move under.
+            if (destinationParts.Count != 2 || sourceParts.Count < 2)
+                return Fail(
+                    "TOMIX_MOVE_UNSUPPORTED",
+                    "A cross-table move needs a 'Table/Measure' source and destination.",
+                    1,
+                    "Only measures can move between tables, e.g. 'Sales/Revenue' 'Metrics/Revenue'.");
+
+            return new RenamePlan(
+                destinationParts[^1],
+                CaseOnly: false,
+                sourceDisplay,
+                destinationDisplay,
+                Error: null,
+                NewParent: destinationParts[0]);
+        }
 
         var newName = destinationParts[^1];
         var oldName = sourceParts[^1];

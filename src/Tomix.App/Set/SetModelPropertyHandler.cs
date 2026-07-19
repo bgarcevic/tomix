@@ -47,7 +47,7 @@ public sealed class SetModelPropertyHandler
                 var fixup = RenameFixupPlan.Empty;
                 if (request.Properties.LastOrDefault(IsNameAssignment) is { } rename)
                     fixup = await RenameFixup.PlanAsync(
-                        session, request.Path, request.Type, rename.Value, cancellationToken);
+                        session, request.Path, request.Type, rename.Value, newTable: null, cancellationToken);
                 var broken = RenameReferences.Apply(mutator, fixup, request.FixRefs, request.StrictRefs);
 
                 var mutation = mutator.SetProperty(new ModelObjectSetRequest(

@@ -77,9 +77,17 @@ tx mv <source> <destination> [model] [options]
 Renames rewrite referencing DAX automatically; `--strict-refs` and
 `--no-fix-refs` behave as on `set`.
 
+Measures can also move to another table (optionally renaming in the same
+step) — the classic "consolidate into a measure table" operation. A move
+rewrites fully-qualified `'Table'[Measure]` references to the new home
+table; unqualified `[Measure]` references stay valid and are left alone.
+Columns, hierarchies, and partitions are bound to their table's data and
+cannot move.
+
 ```sh
 tx mv "Sales/Old Name" "Sales/New Name" --save
 tx mv tables/Sales tables/SalesData
+tx mv "Sales/Total Sales" "Metrics/Total Sales" --save
 ```
 
 ## `rm` — remove an object
@@ -97,11 +105,17 @@ tx rm <path> [model] [options]
 
 Removal is blocked while DAX still references the object; structural
 references (relationships, sort-by, hierarchy levels, perspectives, role
-permissions) cascade-remove instead.
+permissions) cascade-remove instead. Every object kind a mutation path can
+address is removable: tables, measures, columns, hierarchies, levels,
+partitions, calculation items, relationships, roles, role members,
+perspectives, cultures, shared expressions, functions, and data sources.
+A data source still bound to a partition cannot be removed until the
+partition is repointed or removed.
 
 ```sh
 tx rm "Sales/Obsolete" --dry-run
 tx rm tables/Staging --save
+tx rm "Sales[CustomerID] -> Customers[CustomerID]" --save
 ```
 
 ## `replace` — find and replace

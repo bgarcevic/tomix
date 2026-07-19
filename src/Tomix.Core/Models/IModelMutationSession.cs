@@ -47,6 +47,14 @@ public sealed record ModelObjectRemoveRequest(
     ModelObjectKind? Type,
     bool IfExists);
 
+/// <summary>Move the object at <paramref name="Path"/> under <paramref name="NewParent"/>,
+/// renaming it to <paramref name="NewName"/> when given (see <see cref="IObjectMoveSession"/>).</summary>
+public sealed record ModelObjectMoveRequest(
+    string Path,
+    ModelObjectKind? Type,
+    string NewParent,
+    string? NewName = null);
+
 public sealed record ModelReplaceRequest(
     string Pattern,
     string Replacement,

@@ -17,4 +17,8 @@ internal static class MutationCapabilities
     public static IRefreshPolicyMutationSession RequireRefreshPolicies(IModelMutationSession mutator)
         => mutator as IRefreshPolicyMutationSession
             ?? throw new NotSupportedException("This provider does not support refresh policies.");
+
+    public static IObjectMoveSession RequireObjectMove(IModelMutationSession mutator)
+        => mutator as IObjectMoveSession
+            ?? throw new NotSupportedException("This provider does not support moving objects between parents.");
 }
