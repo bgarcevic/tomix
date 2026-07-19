@@ -72,6 +72,74 @@ tx validate --ci github
 tx validate --trx results.trx
 ```
 
+## `test` — DAX regression tests
+
+```
+tx test [path] [options]
+```
+
+Runs DAX regression tests against a live model and exits `1` on any mismatch,
+so a pipeline can block a merge when a query result drifts. Each test is a
+`.dax` file paired with a sibling `<name>.expected.json` snapshot; `path` is a
+single test file or a directory searched recursively for `.dax` files
+(default: the current directory). Test names are the file paths relative to
+`path`, without the extension (`totals/sales-by-region`).
+
+| Option | Description |
+|--------|-------------|
+| `--update` | Record mode: run each query and (re)write its `.expected.json` from the actual result. Byte-identical snapshots are left untouched. |
+| `--filter <pattern>` | Run only tests whose name matches a `*` wildcard pattern (case-insensitive). |
+| `--param <name=value>` | Query parameter applied to every test, referenced as `@name` in DAX. Repeatable. |
+| `--max-rows <n>` | Per-query row cap; a query exceeding it fails as an error (default: `10000`). |
+| `--ci <github\|vsts>` | Emit CI logging commands to stderr so failures annotate the PR. |
+| `--trx <path>` | Write results as a VSTEST `.trx` file. |
+
+Like `query`, tests execute on a **deployed model** (XMLA) or a local
+instance — never on TMDL/BIM files. Target the model with `-s <workspace>
+-d <model>` or the active session.
+
+**Workflow.** Add a test by writing a `.dax` file (any `EVALUATE` query),
+then record its snapshot:
+
+```sh
+tx test ./tests --update -s MyWorkspace -d MyModel   # record snapshots
+tx test ./tests -s MyWorkspace -d MyModel            # verify: all PASS, exit 0
+```
+
+A test without a snapshot fails the run as `MISS` (a new test must not
+silently pass); a result that drifts from its snapshot fails as `FAIL` with a
+difference table. Accept an intentional change by re-running `--update` and
+committing the snapshot diff — the git diff *is* the review artifact.
+
+The snapshot stores column names/types and all cell values as canonical
+invariant strings (`null` = DAX `BLANK()`), plus a hash of the query text
+used to hint when a failing test's query changed since recording:
+
+```json
+{
+  "version": 1,
+  "querySha256": "9f2c…",
+  "columns": [
+    { "name": "Sales[Region]", "type": "string" },
+    { "name": "[Total Sales]", "type": "decimal" }
+  ],
+  "rows": [
+    ["East", "1234.50"],
+    ["West", null]
+  ]
+}
+```
+
+Rows compare **in order** — always end test queries with `ORDER BY` so
+results are deterministic. Keep rowsets small and stable (aggregates,
+`TOPN` over ordered sets); one `EVALUATE` rowset per file.
+
+```sh
+tx test ./tests
+tx test ./tests/totals/sales.dax --update
+tx test ./tests --filter "totals/*" --trx results.trx --ci vsts
+```
+
 ## `vertipaq` — storage statistics
 
 ```

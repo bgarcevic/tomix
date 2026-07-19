@@ -142,6 +142,23 @@ The performance options are **best-effort** and do not have dedicated error code
 shared-capacity Power BI). When they cannot be honored, `tx query` prints a one-line warning to
 stderr, still returns the rowset, and exits `0`.
 
+## Regression Test Codes (`TOMIX_TEST_*`)
+
+Emitted by `test` (DAX regression tests against a live model).
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_TEST_PATH_NOT_FOUND` | 2 | The path argument does not exist. |
+| `TOMIX_TEST_NONE_FOUND` | 2 | No `.dax` test files were found under the path (or none match `--filter`). |
+| `TOMIX_TEST_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
+| `TOMIX_TEST_NO_REMOTE_TARGET` | 2 | `test` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
+| `TOMIX_TEST_UNSUPPORTED` | 2 | The provider session does not support queries (e.g. a local TMDL/BIM model). |
+| `TOMIX_TEST_UPDATE_FAILED` | 1 | An `.expected.json` snapshot could not be written during `--update`. |
+
+Test failures themselves carry **no** diagnostic code: a run whose tests fail (or are missing
+their snapshot) renders the full report and exits `1`, mirroring `bpa run`. `test` also reuses
+`TOMIX_NO_PROVIDER` and `TOMIX_AUTH_REQUIRED`.
+
 ## Incremental Refresh Codes (`TOMIX_REFRESH_POLICY_*`)
 
 Emitted by `incremental-refresh` (show/set/rm/apply).

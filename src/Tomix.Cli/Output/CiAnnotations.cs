@@ -14,6 +14,9 @@ internal static class CiAnnotations
     /// Emits one logging command per annotation. <paramref name="ci"/> values other than
     /// <c>github</c>/<c>vsts</c> (including null/blank) are a no-op. For vsts, a
     /// <c>task.complete result=Failed</c> trailer follows when any annotation is an error.
+    /// Messages may carry untrusted model data (cell values, server error text); line breaks
+    /// are collapsed so a value cannot start a new line and be parsed as its own
+    /// <c>::level::</c> / <c>##vso</c> logging command (both syntaxes are line-oriented).
     /// </summary>
     public static void Emit(string? ci, IReadOnlyList<CiAnnotation> annotations, TextWriter writer)
     {
@@ -25,7 +28,7 @@ internal static class CiAnnotations
             foreach (var annotation in annotations)
             {
                 var level = annotation.IsError ? "error" : "warning";
-                writer.WriteLine($"::{level}::{annotation.Message}");
+                writer.WriteLine($"::{level}::{SingleLine(annotation.Message)}");
             }
         }
         else if (ci.Equals("vsts", StringComparison.OrdinalIgnoreCase))
@@ -33,11 +36,14 @@ internal static class CiAnnotations
             foreach (var annotation in annotations)
             {
                 var type = annotation.IsError ? "error" : "warning";
-                writer.WriteLine($"##vso[task.logissue type={type};]{annotation.Message}");
+                writer.WriteLine($"##vso[task.logissue type={type};]{SingleLine(annotation.Message)}");
             }
 
             if (annotations.Any(a => a.IsError))
                 writer.WriteLine("##vso[task.complete result=Failed;]Done.");
         }
     }
+
+    private static string SingleLine(string message)
+        => message.ReplaceLineEndings(" ");
 }

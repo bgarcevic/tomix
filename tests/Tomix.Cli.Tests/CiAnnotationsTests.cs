@@ -68,4 +68,25 @@ public class CiAnnotationsTests
     [InlineData("vsts")]
     public void Empty_Annotations_Emit_Nothing(string ci)
         => Assert.Equal("", Emit(ci));
+
+    // Messages carry untrusted model data (cell values, server error text); a line break
+    // inside a value must not let it forge its own logging command on a fresh line.
+    [Fact]
+    public void Github_CollapsesLineBreaks_SoValuesCannotForgeCommands()
+    {
+        var output = Emit("github", new CiAnnotation(IsError: true, "before\n::error::forged\r\nafter"));
+
+        Assert.Equal("::error::before ::error::forged after" + Environment.NewLine, output);
+    }
+
+    [Fact]
+    public void Vsts_CollapsesLineBreaks_SoValuesCannotForgeCommands()
+    {
+        var output = Emit("vsts", new CiAnnotation(IsError: true, "before\n##vso[task.setvariable]x"));
+
+        Assert.Equal(
+            "##vso[task.logissue type=error;]before ##vso[task.setvariable]x" + Environment.NewLine +
+            "##vso[task.complete result=Failed;]Done." + Environment.NewLine,
+            output);
+    }
 }

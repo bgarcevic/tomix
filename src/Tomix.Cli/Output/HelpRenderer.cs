@@ -19,7 +19,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ("Discover", ["ls", "get", "find", "deps", "query"]),
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script", "incremental-refresh"]),
         ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
-        ("Validate", ["bpa", "validate", "vertipaq", "diff", "doctor"]),
+        ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
     ];
 
@@ -50,6 +50,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx query -q \"EVALUATE Sales\"",
             "tx query --file query.dax --limit 10",
             "tx query -q \"EVALUATE VALUES(Sales[Region])\" --output-format json",
+        ],
+        ["test"] = [
+            "tx test ./tests -s MyWorkspace -d MyModel",
+            "tx test ./tests --update",
+            "tx test ./tests --filter \"totals/*\" --trx results.trx --ci vsts",
         ],
         ["add"] = [
             "tx add tables/Sales/measures/Revenue -i \"CALCULATE(SUM(Sales[Amount]))\"",

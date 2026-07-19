@@ -64,10 +64,11 @@ Flags that matter in pipelines:
 - `--non-interactive` — disable all prompts; fail with an actionable error
   instead of hanging.
 - `--quiet` — suppress spinners, progress, and hints.
-- `--ci github` / `--ci vsts` on `validate` and `deploy` — emit GitHub
-  Actions / Azure DevOps logging commands to stderr, so findings annotate
-  the PR.
-- `validate --trx <path>` — write results as a VSTEST `.trx` file.
+- `--ci github` / `--ci vsts` on `validate`, `test`, and `deploy` — emit
+  GitHub Actions / Azure DevOps logging commands to stderr, so findings
+  annotate the PR.
+- `--trx <path>` on `validate`, `test`, and `bpa run` — write results as a
+  VSTEST `.trx` file.
 - Color is stripped automatically when output is not a TTY, and the
   [`NO_COLOR`](https://no-color.org/) convention is honored.
 
@@ -76,6 +77,33 @@ Flags that matter in pipelines:
 - run: tx bpa run -m ./model.tmdl --non-interactive
 - run: tx validate -m ./model.tmdl --ci github --non-interactive
 ```
+
+### DAX regression tests as a PR gate
+
+`tx test` runs `.dax` queries with recorded expected results
+([details](../commands/validate.md#test-dax-regression-tests)) and exits
+`1` on any drift. Because tests execute on a deployed model, the PR gate is:
+deploy the PR's model to a dev workspace, refresh it, then run the tests
+against it. On Azure DevOps with a service principal:
+
+```yaml
+# Azure DevOps: deploy the PR model to the dev workspace, then gate on tests
+- script: >
+    tx test ./MyModel.SemanticModel/tests
+    -s "$(DevWorkspace)" -d MyModel
+    --auth spn --non-interactive
+    --trx $(Agent.TempDirectory)/dax-tests.trx --ci vsts
+  displayName: DAX regression tests
+- task: PublishTestResults@2
+  condition: always()
+  inputs:
+    testResultsFormat: VSTest
+    testResultsFiles: $(Agent.TempDirectory)/dax-tests.trx
+```
+
+A non-zero exit fails the stage; `--ci vsts` additionally annotates each
+failing test. Accept intentional result changes by re-running
+`tx test --update` locally and committing the snapshot diff.
 
 Ready-made workflow examples live in the
 [samples folder](https://github.com/bgarcevic/tomix-cli/tree/main/samples).

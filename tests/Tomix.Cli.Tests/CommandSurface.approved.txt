@@ -534,6 +534,16 @@ Discard staged mutations without committing them
 Promote staged mutations onto the source (and workspace mirror)
   opt --force  Commit even if the source changed since staging began (overwrites it).
 
+# tx test
+Run DAX regression tests against a live model (--update records snapshots, --trx/--ci for pipelines)
+  arg [path]  Test file or directory searched recursively for .dax tests (default: current directory)
+  opt --update  Record mode: run each query and (re)write its .expected.json snapshot from the actual result.
+  opt --filter <filter>  Run only tests whose name matches a * wildcard pattern (case-insensitive).
+  opt --param <param>  Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.
+  opt --max-rows <max-rows>  Per-query row cap; a query exceeding it fails as an error (default: 10000).
+  opt --ci <ci>  Emit CI logging commands to stderr: vsts or github
+  opt --trx <trx>  Write results as a VSTEST .trx file to the specified path
+
 # tx update
 Update tx to the latest release.
   opt --check  Preview only: show the latest version and release notes without changing anything.

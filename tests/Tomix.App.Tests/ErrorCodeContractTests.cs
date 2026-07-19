@@ -71,6 +71,21 @@ public sealed class ErrorCodeContractTests
         Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
     }
 
+    // ── Regression-test error codes ─────────────────────────────────────────
+
+    [Theory]
+    [InlineData("TOMIX_TEST_PATH_NOT_FOUND")]
+    [InlineData("TOMIX_TEST_NONE_FOUND")]
+    [InlineData("TOMIX_TEST_BAD_PARAM")]
+    [InlineData("TOMIX_TEST_NO_REMOTE_TARGET")]
+    [InlineData("TOMIX_TEST_UNSUPPORTED")]
+    [InlineData("TOMIX_TEST_UPDATE_FAILED")]
+    public void TestErrorCodes_AreValidUppercaseSnakeCase(string code)
+    {
+        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
+        Assert.StartsWith("TOMIX_TEST_", code);
+    }
+
     // ── Incremental-refresh error codes ─────────────────────────────────────
 
     [Theory]

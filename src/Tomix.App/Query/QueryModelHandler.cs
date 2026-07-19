@@ -134,8 +134,16 @@ public sealed class QueryModelHandler
     internal static ModelReference? ResolveTarget(
         QueryModelRequest request,
         ActiveModelResolver resolver)
+        => ResolveTarget(request.Model, request.Database, request.Server, resolver);
+
+    /// <summary>Shared with <see cref="Test.TestRunHandler"/>, which targets the same live endpoint.</summary>
+    internal static ModelReference? ResolveTarget(
+        string? model,
+        string? database,
+        string? server,
+        ActiveModelResolver resolver)
     {
-        var primary = resolver.ResolveReference(request.Model, request.Database, request.Server);
+        var primary = resolver.ResolveReference(model, database, server);
         if (primary.IsRemote)
             return primary;
 
