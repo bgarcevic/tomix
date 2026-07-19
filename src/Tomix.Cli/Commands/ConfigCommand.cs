@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Config;
 using Tomix.Cli.Output;
 
@@ -8,9 +7,16 @@ namespace Tomix.Cli.Commands;
 
 internal sealed class ConfigCommand : ICommandModule
 {
-    private readonly AppServices _services;
+    private readonly TomixConfigStore _configStore;
+    private readonly string _configDirectory;
+    private readonly string _configFilePath;
 
-    public ConfigCommand(AppServices services) => _services = services;
+    public ConfigCommand(TomixConfigStore configStore, string configDirectory, string configFilePath)
+    {
+        _configStore = configStore;
+        _configDirectory = configDirectory;
+        _configFilePath = configFilePath;
+    }
 
     public Command Build()
     {
@@ -40,7 +46,7 @@ internal sealed class ConfigCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "config init", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new ConfigHandler(_services.ConfigStore).Init(parseResult.GetValue(forceOption));
+            var result = new ConfigHandler(_configStore).Init(parseResult.GetValue(forceOption));
             return CommandOutput.Render(result, formatValue, RenderInit);
         });
 
@@ -67,7 +73,7 @@ internal sealed class ConfigCommand : ICommandModule
 
             var key = parseResult.GetValue(keyArgument) ?? "";
             var value = parseResult.GetValue(valueArgument) ?? "";
-            var result = new ConfigHandler(_services.ConfigStore).Set(key, value);
+            var result = new ConfigHandler(_configStore).Set(key, value);
             return CommandOutput.Render(result, formatValue, RenderSet);
         });
 
@@ -80,8 +86,8 @@ internal sealed class ConfigCommand : ICommandModule
 
         command.SetAction(_ =>
         {
-            AnsiConsole.MarkupLine(Styling.KeyValue("configDir   ", _services.ConfigDirectory));
-            AnsiConsole.MarkupLine(Styling.KeyValue("configFile  ", _services.ConfigFilePath));
+            AnsiConsole.MarkupLine(Styling.KeyValue("configDir   ", _configDirectory));
+            AnsiConsole.MarkupLine(Styling.KeyValue("configFile  ", _configFilePath));
             return 0;
         });
 
@@ -99,7 +105,7 @@ internal sealed class ConfigCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "config show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new ConfigHandler(_services.ConfigStore).List();
+            var result = new ConfigHandler(_configStore).List();
             return CommandOutput.Render(result, formatValue, RenderList);
         });
 

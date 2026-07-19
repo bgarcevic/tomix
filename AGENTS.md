@@ -16,6 +16,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - `/src/Tomix.Cli` - CLI entry point, commands, argument parsing, exit codes, and output rendering (`Output/`)
 - `/src/Tomix.App` - Application use cases and command handlers
 - `/src/Tomix.Core` - Core abstractions, diagnostics, results, and shared domain types
+- `/src/Tomix.Platform` - Dependency-free filesystem and operating-system primitives shared by outer projects
 - `/src/Tomix.Provider.*` - Model providers for TOM and TMDL
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
 - `/samples` - Sample models used by tests and documentation
@@ -27,7 +28,8 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 |------|-------|------|-------|
 | Add or change a CLI command | `/src/Tomix.Cli`, `/src/Tomix.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers. Update the matching page in `/docs/commands` and regenerate `CommandSurface.approved.txt` (`TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests`) |
 | Change command output or color styling | `/src/Tomix.Cli/Output` | `Output/CONTEXT.md`, `/docs/cli-color-strategy.md` | Use `Styling` helpers; do not hard-code ANSI |
-| Add domain types, diagnostics, paths, or result models | `/src/Tomix.Core` | `CONTEXT.md` | Core must stay dependency-light |
+| Add domain types, diagnostics, or result models | `/src/Tomix.Core` | `CONTEXT.md` | Core must stay dependency-light and infrastructure-free |
+| Add shared local paths or filesystem primitives | `/src/Tomix.Platform` | `CONTEXT.md` | BCL-only; no feature stores or external adapters |
 | Change command output | `/src/Tomix.Cli/Output`, `/tests/Tomix.Cli.Tests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts (`GetLsParityTests`, `PropertyCatalogTests`) |
 | Add TMDL or TOM support | `/src/Tomix.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
 | Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |

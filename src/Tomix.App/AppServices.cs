@@ -3,14 +3,15 @@ using Tomix.App.Config;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.App.Update;
-using Tomix.Core.Configuration;
+using Tomix.Platform.Configuration;
 
 namespace Tomix.App;
 
 /// <summary>
-/// The stateful, filesystem-backed services built once by the composition root
-/// (<c>Program.Main</c>) and threaded into commands and handlers. Construction is
-/// side-effect-free: every store only computes paths; no directory is created until a
+/// The stateful, filesystem-backed services built once by the process composition root
+/// (<c>Program.Main</c>). The process root supplies feature-level command composition roots with
+/// the exact stores required by their application handlers; commands and handlers never receive this bundle.
+/// Construction is side-effect-free: every store only computes paths; no directory is created until a
 /// store is first written. <c>TOMIX_CONFIG_DIR</c> and <c>TOMIX_SESSION</c> are therefore
 /// read once per process instead of on every ambient <c>new</c>.
 /// </summary>

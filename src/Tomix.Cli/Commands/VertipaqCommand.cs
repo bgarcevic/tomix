@@ -1,6 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
+using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.App.Vertipaq;
 using Tomix.Cli.Output;
@@ -14,13 +14,19 @@ internal sealed class VertipaqCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly IVertipaqAnalyzer _analyzer;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
+    private readonly MutationStores _mutations;
 
-    public VertipaqCommand(IReadOnlyList<IModelProvider> providers, IVertipaqAnalyzer analyzer, AppServices services)
+    public VertipaqCommand(
+        IReadOnlyList<IModelProvider> providers,
+        IVertipaqAnalyzer analyzer,
+        CliStateStore state,
+        MutationStores mutations)
     {
         _providers = providers;
         _analyzer = analyzer;
-        _services = services;
+        _state = state;
+        _mutations = mutations;
     }
 
     public Command Build()
@@ -142,7 +148,7 @@ internal sealed class VertipaqCommand : ICommandModule
                 if (!RecentConnections.TryGetSource(
                         parseResult,
                         GlobalOptions.ModelValue(parseResult),
-                        _services.State,
+                        _state,
                         out var source,
                         out var recentExit))
                     return recentExit;
@@ -157,7 +163,7 @@ internal sealed class VertipaqCommand : ICommandModule
 
                 // Seed with the picked --recent entry (if any) so the workspace-primary read side
                 // (syncTarget) comes from that entry's mirror, not the active session's.
-                var resolver = RecentConnections.CreateResolver(source, _services.State);
+                var resolver = RecentConnections.CreateResolver(source, _state);
                 reference = resolver.ResolveReference(source.Model, source.Database, server);
                 syncTarget = resolver.ResolveSyncTarget();
             }
@@ -183,7 +189,7 @@ internal sealed class VertipaqCommand : ICommandModule
                     ? "Exporting statistics..."
                     : "Analyzing storage...";
 
-            var handler = new VertipaqHandler(_providers, _analyzer, _services.Mutations);
+            var handler = new VertipaqHandler(_providers, _analyzer, _mutations);
             var result = await CliSpinner.RunAsync(
                 spinnerLabel,
                 () => handler.HandleAsync(request, cancellationToken),

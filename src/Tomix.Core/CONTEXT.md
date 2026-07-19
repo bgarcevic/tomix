@@ -22,7 +22,8 @@ Core domain types and abstractions.
 
 - Must stay dependency-light.
 - Do not depend on CLI, App, Output, TOM, Power BI, XMLA, or console libraries.
-- Do not include infrastructure code.
+- Do not include infrastructure code. Shared BCL-only platform primitives belong in
+  `/src/Tomix.Platform`.
 - Types here should be stable and reusable.
 
 ## Test

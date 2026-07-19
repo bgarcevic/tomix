@@ -4,7 +4,7 @@ using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.AppConfig;
 using Microsoft.Identity.Client.Extensions.Msal;
 using Tomix.Core.Authentication;
-using Tomix.Core.Configuration;
+using Tomix.Platform.Configuration;
 
 namespace Tomix.Auth;
 

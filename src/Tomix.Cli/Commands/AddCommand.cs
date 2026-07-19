@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Add;
+using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
@@ -12,12 +12,14 @@ internal sealed class AddCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
+    private readonly MutationStores _mutations;
 
-    public AddCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public AddCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
+        _mutations = mutations;
     }
 
     public Command Build()
@@ -199,7 +201,7 @@ internal sealed class AddCommand : ICommandModule
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                    _services.State,
+                    _state,
                     out var reference,
                     out var recentExit))
                 return recentExit;
@@ -211,7 +213,7 @@ internal sealed class AddCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new AddModelObjectHandler(_providers, _services.Mutations).HandleAsync(
+                () => new AddModelObjectHandler(_providers, _mutations).HandleAsync(
                     new AddModelObjectRequest(
                         reference,
                         parseResult.GetValue(pathArgument) ?? "",

@@ -1,7 +1,7 @@
 using Tomix.App.Stage;
 using Tomix.App.State;
-using Tomix.Core.Configuration;
 using Tomix.Core.Models;
+using Tomix.Platform.Configuration;
 
 namespace Tomix.App.Tests;
 

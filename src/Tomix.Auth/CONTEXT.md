@@ -11,7 +11,8 @@ MSAL-backed authentication and credential caching.
 
 ## Cross-folder dependencies
 
-- Depends only on `/src/Tomix.Core` among `Tomix.*` projects.
+- Depends on `/src/Tomix.Core` for authentication contracts and `/src/Tomix.Platform` for shared,
+  dependency-free filesystem primitives.
 - Constructed by `/src/Tomix.Cli`, the composition root.
 - Must not be referenced by `/src/Tomix.App` or provider projects.
 

@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Deploy;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,16 +11,16 @@ internal sealed class DeployCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
     private readonly HttpClient? _httpClient;
 
     public DeployCommand(
         IReadOnlyList<IModelProvider> providers,
-        AppServices services,
+        CliStateStore state,
         HttpClient? httpClient = null)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
         _httpClient = httpClient;
     }
 
@@ -141,7 +140,7 @@ internal sealed class DeployCommand : ICommandModule
                     return 2;
                 }
 
-                if (!RecentConnections.TryResolve(parseResult, _services.State, out var entry, out var recentExit))
+                if (!RecentConnections.TryResolve(parseResult, _state, out var entry, out var recentExit))
                     return recentExit;
 
                 // Resolve against the picked entry (not the active session) so a server-only
@@ -151,7 +150,7 @@ internal sealed class DeployCommand : ICommandModule
             }
             else
             {
-                reference = new ActiveModelResolver(_services.State).ResolveReference(
+                reference = new ActiveModelResolver(_state).ResolveReference(
                     explicitModel,
                     parseResult.GetValue(GlobalOptions.Database));
             }
@@ -169,7 +168,7 @@ internal sealed class DeployCommand : ICommandModule
             var spinnerLabel = dryRun ? "Previewing deployment..." : "Deploying model...";
             var result = await CliSpinner.RunAsync(
                 spinnerLabel,
-                () => new DeployModelHandler(_providers, _services.State, httpClient: _httpClient).HandleAsync(
+                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient).HandleAsync(
                     new DeployModelRequest(
                         reference,
                         server,

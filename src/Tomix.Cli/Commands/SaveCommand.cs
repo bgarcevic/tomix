@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Save;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,16 +11,16 @@ internal sealed class SaveCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
     private readonly HttpClient? _httpClient;
 
     public SaveCommand(
         IReadOnlyList<IModelProvider> providers,
-        AppServices services,
+        CliStateStore state,
         HttpClient? httpClient = null)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
         _httpClient = httpClient;
     }
 
@@ -105,7 +104,7 @@ internal sealed class SaveCommand : ICommandModule
             if (!RecentConnections.TryGetSource(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                    _services.State,
+                    _state,
                     out var source,
                     out var recentExit))
                 return recentExit;
@@ -113,7 +112,7 @@ internal sealed class SaveCommand : ICommandModule
             // Seed the resolver with the picked --recent entry (if any) so the sync target is the
             // mirror saved with that entry, not the active session's — otherwise `save --recent`
             // could push the recent model to the wrong workspace mirror.
-            var resolver = RecentConnections.CreateResolver(source, _services.State);
+            var resolver = RecentConnections.CreateResolver(source, _state);
             var reference = resolver.ResolveReference(source.Model, source.Database, source.Server);
 
             var syncTarget = noSync ? null : resolver.ResolveSyncTarget();

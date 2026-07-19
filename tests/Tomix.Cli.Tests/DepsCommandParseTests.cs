@@ -12,7 +12,8 @@ public sealed class DepsCommandParseTests
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
-        root.Subcommands.Add(new DepsCommand(providers, TestServices.Create()).Build());
+        var services = TestServices.Create();
+        root.Subcommands.Add(new DepsCommand(providers, services.State).Build());
         return root.Parse(args);
     }
 

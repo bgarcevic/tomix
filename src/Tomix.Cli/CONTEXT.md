@@ -21,8 +21,10 @@ CLI entry point for `tx`.
 ## Structure
 
 - `Commands/` - one `ICommandModule` per command. Each module builds its `Command`, parses input,
-  calls a handler, selects an output renderer, and returns the exit code. Commands may render prompts
-  and trivial one-line messages; complex tables, trees, serialization, and projections live in `Output/`.
+  constructs and calls its application handlers, selects an output renderer, and returns the exit
+  code. Each module is the feature-level composition root; `Program` owns process-wide dependencies
+  and registers modules. Commands may render prompts and trivial one-line messages; complex tables,
+  trees, serialization, and projections live in `Output/`.
 - `Output/` - shared output wiring used by every command. See `Output/CONTEXT.md` for details.
   - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
   - `JsonOutput` - the single JSON serializer (the `--format json` contract).
@@ -33,6 +35,11 @@ CLI entry point for `tx`.
 
 - Keep command classes thin.
 - Do not put business logic here.
+- Keep handler construction inside the owning command module. Do not introduce a service locator or
+  a container solely to move `new` expressions; inject process-wide dependencies into the module
+  constructor and pass only the exact store or service required by each handler.
+- `AppServices` is the explicit process-lifetime state bundle. `Program` selects its members while
+  registering modules; command modules and application handlers must never receive the entire bundle.
 - Do not access TOM, Power BI, XMLA, BIM, or TMDL APIs directly.
 - Do not hand-roll JSON output inside commands; serialize through `Output/JsonOutput`.
 - Add a new command as its own `ICommandModule` in `Commands/`; reuse `Output/` rather than re-deriving format handling.

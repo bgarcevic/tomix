@@ -12,7 +12,8 @@ public sealed class UpdateCommandParseTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new UpdateCommand(version, source ?? FakeReleaseSource.Empty, TestServices.Create()).Build());
+        var services = TestServices.Create();
+        root.Subcommands.Add(new UpdateCommand(version, source ?? FakeReleaseSource.Empty, services.UpdateCheck).Build());
         return root;
     }
 

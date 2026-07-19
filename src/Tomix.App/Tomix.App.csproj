@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tomix.Core\Tomix.Core.csproj" />
+    <ProjectReference Include="..\Tomix.Platform\Tomix.Platform.csproj" />
   </ItemGroup>
 
   <ItemGroup>

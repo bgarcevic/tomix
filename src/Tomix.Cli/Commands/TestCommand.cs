@@ -1,5 +1,5 @@
 using System.CommandLine;
-using Tomix.App;
+using Tomix.App.State;
 using Tomix.App.Test;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
@@ -17,12 +17,12 @@ internal sealed class TestCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly Func<CliConnectionState?> _loadCurrentSession;
 
-    public TestCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public TestCommand(IReadOnlyList<IModelProvider> providers, Func<CliConnectionState?> loadCurrentSession)
     {
         _providers = providers;
-        _services = services;
+        _loadCurrentSession = loadCurrentSession;
     }
 
     public Command Build()
@@ -118,7 +118,7 @@ internal sealed class TestCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Running tests...",
-                () => new TestRunHandler(_providers, _services.LoadCurrentSession).HandleAsync(request, cancellationToken),
+                () => new TestRunHandler(_providers, _loadCurrentSession).HandleAsync(request, cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format));
 
             if (result.Data is not null)

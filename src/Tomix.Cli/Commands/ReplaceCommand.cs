@@ -1,6 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
+using Tomix.App.Mutations;
 using Tomix.App.Replace;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,12 +12,14 @@ internal sealed class ReplaceCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
+    private readonly MutationStores _mutations;
 
-    public ReplaceCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public ReplaceCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
+        _mutations = mutations;
     }
 
     public Command Build()
@@ -119,14 +121,14 @@ internal sealed class ReplaceCommand : ICommandModule
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                    _services.State,
+                    _state,
                     out var reference,
                     out var recentExit))
                 return recentExit;
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Replacing...",
-                () => new ReplaceModelTextHandler(_providers, _services.Mutations).HandleAsync(
+                () => new ReplaceModelTextHandler(_providers, _mutations).HandleAsync(
                     new ReplaceModelTextRequest(
                         reference,
                         pattern,

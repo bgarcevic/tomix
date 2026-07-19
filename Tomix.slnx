@@ -4,6 +4,7 @@
     <Project Path="src/Tomix.Auth/Tomix.Auth.csproj" />
     <Project Path="src/Tomix.Cli/Tomix.Cli.csproj" />
     <Project Path="src/Tomix.Core/Tomix.Core.csproj" />
+    <Project Path="src/Tomix.Platform/Tomix.Platform.csproj" />
     <Project Path="src/Tomix.Provider.Tmdl/Tomix.Provider.Tmdl.csproj" />
     <Project Path="src/Tomix.Provider.Tom/Tomix.Provider.Tom.csproj" />
     <Project Path="src/Tomix.Provider.Vpax/Tomix.Provider.Vpax.csproj" />

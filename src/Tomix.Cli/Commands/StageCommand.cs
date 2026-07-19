@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Stage;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -16,12 +15,14 @@ internal sealed class StageCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
+    private readonly StagingStore _staging;
 
-    public StageCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public StageCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, StagingStore staging)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
+        _staging = staging;
     }
 
     public Command Build()
@@ -58,7 +59,7 @@ internal sealed class StageCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Committing staged changes...",
-                () => new StageHandler(_services.Staging).CommitAsync(
+                () => new StageHandler(_staging).CommitAsync(
                     reference, _providers, parseResult.GetValue(forceOption), cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
             return CommandOutput.Render(result, format, RenderCommit);
@@ -82,7 +83,7 @@ internal sealed class StageCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "stage list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new StageHandler(_services.Staging).List(), format, RenderList);
+            return CommandOutput.Render(new StageHandler(_staging).List(), format, RenderList);
         });
         return command;
     }
@@ -108,7 +109,7 @@ internal sealed class StageCommand : ICommandModule
             if (!TryResolveModel(parseResult, out var reference, out var recentExit))
                 return recentExit;
             return CommandOutput.Render(
-                new StageHandler(_services.Staging).Discard(reference, all),
+                new StageHandler(_staging).Discard(reference, all),
                 format,
                 result => AnsiConsole.MarkupLine(Styling.Success($"Discarded {result.Discarded} staged change set(s).")));
         });
@@ -123,7 +124,7 @@ internal sealed class StageCommand : ICommandModule
 
         if (!TryResolveModel(parseResult, out var reference, out var recentExit))
             return recentExit;
-        return CommandOutput.Render(new StageHandler(_services.Staging).Status(reference), format, RenderStatusResult);
+        return CommandOutput.Render(new StageHandler(_staging).Status(reference), format, RenderStatusResult);
     }
 
     private static void RenderStatusResult(StageStatusResult result)
@@ -168,7 +169,7 @@ internal sealed class StageCommand : ICommandModule
 
     private bool TryResolveModel(ParseResult parseResult, out ModelReference reference, out int exitCode)
     {
-        if (!RecentConnections.TryGetSource(parseResult, GlobalOptions.ModelValue(parseResult), _services.State, out var source, out exitCode))
+        if (!RecentConnections.TryGetSource(parseResult, GlobalOptions.ModelValue(parseResult), _state, out var source, out exitCode))
         {
             reference = new ModelReference("");
             return false;
@@ -177,8 +178,8 @@ internal sealed class StageCommand : ICommandModule
         // Stage resolution deliberately ignores --server today; a server only takes part
         // when it comes from the --recent override.
         reference = GlobalOptions.RecentSpecified(parseResult)
-            ? RecentConnections.CreateResolver(source, _services.State).ResolveReference(source.Model, source.Database, source.Server)
-            : new ActiveModelResolver(_services.State).ResolveReference(source.Model, source.Database);
+            ? RecentConnections.CreateResolver(source, _state).ResolveReference(source.Model, source.Database, source.Server)
+            : new ActiveModelResolver(_state).ResolveReference(source.Model, source.Database);
         return true;
     }
 }

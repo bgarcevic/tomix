@@ -17,35 +17,44 @@ public sealed class OutputFormatRejectionTests
     private static readonly IReadOnlyList<IModelProvider> NoProviders = [];
 
     private static Command BuildModule(string name)
-        => (name switch
+    {
+        var services = TestServices.Create();
+        var mutations = services.Mutations;
+
+        return (name switch
         {
-            "add" => new AddCommand(NoProviders, TestServices.Create()),
-            "auth" => new AuthCommand(TestServices.Create()),
-            "bpa" => new BpaCommand(NoProviders, TestServices.Create()),
-            "config" => new ConfigCommand(TestServices.Create()),
-            "connect" => new ConnectCommand(NoProviders, FakeWorkspaceCatalog.Empty, () => null, TestServices.Create()),
-            "deploy" => new DeployCommand(NoProviders, TestServices.Create()),
+            "add" => new AddCommand(NoProviders, services.State, mutations),
+            "auth" => new AuthCommand(services.ConfigStore, services.State),
+            "bpa" => new BpaCommand(
+                NoProviders, services.State, mutations, services.BpaRules, services.ConfigDirectory),
+            "config" => new ConfigCommand(services.ConfigStore, services.ConfigDirectory, services.ConfigFilePath),
+            "connect" => new ConnectCommand(NoProviders, FakeWorkspaceCatalog.Empty, () => null, services.State),
+            "deploy" => new DeployCommand(NoProviders, services.State),
             "diff" => new DiffCommand(NoProviders),
-            "doctor" => new DoctorCommand("0.0.0-test", TestServices.Create().ConfigDirectory),
-            "format" => new FormatCommand(NoProviders, new CompositeExpressionFormatterClient([]), TestServices.Create()),
-            "get" => new GetCommand(NoProviders, TestServices.Create()),
+            "doctor" => new DoctorCommand("0.0.0-test", services.ConfigDirectory),
+            "format" => new FormatCommand(NoProviders, new CompositeExpressionFormatterClient([]), services.State, mutations),
+            "get" => new GetCommand(NoProviders, services.State),
             "init" => new InitCommand(),
-            "load" => new LoadCommand(NoProviders, TestServices.Create()),
-            "profile" => new ProfileCommand(TestServices.Create()),
-            "refresh" => new RefreshCommand(NoProviders, TestServices.Create()),
-            "replace" => new ReplaceCommand(NoProviders, TestServices.Create()),
-            "rm" => new RmCommand(NoProviders, TestServices.Create()),
-            "save" => new SaveCommand(NoProviders, TestServices.Create()),
-            "script" => new ScriptCommand(NoProviders, TestServices.Create()),
-            "session" => new SessionCommand(TestServices.Create()),
-            "set" => new SetCommand(NoProviders, TestServices.Create()),
-            "stage" => new StageCommand(NoProviders, TestServices.Create()),
-            "update" => new UpdateCommand("0.0.0-test", FakeReleaseSource.Empty, TestServices.Create()),
-            "validate" => new ValidateCommand(NoProviders, TestServices.Create()),
+            "load" => new LoadCommand(NoProviders, services.State),
+            "profile" => new ProfileCommand(services.State),
+            "refresh" => new RefreshCommand(NoProviders, services.State, services.LoadCurrentSession),
+            "replace" => new ReplaceCommand(NoProviders, services.State, mutations),
+            "rm" => new RmCommand(NoProviders, services.State, mutations),
+            "save" => new SaveCommand(NoProviders, services.State),
+            "script" => new ScriptCommand(NoProviders, services.State, mutations),
+            "session" => new SessionCommand(services.State),
+            "set" => new SetCommand(NoProviders, services.State, mutations),
+            "stage" => new StageCommand(NoProviders, services.State, services.Staging),
+            "update" => new UpdateCommand("0.0.0-test", FakeReleaseSource.Empty, services.UpdateCheck),
+            "validate" => new ValidateCommand(NoProviders, services.State),
             "vertipaq" => new VertipaqCommand(
-                NoProviders, new Tomix.Provider.Vpax.VpaxVertipaqAnalyzer(tokenProvider: null, "0.0.0-test"), TestServices.Create()),
+                NoProviders,
+                new Tomix.Provider.Vpax.VpaxVertipaqAnalyzer(tokenProvider: null, "0.0.0-test"),
+                services.State,
+                mutations),
             _ => (ICommandModule?)null,
         })?.Build() ?? throw new ArgumentException($"Unknown module '{name}'.");
+    }
 
     private static (int ExitCode, string Stderr, ParseResult Result) Invoke(params string[] args)
     {

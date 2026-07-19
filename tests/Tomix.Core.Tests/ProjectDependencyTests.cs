@@ -8,8 +8,9 @@ public sealed class ProjectDependencyTests
         new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
         {
             ["Tomix.Core"] = Set(),
-            ["Tomix.App"] = Set("Tomix.Core"),
-            ["Tomix.Auth"] = Set("Tomix.Core"),
+            ["Tomix.Platform"] = Set(),
+            ["Tomix.App"] = Set("Tomix.Core", "Tomix.Platform"),
+            ["Tomix.Auth"] = Set("Tomix.Core", "Tomix.Platform"),
             ["Tomix.Provider.Tom"] = Set("Tomix.Core"),
             ["Tomix.Provider.Tmdl"] = Set("Tomix.Core", "Tomix.Provider.Tom"),
             ["Tomix.Provider.Vpax"] = Set("Tomix.Core"),
@@ -26,10 +27,21 @@ public sealed class ProjectDependencyTests
     public void ProductionProjects_FollowDocumentedDependencyGraph()
     {
         var root = FindRepositoryRoot();
+        var projectFiles = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "Tomix.*.csproj", SearchOption.AllDirectories)
+            .ToDictionary(
+                path => Path.GetFileNameWithoutExtension(path),
+                path => path,
+                StringComparer.Ordinal);
+
+        Assert.True(
+            AllowedReferences.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(projectFiles.Keys),
+            $"Discovered projects [{string.Join(", ", projectFiles.Keys.Order())}], "
+            + $"but the dependency policy covers [{string.Join(", ", AllowedReferences.Keys.Order())}].");
 
         foreach (var (project, allowed) in AllowedReferences)
         {
-            var projectFile = Path.Combine(root, "src", project, $"{project}.csproj");
+            var projectFile = projectFiles[project];
             var actual = XDocument.Load(projectFile)
                 .Descendants("ProjectReference")
                 .Select(element => element.Attribute("Include")?.Value)

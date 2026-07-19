@@ -16,7 +16,8 @@ public sealed class FindCommandParseTests
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
-        root.Subcommands.Add(new FindCommand(providers, TestServices.Create()).Build());
+        var services = TestServices.Create();
+        root.Subcommands.Add(new FindCommand(providers, services.State).Build());
         return root.Parse(args);
     }
 

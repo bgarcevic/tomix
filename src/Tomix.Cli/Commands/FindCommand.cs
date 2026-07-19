@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Find;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,12 +11,12 @@ internal sealed class FindCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
 
-    public FindCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public FindCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
     }
 
     public Command Build()
@@ -81,7 +80,7 @@ internal sealed class FindCommand : ICommandModule
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                    _services.State,
+                    _state,
                     out var reference,
                     out var recentExit))
                 return recentExit;

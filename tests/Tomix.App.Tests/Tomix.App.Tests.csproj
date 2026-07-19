@@ -6,6 +6,7 @@
     <ProjectReference Include="..\..\src\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
     <ProjectReference Include="..\..\src\Tomix.Provider.Tmdl\Tomix.Provider.Tmdl.csproj" />
     <ProjectReference Include="..\..\src\Tomix.Auth\Tomix.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Tomix.Platform\Tomix.Platform.csproj" />
   </ItemGroup>
 
 </Project>

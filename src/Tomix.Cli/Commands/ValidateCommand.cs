@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.State;
 using Tomix.App.Validate;
 using Tomix.Cli.Output;
@@ -12,12 +11,12 @@ internal sealed class ValidateCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
 
-    public ValidateCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public ValidateCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
     }
 
     public Command Build()
@@ -75,7 +74,7 @@ internal sealed class ValidateCommand : ICommandModule
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                    _services.State,
+                    _state,
                     out var model,
                     out var recentExit))
                 return recentExit;

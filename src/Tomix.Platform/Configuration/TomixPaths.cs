@@ -1,4 +1,4 @@
-namespace Tomix.Core.Configuration;
+namespace Tomix.Platform.Configuration;
 
 /// <summary>
 /// Resolves the well-known on-disk locations tomix uses for local state.

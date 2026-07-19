@@ -1,16 +1,16 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Session;
+using Tomix.App.State;
 using Tomix.Cli.Output;
 
 namespace Tomix.Cli.Commands;
 
 internal sealed class SessionCommand : ICommandModule
 {
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
 
-    public SessionCommand(AppServices services) => _services = services;
+    public SessionCommand(CliStateStore state) => _state = state;
 
     public Command Build()
     {
@@ -39,7 +39,7 @@ internal sealed class SessionCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "session list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new SessionHandler(_services.State).List(), format, RenderList);
+            return CommandOutput.Render(new SessionHandler(_state).List(), format, RenderList);
         });
         return command;
     }
@@ -54,7 +54,7 @@ internal sealed class SessionCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
-                new SessionHandler(_services.State).Clear(),
+                new SessionHandler(_state).Clear(),
                 format,
                 result => AnsiConsole.MarkupLine(result.Cleared ? Styling.Success("Cleared current session.") : Styling.Muted("No active session.")));
         });
@@ -84,7 +84,7 @@ internal sealed class SessionCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
-                new SessionHandler(_services.State).Prune(parseResult.GetValue(allOption), parseResult.GetValue(dryRunOption)),
+                new SessionHandler(_state).Prune(parseResult.GetValue(allOption), parseResult.GetValue(dryRunOption)),
                 format,
                 result => AnsiConsole.MarkupLine(result.DryRun
                     ? Styling.Warning($"Would remove {result.Removed} session(s).")
@@ -99,7 +99,7 @@ internal sealed class SessionCommand : ICommandModule
         if (!CommandOutput.TryValidateFormat(parseResult, format, "session", OutputFormats.Text, OutputFormats.Json))
             return 2;
 
-        return CommandOutput.Render(new SessionHandler(_services.State).Show(), format, RenderShowResult);
+        return CommandOutput.Render(new SessionHandler(_state).Show(), format, RenderShowResult);
     }
 
     private static void RenderShowResult(SessionShowResult result)

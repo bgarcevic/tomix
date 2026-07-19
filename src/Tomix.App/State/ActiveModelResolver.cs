@@ -86,9 +86,16 @@ public sealed class ActiveModelResolver
         return new ModelReference("");
     }
 
-    public ModelReference? ResolveSyncTarget()
+    public ModelReference? ResolveSyncTarget() => ResolveSyncTarget(_loadSession());
+
+    /// <summary>
+    /// Resolves the remote workspace synchronization target from an explicit connection snapshot.
+    /// A remote workspace endpoint wins; otherwise the primary server is used when a local
+    /// workspace is configured. This overload is the single policy used by command and mutation
+    /// lifecycles.
+    /// </summary>
+    public static ModelReference? ResolveSyncTarget(CliConnectionState? session)
     {
-        var session = _loadSession();
         if (session is null || string.IsNullOrWhiteSpace(session.Workspace))
             return null;
 

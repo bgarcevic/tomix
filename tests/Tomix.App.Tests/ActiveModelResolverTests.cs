@@ -7,6 +7,25 @@ namespace Tomix.App.Tests;
 public sealed class ActiveModelResolverTests
 {
     [Fact]
+    public void ResolveSyncTarget_FromConnectionSnapshot_UsesSharedPolicy()
+    {
+        var connection = new CliConnectionState(
+            Server: "powerbi://api.powerbi.com/v1.0/myorg/primary",
+            Database: "Sales",
+            Model: "/local/model",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/mirror");
+
+        var result = ActiveModelResolver.ResolveSyncTarget(connection);
+
+        Assert.NotNull(result);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/mirror", result.Value);
+        Assert.Equal("Sales", result.Database);
+    }
+
+    [Fact]
     public void ResolveReference_ReturnsExplicitModel_WhenProvided()
     {
         var store = new CliStateStore(Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}"));

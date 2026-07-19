@@ -14,7 +14,10 @@ namespace Tomix.Cli.Tests;
 public sealed class VertipaqCommandParseTests
 {
     private static Command BuildCommand()
-        => new VertipaqCommand([], new ThrowingAnalyzer(), TestServices.Create()).Build();
+    {
+        var services = TestServices.Create();
+        return new VertipaqCommand([], new ThrowingAnalyzer(), services.State, services.Mutations).Build();
+    }
 
     private static ParseResult Parse(params string[] args)
     {

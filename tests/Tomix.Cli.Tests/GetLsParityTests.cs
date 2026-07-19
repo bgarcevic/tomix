@@ -126,9 +126,10 @@ public sealed class GetLsParityTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
+        var services = TestServices.Create();
         root.Subcommands.Add(args[0] == "get"
-            ? new GetCommand(Providers, TestServices.Create()).Build()
-            : new LsCommand(Providers, TestServices.Create()).Build());
+            ? new GetCommand(Providers, services.State).Build()
+            : new LsCommand(Providers, services.State).Build());
 
         var originalOut = Console.Out;
         var originalError = Console.Error;

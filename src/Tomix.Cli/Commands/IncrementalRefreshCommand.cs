@@ -1,6 +1,6 @@
 using System.CommandLine;
-using Tomix.App;
 using Tomix.App.IncrementalRefresh;
+using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
@@ -11,12 +11,20 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
+    private readonly MutationStores _mutations;
+    private readonly Func<CliConnectionState?> _loadCurrentSession;
 
-    public IncrementalRefreshCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public IncrementalRefreshCommand(
+        IReadOnlyList<IModelProvider> providers,
+        CliStateStore state,
+        MutationStores mutations,
+        Func<CliConnectionState?> loadCurrentSession)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
+        _mutations = mutations;
+        _loadCurrentSession = loadCurrentSession;
     }
 
     public Command Build()
@@ -50,7 +58,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh show", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var reference = new ActiveModelResolver(_services.State).ResolveReference(
+            var reference = new ActiveModelResolver(_state).ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
@@ -178,7 +186,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "incremental-refresh set", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var reference = new ActiveModelResolver(_services.State).ResolveReference(
+            var reference = new ActiveModelResolver(_state).ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
@@ -190,7 +198,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new SetRefreshPolicyHandler(_providers, _services.Mutations).HandleAsync(
+                () => new SetRefreshPolicyHandler(_providers, _mutations).HandleAsync(
                     new SetRefreshPolicyRequest(
                         reference,
                         parseResult.GetValue(tableArgument) ?? "",
@@ -293,7 +301,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                 parseResult.GetValue(GlobalOptions.NonInteractive)))
                 return 1;
 
-            var reference = new ActiveModelResolver(_services.State).ResolveReference(
+            var reference = new ActiveModelResolver(_state).ResolveReference(
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
@@ -305,7 +313,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new RemoveRefreshPolicyHandler(_providers, _services.Mutations).HandleAsync(
+                () => new RemoveRefreshPolicyHandler(_providers, _mutations).HandleAsync(
                     new RemoveRefreshPolicyRequest(
                         reference,
                         table,
@@ -360,7 +368,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 $"Applying refresh policy for {table}...",
-                () => new ApplyRefreshPolicyHandler(_providers, _services.LoadCurrentSession).HandleAsync(
+                () => new ApplyRefreshPolicyHandler(_providers, _loadCurrentSession).HandleAsync(
                     new ApplyRefreshPolicyRequest(
                         GlobalOptions.ModelValue(parseResult),
                         parseResult.GetValue(GlobalOptions.Server),

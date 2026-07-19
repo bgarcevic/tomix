@@ -1,7 +1,6 @@
 using System.CommandLine;
 using System.Runtime.InteropServices;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Update;
 using Tomix.Cli.Output;
 using Tomix.Core.Results;
@@ -13,13 +12,13 @@ internal sealed class UpdateCommand : ICommandModule
 {
     private readonly string _version;
     private readonly IReleaseSource _releaseSource;
-    private readonly AppServices _services;
+    private readonly UpdateCheckStore _updateCheck;
 
-    public UpdateCommand(string version, IReleaseSource releaseSource, AppServices services)
+    public UpdateCommand(string version, IReleaseSource releaseSource, UpdateCheckStore updateCheck)
     {
         _version = version;
         _releaseSource = releaseSource;
-        _services = services;
+        _updateCheck = updateCheck;
     }
 
     public Command Build()
@@ -48,7 +47,7 @@ internal sealed class UpdateCommand : ICommandModule
                 return 2;
 
             var installKind = InstallationInspector.Detect();
-            var checkHandler = new UpdateCheckHandler(_releaseSource, _services.UpdateCheck);
+            var checkHandler = new UpdateCheckHandler(_releaseSource, _updateCheck);
             var target = parseResult.GetValue(targetVersion);
             var checkResult = await checkHandler.HandleAsync(_version, installKind, target, cancellationToken);
 

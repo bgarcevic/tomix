@@ -96,7 +96,7 @@ public static class MutationLifecycle
         // of CompleteAsync; harmless on other modes.
         var syncTarget = options.NoSync || !string.IsNullOrWhiteSpace(options.SaveTo)
             ? null
-            : ResolveSyncTarget(connection);
+            : ActiveModelResolver.ResolveSyncTarget(connection);
 
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(
@@ -164,25 +164,4 @@ public static class MutationLifecycle
         }
     }
 
-    /// <summary>
-    /// Resolves the remote workspace sync target from the active connection, mirroring
-    /// <c>ActiveModelResolver.ResolveSyncTarget</c>. A remote workspace endpoint wins; otherwise
-    /// the primary server is used. Returns null when there is no mirror configured.
-    /// </summary>
-    private static ModelReference? ResolveSyncTarget(CliConnectionState? connection)
-    {
-        if (connection is null || string.IsNullOrWhiteSpace(connection.Workspace))
-            return null;
-
-        if (ModelReference.IsRemoteEndpoint(connection.Workspace))
-            return new ModelReference(connection.Workspace, NullIfBlank(connection.Database));
-
-        if (!string.IsNullOrWhiteSpace(connection.Server))
-            return new ModelReference(connection.Server, NullIfBlank(connection.Database));
-
-        return null;
-    }
-
-    private static string? NullIfBlank(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value;
 }

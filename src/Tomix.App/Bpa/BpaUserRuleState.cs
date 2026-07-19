@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Tomix.Core.Configuration;
+using Tomix.Platform.Configuration;
 
 namespace Tomix.App.Bpa;
 

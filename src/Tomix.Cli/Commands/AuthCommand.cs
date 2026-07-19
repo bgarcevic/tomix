@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Auth;
+using Tomix.App.Config;
 using Tomix.App.State;
 using Tomix.Auth;
 using Tomix.Cli.Output;
@@ -15,9 +15,14 @@ namespace Tomix.Cli.Commands;
 /// </summary>
 internal sealed class AuthCommand : ICommandModule
 {
-    private readonly AppServices _services;
+    private readonly TomixConfigStore _configStore;
+    private readonly CliStateStore _state;
 
-    public AuthCommand(AppServices services) => _services = services;
+    public AuthCommand(TomixConfigStore configStore, CliStateStore state)
+    {
+        _configStore = configStore;
+        _state = state;
+    }
 
     public Command Build()
     {
@@ -79,7 +84,7 @@ internal sealed class AuthCommand : ICommandModule
             // itself is resolved afterwards so an interactive login can be prompted for it.
             var method = ResolveMethod(useIdentity, certificate, username, useDeviceCode);
             var endpoint = parseResult.GetValue(GlobalOptions.Server)
-                ?? _services.State.LoadCurrentSession()?.Server;
+                ?? _state.LoadCurrentSession()?.Server;
 
             string? password = null;
             if (method == AuthMethod.ServicePrincipalSecret)
@@ -228,7 +233,7 @@ internal sealed class AuthCommand : ICommandModule
 
     private MsalAuthenticator CreateAuthenticator(string? clientIdOverride, string? tenant)
         => new(
-            AuthSettingsFactory.Resolve(_services.ConfigStore.Load(), clientIdOverride, tenant),
+            AuthSettingsFactory.Resolve(_configStore.Load(), clientIdOverride, tenant),
             messageWriter: Console.Error.WriteLine);
 
     private static void RenderLogin(AuthLoginResult result)

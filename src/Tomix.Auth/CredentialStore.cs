@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Tomix.Core.Authentication;
-using Tomix.Core.Configuration;
+using Tomix.Platform.Configuration;
 
 namespace Tomix.Auth;
 

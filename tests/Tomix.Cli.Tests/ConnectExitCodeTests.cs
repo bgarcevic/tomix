@@ -48,7 +48,8 @@ public sealed class ConnectExitCodeTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, TestServices.Create()).Build());
+        var services = TestServices.Create();
+        root.Subcommands.Add(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
 
         var parseResult = root.Parse(args);
         var original = Console.Error;

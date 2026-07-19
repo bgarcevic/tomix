@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Ls;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -13,12 +12,12 @@ internal sealed class LsCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
 
-    public LsCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public LsCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
     }
 
     public Command Build()
@@ -72,7 +71,7 @@ internal sealed class LsCommand : ICommandModule
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult),
-                    _services.State,
+                    _state,
                     out var activeReference,
                     out var recentExit))
                 return recentExit;

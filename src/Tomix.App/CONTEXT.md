@@ -11,7 +11,8 @@ Application use cases and command handlers.
 
 ## Cross-folder dependencies
 
-- Depends only on `/src/Tomix.Core` in the production project graph.
+- Depends on `/src/Tomix.Core` for domain contracts and `/src/Tomix.Platform` for shared,
+  dependency-free filesystem primitives.
 - Receives provider implementations through Core abstractions; never references concrete provider projects.
 - Must not depend on `/src/Tomix.Cli`.
 - Must not depend on console or command-line libraries.
@@ -19,7 +20,7 @@ Application use cases and command handlers.
 ## Rules
 
 - Do not write console output directly.
-- Stateful filesystem-backed stores (`CliStateStore`, `StagingStore`, `TomixConfigStore`, `BpaUserRuleState`, `UpdateCheckStore`) are built once as `AppServices` by the CLI composition root (`Program.Main`) and injected into handlers; handlers must not construct them ambiently. Mutation handlers receive them as `Mutations/MutationStores`.
+- Stateful filesystem-backed stores (`CliStateStore`, `StagingStore`, `TomixConfigStore`, `BpaUserRuleState`, `UpdateCheckStore`) are built once as `AppServices` by the CLI process composition root (`Program.Main`). Command modules select and inject the exact stores their handlers require; handlers never receive the `AppServices` bundle and must not construct stores ambiently. Mutation handlers receive their narrow state dependencies as `Mutations/MutationStores`.
 - Keep provider-specific details behind interfaces.
 - Standard single-model read handlers use `Models/ModelSessionRunner` for provider resolution,
   guarded session opening, and disposal. Specialized multi-session or staging lifecycles may stay

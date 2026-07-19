@@ -8,6 +8,7 @@ using Tomix.App.Auth;
 using Tomix.App.Config;
 using Tomix.App.Connect;
 using Tomix.App.Format;
+using Tomix.App.State;
 using Tomix.App.Update;
 using Tomix.Auth;
 using Tomix.Cli.Commands;
@@ -182,44 +183,53 @@ internal static class Program
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
 
+        var mutations = services.Mutations;
+        Func<CliConnectionState?> loadCurrentSession = services.LoadCurrentSession;
+
         var modules = new ICommandModule[]
         {
-            new AddCommand(providers, services),
-            new AuthCommand(services),
-            new BpaCommand(providers, services, httpClient),
+            new AddCommand(providers, services.State, mutations),
+            new AuthCommand(services.ConfigStore, services.State),
+            new BpaCommand(
+                providers,
+                services.State,
+                mutations,
+                services.BpaRules,
+                services.ConfigDirectory,
+                httpClient),
             new CompletionCommand(() => root.Subcommands.Select(command => command.Name).ToList()),
-            new ConfigCommand(services),
+            new ConfigCommand(services.ConfigStore, services.ConfigDirectory, services.ConfigFilePath),
             new ConnectCommand(
                 providers,
                 workspaceCatalog ?? EmptyWorkspaceCatalog.Instance,
                 cachedUsername ?? (() => null),
-                services),
-            new DeployCommand(providers, services, httpClient),
-            new DepsCommand(providers, services),
+                services.State),
+            new DeployCommand(providers, services.State, httpClient),
+            new DepsCommand(providers, services.State),
             new DiffCommand(providers),
             new DoctorCommand(version, services.ConfigDirectory, releaseSource),
-            new FindCommand(providers, services),
-            new FormatCommand(providers, formatter, services),
-            new GetCommand(providers, services),
-            new IncrementalRefreshCommand(providers, services),
+            new FindCommand(providers, services.State),
+            new FormatCommand(providers, formatter, services.State, mutations),
+            new GetCommand(providers, services.State),
+            new IncrementalRefreshCommand(providers, services.State, mutations, loadCurrentSession),
             new InitCommand(),
-            new LoadCommand(providers, services),
-            new LsCommand(providers, services),
-            new MvCommand(providers, services),
-            new ProfileCommand(services),
-            new QueryCommand(providers, services),
-            new RefreshCommand(providers, services),
-            new ReplaceCommand(providers, services),
-            new RmCommand(providers, services),
-            new SaveCommand(providers, services, httpClient),
-            new ScriptCommand(providers, services),
-            new SessionCommand(services),
-            new SetCommand(providers, services),
-            new StageCommand(providers, services),
-            new TestCommand(providers, services),
-            new UpdateCommand(version, releaseSource ?? UnavailableReleaseSource.Instance, services),
-            new ValidateCommand(providers, services),
-            new VertipaqCommand(providers, analyzer, services)
+            new LoadCommand(providers, services.State),
+            new LsCommand(providers, services.State),
+            new MvCommand(providers, services.State, mutations),
+            new ProfileCommand(services.State),
+            new QueryCommand(providers, loadCurrentSession),
+            new RefreshCommand(providers, services.State, loadCurrentSession),
+            new ReplaceCommand(providers, services.State, mutations),
+            new RmCommand(providers, services.State, mutations),
+            new SaveCommand(providers, services.State, httpClient),
+            new ScriptCommand(providers, services.State, mutations),
+            new SessionCommand(services.State),
+            new SetCommand(providers, services.State, mutations),
+            new StageCommand(providers, services.State, services.Staging),
+            new TestCommand(providers, loadCurrentSession),
+            new UpdateCommand(version, releaseSource ?? UnavailableReleaseSource.Instance, services.UpdateCheck),
+            new ValidateCommand(providers, services.State),
+            new VertipaqCommand(providers, analyzer, services.State, mutations)
         };
 
         foreach (var module in modules)

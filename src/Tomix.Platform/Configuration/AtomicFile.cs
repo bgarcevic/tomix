@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Tomix.Core.Configuration;
+namespace Tomix.Platform.Configuration;
 
 /// <summary>
 /// Crash-safe writes for shared state files (config, sessions, staging manifests, credentials):

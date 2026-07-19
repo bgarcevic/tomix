@@ -14,7 +14,8 @@ Automated tests for Tomix.
 ## Cross-folder dependencies
 
 - `/tests/Tomix.Core.Tests` tests Core types and production project-dependency boundaries.
-- `/tests/Tomix.App.Tests` tests App handlers plus authentication and cross-provider application flows.
+- `/tests/Tomix.App.Tests` tests App handlers, shared platform primitives, authentication, and
+  cross-provider application flows.
 - `/tests/Tomix.Cli.Tests` tests `/src/Tomix.Cli`, including the JSON/CSV output contracts.
 - `/tests/Tomix.Provider.Tom.Tests` tests the TOM file/server adapter.
 - `/tests/Tomix.Provider.Tmdl.Tests` tests TMDL model opening and mapping.

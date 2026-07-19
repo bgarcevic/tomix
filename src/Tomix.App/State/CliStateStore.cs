@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Tomix.Core.Configuration;
+using Tomix.Platform.Configuration;
 
 namespace Tomix.App.State;
 

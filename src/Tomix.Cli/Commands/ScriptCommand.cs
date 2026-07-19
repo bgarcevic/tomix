@@ -1,6 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
+using Tomix.App.Mutations;
 using Tomix.App.Script;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -12,12 +12,14 @@ internal sealed class ScriptCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
+    private readonly MutationStores _mutations;
 
-    public ScriptCommand(IReadOnlyList<IModelProvider> providers, AppServices services)
+    public ScriptCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
     {
         _providers = providers;
-        _services = services;
+        _state = state;
+        _mutations = mutations;
     }
 
     public Command Build()
@@ -122,14 +124,14 @@ internal sealed class ScriptCommand : ICommandModule
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     explicitModel,
-                    _services.State,
+                    _state,
                     out var model,
                     out var recentExit))
                 return recentExit;
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Running script...",
-                () => new ScriptHandler(_providers, _services.Mutations).HandleAsync(
+                () => new ScriptHandler(_providers, _mutations).HandleAsync(
                     new ScriptRunRequest(
                         model,
                         scriptFiles,

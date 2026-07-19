@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Spectre.Console;
-using Tomix.App;
 using Tomix.App.Connect;
 using Tomix.App.Info;
 using Tomix.App.State;
@@ -22,18 +21,18 @@ internal sealed class ConnectCommand : ICommandModule
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly IWorkspaceCatalog _workspaceCatalog;
     private readonly Func<string?> _cachedUsername;
-    private readonly AppServices _services;
+    private readonly CliStateStore _state;
 
     public ConnectCommand(
         IReadOnlyList<IModelProvider> providers,
         IWorkspaceCatalog workspaceCatalog,
         Func<string?> cachedUsername,
-        AppServices services)
+        CliStateStore state)
     {
         _providers = providers;
         _workspaceCatalog = workspaceCatalog;
         _cachedUsername = cachedUsername;
-        _services = services;
+        _state = state;
     }
 
     public Command Build()
@@ -103,7 +102,7 @@ internal sealed class ConnectCommand : ICommandModule
             var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat)
                 ?? (OutputFormats.IsJson(format) ? OutputFormats.Json : null);
 
-            var handler = new ConnectHandler(_services.State);
+            var handler = new ConnectHandler(_state);
             if (GlobalOptions.RecentSpecified(parseResult))
             {
                 if (parseResult.GetValue(clearOption))
@@ -373,7 +372,7 @@ internal sealed class ConnectCommand : ICommandModule
         if (bare && (!InteractionGate.CanPrompt(parseResult, format) || connections.Count == 0))
             return CommandOutput.Render(recents, format, RenderRecentList, ProjectRecentListJson);
 
-        if (!RecentConnections.TryResolve(parseResult, _services.State, out var entry, out var exitCode))
+        if (!RecentConnections.TryResolve(parseResult, _state, out var entry, out var exitCode))
             return exitCode;
 
         var connection = entry!.Connection;
