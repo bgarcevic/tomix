@@ -6,6 +6,60 @@ namespace Tomix.App.Tests;
 
 public sealed class StageHandlerTests
 {
+    // With no active session the resolver produces an empty reference; every stage
+    // command taking a source must fail with TOMIX_NO_MODEL, not crash in StagingStore.
+    [Fact]
+    public async Task EmptyReference_FailsWithNoModel_InsteadOfCrashing()
+    {
+        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(configDir);
+        try
+        {
+            var handler = new StageHandler(new StagingStore(configDir, "test-session"));
+            var empty = new ModelReference("");
+
+            var status = handler.Status(empty);
+            var discard = handler.Discard(empty, all: false);
+            var commit = await handler.CommitAsync(empty, [], force: false, CancellationToken.None);
+
+            foreach (var (success, diagnostics, exitCode) in new[]
+            {
+                (status.Success, status.Diagnostics, status.ExitCode),
+                (discard.Success, discard.Diagnostics, discard.ExitCode),
+                (commit.Success, commit.Diagnostics, commit.ExitCode),
+            })
+            {
+                Assert.False(success);
+                Assert.Equal("TOMIX_NO_MODEL", diagnostics[0].Code);
+                Assert.Equal(2, exitCode);
+            }
+        }
+        finally
+        {
+            Directory.Delete(configDir, true);
+        }
+    }
+
+    [Fact]
+    public void Discard_All_SucceedsWithoutAModel()
+    {
+        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(configDir);
+        try
+        {
+            var handler = new StageHandler(new StagingStore(configDir, "test-session"));
+
+            var result = handler.Discard(new ModelReference(""), all: true);
+
+            Assert.True(result.Success);
+            Assert.Equal(0, result.Data!.Discarded);
+        }
+        finally
+        {
+            Directory.Delete(configDir, true);
+        }
+    }
+
     [Fact]
     public async Task CommitAsync_ReturnsFail_WhenNothingStaged()
     {

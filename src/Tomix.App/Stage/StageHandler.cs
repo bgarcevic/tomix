@@ -14,6 +14,9 @@ public sealed class StageHandler
 
     public TomixResult<StageStatusResult> Status(ModelReference source)
     {
+        if (string.IsNullOrWhiteSpace(source.Value))
+            return NoModel<StageStatusResult>();
+
         StagingInfo? info;
         try
         {
@@ -64,6 +67,9 @@ public sealed class StageHandler
 
     public TomixResult<StageDiscardResult> Discard(ModelReference source, bool all)
     {
+        if (!all && string.IsNullOrWhiteSpace(source.Value))
+            return NoModel<StageDiscardResult>();
+
         var discarded = all ? _staging.DiscardAll() : (_staging.Discard(source) ? 1 : 0);
         return TomixResult<StageDiscardResult>.Ok(new StageDiscardResult(discarded));
     }
@@ -79,6 +85,9 @@ public sealed class StageHandler
         bool force,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(source.Value))
+            return NoModel<StageCommitResult>();
+
         StagingInfo? info;
         try
         {
@@ -174,4 +183,13 @@ public sealed class StageHandler
     // (exit 2 + discard hint), not as an unhandled exception from Program's catch-all.
     private static TomixResult<T> CorruptManifest<T>(StagingManifestCorruptException ex)
         => TomixResult<T>.Fail("TOMIX_STAGE_MANIFEST_CORRUPT", ex.Message, 2);
+
+    // With no active session the resolver hands us an empty reference; StagingStore would
+    // throw from Path.GetFullPath(""), so fail with the documented no-model diagnostic instead.
+    private static TomixResult<T> NoModel<T>()
+        => TomixResult<T>.Fail(
+            "TOMIX_NO_MODEL",
+            "No model specified and no active connection.",
+            2,
+            hint: "Connect first (tx connect <workspace> <model>) or pass --model <path>.");
 }
