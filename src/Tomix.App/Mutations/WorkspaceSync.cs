@@ -31,7 +31,7 @@ internal static class WorkspaceSync
         try
         {
             await deployer.DeployAsync(
-                new ModelDeployRequest(syncTarget.Value, syncTarget.Database, DeployFull: false, CreateOnly: false, Force: force),
+                new ModelDeployRequest(syncTarget.Value, syncTarget.Database, CreateOnly: false, Force: force),
                 cancellationToken);
 
             return (true, targetLabel, null);

@@ -44,4 +44,10 @@ public sealed record CliProfile(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     bool? VertipaqOnRefresh,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Spinner);
+    bool? Spinner,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Workspace = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? WorkspaceFormat = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? WorkspaceAuth = null);

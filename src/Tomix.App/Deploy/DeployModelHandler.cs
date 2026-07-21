@@ -73,7 +73,6 @@ public sealed class DeployModelHandler
         var deployRequest = new ModelDeployRequest(
             server,
             database,
-            request.DeployFull,
             request.CreateOnly,
             request.Force);
 

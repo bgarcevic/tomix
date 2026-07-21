@@ -74,7 +74,6 @@ Best Practice Analyzer: run rules and manage rule collections
 # tx bpa rules
 Manage BPA rule collections
   opt --rules-file <rules-file>  Path to a BPA rules JSON file
-  opt --model-rules  Operate on rules embedded in the model annotation instead of a file
 
 # tx bpa rules disable
 Disable a built-in BPA rule for the current user
@@ -123,8 +122,6 @@ Run BPA rules against a model (--fix to auto-fix)
   opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-model-rules  Exclude BPA rules embedded in the model's annotations
   opt --no-defaults  Exclude the selected standard BPA ruleset
-  opt --vpax <vpax>  Load VertiPaq Analyzer stats from a .vpax file to enable VPA-aware rules
-  opt --vpa-rules  Include built-in VPA-aware rules
   opt --fail-on <fail-on>  Failure threshold: error (default) or warning
   opt --fix  Apply fix expressions to auto-fix violations where possible
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
@@ -184,14 +181,7 @@ Set active connection (workspace, local path, or PBI Desktop). No args = show cu
 Deploy a semantic model to a workspace (--xmla for script-only, --skip-bpa to bypass)
   arg [model]  Path to model (if not using --model)
   opt --profile, -p <profile>  Use a saved connection profile for this deploy (one-shot, does not persist as active connection)
-  opt --deploy-full  Full deploy: overwrite + connections + partitions + shared expressions + roles + role members
   opt --create-only  Only create new model; fail if it already exists
-  opt --deploy-connections  Deploy data source connections
-  opt --deploy-partitions  Deploy partition definitions
-  opt --skip-refresh-policy  Skip overwriting partitions with Incremental Refresh Policies (use with --deploy-partitions)
-  opt --deploy-shared-expressions  Deploy (overwrite) shared expressions
-  opt --deploy-roles  Deploy security roles
-  opt --deploy-role-members  Deploy role members
   opt --xmla <xmla>  Generate XMLA/TMSL script to file instead of deploying. Use '-' for stdout.
   opt --skip-bpa  Skip BPA gate check (configured via .te-bpa.json)
   opt --fix-bpa  Auto-fix BPA violations before deploying (applies FixExpressions where available)
@@ -432,10 +422,8 @@ Save a model to disk in a specified format (like fab export)
   opt --output-path, -o <output-path>  File system path to write the model to. Omit to save the loaded model back to its source.
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted). Defaults to the loaded model's format.
   opt --force  Skip validation and overwrite existing output. Does not override layout-safety refusals.
-  opt --skip-bpa  Skip BPA gate check (configured via .te-bpa.json)
   opt --fix-bpa  Auto-fix BPA violations before saving (applies FixExpressions where available)
   opt --bpa-rules <bpa-rules>  Path(s) to BPA rule file(s) for this save. Overrides bpa.rules in CLI config.
-  opt --skip-validation  Skip DAX semantic validation. Faster for pure download-and-save scenarios.
   opt --supporting-files  Wrap output in a {modelName}.SemanticModel/ folder with .platform and definition.pbism. Only for tmdl/bim on bare targets.
   opt --no-sync  Skip workspace sync when workspace mode is active.
 

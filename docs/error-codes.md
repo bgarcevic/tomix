@@ -228,6 +228,7 @@ Emitted by `incremental-refresh` (show/set/rm/apply).
 |------|------|---------|
 | `TOMIX_PROFILE_NOT_FOUND` | 1 | The named profile was not found. |
 | `TOMIX_PROFILE_NAME_REQUIRED` | 2 | `profile set` called without a profile name. |
+| `TOMIX_NO_ACTIVE_CONNECTION` | 2 | `profile set --from-active` called with no active connection. |
 
 ## Validate Issue Codes
 

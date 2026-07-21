@@ -76,16 +76,6 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Failure threshold: error (default) or warning"
         };
 
-        var vpaxOption = new Option<string?>("--vpax")
-        {
-            Description = "Load VertiPaq Analyzer stats from a .vpax file to enable VPA-aware rules"
-        };
-
-        var vpaRulesOption = new Option<bool>("--vpa-rules")
-        {
-            Description = "Include built-in VPA-aware rules"
-        };
-
         var fixOption = new Option<bool>("--fix")
         {
             Description = "Apply fix expressions to auto-fix violations where possible"
@@ -190,8 +180,6 @@ internal sealed class BpaCommand : ICommandModule
             rulesetOption,
             noModelRulesOption,
             noDefaultsOption,
-            vpaxOption,
-            vpaRulesOption,
             failOnOption,
             fixOption,
             allowDeleteOption,
@@ -299,11 +287,6 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Path to a BPA rules JSON file"
         };
 
-        var modelRulesOption = new Option<bool>("--model-rules")
-        {
-            Description = "Operate on rules embedded in the model annotation instead of a file"
-        };
-
         var rulesetOption = new Option<string?>("--ruleset")
         {
             Description = $"Standard BPA ruleset to use ({string.Join(", ", BpaRuleLoader.KnownRulesets)})"
@@ -342,8 +325,7 @@ internal sealed class BpaCommand : ICommandModule
 
         var rulesCommand = new Command("rules", "Manage BPA rule collections")
         {
-            rulesFileOption,
-            modelRulesOption
+            rulesFileOption
         };
 
         var listCommand = new Command("list", "List BPA rules from all sources with status")

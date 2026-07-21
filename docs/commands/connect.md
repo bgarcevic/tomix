@@ -45,9 +45,6 @@ Runs the BPA gate before deploying (configured via `.te-bpa.json`).
 | `--dry-run` | Preview what would change on the remote target. |
 | `--xmla <file>` | Generate the XMLA/TMSL script to a file instead of deploying (`-` for stdout). |
 | `--create-only` | Only create a new model; fail if it already exists. |
-| `--deploy-full` | Full deploy: overwrite + connections + partitions + shared expressions + roles + role members. |
-| `--deploy-connections` / `--deploy-partitions` / `--deploy-shared-expressions` / `--deploy-roles` / `--deploy-role-members` | Deploy individual aspects. |
-| `--skip-refresh-policy` | Don't overwrite partitions governed by incremental refresh policies (with `--deploy-partitions`). |
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or auto-fix violations before deploying. |
 | `--bpa-rules <file>` | BPA rule file(s) for this deploy. |
 | `-p, --profile <name>` | Use a saved profile for this deploy only. |
@@ -103,8 +100,7 @@ tx save [model] [options]
 | `-o, --output-path <path>` | Where to write. Omit to save back to the source. |
 | `--serialization <tmdl\|bim>` | Output format (defaults to the loaded model's). |
 | `--supporting-files` | Wrap output in a `{modelName}.SemanticModel/` folder with `.platform` and `definition.pbism`. |
-| `--skip-validation` | Skip DAX validation — faster for pure download-and-save. |
-| `--skip-bpa` / `--fix-bpa` / `--bpa-rules <file>` | Control the BPA gate. |
+| `--fix-bpa` / `--bpa-rules <file>` | Auto-fix BPA violations before saving, optionally with specific rule files. |
 | `--force` | Skip validation and overwrite existing output. |
 
 ```sh

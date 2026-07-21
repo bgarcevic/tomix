@@ -7,7 +7,6 @@ public sealed record DeployModelRequest(
     string? Server,
     string? Database,
     string? Profile,
-    bool DeployFull,
     bool CreateOnly,
     bool SkipBpa,
     bool FixBpa,

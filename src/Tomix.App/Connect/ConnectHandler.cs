@@ -41,7 +41,10 @@ public sealed class ConnectHandler
                 NormalizeLocalPath(profile.Model),
                 profile.Auth,
                 Local: !string.IsNullOrWhiteSpace(profile.Model),
-                Profile: profile.Name);
+                Profile: profile.Name,
+                profile.Workspace,
+                profile.WorkspaceFormat,
+                profile.WorkspaceAuth);
         }
         else if (!string.IsNullOrWhiteSpace(request.Model))
         {

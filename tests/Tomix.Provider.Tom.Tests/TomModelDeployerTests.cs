@@ -16,7 +16,7 @@ public sealed class TomModelDeployerTests
     public async Task DeployAsync_RemoteWithoutToken_RequiresAuthentication()
     {
         var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
-        var request = new ModelDeployRequest("powerbi://api.powerbi.com/v1.0/myorg/W", "M", DeployFull: true, CreateOnly: false, Force: false);
+        var request = new ModelDeployRequest("powerbi://api.powerbi.com/v1.0/myorg/W", "M", CreateOnly: false, Force: false);
 
         await Assert.ThrowsAsync<Tomix.Core.Authentication.AuthenticationRequiredException>(
             () => TomModelDeployer.DeployAsync(db, request, tokenProvider: null, CancellationToken.None));

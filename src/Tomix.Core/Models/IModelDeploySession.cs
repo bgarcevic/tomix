@@ -12,7 +12,6 @@ public interface IModelDeploySession
 public sealed record ModelDeployRequest(
     string Server,
     string? Database,
-    bool DeployFull,
     bool CreateOnly,
     bool Force);
 

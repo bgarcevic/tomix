@@ -46,10 +46,6 @@ internal sealed class SaveCommand : ICommandModule
         {
             Description = "Skip validation and overwrite existing output. Does not override layout-safety refusals."
         };
-        var skipBpaOption = new Option<bool>("--skip-bpa")
-        {
-            Description = "Skip BPA gate check (configured via .te-bpa.json)"
-        };
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
             Description = "Auto-fix BPA violations before saving (applies FixExpressions where available)"
@@ -58,10 +54,6 @@ internal sealed class SaveCommand : ICommandModule
         {
             Description = "Path(s) to BPA rule file(s) for this save. Overrides bpa.rules in CLI config.",
             Arity = ArgumentArity.ZeroOrMore
-        };
-        var skipValidationOption = new Option<bool>("--skip-validation")
-        {
-            Description = "Skip DAX semantic validation. Faster for pure download-and-save scenarios."
         };
         var supportingFilesOption = new Option<bool>("--supporting-files")
         {
@@ -78,10 +70,8 @@ internal sealed class SaveCommand : ICommandModule
             outputPathOption,
             serializationOption,
             forceOption,
-            skipBpaOption,
             fixBpaOption,
             bpaRulesOption,
-            skipValidationOption,
             supportingFilesOption,
             noSyncOption
         };

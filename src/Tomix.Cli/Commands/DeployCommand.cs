@@ -38,37 +38,9 @@ internal sealed class DeployCommand : ICommandModule
         };
         profileOption.Aliases.Add("-p");
 
-        var deployFullOption = new Option<bool>("--deploy-full")
-        {
-            Description = "Full deploy: overwrite + connections + partitions + shared expressions + roles + role members"
-        };
         var createOnlyOption = new Option<bool>("--create-only")
         {
             Description = "Only create new model; fail if it already exists"
-        };
-        var deployConnectionsOption = new Option<bool>("--deploy-connections")
-        {
-            Description = "Deploy data source connections"
-        };
-        var deployPartitionsOption = new Option<bool>("--deploy-partitions")
-        {
-            Description = "Deploy partition definitions"
-        };
-        var skipRefreshPolicyOption = new Option<bool>("--skip-refresh-policy")
-        {
-            Description = "Skip overwriting partitions with Incremental Refresh Policies (use with --deploy-partitions)"
-        };
-        var deploySharedExpressionsOption = new Option<bool>("--deploy-shared-expressions")
-        {
-            Description = "Deploy (overwrite) shared expressions"
-        };
-        var deployRolesOption = new Option<bool>("--deploy-roles")
-        {
-            Description = "Deploy security roles"
-        };
-        var deployRoleMembersOption = new Option<bool>("--deploy-role-members")
-        {
-            Description = "Deploy role members"
         };
         var xmlaOption = new Option<string?>("--xmla")
         {
@@ -104,14 +76,7 @@ internal sealed class DeployCommand : ICommandModule
         {
             modelArgument,
             profileOption,
-            deployFullOption,
             createOnlyOption,
-            deployConnectionsOption,
-            deployPartitionsOption,
-            skipRefreshPolicyOption,
-            deploySharedExpressionsOption,
-            deployRolesOption,
-            deployRoleMembersOption,
             xmlaOption,
             skipBpaOption,
             fixBpaOption,
@@ -174,7 +139,6 @@ internal sealed class DeployCommand : ICommandModule
                         server,
                         database,
                         parseResult.GetValue(profileOption),
-                        parseResult.GetValue(deployFullOption),
                         parseResult.GetValue(createOnlyOption),
                         parseResult.GetValue(skipBpaOption),
                         parseResult.GetValue(fixBpaOption),

@@ -124,7 +124,6 @@ public sealed class StageHandler
                     new ModelDeployRequest(
                         manifest.SourceEndpoint,
                         manifest.SourceDatabase,
-                        DeployFull: false,
                         CreateOnly: false,
                         Force: force),
                     cancellationToken);

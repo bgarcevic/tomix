@@ -124,7 +124,8 @@ internal sealed class ProfileCommand : ICommandModule
                 ParseNullableBool(parseResult.GetValue(bpaMutationOption)),
                 ParseNullableBool(parseResult.GetValue(bpaDeployOption)),
                 ParseNullableBool(parseResult.GetValue(vertipaqOption)),
-                ParseNullableBool(parseResult.GetValue(spinnerOption))));
+                ParseNullableBool(parseResult.GetValue(spinnerOption)),
+                parseResult.GetValue(fromActiveOption)));
 
             return CommandOutput.Render(
                 result,
@@ -152,6 +153,8 @@ internal sealed class ProfileCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.KeyValue("model:", $"       {profile.Model ?? ""}"));
         AnsiConsole.MarkupLine(Styling.KeyValue("auth:", $"        {profile.Auth ?? ""}"));
         AnsiConsole.MarkupLine(Styling.KeyValue("description:", $" {profile.Description ?? ""}"));
+        if (profile.Workspace is not null)
+            AnsiConsole.MarkupLine(Styling.KeyValue("workspace:", $"   {profile.Workspace}"));
     }
 
     private static bool? ParseNullableBool(string? value)

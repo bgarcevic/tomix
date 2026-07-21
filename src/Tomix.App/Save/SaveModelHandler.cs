@@ -134,7 +134,7 @@ public sealed class SaveModelHandler
         if (fixResult.FixesApplied == 0 && result.Violations.Any(v => v.Severity == BpaSeverity.Error))
             return TomixResult<SaveModelResult>.Fail(
                 "TOMIX_BPA_VIOLATIONS",
-                $"BPA check found {result.Violations.Count} violation(s) that could not be auto-fixed. Use --skip-bpa to bypass.",
+                $"BPA check found {result.Violations.Count} violation(s) that could not be auto-fixed. Fix them manually or save without --fix-bpa.",
                 exitCode: 1);
 
         return null;
