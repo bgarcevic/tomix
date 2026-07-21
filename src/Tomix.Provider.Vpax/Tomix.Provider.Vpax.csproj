@@ -9,7 +9,9 @@
     <PackageReference Include="Dax.ViewModel" />
     <PackageReference Include="Dax.Vpax" />
     <PackageReference Include="Dax.Vpax.Obfuscator" />
+    <PackageReference Include="Microsoft.AnalysisServices" VersionOverride="19.114.8" />
     <PackageReference Include="Microsoft.AnalysisServices.AdomdClient" />
+    <PackageReference Include="Microsoft.Identity.Client" />
   </ItemGroup>
 
   <ItemGroup>

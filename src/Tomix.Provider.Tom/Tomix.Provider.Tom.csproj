@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AnalysisServices" />
     <PackageReference Include="Microsoft.AnalysisServices.AdomdClient" />
+    <PackageReference Include="Microsoft.Identity.Client" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,24 +6,24 @@
 
   <ItemGroup>
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Dax.Formatter" Version="1.2.0" />
+    <PackageVersion Include="Dax.Formatter" Version="1.2.2" />
     <PackageVersion Include="Dax.Model.Extractor" Version="1.12.1" />
     <PackageVersion Include="Dax.ViewModel" Version="1.12.1" />
     <PackageVersion Include="Dax.Vpax" Version="1.12.1" />
     <PackageVersion Include="Dax.Vpax.Obfuscator" Version="1.2.1" />
-    <PackageVersion Include="Microsoft.AnalysisServices" Version="19.114.0" />
-    <PackageVersion Include="Microsoft.AnalysisServices.AdomdClient" Version="19.114.0" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.66.2" />
-    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.66.2" />
+    <PackageVersion Include="Microsoft.AnalysisServices" Version="19.114.8" />
+    <PackageVersion Include="Microsoft.AnalysisServices.AdomdClient" Version="19.114.8" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.86.1" />
+    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.86.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="MinVer" Version="7.0.0" />
-    <PackageVersion Include="Spectre.Console" Version="0.55.2" />
-    <PackageVersion Include="Spectre.Console.Testing" Version="0.55.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.8" />
-    <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.2" />
+    <PackageVersion Include="Spectre.Console" Version="0.57.2" />
+    <PackageVersion Include="Spectre.Console.Testing" Version="0.57.2" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.10" />
+    <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.3" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
 
 </Project>
