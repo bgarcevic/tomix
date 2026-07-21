@@ -171,7 +171,7 @@ public sealed class CliStateStore
             .ToList();
     }
 
-    public int PruneSessions(bool all)
+    public int PruneSessions(bool all, bool dryRun = false)
     {
         if (!Directory.Exists(SessionsDirectory))
             return 0;
@@ -183,32 +183,33 @@ public sealed class CliStateStore
                 continue;
 
             var id = Path.GetFileNameWithoutExtension(file);
-            if (!all && IsLivePidSession(id))
+            if (!all && !IsDeadPidSession(id))
                 continue;
 
-            File.Delete(file);
+            if (!dryRun)
+                File.Delete(file);
             removed++;
         }
 
         return removed;
     }
 
-    private static bool IsLivePidSession(string sessionId)
+    private static bool IsDeadPidSession(string sessionId)
     {
         if (!sessionId.StartsWith("pid-", StringComparison.OrdinalIgnoreCase))
             return false;
 
+        // A pid session whose suffix is not a pid can never belong to a live shell.
         if (!int.TryParse(sessionId["pid-".Length..], out var pid))
-            return false;
+            return true;
 
         try
         {
-            var process = System.Diagnostics.Process.GetProcessById(pid);
-            return !process.HasExited;
+            return System.Diagnostics.Process.GetProcessById(pid).HasExited;
         }
         catch (ArgumentException)
         {
-            return false;
+            return true;
         }
     }
 

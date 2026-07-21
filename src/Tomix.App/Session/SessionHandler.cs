@@ -31,13 +31,5 @@ public sealed class SessionHandler
     }
 
     public TomixResult<SessionPruneResult> Prune(bool all, bool dryRun)
-    {
-        if (dryRun)
-        {
-            var count = _store.ListSessions().Count(s => !s.Current);
-            return TomixResult<SessionPruneResult>.Ok(new SessionPruneResult(count, DryRun: true));
-        }
-
-        return TomixResult<SessionPruneResult>.Ok(new SessionPruneResult(_store.PruneSessions(all), DryRun: false));
-    }
+        => TomixResult<SessionPruneResult>.Ok(new SessionPruneResult(_store.PruneSessions(all, dryRun), dryRun));
 }
