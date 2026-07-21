@@ -34,7 +34,7 @@ public sealed class DeployModelHandler
         if (request.Model.Value.Length == 0)
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_MODEL",
-                "No model specified. Use --model <path>, --server <url> --database <name>, --local, or set an active connection with 'tx connect'.",
+                "No model specified. Use --model <path>, --server <url> --database <name>, or set an active connection with 'tx connect'.",
                 exitCode: 2,
                 hint: "Specify a model path or use --recent.");
 

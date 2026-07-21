@@ -235,7 +235,6 @@ internal sealed class ScriptCommand : ICommandModule
         "--stage",
         "--revert",
         "--no-sync",
-        "--local",
         "--debug",
         "--non-interactive"
     };

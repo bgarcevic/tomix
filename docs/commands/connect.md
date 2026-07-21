@@ -15,6 +15,7 @@ workspace name, an endpoint, or a local model path.
 
 | Option | Description |
 |--------|-------------|
+| `--local` | Connect to a locally running Power BI Desktop instance (Windows only). |
 | `--remote` | Pick a workspace and model interactively from your tenant (requires a TTY; sign in first with `tx auth login`). |
 | `-p, --profile <name>` | Activate a saved connection profile. |
 | `--clear` | Clear the active connection. |

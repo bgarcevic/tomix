@@ -22,7 +22,6 @@ pages:
 | `-m, --model <model>` | Path to semantic model (TMDL folder, `.bim` file, or TE folder). |
 | `-s, --server <server>` | Workspace name or endpoint (e.g. `MyWorkspace`, `powerbi://...`, `asazure://...`, `localhost`). |
 | `-d, --database <database>` | Semantic model name on the workspace. |
-| `--local` | Connect to a locally running Power BI Desktop instance (Windows only). |
 | `--auth <auth>` | Auth method: `auto` (default), `interactive`, `spn`, `managed-identity`. |
 | `--recent [N]` | Use a recently used model. No value = interactive picker, `N` = Nth most recent. |
 | `--output-format <fmt>` | Stdout format: `text` (default), `json`, `csv`, `tmsl` (alias: `bim`), `tmdl`. Not every format is supported by every command. |
@@ -30,7 +29,7 @@ pages:
 | `--non-interactive` | Disable all interactive prompts; fail with an actionable error if required input is missing. |
 | `-y, --yes` | Skip confirmation prompts for destructive operations. |
 | `--quiet` | Suppress non-essential output (spinners, progress, hints). Errors and data still print. |
-| `--debug` | Enable debug logging to stderr (connection strings, auth flow, timing). |
+| `--debug` | Show the full stack trace on stderr when an unexpected error occurs. |
 
 ## Object paths
 

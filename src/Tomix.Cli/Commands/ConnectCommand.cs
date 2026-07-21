@@ -53,6 +53,10 @@ internal sealed class ConnectCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
         workspaceOption.Aliases.Add("-w");
+        var localOption = new Option<bool>("--local")
+        {
+            Description = "Connect to a locally running Power BI Desktop instance (Windows only)"
+        };
         var remoteOption = new Option<bool>("--remote")
         {
             Description = "Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login')."
@@ -84,6 +88,7 @@ internal sealed class ConnectCommand : ICommandModule
             serverArgument,
             databaseArgument,
             workspaceOption,
+            localOption,
             remoteOption,
             profileOption,
             clearOption,
@@ -113,7 +118,7 @@ internal sealed class ConnectCommand : ICommandModule
                     !string.IsNullOrWhiteSpace(parseResult.GetValue(profileOption)) ||
                     parseResult.GetResult(workspaceOption) is not null ||
                     parseResult.GetValue(remoteOption) ||
-                    parseResult.GetValue(GlobalOptions.Local))
+                    parseResult.GetValue(localOption))
                     return RenderRecentOptionError("--recent cannot be combined with a server/database, --profile, --workspace, --remote, or --local.");
 
                 return await ConnectRecentAsync(handler, parseResult, format, cancellationToken);
@@ -135,7 +140,7 @@ internal sealed class ConnectCommand : ICommandModule
                 Profile: parseResult.GetValue(profileOption),
                 WorkspaceValue: parseResult.GetValue(workspaceOption),
                 WorkspaceSpecified: parseResult.GetResult(workspaceOption) is not null,
-                Local: parseResult.GetValue(GlobalOptions.Local),
+                Local: parseResult.GetValue(localOption),
                 Remote: parseResult.GetValue(remoteOption),
                 Auth: GlobalOptions.AuthValue(parseResult),
                 WorkspaceFormat: parseResult.GetValue(workspaceFormatOption),

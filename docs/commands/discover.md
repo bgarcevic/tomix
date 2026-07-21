@@ -97,7 +97,7 @@ tx query [options]
 ```
 
 Executes against a live model (the active remote connection, or
-`-s`/`-d`/`--local`). See [Output & scripting](../guides/scripting.md#querying-live-models)
+`-s`/`-d`). See [Output & scripting](../guides/scripting.md#querying-live-models)
 for the performance-analysis workflow.
 
 | Option | Description |

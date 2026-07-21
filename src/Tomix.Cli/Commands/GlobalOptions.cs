@@ -31,12 +31,6 @@ internal static class GlobalOptions
         Recursive = true
     };
 
-    public static readonly Option<bool> Local = new("--local")
-    {
-        Description = "Connect to a locally running Power BI Desktop instance (Windows only)",
-        Recursive = true
-    };
-
     public static readonly Option<string?> Auth = new("--auth")
     {
         Description = "Auth method: auto, interactive, spn, managed-identity (default: auto)",
@@ -52,7 +46,7 @@ internal static class GlobalOptions
 
     public static readonly Option<bool> Debug = new("--debug")
     {
-        Description = "Enable debug logging to stderr (connection strings, auth flow, timing)",
+        Description = "Show the full stack trace on stderr when an unexpected error occurs",
         Recursive = true
     };
 
@@ -93,7 +87,6 @@ internal static class GlobalOptions
         yield return ErrorFormat;
         yield return Server;
         yield return Database;
-        yield return Local;
         yield return Auth;
         yield return Recent;
         yield return Debug;
