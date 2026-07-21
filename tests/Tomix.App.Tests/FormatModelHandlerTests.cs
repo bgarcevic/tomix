@@ -42,6 +42,57 @@ public sealed class FormatModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_InlineFormatFails_ReturnsFormatFailedCode()
+    {
+        var handler = new FormatModelHandler(
+            [], new FailingFormatter(["Syntax error near 'this'."]), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference(""),
+                Expression: "this is not dax",
+                Path: null,
+                Language: "dax",
+                Type: null,
+                Long: false,
+                Semicolons: false,
+                NoSpaceAfterFunction: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, result.ExitCode);
+        var diagnostic = result.Diagnostics.First();
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.Code);
+        Assert.Contains("Syntax error near 'this'.", diagnostic.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_InlineFormatFailsWithoutErrors_StillFails()
+    {
+        var handler = new FormatModelHandler([], new FailingFormatter([]), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference(""),
+                Expression: "this is not dax",
+                Path: null,
+                Language: "dax",
+                Type: null,
+                Long: false,
+                Semicolons: false,
+                NoSpaceAfterFunction: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("TOMIX_FORMAT_FAILED", result.Diagnostics.First().Code);
+    }
+
+    [Fact]
     public async Task HandleAsync_ObjectPathSave_SetsFormattedExpressionAndSaves()
     {
         var session = new StubSession(Snapshot());
@@ -266,6 +317,20 @@ public sealed class FormatModelHandlerTests
                 $"formatted:{request.Language}:{request.Expression}",
                 []));
         }
+    }
+
+    private sealed class FailingFormatter : IExpressionFormatterClient
+    {
+        private readonly IReadOnlyList<string> _errors;
+
+        public FailingFormatter(IReadOnlyList<string> errors) => _errors = errors;
+
+        public bool CanFormat(string language) => true;
+
+        public Task<ExpressionFormatResponse> FormatAsync(
+            ExpressionFormatRequest request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new ExpressionFormatResponse(false, request.Expression, _errors));
     }
 
     private sealed class StubProvider : IModelProvider

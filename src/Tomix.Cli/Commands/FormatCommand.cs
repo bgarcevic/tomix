@@ -163,7 +163,9 @@ internal sealed class FormatCommand : ICommandModule
                 result,
                 formatValue,
                 Render,
-                data => (object)data);
+                data => (object)data,
+                renderCsv: null,
+                parseResult.GetValue(GlobalOptions.ErrorFormat));
         });
 
         return command;

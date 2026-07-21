@@ -150,6 +150,16 @@ public sealed class FormatModelHandler
                 request.NoSpaceAfterFunction),
             cancellationToken);
 
+        if (!formatted.Success)
+        {
+            var detail = formatted.Errors.Count > 0
+                ? string.Join("; ", formatted.Errors)
+                : "the formatter reported a failure";
+            return TomixResult<FormatModelResult>.Fail(
+                "TOMIX_FORMAT_FAILED",
+                $"Formatting failed: {detail}");
+        }
+
         return TomixResult<FormatModelResult>.Ok(
             new InlineFormatResult(formatted.Success, formatted.Formatted, formatted.Errors),
             exitCode: 0);

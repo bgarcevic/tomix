@@ -269,6 +269,7 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |
+| `TOMIX_FORMAT_FAILED` | 1 | `format --expression` failed to format the inline expression (invalid DAX/M, or the formatter service was unreachable). The message includes the formatter's error details. |
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_INVALID_OUTPUT_FORMAT` | 2 | `--output-format` value is not one of: auto, text, json, csv, tmsl, bim, tmdl. |
 | `TOMIX_OUTPUT_FORMAT_UNSUPPORTED` | 2 | The command cannot render the requested `--output-format`; the message lists the formats it supports. |
