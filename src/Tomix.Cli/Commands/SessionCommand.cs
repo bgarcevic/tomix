@@ -53,6 +53,12 @@ internal sealed class SessionCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "session clear", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            if (!ConfirmationHelper.ConfirmOrAbort(
+                "Clear", "active state for the current session",
+                parseResult,
+                format))
+                return 1;
+
             return CommandOutput.Render(
                 new SessionHandler(_state).Clear(),
                 format,
@@ -83,8 +89,17 @@ internal sealed class SessionCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "session prune", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            var all = parseResult.GetValue(allOption);
+            var dryRun = parseResult.GetValue(dryRunOption);
+            if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
+                "Prune",
+                all ? "all sessions except the current one" : "sessions whose shell is no longer running",
+                parseResult,
+                format))
+                return 1;
+
             return CommandOutput.Render(
-                new SessionHandler(_state).Prune(parseResult.GetValue(allOption), parseResult.GetValue(dryRunOption)),
+                new SessionHandler(_state).Prune(all, dryRun),
                 format,
                 result => AnsiConsole.MarkupLine(result.DryRun
                     ? Styling.Warning($"Would remove {result.Removed} session(s).")

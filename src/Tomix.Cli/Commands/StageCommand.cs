@@ -106,6 +106,13 @@ internal sealed class StageCommand : ICommandModule
                 return 2;
 
             var all = parseResult.GetValue(allOption);
+            if (!ConfirmationHelper.ConfirmOrAbort(
+                "Discard staged changes",
+                all ? "for every model in this session" : "for the active model",
+                parseResult,
+                format))
+                return 1;
+
             if (!TryResolveModel(parseResult, out var reference, out var recentExit))
                 return recentExit;
             return CommandOutput.Render(
