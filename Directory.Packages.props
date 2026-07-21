@@ -15,7 +15,7 @@
     <PackageVersion Include="Microsoft.AnalysisServices.AdomdClient" Version="19.114.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.66.2" />
     <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.66.2" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="MinVer" Version="7.0.0" />
     <PackageVersion Include="Spectre.Console" Version="0.55.2" />
     <PackageVersion Include="Spectre.Console.Testing" Version="0.55.2" />
