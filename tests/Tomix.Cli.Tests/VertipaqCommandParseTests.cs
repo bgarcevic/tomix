@@ -8,7 +8,10 @@ namespace Tomix.Cli.Tests;
 /// <summary>
 /// Parse-time and pre-flight validation for <c>vertipaq</c>: bad --top/--fields values, csv
 /// with multiple views, and option conflicts all exit 2 before any model or connection is
-/// touched. Uses a throwing analyzer to prove nothing was analyzed.
+/// touched. Uses a throwing analyzer to prove nothing was analyzed. Usage errors must go
+/// through the standard error path so <c>--error-format json</c> (or <c>--output-format json</c>)
+/// yields the structured envelope with <c>TOMIX_VERTIPAQ_INVALID_TOP</c> /
+/// <c>TOMIX_VERTIPAQ_INVALID_FIELDS</c> attached.
 /// </summary>
 [Collection(ConsoleStateCollection.Name)]
 public sealed class VertipaqCommandParseTests
@@ -75,6 +78,28 @@ public sealed class VertipaqCommandParseTests
     }
 
     [Fact]
+    public void Top_Zero_EmitsInvalidTopCode_InJsonEnvelope()
+    {
+        var (exitCode, stderr) = Invoke(
+            "vertipaq", "--top", "0", "--error-format", "json", "--quiet");
+
+        Assert.Equal(2, exitCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(stderr);
+        Assert.Equal("TOMIX_VERTIPAQ_INVALID_TOP", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public void Top_Zero_JsonOutputFormat_ImpliesJsonErrorEnvelope()
+    {
+        var (exitCode, stderr) = Invoke(
+            "vertipaq", "--top", "0", "--output-format", "json", "--quiet");
+
+        Assert.Equal(2, exitCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(stderr);
+        Assert.Equal("TOMIX_VERTIPAQ_INVALID_TOP", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public void Fields_UnknownToken_ExitsTwo_ListingValidTokens()
     {
         var (exitCode, stderr) = Invoke("vertipaq", "--fields", "name,bogus", "--quiet");
@@ -82,6 +107,18 @@ public sealed class VertipaqCommandParseTests
         Assert.Equal(2, exitCode);
         Assert.Contains("bogus", stderr);
         Assert.Contains("card", stderr); // the valid-token list for the columns view
+    }
+
+    [Fact]
+    public void Fields_UnknownToken_EmitsInvalidFieldsCode_WithHint_InJsonEnvelope()
+    {
+        var (exitCode, stderr) = Invoke(
+            "vertipaq", "--fields", "name,bogus", "--error-format", "json", "--quiet");
+
+        Assert.Equal(2, exitCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(stderr);
+        Assert.Equal("TOMIX_VERTIPAQ_INVALID_FIELDS", doc.RootElement.GetProperty("code").GetString());
+        Assert.Contains("card", doc.RootElement.GetProperty("hint").GetString());
     }
 
     [Fact]
@@ -94,12 +131,34 @@ public sealed class VertipaqCommandParseTests
     }
 
     [Fact]
+    public void Fields_WithMultipleViews_EmitsInvalidFieldsCode_InJsonEnvelope()
+    {
+        var (exitCode, stderr) = Invoke(
+            "vertipaq", "--all", "--fields", "name,size", "--error-format", "json", "--quiet");
+
+        Assert.Equal(2, exitCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(stderr);
+        Assert.Equal("TOMIX_VERTIPAQ_INVALID_FIELDS", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public void Csv_WithMultipleViews_ExitsTwo()
     {
         var (exitCode, stderr) = Invoke("vertipaq", "--all", "--output-format", "csv", "--quiet");
 
         Assert.Equal(2, exitCode);
         Assert.Contains("single view", stderr);
+    }
+
+    [Fact]
+    public void Csv_WithMultipleViews_EmitsOptionsConflictCode_InJsonEnvelope()
+    {
+        var (exitCode, stderr) = Invoke(
+            "vertipaq", "--all", "--output-format", "csv", "--error-format", "json", "--quiet");
+
+        Assert.Equal(2, exitCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(stderr);
+        Assert.Equal("TOMIX_VERTIPAQ_OPTIONS_CONFLICT", doc.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]

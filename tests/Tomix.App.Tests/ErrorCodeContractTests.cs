@@ -24,6 +24,11 @@ public sealed class ErrorCodeContractTests
 
     // ── VertiPaq / VPAX error codes ─────────────────────────────────────────
 
+    /// <summary>
+    /// INVALID_FIELDS and INVALID_TOP are usage errors emitted by the CLI layer
+    /// (VertipaqCommand) rather than the handler; their actual emission through the
+    /// JSON error envelope is pinned in <c>Tomix.Cli.Tests.VertipaqCommandParseTests</c>.
+    /// </summary>
     [Theory]
     [InlineData("TOMIX_VERTIPAQ_UNSUPPORTED_SOURCE")]
     [InlineData("TOMIX_VERTIPAQ_FAILED")]

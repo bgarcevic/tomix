@@ -1,9 +1,9 @@
 using System.CommandLine;
-using Spectre.Console;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.App.Vertipaq;
 using Tomix.Cli.Output;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Vertipaq;
 
@@ -99,7 +99,9 @@ internal sealed class VertipaqCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            // Effective stderr format: explicit --error-format wins, else JSON output implies JSON errors.
+            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat)
+                ?? (OutputFormats.IsJson(formatValue) ? OutputFormats.Json : null);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
 
             if (!CommandOutput.TryValidateFormat(parseResult,
@@ -118,7 +120,10 @@ internal sealed class VertipaqCommand : ICommandModule
                 Top: parseResult.GetValue(topOption));
 
             if (options.Top is { } top && top <= 0)
-                return WriteUsageError("--top must be a positive integer.");
+                return WriteUsageError(
+                    "TOMIX_VERTIPAQ_INVALID_TOP",
+                    "--top must be a positive integer.",
+                    errorFormat);
 
             var sections = VertipaqView.ResolveSections(options);
 
@@ -126,18 +131,24 @@ internal sealed class VertipaqCommand : ICommandModule
             {
                 if (sections.Count != 1)
                     return WriteUsageError(
-                        "--fields applies to a single view; pick one of --tables/--columns/--relationships/--partitions.");
+                        "TOMIX_VERTIPAQ_INVALID_FIELDS",
+                        "--fields applies to a single view; pick one of --tables/--columns/--relationships/--partitions.",
+                        errorFormat);
 
                 var unknown = VertipaqView.UnknownTokens(sections[0], options.Fields);
                 if (unknown.Count > 0)
                     return WriteUsageError(
+                        "TOMIX_VERTIPAQ_INVALID_FIELDS",
                         $"Unknown --fields value(s): {string.Join(", ", unknown)}.",
-                        $"Valid fields for this view: {string.Join(", ", VertipaqView.ValidTokens(sections[0]))}");
+                        errorFormat,
+                        hint: $"Valid fields for this view: {string.Join(", ", VertipaqView.ValidTokens(sections[0]))}");
             }
 
             if (OutputFormats.IsCsv(formatValue) && sections.Count != 1)
                 return WriteUsageError(
-                    "csv output supports a single view; pick one of --tables/--columns/--relationships/--partitions.");
+                    "TOMIX_VERTIPAQ_OPTIONS_CONFLICT",
+                    "csv output supports a single view; pick one of --tables/--columns/--relationships/--partitions.",
+                    errorFormat);
 
             var importPath = parseResult.GetValue(importOption);
 
@@ -356,12 +367,11 @@ internal sealed class VertipaqCommand : ICommandModule
         => value?.UtcDateTime.ToString(
             "yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
 
-    private static int WriteUsageError(string message, string? guidance = null)
+    private static int WriteUsageError(string code, string message, string? errorFormat, string? hint = null)
     {
-        var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
-        err.MarkupLine(Styling.Error(message));
-        if (guidance is not null)
-            err.MarkupLine(Styling.Guidance($"  → {guidance}"));
+        ErrorOutput.Write(
+            [new TomixDiagnostic(code, DiagnosticSeverity.Error, message, Hint: hint)],
+            errorFormat);
         return 2;
     }
 }

@@ -178,7 +178,9 @@ Emitted by `incremental-refresh` (show/set/rm/apply).
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_VERTIPAQ_UNSUPPORTED_SOURCE` | 2 | The source is a local model definition (TMDL/BIM) with no live storage engine; connect to a deployed model or use `--import`. |
-| `TOMIX_VERTIPAQ_OPTIONS_CONFLICT` | 2 | Conflicting options: `--import` with `--export` or `--annotate`, `--obfuscate` without `--export`, or `--save` without `--annotate`. |
+| `TOMIX_VERTIPAQ_OPTIONS_CONFLICT` | 2 | Conflicting options: `--import` with `--export` or `--annotate`, `--obfuscate` without `--export`, `--save` without `--annotate`, or csv output with multiple views. |
+| `TOMIX_VERTIPAQ_INVALID_FIELDS` | 2 | `--fields` was combined with multiple views, or contained an unknown field token for the selected view. |
+| `TOMIX_VERTIPAQ_INVALID_TOP` | 2 | `--top` was zero or negative; it must be a positive integer. |
 | `TOMIX_VERTIPAQ_TABLE_NOT_FOUND` | 1 | The positional table filter matched no table in the statistics. |
 | `TOMIX_VERTIPAQ_FAILED` | 1 | Statistics extraction against the live engine failed. |
 | `TOMIX_VPAX_READ_FAILED` | 2 | The `--import` file is missing, unreadable, or not a valid statistics package. |
