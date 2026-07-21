@@ -81,13 +81,14 @@ command and is suppressed in CI and for JSON/CSV output. Opt out entirely with
 
 ## Commands
 
-Discover: `ls`, `get`, `find`, `deps`
+Discover: `ls`, `get`, `find`, `deps`, `query` (run DAX/DMV queries against
+a live model)
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
-formatter APIs), `script` (run C# scripts against a model)
+formatter APIs), `script` (run C# scripts against a model),
+`incremental-refresh` (manage refresh policies)
 Connect: `connect` (interactive workspace/model pickers with `--remote`,
 reconnect to a previous target with `--recent`), `deploy`, `refresh`,
-`incremental-refresh` (manage refresh policies), `query` (run DAX/DMV queries
-against a live model), `load`, `save`, `auth`, `session`
+`load`, `save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
 `vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are

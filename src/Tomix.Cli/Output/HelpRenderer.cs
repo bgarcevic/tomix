@@ -23,8 +23,6 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
     ];
 
-    internal static readonly string[] NotImplementedCommands = [];
-
     internal static readonly Dictionary<string, string[]> CommandExamples = new(StringComparer.Ordinal)
     {
         ["ls"] = [
@@ -105,6 +103,12 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx deploy ./model.tmdl",
             "tx deploy ./model.tmdl --dry-run",
             "tx deploy ./model.bim --skip-bpa",
+        ],
+        ["refresh"] = [
+            "tx refresh",
+            "tx refresh --type full",
+            "tx refresh --table Sales --table Customers",
+            "tx refresh --partition Sales.FY2024 --dry-run",
         ],
         ["load"] = [
             "tx load ./model.tmdl",
@@ -233,18 +237,9 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             AnsiConsole.WriteLine();
         }
 
-        var notImplemented = NotImplementedCommands.Where(subcommandMap.ContainsKey).ToList();
-        if (notImplemented.Count > 0)
-        {
-            AnsiConsole.MarkupLine(Styling.Title("Not yet implemented:"));
-            WriteCommandRows(notImplemented.Select(name => subcommandMap[name]).ToList());
-            AnsiConsole.WriteLine();
-        }
-
         // Safety net: a registered command missing from RootSections must still show up in help
         // rather than silently vanishing.
         var listed = RootSections.SelectMany(section => section.Commands)
-            .Concat(NotImplementedCommands)
             .ToHashSet(StringComparer.Ordinal);
         var unlisted = root.Subcommands.Where(sc => !listed.Contains(sc.Name)).ToList();
         if (unlisted.Count > 0)

@@ -20,7 +20,6 @@ public sealed class HelpSectionCoverageTests
 
     private static HashSet<string> ListedNames()
         => SpectreHelpAction.RootSections.SelectMany(section => section.Commands)
-            .Concat(SpectreHelpAction.NotImplementedCommands)
             .ToHashSet(StringComparer.Ordinal);
 
     [Fact]
@@ -52,7 +51,6 @@ public sealed class HelpSectionCoverageTests
     public void SectionedCommands_HaveNoDuplicates()
     {
         var all = SpectreHelpAction.RootSections.SelectMany(section => section.Commands)
-            .Concat(SpectreHelpAction.NotImplementedCommands)
             .ToList();
         var duplicates = all.GroupBy(name => name, StringComparer.Ordinal)
             .Where(group => group.Count() > 1)
