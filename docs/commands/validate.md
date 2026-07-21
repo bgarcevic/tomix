@@ -36,6 +36,7 @@ the `bpa rules` commands for explicit customization.
 | `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. |
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
+| `--no-multiline` | Collapse each rule's guidance to a single line. Text output only. |
 | `--no-model-rules` / `--no-defaults` | Exclude rules embedded in the model / the selected standard ruleset. |
 | `--allow-external-rules` | Also load remote (URL) rule files referenced by the model's rule annotations. Skipped by default so a model file cannot make `tx` fetch arbitrary URLs. |
 | `--ci <github\|vsts>` | Emit CI logging commands to stderr. |
@@ -54,6 +55,16 @@ tx bpa run --fix --save
 | `bpa rules list` | List BPA rules from all sources with status. |
 | `bpa rules enable` / `bpa rules disable` | Re-enable or disable a built-in rule for the current user. |
 | `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
+
+`bpa rules --rules-file <file>` points the subcommands at a BPA rules JSON
+file. `bpa rules list` narrows what is listed:
+
+| Option | Description |
+|--------|-------------|
+| `--ruleset <name>` | Standard BPA ruleset to list: `standard`, `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
+| `--no-defaults` | Suppress built-in rules from the output. |
+| `--ignored` / `--disabled` | Show only ignored / only disabled rules. |
+| `--all` | Show all rules including disabled and ignored. |
 
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
 `--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files).

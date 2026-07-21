@@ -68,7 +68,7 @@ tx refresh [options]
 | `--type <type>` | `full`, `dataonly`, `automatic` (default), `calculate`, `clearvalues`, `defragment`, `add`. |
 | `--table <name>` | Refresh specific table(s). Repeatable. |
 | `--partition <Table.Partition>` | Refresh specific partition(s). Repeatable. |
-| `--skip-refresh-policy` | Skip policy-based partitioning. |
+| `--apply-refresh-policy [true\|false]` / `--skip-refresh-policy` | Apply incremental refresh policy (default: `true`); `--skip-refresh-policy` is shorthand for `--apply-refresh-policy false`. |
 | `--effective-date <yyyy-MM-dd>` | Override the current date for refresh-policy evaluation. |
 | `--max-parallelism <n>` | Maximum parallel refresh operations. |
 | `--dry-run` | Output the TMSL script without executing it. |
@@ -154,8 +154,16 @@ tx session [show|clear|list|prune]
 | `session list` | List all session files. |
 | `session prune` | Delete session files whose shell process is no longer running. |
 
+`session prune` options:
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Also remove named and live process sessions. The current session is kept. |
+| `--dry-run` | Show what would be removed without doing it. |
+
 ```sh
 tx session            # current session details
 tx session clear      # clear active state for this session
 tx session prune      # delete session files for dead shells
+tx session prune --all --dry-run
 ```

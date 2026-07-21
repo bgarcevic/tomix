@@ -34,9 +34,21 @@ tx profile <list|show|set|remove>
 | `profile set <name>` | Create or update a profile. `--from-active` seeds it from the active connection (explicit `-s`/`-d`/`--model`/`--auth` still win). |
 | `profile remove <name>` | Delete a profile. |
 
+`profile set` options:
+
+| Option | Description |
+|--------|-------------|
+| `--desc, --description <text>` | Human-readable description of this profile. |
+| `--from-active` | Save the current active connection as this profile. |
+| `--auto-format <true\|false>` | Override `autoFormat` (`null` to clear). |
+| `--validate-on-mutation <true\|false>` | Override `validateOnMutation`. |
+| `--bpa-on-mutation` / `--bpa-on-deploy` | Override `bpa.onMutation` / `bpa.onDeploy`. |
+| `--vertipaq-on-refresh <true\|false>` | Override `vertipaqOnRefresh`. |
+| `--spinner <true\|false>` | Override `spinner`. |
+
 ```sh
 tx profile set dev -s DevWorkspace -d Sales
-tx profile set dev --from-active
+tx profile set dev --from-active --desc "Dev workspace"
 tx connect --profile dev
 ```
 
@@ -85,6 +97,11 @@ Inspect and manage staged (uncommitted) model mutations — see
 | `stage list` | List all staged models in the current session. |
 | `stage commit` | Promote staged mutations onto the source (and workspace mirror). |
 | `stage discard` | Discard staged mutations without committing them. |
+
+`stage commit --force` commits even if the source changed since staging began
+(overwrites it); without it, source drift blocks the commit so you can
+re-stage. `stage discard --all` discards staged mutations for every model in
+the session, not just the active one.
 
 ```sh
 tx stage             # staged mutations for the active model

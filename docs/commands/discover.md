@@ -12,7 +12,7 @@ tx ls [path-filter] [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `partition`, `relationship`, `role`, `perspective`, `culture`. |
+| `--type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `partition`, `relationship`, `role`, `perspective`, `culture`, `kpi`, `tablepermission`, `calendar`. |
 | `--paths-only` | One object path per line, suitable for piping. |
 | `--no-multiline` | Collapse multi-line cell content (e.g. measure expressions) to a single line. Text output only. |
 

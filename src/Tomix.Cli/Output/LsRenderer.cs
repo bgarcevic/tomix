@@ -346,6 +346,7 @@ internal sealed partial class LsRenderer
         ModelObjectKind.RoleMember => "Members",
         ModelObjectKind.Perspective => "Perspectives",
         ModelObjectKind.Culture => "Cultures",
+        ModelObjectKind.Kpi => "KPIs",
         _ => kind.ToString() + "s"
     };
 

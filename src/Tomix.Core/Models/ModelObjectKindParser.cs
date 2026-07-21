@@ -18,6 +18,9 @@ public static class ModelObjectKindParser
             case "member":
             case "rolemember": kind = ModelObjectKind.RoleMember; return true;
             case "datasource": kind = ModelObjectKind.DataSource; return true;
+            case "kpi": kind = ModelObjectKind.Kpi; return true;
+            case "tablepermission": kind = ModelObjectKind.TablePermission; return true;
+            case "calendar": kind = ModelObjectKind.Calendar; return true;
             case "relationship": kind = ModelObjectKind.Relationship; return true;
             case "role": kind = ModelObjectKind.Role; return true;
             case "perspective": kind = ModelObjectKind.Perspective; return true;

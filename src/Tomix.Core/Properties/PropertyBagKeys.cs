@@ -21,6 +21,7 @@ public static class PropertyBagKeys
     public const string KpiTargetExpression = "KpiTargetExpression";
     public const string KpiStatusExpression = "KpiStatusExpression";
     public const string KpiTrendExpression = "KpiTrendExpression";
+    public const string KpiTargetFormatString = "KpiTargetFormatString";
     public const string FromColumn = "FromColumn";
     public const string ToColumn = "ToColumn";
     public const string FromCardinality = "FromCardinality";

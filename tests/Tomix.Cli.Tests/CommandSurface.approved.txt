@@ -101,7 +101,6 @@ List BPA rules from all sources with status
   opt --no-defaults  Suppress built-in rules from output
   opt --ignored  Show only ignored rules
   opt --disabled  Show only disabled rules
-  opt --no-multiline  Collapse multi-line cell content in text output
   opt --all  Show all rules including disabled and ignored
 
 # tx bpa rules unignore
@@ -312,7 +311,7 @@ Load a semantic model and display summary
 List model objects
   arg [path-filter]  Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard ('Sa*', '*/Amount'); quote names with spaces ("'Net Sales'/'Sales Amount'"); inside quotes, '' is a literal apostrophe.
   arg [model]  Path to model (if not using --model)
-  opt --type <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, partition, relationship, role, perspective, culture.
+  opt --type <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, partition, relationship, role, perspective, culture, kpi, tablepermission, calendar.
   opt --paths-only  Output one object path per line, suitable for piping to other commands.
   opt --no-multiline  Collapse multi-line cell content (e.g. measure expressions) to a single line and truncate. Text output only.
 

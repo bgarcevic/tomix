@@ -312,11 +312,6 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Show all rules including disabled and ignored"
         };
 
-        var noMultilineOption = new Option<bool>("--no-multiline")
-        {
-            Description = "Collapse multi-line cell content in text output"
-        };
-
         var modelArgument = new Argument<string>("model")
         {
             Description = "Path to model",
@@ -335,7 +330,6 @@ internal sealed class BpaCommand : ICommandModule
             noDefaultsOption,
             ignoredOption,
             disabledOption,
-            noMultilineOption,
             allOption
         };
 

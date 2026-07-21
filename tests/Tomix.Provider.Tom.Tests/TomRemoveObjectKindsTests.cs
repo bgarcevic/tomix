@@ -6,8 +6,9 @@ namespace Tomix.Provider.Tom.Tests;
 /// <summary>
 /// Removal coverage for the object kinds beyond table children and roles: relationships,
 /// levels, calculation items, role members, perspectives, cultures, shared expressions,
-/// functions, and data sources. Every kind the mutation resolver can address must also be
-/// removable — anything else is a create/delete asymmetry with <c>add</c>.
+/// functions, data sources, KPIs, table permissions, and calendars. Every kind the mutation
+/// resolver can address must also be removable — anything else is a create/delete asymmetry
+/// with <c>add</c>.
 /// </summary>
 public sealed class TomRemoveObjectKindsTests
 {
@@ -201,6 +202,103 @@ public sealed class TomRemoveObjectKindsTests
 
         Assert.Contains("Sales/FromWarehouse", ex.Message);
         Assert.Single(db.Model.DataSources);
+    }
+
+    [Fact]
+    public void RemoveKpi_ByTypeOption_KeepsMeasure()
+    {
+        var db = BaseModel();
+        var sales = db.Model.Tables["Sales"];
+        sales.Measures.Add(new Measure
+        {
+            Name = "Total",
+            Expression = "1",
+            KPI = new KPI { TargetExpression = "0", StatusExpression = "0" }
+        });
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.RemoveObject(new ModelObjectRemoveRequest("Sales/Total", ModelObjectKind.Kpi, IfExists: false));
+
+        Assert.True(result.Changed);
+        Assert.Null(sales.Measures["Total"].KPI);
+        Assert.Single(sales.Measures);
+    }
+
+    [Fact]
+    public void RemoveKpi_ViaKpiPathSegment()
+    {
+        var db = BaseModel();
+        var sales = db.Model.Tables["Sales"];
+        sales.Measures.Add(new Measure
+        {
+            Name = "Total",
+            Expression = "1",
+            KPI = new KPI { TargetExpression = "0", StatusExpression = "0" }
+        });
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.RemoveObject(Remove("Sales/Total/KPI"));
+
+        Assert.True(result.Changed);
+        Assert.Null(sales.Measures["Total"].KPI);
+    }
+
+    [Fact]
+    public void RemoveMeasure_WithKpi_BarePathStillTargetsMeasure()
+    {
+        // The KPI shares its measure's path; without an explicit kind the measure must win
+        // outright — a KPI candidate here would make every KPI-bearing measure ambiguous.
+        var db = BaseModel();
+        var sales = db.Model.Tables["Sales"];
+        sales.Measures.Add(new Measure
+        {
+            Name = "Total",
+            Expression = "1",
+            KPI = new KPI { TargetExpression = "0", StatusExpression = "0" }
+        });
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.RemoveObject(Remove("Sales/Total"));
+
+        Assert.True(result.Changed);
+        Assert.Empty(sales.Measures);
+    }
+
+    [Fact]
+    public void RemoveTablePermission_KeepsRoleAndTable()
+    {
+        var db = BaseModel();
+        var role = new ModelRole { Name = "Readers" };
+        role.TablePermissions.Add(new TablePermission
+        {
+            Name = "Customer",
+            Table = db.Model.Tables["Customer"],
+            FilterExpression = "[Id] > 0"
+        });
+        db.Model.Roles.Add(role);
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.RemoveObject(Remove("Readers/Customer"));
+
+        Assert.True(result.Changed);
+        Assert.Empty(role.TablePermissions);
+        Assert.Single(db.Model.Roles);
+        Assert.NotNull(db.Model.Tables.Find("Customer"));
+    }
+
+    [Fact]
+    public void RemoveCalendar()
+    {
+        var db = BaseModel();
+        db.CompatibilityLevel = 1701; // calendars require CL 1701+
+        var sales = db.Model.Tables["Sales"];
+        sales.Calendars.Add(new Calendar { Name = "Fiscal" });
+        var mutator = new TomModelMutator(db);
+
+        var result = mutator.RemoveObject(Remove("Sales/Fiscal"));
+
+        Assert.True(result.Changed);
+        Assert.Empty(sales.Calendars);
     }
 
     private static void AddHierarchy(Database db, string name, params string[] levelColumns)

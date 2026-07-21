@@ -231,6 +231,99 @@ public sealed class TomSetResolutionTests
     }
 
     [Fact]
+    public void SetProperty_Kpi_TypeOption_SetsStatusExpression()
+    {
+        var db = NewDatabase();
+        var table = AddTable(db, "Sales");
+        var measure = new Measure
+        {
+            Name = "Total",
+            Expression = "1",
+            KPI = new KPI { TargetExpression = "0", StatusExpression = "0" }
+        };
+        table.Measures.Add(measure);
+
+        var mutator = new TomModelMutator(db);
+        mutator.SetProperty(new ModelObjectSetRequest(
+            "Sales/Total", [new ModelPropertyAssignment("statusexpression", "IF([Total] > 0, 1, -1)")], ModelObjectKind.Kpi));
+
+        Assert.Equal("IF([Total] > 0, 1, -1)", measure.KPI.StatusExpression);
+    }
+
+    [Fact]
+    public void SetProperty_Kpi_LsPath_SetsTargetExpression()
+    {
+        var db = NewDatabase();
+        var table = AddTable(db, "Sales");
+        var measure = new Measure
+        {
+            Name = "Total",
+            Expression = "1",
+            KPI = new KPI { TargetExpression = "0", StatusExpression = "0" }
+        };
+        table.Measures.Add(measure);
+
+        var mutator = new TomModelMutator(db);
+        mutator.SetProperty(new ModelObjectSetRequest(
+            "Sales/Total/KPI", [new ModelPropertyAssignment("targetexpression", "100")], null));
+
+        Assert.Equal("100", measure.KPI.TargetExpression);
+    }
+
+    [Fact]
+    public void SetProperty_Kpi_SetsTargetFormatString()
+    {
+        var db = NewDatabase();
+        var table = AddTable(db, "Sales");
+        var measure = new Measure
+        {
+            Name = "Total",
+            Expression = "1",
+            KPI = new KPI { TargetExpression = "0", StatusExpression = "0" }
+        };
+        table.Measures.Add(measure);
+
+        var mutator = new TomModelMutator(db);
+        mutator.SetProperty(new ModelObjectSetRequest(
+            "Sales/Total/KPI", [new ModelPropertyAssignment("targetformatstring", "#,0")], null));
+
+        Assert.Equal("#,0", measure.KPI.TargetFormatString);
+    }
+
+    [Fact]
+    public void SetProperty_TablePermission_SetsFilterExpression()
+    {
+        var db = NewDatabase();
+        var table = AddTable(db, "Sales");
+        var role = new ModelRole { Name = "Readers" };
+        var permission = new TablePermission { Name = "Sales", Table = table, FilterExpression = "TRUE()" };
+        role.TablePermissions.Add(permission);
+        db.Model.Roles.Add(role);
+
+        var mutator = new TomModelMutator(db);
+        mutator.SetProperty(new ModelObjectSetRequest(
+            "Readers/Sales", [new ModelPropertyAssignment("filterexpression", "[Region] = \"EU\"")], null));
+
+        Assert.Equal("[Region] = \"EU\"", permission.FilterExpression);
+    }
+
+    [Fact]
+    public void SetProperty_Calendar_Renames()
+    {
+        var db = NewDatabase();
+        db.CompatibilityLevel = 1701; // calendars require CL 1701+
+        var table = AddTable(db, "Dates");
+        var calendar = new Calendar { Name = "Fiscal" };
+        table.Calendars.Add(calendar);
+
+        var mutator = new TomModelMutator(db);
+        mutator.SetProperty(new ModelObjectSetRequest(
+            "Dates/Fiscal", [new ModelPropertyAssignment("name", "Fiscal Year")], null));
+
+        Assert.Equal("Fiscal Year", calendar.Name);
+    }
+
+    [Fact]
     public void SetProperty_NotFound_ThrowsObjectNotFoundWithHint()
     {
         var mutator = new TomModelMutator(NewDatabase());

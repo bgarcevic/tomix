@@ -101,6 +101,27 @@ public static class ModelPropertyCatalog
         new("members", "Members", o => Count(o, ModelObjectKind.RoleMember))
     ];
 
+    private static readonly IReadOnlyList<PropertyDescriptor> Kpi =
+    [
+        Name(writable: false),
+        Description(writable: true),
+        // KPI expressions are diffed via the parent measure's kpi* properties — not diffable here.
+        new("targetExpression", "TargetExpression", o => Bag(o, PropertyBagKeys.KpiTargetExpression), Writable: true),
+        new("statusExpression", "StatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Writable: true),
+        new("trendExpression", "TrendExpression", o => Bag(o, PropertyBagKeys.KpiTrendExpression), Writable: true),
+        // Only surfaced here (the measure's kpi* properties omit it), so it is diffable.
+        new("targetFormatString", "TargetFormatString", o => Bag(o, PropertyBagKeys.KpiTargetFormatString), Writable: true, Diffable: true)
+    ];
+
+    private static readonly IReadOnlyList<PropertyDescriptor> TablePermission =
+    [
+        Name(writable: true),
+        // MetadataPermission is the permission's Detail, which diff already compares — not diffable here.
+        new("metadataPermission", "MetadataPermission", o => o.Detail ?? ""),
+        // The RLS filter is diffed via the parent role's rlsExpression — not diffable here.
+        new("filterExpression", "FilterExpression", o => o.Expression ?? "", Writable: true)
+    ];
+
     private static readonly IReadOnlyList<PropertyDescriptor> Generic =
     [
         Name(writable: false),
@@ -121,6 +142,8 @@ public static class ModelPropertyCatalog
         ModelObjectKind.Partition => Partition,
         ModelObjectKind.Relationship => Relationship,
         ModelObjectKind.Role => Role,
+        ModelObjectKind.Kpi => Kpi,
+        ModelObjectKind.TablePermission => TablePermission,
         _ => Generic
     };
 

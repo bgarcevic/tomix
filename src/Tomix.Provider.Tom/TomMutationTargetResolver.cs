@@ -31,7 +31,8 @@ internal sealed class TomMutationTargetResolver
     private enum MutationTargetKind
     {
         Table, Measure, Column, Hierarchy, Partition, CalculationItem, Level,
-        Role, RoleMember, Relationship, Perspective, Culture, Expression, Function, DataSource
+        Role, RoleMember, Relationship, Perspective, Culture, Expression, Function, DataSource,
+        Kpi, TablePermission, Calendar
     }
 
     /// <summary>
@@ -145,12 +146,28 @@ internal sealed class TomMutationTargetResolver
             if (Allows(filter, daxForm, MutationTargetKind.CalculationItem)
                 && table.CalculationGroup?.CalculationItems.FirstOrDefault(i => NameEquals(i.Name, name)) is { } item)
                 candidates.Add((MutationTargetKind.CalculationItem, new TomResolvedObject(item, table, $"{tablePath}/{Segment(item.Name)}")));
+
+            // A KPI has no name of its own — 'Table/Measure' always names the measure first, so
+            // the KPI is only reachable with an explicit kind (--type kpi or a KPIs keyword).
+            if (filter == MutationTargetKind.Kpi && !daxForm
+                && table.Measures.FirstOrDefault(m => NameEquals(m.Name, name)) is { KPI: not null } kpiMeasure)
+                candidates.Add((MutationTargetKind.Kpi, new TomResolvedObject(kpiMeasure.KPI, kpiMeasure, $"{tablePath}/{Segment(kpiMeasure.Name)}")));
+
+            if (Allows(filter, daxForm, MutationTargetKind.Calendar)
+                && table.Calendars.FirstOrDefault(c => NameEquals(c.Name, name)) is { } calendar)
+                candidates.Add((MutationTargetKind.Calendar, new TomResolvedObject(calendar, table, $"{tablePath}/{Segment(calendar.Name)}")));
         }
 
-        if (Allows(filter, daxForm, MutationTargetKind.RoleMember)
-            && _database.Model.Roles.FirstOrDefault(r => NameEquals(r.Name, parent)) is { } role
-            && role.Members.FirstOrDefault(m => NameEquals(m.MemberName, name)) is { } member)
-            candidates.Add((MutationTargetKind.RoleMember, new TomResolvedObject(member, role, $"{role.Name}/{member.MemberName}")));
+        if (_database.Model.Roles.FirstOrDefault(r => NameEquals(r.Name, parent)) is { } role)
+        {
+            if (Allows(filter, daxForm, MutationTargetKind.RoleMember)
+                && role.Members.FirstOrDefault(m => NameEquals(m.MemberName, name)) is { } member)
+                candidates.Add((MutationTargetKind.RoleMember, new TomResolvedObject(member, role, $"{role.Name}/{member.MemberName}")));
+
+            if (Allows(filter, daxForm, MutationTargetKind.TablePermission)
+                && role.TablePermissions.FirstOrDefault(p => NameEquals(p.Name, name)) is { } permission)
+                candidates.Add((MutationTargetKind.TablePermission, new TomResolvedObject(permission, role, $"{role.Name}/{permission.Name}")));
+        }
     }
 
     private void CollectLevelCandidates(
@@ -256,6 +273,9 @@ internal sealed class TomMutationTargetResolver
         ModelObjectKind.Culture => MutationTargetKind.Culture,
         ModelObjectKind.CalculationItem => MutationTargetKind.CalculationItem,
         ModelObjectKind.DataSource => MutationTargetKind.DataSource,
+        ModelObjectKind.Kpi => MutationTargetKind.Kpi,
+        ModelObjectKind.TablePermission => MutationTargetKind.TablePermission,
+        ModelObjectKind.Calendar => MutationTargetKind.Calendar,
         _ => null
     };
 
@@ -272,6 +292,11 @@ internal sealed class TomMutationTargetResolver
             ["CalcItems"] = MutationTargetKind.CalculationItem,
             ["Expressions"] = MutationTargetKind.Expression,
             ["Functions"] = MutationTargetKind.Function,
-            ["DataSources"] = MutationTargetKind.DataSource
+            ["DataSources"] = MutationTargetKind.DataSource,
+            // Singular KPI included so the ls path 'Table/Measure/KPI' resolves as-is.
+            ["KPIs"] = MutationTargetKind.Kpi,
+            ["KPI"] = MutationTargetKind.Kpi,
+            ["TablePermissions"] = MutationTargetKind.TablePermission,
+            ["Calendars"] = MutationTargetKind.Calendar
         };
 }

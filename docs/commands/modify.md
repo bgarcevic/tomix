@@ -108,9 +108,13 @@ references (relationships, sort-by, hierarchy levels, perspectives, role
 permissions) cascade-remove instead. Every object kind a mutation path can
 address is removable: tables, measures, columns, hierarchies, levels,
 partitions, calculation items, relationships, roles, role members,
-perspectives, cultures, shared expressions, functions, and data sources.
+perspectives, cultures, shared expressions, functions, data sources,
+KPIs, table permissions, and calendars.
 A data source still bound to a partition cannot be removed until the
-partition is repointed or removed.
+partition is repointed or removed. A KPI shares its measure's path, so
+address it explicitly: `tx rm "Sales/Total/KPI"` or
+`tx rm "Sales/Total" -t kpi` (the measure survives; removing the measure
+takes its KPI with it).
 
 ```sh
 tx rm "Sales/Obsolete" --dry-run
@@ -192,6 +196,18 @@ tx incremental-refresh <show|set|rm|apply> <table> [options]
 | `incremental-refresh set <table>` | Create or edit the policy on a table. |
 | `incremental-refresh rm <table>` | Remove the policy from a table. |
 | `incremental-refresh apply <table>` | Apply the policy on a deployed model (generates partitions server-side). |
+
+`incremental-refresh set` policy options:
+
+| Option | Description |
+|--------|-------------|
+| `--mode <import\|hybrid>` | Policy mode: `import` (default) or `hybrid` (adds a DirectQuery partition for the newest data). |
+| `--rolling-window-periods <n>` / `--rolling-window-granularity <g>` | How many periods of history to keep (the archive window) and their granularity: `day`, `month`, `quarter`, `year`. |
+| `--incremental-periods <n>` / `--incremental-granularity <g>` | How many periods to refresh incrementally and their granularity. |
+| `--incremental-offset <n>` | Periods to shift the window head from today (e.g. for future-dated data). |
+| `--polling-expression <m>` / `--polling-expression-file <file>` | M expression polled per partition to detect data changes (`-` reads from stdin / read from a file). |
+| `--source-expression <m>` / `--source-expression-file <file>` | M source query filtering on `RangeStart`/`RangeEnd` (`-` reads from stdin / read from a file). |
+| `--force` | Save despite validation errors; also lets `--save-to` overwrite an existing target. |
 
 ```sh
 tx incremental-refresh show Sales

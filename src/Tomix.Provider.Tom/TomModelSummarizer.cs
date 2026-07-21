@@ -39,6 +39,7 @@ public static class TomModelSummarizer
     private const string PropKpiTargetExpression = PropertyBagKeys.KpiTargetExpression;
     private const string PropKpiStatusExpression = PropertyBagKeys.KpiStatusExpression;
     private const string PropKpiTrendExpression = PropertyBagKeys.KpiTrendExpression;
+    private const string PropKpiTargetFormatString = PropertyBagKeys.KpiTargetFormatString;
     private const string PropObjectType = "ObjectType";
     private const string PropUsedInHierarchies = "UsedInHierarchies";
     private const string PropUsedInVariations = "UsedInVariations";
@@ -131,6 +132,8 @@ public static class TomModelSummarizer
         if (isCalcGroup)
             children.AddRange(table.CalculationGroup!.CalculationItems.Select(ci => BuildCalculationItem(ci, path)));
 
+        children.AddRange(table.Calendars.Select(c => BuildCalendar(c, path)));
+
         foreach (var partition in table.Partitions)
             children.Add(BuildPartition(partition, path));
 
@@ -208,6 +211,7 @@ public static class TomModelSummarizer
 
     private static ModelObject BuildMeasure(Measure measure, string tablePath)
     {
+        var path = $"{tablePath}/{Segment(measure.Name)}";
         var props = new Dictionary<string, string>
         {
             [PropDataType] = measure.DataType.ToString(),
@@ -227,15 +231,35 @@ public static class TomModelSummarizer
         return new ModelObject(
             measure.Name,
             ModelObjectKind.Measure,
-            $"{tablePath}/{Segment(measure.Name)}",
+            path,
             Detail: null,
             Expression: measure.Expression,
             Description: Desc(measure.Description),
             Hidden: measure.IsHidden,
             SourceColumn: null,
-            Children: [],
+            Children: measure.KPI is null ? [] : [BuildKpi(measure.KPI, path)],
             Properties: props);
     }
+
+    private static ModelObject BuildKpi(KPI kpi, string measurePath)
+        => new(
+            "KPI",
+            ModelObjectKind.Kpi,
+            $"{measurePath}/KPI",
+            Detail: null,
+            Expression: kpi.StatusExpression,
+            Description: Desc(kpi.Description),
+            Hidden: false,
+            SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string>
+            {
+                [PropKpiTargetExpression] = kpi.TargetExpression ?? "",
+                [PropKpiStatusExpression] = kpi.StatusExpression ?? "",
+                [PropKpiTrendExpression] = kpi.TrendExpression ?? "",
+                [PropKpiTargetFormatString] = kpi.TargetFormatString ?? "",
+                [PropObjectType] = "KPI"
+            });
 
     private static ModelObject BuildHierarchy(Hierarchy hierarchy, string tablePath)
     {
@@ -329,13 +353,15 @@ public static class TomModelSummarizer
     private static ModelObject BuildRole(ModelRole role)
     {
         var path = $"Roles/{Segment(role.Name)}";
-        var members = role.Members
+        var children = role.Members
             .Select(m => Leaf(
                 m.MemberName,
                 ModelObjectKind.RoleMember,
                 $"{path}/{Segment(m.MemberName)}",
                 detail: null))
             .ToList();
+
+        children.AddRange(role.TablePermissions.Select(tp => BuildTablePermission(tp, path)));
 
         var rlsExpressions = new List<string>();
         foreach (var tp in role.TablePermissions)
@@ -360,9 +386,22 @@ public static class TomModelSummarizer
             Description: Desc(role.Description),
             Hidden: false,
             SourceColumn: null,
-            Children: members,
+            Children: children,
             Properties: props);
     }
+
+    private static ModelObject BuildTablePermission(TablePermission permission, string rolePath)
+        => new(
+            permission.Name,
+            ModelObjectKind.TablePermission,
+            $"{rolePath}/{Segment(permission.Name)}",
+            Detail: permission.MetadataPermission.ToString().ToLowerInvariant(),
+            Expression: string.IsNullOrWhiteSpace(permission.FilterExpression) ? null : permission.FilterExpression,
+            Description: null,
+            Hidden: false,
+            SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string> { [PropObjectType] = "TablePermission" });
 
     private static ModelObject BuildCalculationItem(CalculationItem item, string tablePath)
         => new(
@@ -376,6 +415,19 @@ public static class TomModelSummarizer
             SourceColumn: null,
             Children: [],
             Properties: new Dictionary<string, string> { [PropObjectType] = "CalculationItem" });
+
+    private static ModelObject BuildCalendar(Calendar calendar, string tablePath)
+        => new(
+            calendar.Name,
+            ModelObjectKind.Calendar,
+            $"{tablePath}/{Segment(calendar.Name)}",
+            Detail: null,
+            Expression: null,
+            Description: Desc(calendar.Description),
+            Hidden: false,
+            SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string> { [PropObjectType] = "Calendar" });
 
     private static ModelObject BuildDataSource(DataSource dataSource)
         => new(

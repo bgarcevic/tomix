@@ -17,5 +17,8 @@ public enum ModelObjectKind
     Perspective,
     Culture,
     CalculationItem,
-    DataSource
+    DataSource,
+    Kpi,
+    TablePermission,
+    Calendar
 }

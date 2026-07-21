@@ -4,7 +4,7 @@ namespace Tomix.Cli.Output;
 
 internal static class TypeValidation
 {
-    private static readonly string ValidTypes = "table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, relationship, role, member, perspective, culture, datasource";
+    private static readonly string ValidTypes = "table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, relationship, role, member, perspective, culture, datasource, kpi, tablepermission, calendar";
 
     public static int WriteInvalidTypeError()
     {

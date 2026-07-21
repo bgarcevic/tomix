@@ -232,6 +232,18 @@ public sealed class TomModelMutator
                 memberRole.Members.Remove(member);
                 return [];
 
+            case KPI when resolved.Parent is Measure kpiMeasure:
+                kpiMeasure.KPI = null;
+                return [];
+
+            case TablePermission permission when resolved.Parent is ModelRole permissionRole:
+                permissionRole.TablePermissions.Remove(permission);
+                return [];
+
+            case Calendar calendar when resolved.Parent is Table calendarTable:
+                calendarTable.Calendars.Remove(calendar);
+                return [];
+
             case Perspective perspective:
                 _database.Model.Perspectives.Remove(perspective);
                 return [];

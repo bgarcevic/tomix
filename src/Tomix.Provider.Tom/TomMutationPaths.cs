@@ -106,7 +106,9 @@ internal static partial class TomMutationPaths
             ["Expressions"] = "expression",
             ["Functions"] = "function",
             ["Calendars"] = "calendar",
-            ["KPIs"] = "kpi"
+            ["KPIs"] = "kpi",
+            ["KPI"] = "kpi",
+            ["TablePermissions"] = "tablepermission"
         };
 
     private static bool IsSupplementalKeyword(PathSegment segment)
