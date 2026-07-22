@@ -215,19 +215,31 @@ public sealed class TomSetResolutionTests
     }
 
     [Fact]
-    public void SetProperty_RoleMember_IsReachable_AndSurfacesTomImmutability()
+    public void SetProperty_RoleMember_RenamesByReplacement_PreservingIdentityFields()
     {
-        // TOM makes MemberName immutable once set; the point here is that the member RESOLVES
-        // (previously "Object not found") so TOM's own clear error reaches the user.
+        // TOM makes MemberName immutable once set, so the rename replaces the member with an
+        // equivalent one; identity fields and annotations must survive the swap.
         var db = NewDatabase();
         var role = new ModelRole { Name = "Readers" };
-        role.Members.Add(new ExternalModelRoleMember { MemberName = "user@contoso.com", IdentityProvider = "AzureAD" });
+        var member = new ExternalModelRoleMember
+        {
+            MemberName = "user@contoso.com",
+            MemberID = "aad-object-id",
+            IdentityProvider = "AzureAD"
+        };
+        member.Annotations.Add(new Annotation { Name = "Tag", Value = "kept" });
+        role.Members.Add(member);
         db.Model.Roles.Add(role);
 
         var mutator = new TomModelMutator(db);
-        var ex = Assert.Throws<InvalidOperationException>(() => mutator.SetProperty(new ModelObjectSetRequest(
-            "Readers/user@contoso.com", [new ModelPropertyAssignment("membername", "other@contoso.com")], null)));
-        Assert.Contains("immutable", ex.Message);
+        mutator.SetProperty(new ModelObjectSetRequest(
+            "Readers/user@contoso.com", [new ModelPropertyAssignment("membername", "other@contoso.com")], null));
+
+        var renamed = Assert.IsType<ExternalModelRoleMember>(Assert.Single(role.Members));
+        Assert.Equal("other@contoso.com", renamed.MemberName);
+        Assert.Equal("aad-object-id", renamed.MemberID);
+        Assert.Equal("AzureAD", renamed.IdentityProvider);
+        Assert.Equal("kept", renamed.Annotations["Tag"].Value);
     }
 
     [Fact]

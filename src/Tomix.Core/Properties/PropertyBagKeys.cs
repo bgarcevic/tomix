@@ -32,5 +32,9 @@ public static class PropertyBagKeys
     public const string DataView = "DataView";
     public const string QueryGroup = "QueryGroup";
     public const string RefreshPolicy = "RefreshPolicy";
+    public const string RefreshPolicySourceExpression = "RefreshPolicySourceExpression";
+    public const string RefreshPolicyPollingExpression = "RefreshPolicyPollingExpression";
+    public const string NoSelectionExpression = "NoSelectionExpression";
+    public const string MultipleOrEmptySelectionExpression = "MultipleOrEmptySelectionExpression";
     public const string AnnotationPrefix = "Annotation:";
 }

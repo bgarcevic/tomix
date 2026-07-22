@@ -135,6 +135,18 @@ tx replace [pattern] [replacement] [model] [options]
 | `--case-sensitive` | Case-sensitive matching. |
 | `--dry-run` | Preview changes without applying. |
 
+`--in expressions` walks every expression-bearing property: measure DAX,
+detail-rows and format-string definitions, KPI target/status/trend, calculated
+columns, partition M and calculated-table DAX, refresh-policy source and
+polling M, calculation-group items and selection expressions, role
+table-permission filters, shared expressions, and DAX functions. `--in names`
+covers every renameable object, including role members; table-permission
+names are excluded because the engine derives them from the table. `all` deliberately
+excludes annotations — their values are often tool-generated JSON — so
+annotations are only touched when requested explicitly (Tabular Editor's CLI
+includes them in `all`). Whatever `tx find` reports for a scope, `tx replace`
+rewrites in that scope; a test enforces the pairing.
+
 ```sh
 tx replace "[OrderDate]" "[ShipDate]" --dry-run
 tx replace "old_name" "new_name" --in names --save

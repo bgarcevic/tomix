@@ -117,6 +117,10 @@ public static class TomModelSummarizer
             [PropRowLevelSecurity] = rlsIndex.TryGetValue(table.Name, out var rls) ? string.Join("\n", rls) : "",
             [PropPerspectives] = perspectiveMembership.TryGetValue(table.Name, out var persp) ? string.Join("\n", persp) : "",
             [PropRefreshPolicy] = TomRefreshPolicyManager.Summarize(table),
+            [PropertyBagKeys.RefreshPolicySourceExpression] = (table.RefreshPolicy as BasicRefreshPolicy)?.SourceExpression ?? "",
+            [PropertyBagKeys.RefreshPolicyPollingExpression] = (table.RefreshPolicy as BasicRefreshPolicy)?.PollingExpression ?? "",
+            [PropertyBagKeys.NoSelectionExpression] = table.CalculationGroup?.NoSelectionExpression?.Expression ?? "",
+            [PropertyBagKeys.MultipleOrEmptySelectionExpression] = table.CalculationGroup?.MultipleOrEmptySelectionExpression?.Expression ?? "",
             [PropertyBagKeys.DefaultDetailRowsExpression] = table.DefaultDetailRowsDefinition?.Expression ?? "",
             [PropObjectType] = "Table"
         };
@@ -270,7 +274,8 @@ public static class TomModelSummarizer
                 l.Name,
                 ModelObjectKind.Level,
                 $"{path}/{Segment(l.Name)}",
-                detail: l.Column?.Name))
+                detail: l.Column?.Name,
+                description: Desc(l.Description)))
             .ToList();
 
         return new ModelObject(

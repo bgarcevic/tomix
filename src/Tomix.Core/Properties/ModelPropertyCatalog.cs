@@ -29,7 +29,12 @@ public static class ModelPropertyCatalog
         new("hierarchies", "Hierarchies", o => Count(o, ModelObjectKind.Hierarchy)),
         new("partitions", "Partitions", o => Count(o, ModelObjectKind.Partition)),
         new("refreshPolicy", "RefreshPolicy", o => Bag(o, PropertyBagKeys.RefreshPolicy)),
-        new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", o => Bag(o, PropertyBagKeys.DefaultDetailRowsExpression), Diffable: true)
+        new("refreshPolicySourceExpression", "RefreshPolicySourceExpression", o => Bag(o, PropertyBagKeys.RefreshPolicySourceExpression), Searchable: true, SearchScope: ExpressionsScope),
+        new("refreshPolicyPollingExpression", "RefreshPolicyPollingExpression", o => Bag(o, PropertyBagKeys.RefreshPolicyPollingExpression), Searchable: true, SearchScope: ExpressionsScope),
+        // Calculation-group selection expressions; empty for regular tables.
+        new("noSelectionExpression", "NoSelectionExpression", o => Bag(o, PropertyBagKeys.NoSelectionExpression), Searchable: true, SearchScope: ExpressionsScope),
+        new("multipleOrEmptySelectionExpression", "MultipleOrEmptySelectionExpression", o => Bag(o, PropertyBagKeys.MultipleOrEmptySelectionExpression), Searchable: true, SearchScope: ExpressionsScope),
+        new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", o => Bag(o, PropertyBagKeys.DefaultDetailRowsExpression), Searchable: true, SearchScope: ExpressionsScope, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Measure =
@@ -41,8 +46,8 @@ public static class ModelPropertyCatalog
         FormatString(),
         DisplayFolder(),
         DataType(diffable: true),
-        new("detailRowsExpression", "DetailRowsExpression", o => Bag(o, PropertyBagKeys.DetailRowsExpression), Diffable: true),
-        new("formatStringExpression", "FormatStringExpression", o => Bag(o, PropertyBagKeys.FormatStringExpression), Diffable: true),
+        new("detailRowsExpression", "DetailRowsExpression", o => Bag(o, PropertyBagKeys.DetailRowsExpression), Searchable: true, SearchScope: ExpressionsScope, Diffable: true),
+        new("formatStringExpression", "FormatStringExpression", o => Bag(o, PropertyBagKeys.FormatStringExpression), Searchable: true, SearchScope: ExpressionsScope, Diffable: true),
         new("kpi", "KPI", o => Bag(o, PropertyBagKeys.Kpi), Diffable: true),
         new("kpiTargetExpression", "KpiTargetExpression", o => Bag(o, PropertyBagKeys.KpiTargetExpression), Diffable: true),
         new("kpiStatusExpression", "KpiStatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Diffable: true),
@@ -79,7 +84,9 @@ public static class ModelPropertyCatalog
 
     private static readonly IReadOnlyList<PropertyDescriptor> Relationship =
     [
-        Name(writable: false),
+        // Not searchable: the name is synthesized from the endpoint columns, not authored
+        // text, and replace never rewrites it. Relationship annotations remain searchable.
+        new("name", "Name", o => o.Name),
         // Endpoints, cardinality, and active state are also encoded in the relationship's Detail
         // string, which diff already compares in its fixed identity set — only properties absent
         // from Detail are diffable here, so an edit is never reported twice.
@@ -106,20 +113,25 @@ public static class ModelPropertyCatalog
         Name(writable: false),
         Description(writable: true),
         // KPI expressions are diffed via the parent measure's kpi* properties — not diffable here.
-        new("targetExpression", "TargetExpression", o => Bag(o, PropertyBagKeys.KpiTargetExpression), Writable: true),
-        new("statusExpression", "StatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Writable: true),
-        new("trendExpression", "TrendExpression", o => Bag(o, PropertyBagKeys.KpiTrendExpression), Writable: true),
+        // They are searchable here (and only here) so find reports each site exactly once.
+        new("targetExpression", "TargetExpression", o => Bag(o, PropertyBagKeys.KpiTargetExpression), Writable: true, Searchable: true, SearchScope: ExpressionsScope),
+        new("statusExpression", "StatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Writable: true, Searchable: true, SearchScope: ExpressionsScope),
+        new("trendExpression", "TrendExpression", o => Bag(o, PropertyBagKeys.KpiTrendExpression), Writable: true, Searchable: true, SearchScope: ExpressionsScope),
         // Only surfaced here (the measure's kpi* properties omit it), so it is diffable.
-        new("targetFormatString", "TargetFormatString", o => Bag(o, PropertyBagKeys.KpiTargetFormatString), Writable: true, Diffable: true)
+        new("targetFormatString", "TargetFormatString", o => Bag(o, PropertyBagKeys.KpiTargetFormatString), Writable: true, Searchable: true, SearchScope: FormatStringsScope, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> TablePermission =
     [
-        Name(writable: true),
+        // Not searchable: TOM derives the permission's name from the referenced table, so the
+        // site is find/replace-addressable only via the table itself.
+        new("name", "Name", o => o.Name, Writable: true),
         // MetadataPermission is the permission's Detail, which diff already compares — not diffable here.
         new("metadataPermission", "MetadataPermission", o => o.Detail ?? ""),
         // The RLS filter is diffed via the parent role's rlsExpression — not diffable here.
-        new("filterExpression", "FilterExpression", o => o.Expression ?? "", Writable: true)
+        // It is searchable here (the role's aggregated rlsExpression is not) so find reports
+        // each filter exactly once, at the object replace rewrites.
+        new("filterExpression", "FilterExpression", o => o.Expression ?? "", Writable: true, Searchable: true, SearchScope: ExpressionsScope)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Generic =

@@ -63,6 +63,13 @@ tx find <pattern> [model] [options]
 | `--paths-only` | One matching object path per line, suitable for piping. |
 | `--no-multiline` | Collapse multi-line match context to a single line. Text output only. |
 
+Searches every scope site `tx replace` can rewrite — including partition
+expressions, KPI expressions, detail-rows and format-string definitions,
+refresh-policy M, calculation-group selection expressions, and RLS filter
+expressions — so a find preview is also a replace preview. Relationship
+names are skipped (synthesized from endpoints, not authored text), but
+relationship annotations are searched under `--in annotations`.
+
 ```sh
 tx find "SUM" --in expressions
 tx find "TODO|FIXME" --regex --in descriptions

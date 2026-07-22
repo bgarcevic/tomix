@@ -500,7 +500,7 @@ internal static class TomPropertyApplier
         {
             case "name":
             case "membername":
-                member.MemberName = value;
+                RenameMember(member, value);
                 break;
             case "memberid":
                 member.MemberID = value;
@@ -508,6 +508,42 @@ internal static class TomPropertyApplier
             default:
                 throw new NotSupportedException($"Setting '{displayName}' is not supported for role members.");
         }
+    }
+
+    /// <summary>
+    /// TOM freezes <c>ModelRoleMember.MemberName</c> once set, so a rename must replace the
+    /// member with an equivalent one under the new name. MemberID, identity-provider fields,
+    /// and annotation values carry over (annotations as clones — TOM refuses to reattach
+    /// removed objects). Also used by TomTextReplacer.
+    /// </summary>
+    internal static ModelRoleMember RenameMember(ModelRoleMember member, string newName)
+    {
+        if (member.Role is not { } role)
+            throw new NotSupportedException("Cannot rename a role member that is not attached to a role.");
+
+        ModelRoleMember renamed = member switch
+        {
+            ExternalModelRoleMember external => new ExternalModelRoleMember
+            {
+                MemberName = newName,
+                MemberID = external.MemberID,
+                IdentityProvider = external.IdentityProvider,
+                MemberType = external.MemberType
+            },
+            _ => new WindowsModelRoleMember
+            {
+                MemberName = newName,
+                MemberID = member.MemberID
+            }
+        };
+
+        // Clone the annotations: TOM's change tracker refuses to reattach removed objects.
+        foreach (var annotation in member.Annotations)
+            renamed.Annotations.Add(new Annotation { Name = annotation.Name, Value = annotation.Value });
+
+        role.Members.Remove(member);
+        role.Members.Add(renamed);
+        return renamed;
     }
 
     private static void ApplyRelationshipProperty(SingleColumnRelationship relationship, string property, string value, string displayName)

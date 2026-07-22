@@ -58,7 +58,7 @@ public sealed class PropertyCatalogTests
 
     [Theory]
     [InlineData(ModelObjectKind.Table,
-        "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,defaultDetailRowsExpression")]
+        "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,refreshPolicySourceExpression,refreshPolicyPollingExpression,noSelectionExpression,multipleOrEmptySelectionExpression,defaultDetailRowsExpression")]
     [InlineData(ModelObjectKind.Measure,
         "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,kpiTargetExpression,kpiStatusExpression,kpiTrendExpression,lineageTag")]
     [InlineData(ModelObjectKind.Column,
