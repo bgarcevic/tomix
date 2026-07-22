@@ -90,6 +90,8 @@ public sealed class TomModelMutator
         // original and must be captured first and re-created against the clone.
         var clone = measure.Clone();
         clone.Name = newName;
+        if (request.NewDisplayFolder is not null)
+            clone.DisplayFolder = request.NewDisplayFolder;
 
         var memberships = new List<Perspective>();
         foreach (var perspective in _database.Model.Perspectives)

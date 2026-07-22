@@ -268,6 +268,11 @@ public static class TomModelSummarizer
     private static ModelObject BuildHierarchy(Hierarchy hierarchy, string tablePath)
     {
         var path = $"{tablePath}/{Segment(hierarchy.Name)}";
+        var props = new Dictionary<string, string>
+        {
+            [PropDisplayFolder] = hierarchy.DisplayFolder ?? ""
+        };
+        AddAnnotations(props, hierarchy.Annotations);
         var levels = hierarchy.Levels
             .OrderBy(l => l.Ordinal)
             .Select(l => Leaf(
@@ -287,7 +292,8 @@ public static class TomModelSummarizer
             Description: Desc(hierarchy.Description),
             Hidden: hierarchy.IsHidden,
             SourceColumn: null,
-            Children: levels);
+            Children: levels,
+            Properties: props);
     }
 
     private static ModelObject BuildPartition(Partition partition, string tablePath)

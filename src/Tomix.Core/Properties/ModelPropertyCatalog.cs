@@ -72,6 +72,18 @@ public static class ModelPropertyCatalog
         new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag))
     ];
 
+    // The generic keys (including the always-empty expression) stay in place so existing
+    // JSON/CSV consumers keep their schema; displayFolder is appended, not substituted.
+    private static readonly IReadOnlyList<PropertyDescriptor> Hierarchy =
+    [
+        Name(writable: true),
+        Description(writable: true),
+        IsHidden(writable: true),
+        new("detail", "Detail", o => o.Detail ?? ""),
+        Expression(writable: false),
+        DisplayFolder()
+    ];
+
     private static readonly IReadOnlyList<PropertyDescriptor> Partition =
     [
         Name(writable: true),
@@ -151,6 +163,7 @@ public static class ModelPropertyCatalog
         ModelObjectKind.Table => Table,
         ModelObjectKind.Measure => Measure,
         ModelObjectKind.Column => Column,
+        ModelObjectKind.Hierarchy => Hierarchy,
         ModelObjectKind.Partition => Partition,
         ModelObjectKind.Relationship => Relationship,
         ModelObjectKind.Role => Role,
@@ -192,7 +205,8 @@ public static class ModelPropertyCatalog
     /// </summary>
     public static IReadOnlyList<string> WritableTokens(ModelObjectKind kind) => kind switch
     {
-        ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.Partition
+        ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
+            or ModelObjectKind.Hierarchy or ModelObjectKind.Partition
             => For(kind).Where(d => d.Writable).Select(d => d.JsonKey).ToList(),
         _ => []
     };

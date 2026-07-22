@@ -86,7 +86,10 @@ public sealed class CommandSurfaceSnapshotTests
 
     private static void WriteCommand(StringBuilder sb, Command command, string path)
     {
-        sb.Append("# ").Append(path).Append('\n');
+        sb.Append("# ").Append(path);
+        if (command.Aliases.Count > 0)
+            sb.Append(" (aliases: ").Append(string.Join(", ", command.Aliases.OrderBy(a => a, StringComparer.Ordinal))).Append(')');
+        sb.Append('\n');
         sb.Append(OneLine(command.Description)).Append('\n');
 
         foreach (var arg in command.Arguments.Where(a => !a.Hidden))

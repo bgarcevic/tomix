@@ -316,8 +316,8 @@ List model objects
   opt --paths-only  Output one object path per line, suitable for piping to other commands.
   opt --no-multiline  Collapse multi-line cell content (e.g. measure expressions) to a single line and truncate. Text output only.
 
-# tx mv
-Move or rename a model object
+# tx mv (aliases: move, rename)
+Move or rename a model object, including in and out of display folders
   arg <source>  Source object path
   arg <destination>  Destination object path
   arg [model]  Path to model (if not using --model)

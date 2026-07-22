@@ -48,12 +48,15 @@ public sealed record ModelObjectRemoveRequest(
     bool IfExists);
 
 /// <summary>Move the object at <paramref name="Path"/> under <paramref name="NewParent"/>,
-/// renaming it to <paramref name="NewName"/> when given (see <see cref="IObjectMoveSession"/>).</summary>
+/// renaming it to <paramref name="NewName"/> when given (see <see cref="IObjectMoveSession"/>).
+/// <paramref name="NewDisplayFolder"/> places the moved object in that display folder
+/// (backslash-nested); <c>null</c> keeps the folder it had.</summary>
 public sealed record ModelObjectMoveRequest(
     string Path,
     ModelObjectKind? Type,
     string NewParent,
-    string? NewName = null);
+    string? NewName = null,
+    string? NewDisplayFolder = null);
 
 public sealed record ModelReplaceRequest(
     string Pattern,

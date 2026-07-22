@@ -70,7 +70,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Role,
         "name,description,modelPermission,rlsExpression,members")]
     [InlineData(ModelObjectKind.Hierarchy,
-        "name,description,isHidden,detail,expression")]
+        "name,description,isHidden,detail,expression,displayFolder")]
     public void For_PinsThePropertyContractPerKind(ModelObjectKind kind, string expectedKeys)
     {
         Assert.Equal(expectedKeys.Split(','), ModelPropertyCatalog.For(kind).Select(d => d.JsonKey));

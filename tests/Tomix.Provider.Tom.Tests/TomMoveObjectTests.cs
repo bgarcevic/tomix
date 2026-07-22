@@ -91,6 +91,31 @@ public sealed class TomMoveObjectTests
     }
 
     [Fact]
+    public void MoveMeasure_WithDisplayFolder_SetsFolderOnTheMovedMeasure()
+    {
+        var db = BaseModel();
+        db.Model.Tables["Sales"].Measures["Revenue"].DisplayFolder = "Old";
+        var mutator = new TomModelMutator(db);
+
+        mutator.MoveObject(new ModelObjectMoveRequest(
+            "Sales/Revenue", Type: null, "Metrics", NewName: null, NewDisplayFolder: @"Finance\KPIs"));
+
+        Assert.Equal(@"Finance\KPIs", db.Model.Tables["Metrics"].Measures["Revenue"].DisplayFolder);
+    }
+
+    [Fact]
+    public void MoveMeasure_WithoutDisplayFolder_KeepsTheFolderItHad()
+    {
+        var db = BaseModel();
+        db.Model.Tables["Sales"].Measures["Revenue"].DisplayFolder = "Finance";
+        var mutator = new TomModelMutator(db);
+
+        mutator.MoveObject(Move("Sales/Revenue", "Metrics"));
+
+        Assert.Equal("Finance", db.Model.Tables["Metrics"].Measures["Revenue"].DisplayFolder);
+    }
+
+    [Fact]
     public void MoveColumn_IsNotSupported()
     {
         var db = BaseModel();

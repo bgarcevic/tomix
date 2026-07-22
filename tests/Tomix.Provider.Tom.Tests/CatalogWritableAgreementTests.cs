@@ -26,7 +26,8 @@ public sealed class CatalogWritableAgreementTests
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
-        => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column, ModelObjectKind.Partition);
+        => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column,
+            ModelObjectKind.Hierarchy, ModelObjectKind.Partition);
 
     [Theory]
     [MemberData(nameof(CatalogedKinds))]
@@ -103,6 +104,7 @@ public sealed class CatalogWritableAgreementTests
         ModelObjectKind.Table => ("tables/T", null),
         ModelObjectKind.Measure => ("T/M", ModelObjectKind.Measure),
         ModelObjectKind.Column => ("T/C", ModelObjectKind.Column),
+        ModelObjectKind.Hierarchy => ("T/H", ModelObjectKind.Hierarchy),
         ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
@@ -118,6 +120,9 @@ public sealed class CatalogWritableAgreementTests
         });
         table.Columns.Add(new DataColumn { Name = "C", DataType = DataType.Int64 });
         table.Measures.Add(new Measure { Name = "M", Expression = "1" });
+        var hierarchy = new Hierarchy { Name = "H" };
+        hierarchy.Levels.Add(new Level { Name = "L", Column = table.Columns["C"] });
+        table.Hierarchies.Add(hierarchy);
         db.Model.Tables.Add(table);
         return db;
     }

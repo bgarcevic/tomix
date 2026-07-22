@@ -74,20 +74,36 @@ tx set tables/Sales/Name -i "Sales_v2" --save
 tx mv <source> <destination> [model] [options]
 ```
 
+Aliases: `move`, `rename`.
+
 Renames rewrite referencing DAX automatically; `--strict-refs` and
 `--no-fix-refs` behave as on `set`.
 
-Measures can also move to another table (optionally renaming in the same
-step) — the classic "consolidate into a measure table" operation. A move
-rewrites fully-qualified `'Table'[Measure]` references to the new home
-table; unqualified `[Measure]` references stay valid and are left alone.
-Columns, hierarchies, and partitions are bound to their table's data and
-cannot move.
+**Display folders.** Middle path segments are display folders, so `mv`
+moves measures, columns, and hierarchies in and out of folders within
+their table (nested folders as deeper segments). A destination ending in
+`/` keeps the source name. Folder segments are only applied when either
+path names them — a plain rename never touches the folder the object is
+in; to move an object out of its folder, write the folder-qualified
+source. A 3-segment path that matches a hierarchy level keeps its level
+meaning — use `-t` when a level and a folder path could collide. Folder
+changes never affect DAX, so no reference fixup runs for them.
+
+Measures can also move to another table (optionally renaming and picking
+a folder in the same step) — the classic "consolidate into a measure
+table" operation. A move rewrites fully-qualified `'Table'[Measure]`
+references to the new home table; unqualified `[Measure]` references stay
+valid and are left alone. Columns, hierarchies, and partitions are bound
+to their table's data and cannot move.
 
 ```sh
 tx mv "Sales/Old Name" "Sales/New Name" --save
 tx mv tables/Sales tables/SalesData
 tx mv "Sales/Total Sales" "Metrics/Total Sales" --save
+tx mv "Sales/Revenue" "Sales/Finance/Revenue" --save     # into a folder
+tx mv "Sales/Finance/Revenue" "Sales/Revenue" --save     # out of the folder
+tx mv "Sales/Finance/Revenue" "Sales/Margins/" --save    # between folders, keep name
+tx rename "Sales/Date" "Sales/CalendarDate" -t Hierarchy --save
 ```
 
 ## `rm` — remove an object

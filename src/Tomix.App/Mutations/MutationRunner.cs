@@ -126,6 +126,10 @@ public static class MutationRunner
         {
             return TomixResult<TResult>.Fail("TOMIX_OBJECT_AMBIGUOUS", ex.Message);
         }
+        catch (Mv.MoveNoopException ex)
+        {
+            return TomixResult<TResult>.Fail("TOMIX_MOVE_NOOP", ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             return TomixResult<TResult>.Fail("TOMIX_MUTATION_FAILED", ex.Message);

@@ -80,7 +80,7 @@ internal sealed class MvCommand : ICommandModule
             Description = "Do not rewrite DAX references to the renamed or moved object; warn instead."
         };
 
-        var command = new Command("mv", "Move or rename a model object")
+        var command = new Command("mv", "Move or rename a model object, including in and out of display folders")
         {
             sourceArgument,
             destinationArgument,
@@ -96,6 +96,8 @@ internal sealed class MvCommand : ICommandModule
             strictRefsOption,
             noFixRefsOption
         };
+        command.Aliases.Add("move");
+        command.Aliases.Add("rename");
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
