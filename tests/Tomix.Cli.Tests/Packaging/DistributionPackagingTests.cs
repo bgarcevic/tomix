@@ -58,7 +58,7 @@ public sealed class DistributionPackagingTests
         Assert.Contains("dotnet publish src/Tomix.Cli/Tomix.Cli.csproj", workflow);
         Assert.Contains("--self-contained true", workflow);
         Assert.Contains("-p:PublishSingleFile=true", workflow);
-        Assert.Contains("actions/upload-artifact@v4", workflow);
+        Assert.Contains("actions/upload-artifact@v7", workflow);
         Assert.Contains("name: pack tool", workflow);
     }
 }
