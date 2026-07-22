@@ -66,7 +66,17 @@ tx set <path> [model] [options]
 ```sh
 tx set "Sales[Total Sales]" -q "CALCULATE(SUM(Sales[Amount]))"    # expression is the default property
 tx set tables/Sales/Name -i "Sales_v2" --save
+tx set "Sales[Amount]" -q summarizeBy -i Sum
+tx set "Dates[Month]" -q sortByColumn -i MonthNo                  # empty value clears it
+tx set "Sales[OrderId]" -q isKey -i true
 ```
+
+Columns accept every writable scalar property (`sourceColumn`, `dataType`,
+`dataCategory`, `summarizeBy`, `sortByColumn`, `isKey`, `isNullable`,
+`isUnique`, `isAvailableInMDX`, `keepUniqueRows`, `encodingHint`, lineage
+tags, and more) — everything `tx get` shows for the column. An unsupported
+property name lists the full writable set; enum-valued properties list
+their valid values on a bad value.
 
 ## `mv` — move or rename
 

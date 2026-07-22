@@ -59,17 +59,34 @@ public static class ModelPropertyCatalog
     [
         Name(writable: true),
         Description(writable: true),
-        new("sourceColumn", "SourceColumn", o => o.SourceColumn ?? ""),
+        new("sourceColumn", "SourceColumn", o => o.SourceColumn ?? "", Writable: true),
         Expression(writable: false),
         // Not diffable: a column's Detail IS its data type, and diff already compares Detail
         // in its fixed identity set — marking this diffable would report the same edit twice.
-        DataType(diffable: false),
+        DataType(diffable: false, writable: true),
         IsHidden(writable: true),
         FormatString(),
         DisplayFolder(),
-        new("sortByColumn", "SortByColumn", o => Bag(o, PropertyBagKeys.SortByColumn), Diffable: true),
-        new("summarizeBy", "SummarizeBy", o => Bag(o, PropertyBagKeys.SummarizeBy), Diffable: true),
-        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag))
+        new("sortByColumn", "SortByColumn", o => Bag(o, PropertyBagKeys.SortByColumn), Writable: true, Diffable: true),
+        new("summarizeBy", "SummarizeBy", o => Bag(o, PropertyBagKeys.SummarizeBy), Writable: true, Diffable: true),
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true),
+        new("dataCategory", "DataCategory", o => Bag(o, PropertyBagKeys.DataCategory), Writable: true, Diffable: true),
+        new("isKey", "IsKey", o => BoolBag(o, PropertyBagKeys.IsKey), Writable: true, Diffable: true),
+        new("isNullable", "IsNullable", o => BoolBag(o, PropertyBagKeys.IsNullable), Writable: true, Diffable: true),
+        new("isUnique", "IsUnique", o => BoolBag(o, PropertyBagKeys.IsUnique), Writable: true, Diffable: true),
+        new("isAvailableInMDX", "IsAvailableInMDX", o => BoolBag(o, PropertyBagKeys.IsAvailableInMDX), Writable: true, Diffable: true),
+        new("keepUniqueRows", "KeepUniqueRows", o => BoolBag(o, PropertyBagKeys.KeepUniqueRows), Writable: true, Diffable: true),
+        new("encodingHint", "EncodingHint", o => Bag(o, PropertyBagKeys.EncodingHint), Writable: true, Diffable: true),
+        // Display/plumbing properties below are writable for parity but not diffable: they carry
+        // no model semantics diff should report on.
+        new("alignment", "Alignment", o => Bag(o, PropertyBagKeys.Alignment), Writable: true),
+        new("tableDetailPosition", "TableDetailPosition", o => IntBag(o, PropertyBagKeys.TableDetailPosition), Writable: true),
+        new("isDefaultLabel", "IsDefaultLabel", o => BoolBag(o, PropertyBagKeys.IsDefaultLabel), Writable: true),
+        new("isDefaultImage", "IsDefaultImage", o => BoolBag(o, PropertyBagKeys.IsDefaultImage), Writable: true),
+        new("displayOrdinal", "DisplayOrdinal", o => IntBag(o, PropertyBagKeys.DisplayOrdinal), Writable: true),
+        new("sourceProviderType", "SourceProviderType", o => Bag(o, PropertyBagKeys.SourceProviderType), Writable: true),
+        new("isDataTypeInferred", "IsDataTypeInferred", o => BoolBag(o, PropertyBagKeys.IsDataTypeInferred), Writable: true)
     ];
 
     // The generic keys (including the always-empty expression) stay in place so existing
@@ -243,11 +260,17 @@ public static class ModelPropertyCatalog
     private static PropertyDescriptor DisplayFolder()
         => new("displayFolder", "DisplayFolder", o => Bag(o, PropertyBagKeys.DisplayFolder), Writable: true, Searchable: true, SearchScope: DisplayFoldersScope, Diffable: true);
 
-    private static PropertyDescriptor DataType(bool diffable)
-        => new("dataType", "DataType", o => NormalizeDataType(o.Property(PropertyBagKeys.DataType) ?? o.Detail), Diffable: diffable);
+    private static PropertyDescriptor DataType(bool diffable, bool writable = false)
+        => new("dataType", "DataType", o => NormalizeDataType(o.Property(PropertyBagKeys.DataType) ?? o.Detail), Writable: writable, Diffable: diffable);
 
     private static string Bag(ModelObject obj, string key)
         => obj.Property(key) ?? "";
+
+    private static bool BoolBag(ModelObject obj, string key)
+        => Bag(obj, key) == "true";
+
+    private static int IntBag(ModelObject obj, string key)
+        => int.TryParse(Bag(obj, key), out var parsed) ? parsed : 0;
 
     private static int Count(ModelObject obj, ModelObjectKind kind)
         => obj.Children.Count(c => c.Kind == kind);

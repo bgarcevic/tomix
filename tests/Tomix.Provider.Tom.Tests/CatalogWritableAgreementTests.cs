@@ -22,7 +22,26 @@ public sealed class CatalogWritableAgreementTests
             ["dataCategory"] = "Time",
             ["expression"] = "2",
             ["formatString"] = "#,0",
-            ["displayFolder"] = "Folder"
+            ["displayFolder"] = "Folder",
+            ["sourceColumn"] = "src",
+            ["dataType"] = "String",
+            ["sortByColumn"] = "C2",
+            ["summarizeBy"] = "Sum",
+            ["lineageTag"] = "tag-1",
+            ["sourceLineageTag"] = "src-tag-1",
+            ["isKey"] = "true",
+            ["isNullable"] = "false",
+            ["isUnique"] = "true",
+            ["isAvailableInMDX"] = "false",
+            ["keepUniqueRows"] = "true",
+            ["encodingHint"] = "Value",
+            ["alignment"] = "Left",
+            ["tableDetailPosition"] = "1",
+            ["isDefaultLabel"] = "true",
+            ["isDefaultImage"] = "false",
+            ["displayOrdinal"] = "2",
+            ["sourceProviderType"] = "int",
+            ["isDataTypeInferred"] = "false"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
@@ -119,6 +138,7 @@ public sealed class CatalogWritableAgreementTests
             Source = new MPartitionSource { Expression = "let x = 1 in x" }
         });
         table.Columns.Add(new DataColumn { Name = "C", DataType = DataType.Int64 });
+        table.Columns.Add(new DataColumn { Name = "C2", DataType = DataType.String });
         table.Measures.Add(new Measure { Name = "M", Expression = "1" });
         var hierarchy = new Hierarchy { Name = "H" };
         hierarchy.Levels.Add(new Level { Name = "L", Column = table.Columns["C"] });

@@ -8,8 +8,8 @@ public static class TomModelSummarizer
 {
     private const string PropDataType = "DataType";
     private const string PropColumnType = "ColumnType";
-    private const string PropIsKey = "IsKey";
-    private const string PropIsAvailableInMdx = "IsAvailableInMdx";
+    private const string PropIsKey = PropertyBagKeys.IsKey;
+    private const string PropIsAvailableInMdx = PropertyBagKeys.IsAvailableInMDX;
     private const string PropSummarizeBy = "SummarizeBy";
     private const string PropFormatString = "FormatString";
     private const string PropDisplayFolder = "DisplayFolder";
@@ -183,6 +183,18 @@ public static class TomModelSummarizer
             [PropDataCategory] = column.DataCategory ?? "",
             [PropSortByColumn] = column.SortByColumn?.Name ?? "",
             [PropLineageTag] = column.LineageTag ?? "",
+            [PropertyBagKeys.SourceLineageTag] = column.SourceLineageTag ?? "",
+            [PropertyBagKeys.IsNullable] = column.IsNullable.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.IsUnique] = column.IsUnique.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.KeepUniqueRows] = column.KeepUniqueRows.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.EncodingHint] = column.EncodingHint.ToString(),
+            [PropertyBagKeys.Alignment] = column.Alignment.ToString(),
+            [PropertyBagKeys.TableDetailPosition] = column.TableDetailPosition.ToString(),
+            [PropertyBagKeys.IsDefaultLabel] = column.IsDefaultLabel.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.IsDefaultImage] = column.IsDefaultImage.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.DisplayOrdinal] = column.DisplayOrdinal.ToString(),
+            [PropertyBagKeys.SourceProviderType] = column.SourceProviderType ?? "",
+            [PropertyBagKeys.IsDataTypeInferred] = column.IsDataTypeInferred.ToString().ToLowerInvariant(),
             [PropUsedInRelationships] = usedInRels.ToString().ToLowerInvariant(),
             [PropUsedInHierarchies] = hierarchies is not null ? string.Join("\n", hierarchies) : "",
             [PropUsedInVariations] = string.Join("\n", column.Variations.Select(v => v.Name)),
@@ -208,7 +220,12 @@ public static class TomModelSummarizer
                 : null,
             Description: Desc(column.Description),
             Hidden: column.IsHidden,
-            SourceColumn: column is DataColumn dc ? dc.SourceColumn : null,
+            SourceColumn: column switch
+            {
+                DataColumn dataColumn => dataColumn.SourceColumn,
+                CalculatedTableColumn tableColumn => tableColumn.SourceColumn,
+                _ => null
+            },
             Children: [],
             Properties: props);
     }

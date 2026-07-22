@@ -62,7 +62,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Measure,
         "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,kpiTargetExpression,kpiStatusExpression,kpiTrendExpression,lineageTag")]
     [InlineData(ModelObjectKind.Column,
-        "name,description,sourceColumn,expression,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag")]
+        "name,description,sourceColumn,expression,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag,sourceLineageTag,dataCategory,isKey,isNullable,isUnique,isAvailableInMDX,keepUniqueRows,encodingHint,alignment,tableDetailPosition,isDefaultLabel,isDefaultImage,displayOrdinal,sourceProviderType,isDataTypeInferred")]
     [InlineData(ModelObjectKind.Partition,
         "name,description,expression,mode,dataView,queryGroup")]
     [InlineData(ModelObjectKind.Relationship,
@@ -185,7 +185,11 @@ public sealed class PropertyCatalogTests
             ModelPropertyCatalog.WritableTokens(ModelObjectKind.Table));
         Assert.Equal(["name", "description", "isHidden", "expression", "formatString", "displayFolder"],
             ModelPropertyCatalog.WritableTokens(ModelObjectKind.Measure));
-        Assert.Equal(["name", "description", "isHidden", "formatString", "displayFolder"],
+        Assert.Equal(["name", "description", "sourceColumn", "dataType", "isHidden", "formatString",
+                "displayFolder", "sortByColumn", "summarizeBy", "lineageTag", "sourceLineageTag",
+                "dataCategory", "isKey", "isNullable", "isUnique", "isAvailableInMDX", "keepUniqueRows",
+                "encodingHint", "alignment", "tableDetailPosition", "isDefaultLabel", "isDefaultImage",
+                "displayOrdinal", "sourceProviderType", "isDataTypeInferred"],
             ModelPropertyCatalog.WritableTokens(ModelObjectKind.Column));
         Assert.Equal(["name", "expression"],
             ModelPropertyCatalog.WritableTokens(ModelObjectKind.Partition));

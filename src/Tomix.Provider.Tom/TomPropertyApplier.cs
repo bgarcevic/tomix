@@ -268,9 +268,113 @@ internal static class TomPropertyApplier
             case "ishidden":
                 column.IsHidden = ParseBool(value, displayName);
                 break;
+            case "sourcecolumn":
+                ApplySourceColumn(column, value, displayName);
+                break;
+            case "datacategory":
+                column.DataCategory = value;
+                break;
+            case "lineagetag":
+                column.LineageTag = value;
+                break;
+            case "sourcelineagetag":
+                column.SourceLineageTag = value;
+                break;
+            case "sourceprovidertype":
+                column.SourceProviderType = value;
+                break;
+            case "iskey":
+                column.IsKey = ParseBool(value, displayName);
+                break;
+            case "isnullable":
+                column.IsNullable = ParseBool(value, displayName);
+                break;
+            case "isunique":
+                column.IsUnique = ParseBool(value, displayName);
+                break;
+            case "isavailableinmdx":
+                column.IsAvailableInMDX = ParseBool(value, displayName);
+                break;
+            case "keepuniquerows":
+                column.KeepUniqueRows = ParseBool(value, displayName);
+                break;
+            case "isdefaultlabel":
+                column.IsDefaultLabel = ParseBool(value, displayName);
+                break;
+            case "isdefaultimage":
+                column.IsDefaultImage = ParseBool(value, displayName);
+                break;
+            case "isdatatypeinferred":
+                column.IsDataTypeInferred = ParseBool(value, displayName);
+                break;
+            case "tabledetailposition":
+                column.TableDetailPosition = ParseInt(value, displayName);
+                break;
+            case "displayordinal":
+                column.DisplayOrdinal = ParseInt(value, displayName);
+                break;
+            case "datatype":
+                column.DataType = ParseDataType(value, displayName);
+                break;
+            case "summarizeby":
+                column.SummarizeBy = ParseEnum<AggregateFunction>(value, displayName);
+                break;
+            case "alignment":
+                column.Alignment = ParseEnum<Alignment>(value, displayName);
+                break;
+            case "encodinghint":
+                column.EncodingHint = ParseEnum<EncodingHintType>(value, displayName);
+                break;
+            case "sortbycolumn":
+                ApplySortByColumn(column, value, displayName);
+                break;
             default:
                 throw UnsupportedProperty(displayName, "columns", ModelObjectKind.Column);
         }
+    }
+
+    /// <summary>
+    /// <c>SourceColumn</c> exists only on data and calculated-table columns; a calculated
+    /// column's values come from its DAX expression instead.
+    /// </summary>
+    private static void ApplySourceColumn(Column column, string value, string displayName)
+    {
+        switch (column)
+        {
+            case DataColumn dataColumn:
+                dataColumn.SourceColumn = value;
+                break;
+            case CalculatedTableColumn tableColumn:
+                tableColumn.SourceColumn = value;
+                break;
+            default:
+                throw new NotSupportedException(
+                    $"Setting '{displayName}' is not supported for calculated columns; set 'expression' instead.");
+        }
+    }
+
+    /// <summary>Resolves the sort-by column by name within the same table; empty clears it.</summary>
+    private static void ApplySortByColumn(Column column, string value, string displayName)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            column.SortByColumn = null;
+            return;
+        }
+
+        if (column.Table is not { } table)
+            throw new NotSupportedException($"Cannot set '{displayName}' on a column that is not attached to a table.");
+
+        column.SortByColumn = table.Columns.Find(value)
+            ?? throw new ArgumentException(
+                $"Column '{value}' does not exist in table '{table.Name}'; '{displayName}' must name a column in the same table.");
+    }
+
+    /// <summary>Parses a data type, accepting the same friendly aliases the catalog normalizes (e.g. <c>bool</c>).</summary>
+    private static DataType ParseDataType(string value, string displayName)
+    {
+        var normalized = ModelPropertyCatalog.NormalizeDataType(value);
+        return ParseEnum<DataType>(normalized.Length == 0 ? value : normalized, displayName);
     }
 
     private static void ApplyPartitionProperty(Partition partition, string property, string value, string displayName)

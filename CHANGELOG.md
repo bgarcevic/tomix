@@ -31,6 +31,17 @@ and the API surface that major versions protect.
 
 ### Added
 
+- Columns now expose their full writable scalar property surface. `tx set`
+  accepts `sourceColumn`, `dataType`, `dataCategory`, `summarizeBy`,
+  `sortByColumn` (by sibling column name; empty clears), `lineageTag`,
+  `sourceLineageTag`, `isKey`, `isNullable`, `isUnique`, `isAvailableInMDX`,
+  `keepUniqueRows`, `encodingHint`, `alignment`, `tableDetailPosition`,
+  `isDefaultLabel`, `isDefaultImage`, `displayOrdinal`, `sourceProviderType`,
+  and `isDataTypeInferred` in addition to the existing five; `get`/`ls`/`find`
+  JSON, CSV, and text output gain the matching column properties (additive —
+  existing keys and their order are unchanged). This also lets `bpa --fix`
+  rules that assign these properties (e.g. `IsAvailableInMDX = false`) apply
+  to columns.
 - `defaultFormat=text|json` now controls implicit command output (`human` is
   normalized to `text`); an explicit `--output-format` always wins.
 - `tx doctor` is now a no-network local health report covering config access and
