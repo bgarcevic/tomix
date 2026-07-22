@@ -135,8 +135,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+      id-token: write # OIDC token for NuGet Trusted Publishing
     env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      NUGET_USER: ${{ secrets.NUGET_USER }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -158,18 +159,34 @@ jobs:
             artifacts/packages/checksums.txt
           generate_release_notes: true
           draft: false
+          # Hyphenated tags (v0.1.0-rc.1) are prereleases: excluded from
+          # /releases/latest, so install.sh and `tx update` never see them.
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
       # NuGet publishing runs after the GitHub Release so a nuget.org outage can
-      # never block the binary channel. Both steps no-op when the secret is unset
+      # never block the binary channel. Trusted Publishing (OIDC) replaces a
+      # long-lived API key: NuGet/login exchanges this job's GitHub OIDC token
+      # for a 1-hour key, authorized by the policy configured on nuget.org
+      # (owner bgarcevic, repo tomix-cli, workflow file release.yml). All steps
+      # no-op when the NUGET_USER secret (nuget.org profile name) is unset
       # (forks); --skip-duplicate keeps tag re-runs idempotent.
       - name: Setup .NET
-        if: env.NUGET_API_KEY != ''
+        if: env.NUGET_USER != ''
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
+      - name: NuGet login (OIDC)
+        if: env.NUGET_USER != ''
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ env.NUGET_USER }}
+
       - name: Push to NuGet
-        if: env.NUGET_API_KEY != ''
+        if: env.NUGET_USER != ''
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >
           dotnet nuget push artifacts/packages/*.nupkg
           --api-key "$NUGET_API_KEY"

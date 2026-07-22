@@ -14,7 +14,7 @@ GitHub automation and project metadata.
 - CI should build `/src`.
 - CI should test `/tests`.
 - Release workflows should package `/src/Tomix.Cli`.
-- The release workflow pushes the `Tomix.Cli` tool package to nuget.org when the `NUGET_API_KEY` secret is set; the push steps skip silently when it is not (forks).
+- The release workflow pushes the `Tomix.Cli` tool package to nuget.org via Trusted Publishing (OIDC): `NuGet/login` exchanges the job's GitHub OIDC token for a short-lived API key, authorized by a policy on nuget.org (owner `bgarcevic`, repo `tomix-cli`, workflow file `release.yml`). The push steps run only when the `NUGET_USER` secret (nuget.org profile name) is set and skip silently when it is not (forks).
 - Workflows may reference `/samples` for smoke tests.
 - Workflows should not require integration-test secrets for normal PR validation.
 

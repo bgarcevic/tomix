@@ -1,0 +1,89 @@
+name: install smoke test
+
+# Runs the real installer commands from the docs against a published release,
+# on every platform the release workflow ships archives for. Triggered after
+# the release workflow *completes* (not on `release: published`, which can
+# fire before all assets finish uploading and 404 the download).
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release to install (e.g. 0.1.0-rc.1); empty = latest"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke ${{ matrix.rid }}
+    # For workflow_run, head_branch is the pushed tag; skip dispatch-triggered
+    # release runs (no tag, nothing published) and failed release runs.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # arm runners (ubuntu-24.04-arm, windows-11-arm) are free for public repos.
+        include:
+          - { os: ubuntu-latest, rid: linux-x64 }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
+          - { os: macos-13, rid: osx-x64 }
+          - { os: macos-latest, rid: osx-arm64 }
+          - { os: windows-latest, rid: win-x64 }
+          - { os: windows-11-arm, rid: win-arm64 }
+    env:
+      # TOMIX_REPO keeps this workflow working on forks; TOMIX_VERSION pins the
+      # just-released tag (the installers strip the leading v). Empty = latest.
+      TOMIX_REPO: ${{ github.repository }}
+      TOMIX_VERSION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || inputs.version }}
+
+    steps:
+      - name: Install (sh)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://raw.githubusercontent.com/${TOMIX_REPO}/main/install/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm "https://raw.githubusercontent.com/$env:TOMIX_REPO/main/install/install.ps1" | iex
+          Add-Content $env:GITHUB_PATH (Join-Path $env:LOCALAPPDATA 'Programs\tx')
+
+      - name: Verify version and doctor
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(tx --version)"
+          echo "installed: ${actual}"
+          if [ -n "${TOMIX_VERSION:-}" ]; then
+            expected="${TOMIX_VERSION#v}"
+            if [ "$actual" != "$expected" ]; then
+              echo "version mismatch: expected ${expected}, got ${actual}" >&2
+              exit 1
+            fi
+          fi
+          tx doctor
+
+      - name: Verify self-update detects standalone install
+        # Skipped on forks: `tx update` queries the canonical repo's releases.
+        # Non-blocking: unauthenticated api.github.com calls from shared
+        # runner IPs can hit rate limits.
+        if: github.repository == 'bgarcevic/tomix-cli'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          tx update --check --output-format json | tee check.json
+          grep -q '"installKind":[[:space:]]*"Standalone"' check.json
