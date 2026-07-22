@@ -42,6 +42,11 @@ tx session clear    # clear active state for this session
 tx session prune    # delete session files for dead shells
 ```
 
+The default prune is conservative: only dead, well-formed `pid-<number>`
+sessions are removed. Named, malformed-PID, live-PID, and current sessions are
+kept. Use `--all` to remove every non-current session; add `--dry-run` to inspect
+the exact candidate count without deleting anything.
+
 ## Authentication
 
 Remote targets authenticate via `tx auth`:
@@ -77,10 +82,15 @@ Named profiles capture a connection for quick environment switching:
 
 ```sh
 tx profile set dev -s DevWorkspace -d Sales
+tx profile set desktop --from-active   # preserves Desktop Local mode
 tx profile list
 tx connect --profile dev        # activate it
 tx deploy --profile prod        # or use one-shot, without persisting
 ```
+
+`--from-active` also preserves workspace mirroring; explicit connection flags
+override the copied active values. Profile activation validates the resolved
+local path or remote database before replacing the active session.
 
 ## Workspace mode
 

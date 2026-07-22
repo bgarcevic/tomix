@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Tomix.Core.Configuration;
 using Tomix.Platform.Configuration;
 
 namespace Tomix.App.Config;
@@ -41,9 +42,15 @@ public sealed class TomixConfigStore
                 $"Config file is corrupt: {_path}. Fix or delete it, then re-create settings with 'tx config set'.", ex);
         }
 
-        return data is null
+        var values = data is null
             ? NewMap()
             : new Dictionary<string, string>(data, StringComparer.OrdinalIgnoreCase);
+
+        if (values.TryGetValue(ConfigKeys.DefaultFormat, out var format) &&
+            string.Equals(format, "human", StringComparison.OrdinalIgnoreCase))
+            values[ConfigKeys.DefaultFormat] = "text";
+
+        return values;
     }
 
     public void Save(IDictionary<string, string> values)

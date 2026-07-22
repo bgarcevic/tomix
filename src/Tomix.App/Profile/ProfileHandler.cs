@@ -45,26 +45,65 @@ public sealed class ProfileHandler
         }
 
         var profiles = _store.LoadProfiles();
+        profiles.TryGetValue(request.Name, out var existing);
+        var server = request.Model is not null || request.Local == true
+            ? null
+            : request.Server ?? session?.Server ?? existing?.Server;
+        var database = request.Database ?? session?.Database ?? existing?.Database;
+        var model = request.Server is not null || request.Local == true
+            ? null
+            : request.Model ?? session?.Model ?? existing?.Model;
+        var local = request.Local
+            ?? (request.Model is not null ? true : (bool?)null)
+            ?? (request.Server is not null ? false : (bool?)null)
+            ?? session?.Local
+            ?? existing?.Local
+            ?? !string.IsNullOrWhiteSpace(model);
+
+        if (existing is null && string.IsNullOrWhiteSpace(server) && string.IsNullOrWhiteSpace(model) && !local)
+            return TomixResult<ProfileSetResult>.Fail(
+                "TOMIX_PROFILE_TARGET_REQUIRED",
+                "A new profile requires --server, --model, or --from-active.",
+                exitCode: 2);
+
         var profile = new CliProfile(
             request.Name,
-            request.Server ?? session?.Server,
-            request.Database ?? session?.Database,
-            request.Model ?? session?.Model,
-            request.Auth ?? session?.Auth,
-            request.Description,
-            request.AutoFormat,
-            request.ValidateOnMutation,
-            request.BpaOnMutation,
-            request.BpaOnDeploy,
-            request.VertipaqOnRefresh,
-            request.Spinner,
-            session?.Workspace,
-            session?.WorkspaceFormat,
-            session?.WorkspaceAuth);
+            server,
+            database,
+            model,
+            request.Auth ?? session?.Auth ?? existing?.Auth,
+            request.Description ?? existing?.Description,
+            local,
+            session?.Workspace ?? existing?.Workspace,
+            session?.WorkspaceFormat ?? existing?.WorkspaceFormat,
+            session?.WorkspaceAuth ?? existing?.WorkspaceAuth);
 
         profiles[request.Name] = profile;
         _store.SaveProfiles(profiles);
         return TomixResult<ProfileSetResult>.Ok(new ProfileSetResult(profile));
+    }
+
+    public TomixResult<ProfileResolveResult> Resolve(string name)
+    {
+        var profiles = _store.LoadProfiles();
+        if (!profiles.TryGetValue(name, out var profile))
+            return TomixResult<ProfileResolveResult>.Fail(
+                "TOMIX_PROFILE_NOT_FOUND", $"Profile '{name}' not found", exitCode: 1);
+
+        var normalized = profile with
+        {
+            Local = profile.Local || !string.IsNullOrWhiteSpace(profile.Model)
+        };
+
+        if (string.IsNullOrWhiteSpace(normalized.Server) &&
+            string.IsNullOrWhiteSpace(normalized.Model) &&
+            !normalized.Local)
+            return TomixResult<ProfileResolveResult>.Fail(
+                "TOMIX_PROFILE_TARGET_REQUIRED",
+                $"Profile '{name}' has no usable connection target.",
+                exitCode: 2);
+
+        return TomixResult<ProfileResolveResult>.Ok(new ProfileResolveResult(normalized));
     }
 
     public TomixResult<ProfileRemoveResult> Remove(string name)
@@ -85,10 +124,5 @@ public sealed record ProfileSetRequest(
     string? Model,
     string? Auth,
     string? Description,
-    bool? AutoFormat,
-    bool? ValidateOnMutation,
-    bool? BpaOnMutation,
-    bool? BpaOnDeploy,
-    bool? VertipaqOnRefresh,
-    bool? Spinner,
+    bool? Local,
     bool FromActive = false);

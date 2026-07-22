@@ -85,7 +85,7 @@ internal static class UpdateNotice
         var localOption = parseResult.CommandResult.Command.Options
             .FirstOrDefault(option => option.Name == "--output-format");
         if (localOption is Option<string> local)
-            return parseResult.GetValue(local) ?? OutputFormats.Text;
+            return GlobalOptions.OutputFormatValue(parseResult, local);
 
         return GlobalOptions.OutputFormatValue(parseResult);
     }

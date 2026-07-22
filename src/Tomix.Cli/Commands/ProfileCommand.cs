@@ -86,24 +86,12 @@ internal sealed class ProfileCommand : ICommandModule
         var descriptionOption = new Option<string?>("--description") { Description = "Human-readable description of this profile" };
         descriptionOption.Aliases.Add("--desc");
         var fromActiveOption = new Option<bool>("--from-active") { Description = "Save the current active connection as this profile" };
-        var autoFormatOption = new Option<string?>("--auto-format") { Description = "Override autoFormat (true/false/null to clear)" };
-        var validateOption = new Option<string?>("--validate-on-mutation") { Description = "Override validateOnMutation" };
-        var bpaMutationOption = new Option<string?>("--bpa-on-mutation") { Description = "Override bpa.onMutation" };
-        var bpaDeployOption = new Option<string?>("--bpa-on-deploy") { Description = "Override bpa.onDeploy" };
-        var vertipaqOption = new Option<string?>("--vertipaq-on-refresh") { Description = "Override vertipaqOnRefresh" };
-        var spinnerOption = new Option<string?>("--spinner") { Description = "Override spinner" };
 
         var command = new Command("set", "Create or update a named connection profile")
         {
             nameArgument,
             descriptionOption,
-            fromActiveOption,
-            autoFormatOption,
-            validateOption,
-            bpaMutationOption,
-            bpaDeployOption,
-            vertipaqOption,
-            spinnerOption
+            fromActiveOption
         };
 
         command.SetAction(parseResult =>
@@ -119,12 +107,7 @@ internal sealed class ProfileCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult),
                 GlobalOptions.AuthValue(parseResult),
                 parseResult.GetValue(descriptionOption),
-                ParseNullableBool(parseResult.GetValue(autoFormatOption)),
-                ParseNullableBool(parseResult.GetValue(validateOption)),
-                ParseNullableBool(parseResult.GetValue(bpaMutationOption)),
-                ParseNullableBool(parseResult.GetValue(bpaDeployOption)),
-                ParseNullableBool(parseResult.GetValue(vertipaqOption)),
-                ParseNullableBool(parseResult.GetValue(spinnerOption)),
+                Local: null,
                 parseResult.GetValue(fromActiveOption)));
 
             return CommandOutput.Render(
@@ -153,15 +136,9 @@ internal sealed class ProfileCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.KeyValue("model:", $"       {profile.Model ?? ""}"));
         AnsiConsole.MarkupLine(Styling.KeyValue("auth:", $"        {profile.Auth ?? ""}"));
         AnsiConsole.MarkupLine(Styling.KeyValue("description:", $" {profile.Description ?? ""}"));
+        AnsiConsole.MarkupLine(Styling.KeyValue("local:", $"       {profile.Local}"));
         if (profile.Workspace is not null)
             AnsiConsole.MarkupLine(Styling.KeyValue("workspace:", $"   {profile.Workspace}"));
     }
 
-    private static bool? ParseNullableBool(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value) || value.Equals("null", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        return bool.TryParse(value, out var parsed) ? parsed : null;
-    }
 }

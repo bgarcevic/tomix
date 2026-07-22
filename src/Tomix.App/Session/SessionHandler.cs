@@ -31,5 +31,11 @@ public sealed class SessionHandler
     }
 
     public TomixResult<SessionPruneResult> Prune(bool all, bool dryRun)
-        => TomixResult<SessionPruneResult>.Ok(new SessionPruneResult(_store.PruneSessions(all, dryRun), dryRun));
+    {
+        var candidates = _store.SelectPruneCandidates(all);
+        if (dryRun)
+            return TomixResult<SessionPruneResult>.Ok(new SessionPruneResult(candidates.Count, DryRun: true));
+
+        return TomixResult<SessionPruneResult>.Ok(new SessionPruneResult(CliStateStore.PruneSessions(candidates), DryRun: false));
+    }
 }

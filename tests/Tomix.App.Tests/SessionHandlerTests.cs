@@ -185,16 +185,20 @@ public sealed class SessionHandlerTests
     }
 
     [Fact]
-    public void Prune_TreatsMalformedPidSessionAsDead()
+    public void Prune_PreservesMalformedPidSessions()
     {
         WithStore((store, handler) =>
         {
-            var malformed = AddSessionFile(store, "pid-not-a-number");
+            var nonNumeric = AddSessionFile(store, "pid-not-a-number");
+            var missing = AddSessionFile(store, "pid-");
+            var negative = AddSessionFile(store, "pid--1");
 
             var result = handler.Prune(all: false, dryRun: false);
 
-            Assert.Equal(1, result.Data!.Removed);
-            Assert.False(File.Exists(malformed));
+            Assert.Equal(0, result.Data!.Removed);
+            Assert.True(File.Exists(nonNumeric));
+            Assert.True(File.Exists(missing));
+            Assert.True(File.Exists(negative));
         });
     }
 

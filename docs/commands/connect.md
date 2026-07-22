@@ -165,6 +165,12 @@ tx session [show|clear|list|prune]
 `session clear` and `session prune` ask for confirmation (`--dry-run` never
 does); pass `--yes` in scripts.
 
+Without `--all`, pruning removes only well-formed `pid-<number>` sessions whose
+process is no longer running. It preserves the current session, named sessions,
+malformed PID names, and live PID sessions. `--all` removes every non-current
+session. `--dry-run` runs the same candidate selection without deleting files,
+so its count exactly matches a subsequent prune against unchanged state.
+
 ```sh
 tx session            # current session details
 tx session clear      # clear active state for this session

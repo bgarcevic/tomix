@@ -5,13 +5,18 @@ namespace Tomix.Cli.Commands;
 
 internal static class GlobalOptions
 {
+    private static string _defaultOutputFormat = OutputFormats.Text;
     public static readonly Option<string?> Model = new("--model")
     {
         Description = "Path to semantic model (TMDL folder, .bim file, or TE folder)",
         Recursive = true
     };
 
-    public static readonly Option<string> OutputFormat = OutputFormats.CreateOption();
+    public static readonly Option<string> OutputFormat = new("--output-format")
+    {
+        Description = "Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command.",
+        DefaultValueFactory = _ => _defaultOutputFormat
+    };
 
     public static readonly Option<string?> ErrorFormat = new("--error-format")
     {
@@ -97,6 +102,24 @@ internal static class GlobalOptions
 
     public static string OutputFormatValue(ParseResult parseResult)
         => parseResult.GetValue(OutputFormat) ?? OutputFormats.Text;
+
+    public static string OutputFormatValue(ParseResult parseResult, Option<string> localOption)
+    {
+        if (parseResult.GetResult(localOption) is { Implicit: false })
+            return parseResult.GetValue(localOption) ?? OutputFormats.Text;
+
+        if (parseResult.GetResult(OutputFormat) is { Implicit: false })
+            return parseResult.GetValue(OutputFormat) ?? OutputFormats.Text;
+
+        return parseResult.GetValue(localOption) ?? OutputFormats.Text;
+    }
+
+    public static void ConfigureDefaultOutputFormat(string? format)
+        => _defaultOutputFormat = string.Equals(format, OutputFormats.Json, StringComparison.OrdinalIgnoreCase)
+            ? OutputFormats.Json
+            : OutputFormats.Text;
+
+    public static string DefaultOutputFormat => _defaultOutputFormat;
 
     public static string? ModelValue(ParseResult parseResult)
         => parseResult.GetValue(Model);

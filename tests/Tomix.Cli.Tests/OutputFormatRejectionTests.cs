@@ -31,7 +31,10 @@ public sealed class OutputFormatRejectionTests
             "connect" => new ConnectCommand(NoProviders, FakeWorkspaceCatalog.Empty, () => null, services.State),
             "deploy" => new DeployCommand(NoProviders, services.State),
             "diff" => new DiffCommand(NoProviders),
-            "doctor" => new DoctorCommand("0.0.0-test", services.ConfigDirectory),
+            "doctor" => new DoctorCommand(
+                "0.0.0-test", services.ConfigDirectory, services.ConfigStore, services.State,
+                services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth", "auth-state.json"),
+                ["FakeProvider"]),
             "format" => new FormatCommand(NoProviders, new CompositeExpressionFormatterClient([]), services.State, mutations),
             "get" => new GetCommand(NoProviders, services.State),
             "init" => new InitCommand(),

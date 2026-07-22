@@ -31,6 +31,10 @@ pages:
 | `--quiet` | Suppress non-essential output (spinners, progress, hints). Errors and data still print. |
 | `--debug` | Show the full stack trace on stderr when an unexpected error occurs. |
 
+`tx config set defaultFormat json` changes the implicit stdout format to JSON
+for commands that support it. An explicit `--output-format` always wins;
+completion scripts remain text regardless of this preference.
+
 ## Object paths
 
 Commands address model objects by **path**: slash-separated

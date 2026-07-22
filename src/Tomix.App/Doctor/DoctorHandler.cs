@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using Tomix.App.Config;
+using Tomix.App.State;
 using Tomix.App.Update;
 using Tomix.Core.Doctor;
 using Tomix.Core.Results;
@@ -6,128 +9,225 @@ using Tomix.Core.Update;
 
 namespace Tomix.App.Doctor;
 
+/// <summary>
+/// Runs deterministic local health checks. It never authenticates, opens a credential store,
+/// refreshes a token, or contacts a release/model service.
+/// </summary>
 public sealed class DoctorHandler
 {
-    private static readonly TimeSpan UpdateCheckTimeout = TimeSpan.FromSeconds(3);
-
     private readonly string _configDirectory;
-    private readonly IReleaseSource? _releaseSource;
-    private readonly InstallKind? _installKind;
+    private readonly TomixConfigStore _configStore;
+    private readonly CliStateStore _state;
+    private readonly UpdateCheckStore _updateStore;
+    private readonly string _authMetadataFile;
+    private readonly IReadOnlyList<string> _providerNames;
+    private readonly string? _configLoadError;
 
-    /// <param name="configDirectory">
-    /// The resolved config directory from the composition root, so doctor reports the same
-    /// location every other command uses instead of re-reading the environment.
-    /// </param>
-    /// <param name="releaseSource">Latest-release lookup for the update check; null skips it.</param>
-    /// <param name="installKind">Override for tests; defaults to inspecting the running process.</param>
-    public DoctorHandler(string configDirectory, IReleaseSource? releaseSource = null, InstallKind? installKind = null)
+    public DoctorHandler(
+        string configDirectory,
+        TomixConfigStore configStore,
+        CliStateStore state,
+        UpdateCheckStore updateStore,
+        string authMetadataFile,
+        IReadOnlyList<string> providerNames,
+        string? configLoadError = null)
     {
         _configDirectory = configDirectory;
-        _releaseSource = releaseSource;
-        _installKind = installKind;
+        _configStore = configStore;
+        _state = state;
+        _updateStore = updateStore;
+        _authMetadataFile = authMetadataFile;
+        _providerNames = providerNames;
+        _configLoadError = configLoadError;
     }
 
-    public TomixResult<DoctorResult> Handle(string version)
+    public TomixResult<DoctorResult> Handle(string version, DoctorTerminalCapabilities terminal)
     {
-        var checks = new List<DoctorCheck>();
-
-        checks.Add(new DoctorCheck(
-            Name: "runtime",
-            Status: DoctorCheckStatus.Pass,
-            Message: $".NET {Environment.Version}"));
-
-        checks.Add(new DoctorCheck(
-            Name: "operating-system",
-            Status: DoctorCheckStatus.Pass,
-            Message: RuntimeInformation.OSDescription));
-
-        var configDirectory = _configDirectory;
-
-        try
+        var checks = new List<DoctorCheck>
         {
-            Directory.CreateDirectory(configDirectory);
+            new("runtime", DoctorCheckStatus.Pass, $".NET {Environment.Version}"),
+            new("operating-system", DoctorCheckStatus.Pass, RuntimeInformation.OSDescription)
+        };
 
-            checks.Add(new DoctorCheck(
-                Name: "config-directory",
-                Status: DoctorCheckStatus.Pass,
-                Message: configDirectory));
-        }
-        catch (Exception ex)
-        {
-            checks.Add(new DoctorCheck(
-                Name: "config-directory",
-                Status: DoctorCheckStatus.Fail,
-                Message: $"Could not create config directory: {ex.Message}"));
-        }
-
-        var latestVersion = AddUpdateCheck(checks, version);
+        AddConfigDirectoryCheck(checks);
+        AddConfigCheck(checks);
+        AddProfilesCheck(checks);
+        AddSessionsCheck(checks);
+        AddAuthenticationCheck(checks);
+        AddProvidersCheck(checks);
+        checks.Add(new DoctorCheck(
+            "terminal",
+            DoctorCheckStatus.Pass,
+            $"interactive={terminal.Interactive}, ansi={terminal.Ansi}, color={terminal.ColorSystem}"));
+        var latestVersion = AddCachedUpdateCheck(checks, version);
 
         var result = new DoctorResult(
-            Version: version,
-            OperatingSystem: RuntimeInformation.OSDescription,
-            DotNetVersion: Environment.Version.ToString(),
-            ConfigDirectory: configDirectory,
-            Checks: checks,
-            LatestVersion: latestVersion);
-
-        var hasFailure = checks.Any(check => check.Status == DoctorCheckStatus.Fail);
+            version,
+            RuntimeInformation.OSDescription,
+            Environment.Version.ToString(),
+            _configDirectory,
+            terminal,
+            checks,
+            latestVersion);
+        var failed = checks.Any(check => check.Status == DoctorCheckStatus.Fail);
 
         return new TomixResult<DoctorResult>(
-            Success: !hasFailure,
+            Success: !failed,
             Data: result,
-            Diagnostics: Array.Empty<Tomix.Core.Diagnostics.TomixDiagnostic>(),
-            ExitCode: hasFailure ? 1 : 0);
+            Diagnostics: [],
+            ExitCode: failed ? 1 : 0);
     }
 
-    /// <summary>
-    /// Compares the installed version against the latest GitHub release. Doctor is a
-    /// diagnostic command, so a short (3s) live lookup is acceptable here; the result is
-    /// never a Fail — network state must not change doctor's exit code.
-    /// </summary>
-    private string? AddUpdateCheck(List<DoctorCheck> checks, string version)
+    private void AddConfigDirectoryCheck(List<DoctorCheck> checks)
     {
-        if (_releaseSource is null)
-            return null;
+        string? probe = null;
+        try
+        {
+            Directory.CreateDirectory(_configDirectory);
+            _ = Directory.EnumerateFileSystemEntries(_configDirectory).Take(1).ToList();
+            probe = Path.Combine(_configDirectory, $".doctor-{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(probe, "tomix doctor");
+            checks.Add(new DoctorCheck("config-directory", DoctorCheckStatus.Pass, $"read/write: {_configDirectory}"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            checks.Add(new DoctorCheck("config-directory", DoctorCheckStatus.Fail, $"read/write check failed: {ex.Message}"));
+        }
+        finally
+        {
+            if (probe is not null)
+            {
+                try { File.Delete(probe); }
+                catch (Exception) { /* the failed cleanup is covered by the write-access check */ }
+            }
+        }
+    }
 
-        var installKind = _installKind ?? InstallationInspector.Detect();
-        if (installKind == InstallKind.Development)
-            return null;
+    private void AddConfigCheck(List<DoctorCheck> checks)
+    {
+        if (_configLoadError is not null)
+        {
+            checks.Add(new DoctorCheck("configuration", DoctorCheckStatus.Fail, _configLoadError));
+            return;
+        }
 
         try
         {
-            using var cts = new CancellationTokenSource(UpdateCheckTimeout);
-            var latest = _releaseSource.GetLatestAsync(cts.Token).GetAwaiter().GetResult();
+            var values = _configStore.Load();
+            checks.Add(new DoctorCheck("configuration", DoctorCheckStatus.Pass, $"valid ({values.Count} value(s))"));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            checks.Add(new DoctorCheck("configuration", DoctorCheckStatus.Fail, ex.Message));
+        }
+    }
 
-            if (latest is null
-                || !CliVersion.TryParse(latest.Version, out var latestVersion)
-                || !CliVersion.TryParse(version, out var currentVersion))
+    private void AddProfilesCheck(List<DoctorCheck> checks)
+    {
+        try
+        {
+            var profiles = _state.LoadProfiles();
+            var invalid = profiles
+                .Where(pair => string.IsNullOrWhiteSpace(pair.Value.Server) &&
+                               string.IsNullOrWhiteSpace(pair.Value.Model) &&
+                               !pair.Value.Local)
+                .Select(pair => pair.Key)
+                .ToList();
+            checks.Add(invalid.Count > 0
+                ? new DoctorCheck("profiles", DoctorCheckStatus.Fail, $"profile(s) without a usable target: {string.Join(", ", invalid)}")
+                : new DoctorCheck(
+                    "profiles",
+                    profiles.Count == 0 ? DoctorCheckStatus.Warning : DoctorCheckStatus.Pass,
+                    profiles.Count == 0 ? "no profiles configured" : $"valid ({profiles.Count} profile(s))"));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            checks.Add(new DoctorCheck("profiles", DoctorCheckStatus.Fail, ex.Message));
+        }
+    }
+
+    private void AddSessionsCheck(List<DoctorCheck> checks)
+    {
+        try
+        {
+            var sessions = _state.ListSessions();
+            var invalid = new List<string>();
+            foreach (var session in sessions)
             {
-                checks.Add(new DoctorCheck(
-                    Name: "update",
-                    Status: DoctorCheckStatus.Warning,
-                    Message: "could not determine the latest released version"));
-                return null;
+                try
+                {
+                    var json = File.ReadAllText(session.Path);
+                    var state = JsonSerializer.Deserialize<CliConnectionState>(json);
+                    if (state is null ||
+                        string.IsNullOrWhiteSpace(state.Server) &&
+                        string.IsNullOrWhiteSpace(state.Model) &&
+                        !state.Local)
+                        invalid.Add(session.SessionId);
+                }
+                catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+                {
+                    invalid.Add(session.SessionId);
+                }
             }
 
-            checks.Add(latestVersion.IsNewerThan(currentVersion)
-                ? new DoctorCheck(
-                    Name: "update",
-                    Status: DoctorCheckStatus.Warning,
-                    Message: $"update available: {latest.Version} (run 'tx update')")
-                : new DoctorCheck(
-                    Name: "update",
-                    Status: DoctorCheckStatus.Pass,
-                    Message: $"up to date ({version})"));
-
-            return latest.Version;
+            checks.Add(invalid.Count == 0
+                ? new DoctorCheck("sessions", DoctorCheckStatus.Pass, $"valid ({sessions.Count} session(s))")
+                : new DoctorCheck("sessions", DoctorCheckStatus.Fail, $"invalid session file(s): {string.Join(", ", invalid)}"));
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            checks.Add(new DoctorCheck(
-                Name: "update",
-                Status: DoctorCheckStatus.Warning,
-                Message: "could not check for updates (github.com unreachable?)"));
+            checks.Add(new DoctorCheck("sessions", DoctorCheckStatus.Fail, ex.Message));
+        }
+    }
+
+    private void AddAuthenticationCheck(List<DoctorCheck> checks)
+    {
+        if (!File.Exists(_authMetadataFile))
+        {
+            checks.Add(new DoctorCheck("authentication", DoctorCheckStatus.Warning, "no cached authentication metadata"));
+            return;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(_authMetadataFile));
+            var username = document.RootElement.EnumerateObject()
+                .FirstOrDefault(property => property.Name.Equals("username", StringComparison.OrdinalIgnoreCase))
+                .Value;
+            if (username.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(username.GetString()))
+                throw new JsonException("username is missing");
+
+            checks.Add(new DoctorCheck("authentication", DoctorCheckStatus.Pass, $"cached metadata for {username.GetString()}"));
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            checks.Add(new DoctorCheck("authentication", DoctorCheckStatus.Fail, $"cached metadata is invalid: {ex.Message}"));
+        }
+    }
+
+    private void AddProvidersCheck(List<DoctorCheck> checks)
+        => checks.Add(_providerNames.Count == 0
+            ? new DoctorCheck("model-providers", DoctorCheckStatus.Fail, "no model providers registered")
+            : new DoctorCheck("model-providers", DoctorCheckStatus.Pass, string.Join(", ", _providerNames)));
+
+    private string? AddCachedUpdateCheck(List<DoctorCheck> checks, string version)
+    {
+        var cached = _updateStore.Load();
+        if (cached is null)
+        {
+            checks.Add(new DoctorCheck("update-cache", DoctorCheckStatus.Warning, "no cached update information"));
             return null;
         }
+
+        var newer = CliVersion.TryParse(cached.LatestVersion, out var latest) &&
+                    CliVersion.TryParse(version, out var current) &&
+                    latest.IsNewerThan(current);
+        checks.Add(new DoctorCheck(
+            "update-cache",
+            newer ? DoctorCheckStatus.Warning : DoctorCheckStatus.Pass,
+            newer
+                ? $"cached update available: {cached.LatestVersion} (checked {cached.LastCheckedUtc:O})"
+                : $"cached latest: {cached.LatestVersion} (checked {cached.LastCheckedUtc:O})"));
+        return cached.LatestVersion;
     }
 }

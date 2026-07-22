@@ -144,6 +144,7 @@ Run BPA rules against a model (--fix to auto-fix)
 # tx completion
 Generate a shell completion script.
   arg [shell]  Target shell: bash, zsh, fish, or powershell.
+  opt --output-format <output-format>  Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command.
 
 # tx config
 View and manage CLI configuration
@@ -346,12 +347,6 @@ Create or update a named connection profile
   arg <name>  Profile name
   opt --desc, --description <description>  Human-readable description of this profile
   opt --from-active  Save the current active connection as this profile
-  opt --auto-format <auto-format>  Override autoFormat (true/false/null to clear)
-  opt --validate-on-mutation <validate-on-mutation>  Override validateOnMutation
-  opt --bpa-on-mutation <bpa-on-mutation>  Override bpa.onMutation
-  opt --bpa-on-deploy <bpa-on-deploy>  Override bpa.onDeploy
-  opt --vertipaq-on-refresh <vertipaq-on-refresh>  Override vertipaqOnRefresh
-  opt --spinner <spinner>  Override spinner
 
 # tx profile show
 Show details of a saved connection profile

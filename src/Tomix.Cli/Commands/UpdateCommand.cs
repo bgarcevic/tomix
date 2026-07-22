@@ -31,7 +31,7 @@ internal sealed class UpdateCommand : ICommandModule
         {
             Description = "Update (or downgrade, with --yes) to a specific released version instead of the latest."
         };
-        var format = OutputFormats.CreateOption();
+        var format = OutputFormats.CreateOption(GlobalOptions.DefaultOutputFormat);
 
         var command = new Command("update", "Update tx to the latest release.")
         {
@@ -42,7 +42,7 @@ internal sealed class UpdateCommand : ICommandModule
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var formatValue = parseResult.GetValue(format) ?? OutputFormats.Text;
+            var formatValue = GlobalOptions.OutputFormatValue(parseResult, format);
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "update", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 

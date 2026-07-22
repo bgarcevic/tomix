@@ -8,4 +8,6 @@ public sealed record ProfileShowResult(CliProfile Profile);
 
 public sealed record ProfileSetResult(CliProfile Profile);
 
+public sealed record ProfileResolveResult(CliProfile Profile);
+
 public sealed record ProfileRemoveResult(string Name, bool Removed);

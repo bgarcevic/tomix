@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Tomix.App.State;
 using Tomix.Cli.Commands;
 using Tomix.Core.Models;
 
@@ -36,6 +37,48 @@ public sealed class ConnectExitCodeTests
 
             Assert.NotEqual(0, exitCode);
             Assert.Contains("\"code\": \"TOMIX_MODEL_LOAD_FAILED\"", stderr);
+        }
+        finally
+        {
+            Directory.Delete(model, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ProfileActivation_ValidatesExpandedTargetBeforeReplacingSession()
+    {
+        var model = Directory.CreateTempSubdirectory("tomix-profile-connect-").FullName;
+        try
+        {
+            var services = TestServices.Create();
+            services.State.SaveProfiles(new Dictionary<string, CliProfile>
+            {
+                ["local"] = new("local", null, null, model, null, null, Local: true)
+            });
+            services.State.SaveCurrentSession(new CliConnectionState(
+                "powerbi://api.powerbi.com/v1.0/myorg/old", "Old", null, null,
+                Local: false, Profile: null));
+
+            var root = new RootCommand("test");
+            foreach (var option in GlobalOptions.All())
+                root.Options.Add(option);
+            root.Subcommands.Add(new ConnectCommand(
+                [new ThrowingProvider()], FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
+
+            var stderr = new StringWriter();
+            var original = Console.Error;
+            Console.SetError(stderr);
+            try
+            {
+                var exitCode = Program.Invoke(root.Parse(["connect", "--profile", "local"]));
+
+                Assert.NotEqual(0, exitCode);
+                Assert.Equal("Old", services.State.LoadCurrentSession()!.Database);
+            }
+            finally
+            {
+                Console.SetError(original);
+            }
         }
         finally
         {

@@ -53,20 +53,13 @@ public sealed class ConnectHandlerRecentsTests
     }
 
     [Fact]
-    public void Set_ViaProfile_RecordsResolvedFieldsWithProfileName()
+    public void Set_WithResolvedProfileFields_RecordsProfileName()
     {
         WithStore((store, handler) =>
         {
-            store.SaveProfiles(new Dictionary<string, CliProfile>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["prod"] = new(
-                    "prod", "powerbi://api.powerbi.com/v1.0/myorg/prod", "Sales",
-                    Model: null, Auth: "spn", Description: null,
-                    AutoFormat: null, ValidateOnMutation: null, BpaOnMutation: null,
-                    BpaOnDeploy: null, VertipaqOnRefresh: null, Spinner: null)
-            });
-
-            handler.Set(new ConnectSetRequest(null, null, null, null, Local: false, Profile: "prod"));
+            handler.Set(new ConnectSetRequest(
+                "powerbi://api.powerbi.com/v1.0/myorg/prod", "Sales", null, "spn",
+                Local: false, Profile: "prod"));
 
             var recents = store.LoadRecentConnections();
 

@@ -84,11 +84,20 @@ internal sealed class ConfigCommand : ICommandModule
     {
         var command = new Command("paths", "Show resolved paths for local CLI files.");
 
-        command.SetAction(_ =>
+        command.SetAction(parseResult =>
         {
-            AnsiConsole.MarkupLine(Styling.KeyValue("configDir   ", _configDirectory));
-            AnsiConsole.MarkupLine(Styling.KeyValue("configFile  ", _configFilePath));
-            return 0;
+            var formatValue = GlobalOptions.OutputFormatValue(parseResult);
+            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "config paths", OutputFormats.Text, OutputFormats.Json))
+                return 2;
+
+            return CommandOutput.Render(
+                Tomix.Core.Results.TomixResult<ConfigPathsResult>.Ok(new ConfigPathsResult(_configDirectory, _configFilePath)),
+                formatValue,
+                result =>
+                {
+                    AnsiConsole.MarkupLine(Styling.KeyValue("configDir   ", result.ConfigDir));
+                    AnsiConsole.MarkupLine(Styling.KeyValue("configFile  ", result.ConfigFile));
+                });
         });
 
         return command;
@@ -126,7 +135,12 @@ internal sealed class ConfigCommand : ICommandModule
         var nameWidth = result.Values.Keys.Max(key => key.Length);
 
         foreach (var (key, value) in result.Values)
-            AnsiConsole.MarkupLine(Styling.KeyValue(key.PadRight(nameWidth) + " ", value));
+        {
+            var suffix = result.UnsupportedKeys.Contains(key, StringComparer.OrdinalIgnoreCase)
+                ? " (unsupported)"
+                : "";
+            AnsiConsole.MarkupLine(Styling.KeyValue(key.PadRight(nameWidth) + " ", value + suffix));
+        }
     }
 
     private static void RenderSet(ConfigSetResult result)

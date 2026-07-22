@@ -16,12 +16,12 @@ internal static class OutputFormats
     public const string Bim = "bim";
     public const string Tmdl = "tmdl";
 
-    public static Option<string> CreateOption()
+    public static Option<string> CreateOption(string defaultValue = Text)
     {
         var option = new Option<string>("--output-format")
         {
             Description = "Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command.",
-            DefaultValueFactory = _ => Text
+            DefaultValueFactory = _ => defaultValue
         };
 
         return option;

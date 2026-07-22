@@ -25,36 +25,35 @@ namespace Tomix.Cli;
 
 internal static class Program
 {
-    private static int Main(string[] args)
+    private static int Main(string[] args) => Run(args);
+
+    internal static int Run(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
 
         var services = AppServices.Create();
         IDictionary<string, string> config;
+        InvalidOperationException? configLoadError = null;
         try
         {
             config = services.ConfigStore.Load();
         }
         catch (InvalidOperationException ex)
         {
-            // Config loads before argument parsing, so the top-level exception handler
-            // cannot catch this. A corrupt config must still fail with the actionable
-            // message, not an unhandled stack trace.
-            ErrorOutput.Write(
-                [new TomixDiagnostic(
-                    "TOMIX_CONFIG_CORRUPT",
-                    DiagnosticSeverity.Error,
-                    ex.Message,
-                    "Fix or delete the file, then re-create settings with 'tx config set'.")],
-                format: null);
-            return 2;
+            // Parse with an empty fallback so help, doctor, and config recovery commands
+            // remain available. All other commands are rejected after parsing below.
+            config = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            configLoadError = ex;
         }
         // Per https://no-color.org: only a non-empty value disables color.
         var noColorEnv = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
         var noColorCfg = config.TryGetValue(ConfigKeys.NoColor, out var noColor) && bool.TryParse(noColor, out var noColorEnabled) && noColorEnabled;
         if (noColorEnv || noColorCfg)
             AnsiConsole.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
+
+        config.TryGetValue(ConfigKeys.DefaultFormat, out var defaultOutputFormat);
+        GlobalOptions.ConfigureDefaultOutputFormat(defaultOutputFormat);
 
         var tokenProvider = new MsalAuthenticator(
             AuthSettingsFactory.Resolve(config),
@@ -75,7 +74,8 @@ internal static class Program
         var version = ResolveVersion();
         var root = BuildRootCommand(
             providers, formatter, version, services, workspaceCatalog, tokenProvider.CachedUsername,
-            new VpaxVertipaqAnalyzer(tokenProvider, version), releaseSource, httpClient);
+            new VpaxVertipaqAnalyzer(tokenProvider, version), releaseSource, httpClient,
+            configLoadError?.Message);
 
         if (args.Length == 0)
         {
@@ -108,8 +108,21 @@ internal static class Program
             return 2;
         }
 
+        if (configLoadError is not null && !CanRunWithCorruptConfig(parseResult, args))
+        {
+            ErrorOutput.Write(
+                [new TomixDiagnostic(
+                    "TOMIX_CONFIG_CORRUPT",
+                    DiagnosticSeverity.Error,
+                    configLoadError.Message,
+                    "Run 'tx config init --force' to reset the file, or repair it manually.")],
+                parseResult.GetValue(GlobalOptions.ErrorFormat));
+            return 2;
+        }
+
         var exitCode = Invoke(parseResult);
-        UpdateNotice.Run(parseResult, version, config, services.UpdateCheck, releaseSource);
+        if (configLoadError is null)
+            UpdateNotice.Run(parseResult, version, config, services.UpdateCheck, releaseSource);
         return exitCode;
     }
 
@@ -176,7 +189,8 @@ internal static class Program
         Func<string?>? cachedUsername = null,
         IVertipaqAnalyzer? analyzer = null,
         IReleaseSource? releaseSource = null,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        string? configLoadError = null)
     {
         analyzer ??= new VpaxVertipaqAnalyzer(tokenProvider: null, version);
         var root = new RootCommand("tx - CLI for semantic models");
@@ -197,7 +211,7 @@ internal static class Program
                 services.BpaRules,
                 services.ConfigDirectory,
                 httpClient),
-            new CompletionCommand(() => root.Subcommands.Select(command => command.Name).ToList()),
+            new CompletionCommand(),
             new ConfigCommand(services.ConfigStore, services.ConfigDirectory, services.ConfigFilePath),
             new ConnectCommand(
                 providers,
@@ -207,7 +221,15 @@ internal static class Program
             new DeployCommand(providers, services.State, httpClient),
             new DepsCommand(providers, services.State),
             new DiffCommand(providers),
-            new DoctorCommand(version, services.ConfigDirectory, releaseSource),
+            new DoctorCommand(
+                version,
+                services.ConfigDirectory,
+                services.ConfigStore,
+                services.State,
+                services.UpdateCheck,
+                Path.Combine(services.ConfigDirectory, "auth", "auth-state.json"),
+                providers.Select(provider => provider.GetType().Name).ToList(),
+                configLoadError),
             new FindCommand(providers, services.State),
             new FormatCommand(providers, formatter, services.State, mutations),
             new GetCommand(providers, services.State),
@@ -237,6 +259,24 @@ internal static class Program
 
         ApplySpectreHelp(root);
         return root;
+    }
+
+    internal static bool CanRunWithCorruptConfig(ParseResult parseResult, IReadOnlyList<string> args)
+    {
+        if (args.Any(argument => argument is "--help" or "-h" or "-?"))
+            return true;
+
+        if (args.Contains("--version") && parseResult.CommandResult.Command is RootCommand)
+            return true;
+
+        var leaf = parseResult.CommandResult.Command.Name;
+        if (leaf.Equals("doctor", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var isConfig = args.Any(argument => argument.Equals("config", StringComparison.OrdinalIgnoreCase));
+        return isConfig &&
+               (leaf.Equals("paths", StringComparison.OrdinalIgnoreCase) ||
+                leaf.Equals("init", StringComparison.OrdinalIgnoreCase) && args.Contains("--force"));
     }
 
     private static void ApplySpectreHelp(Command command)

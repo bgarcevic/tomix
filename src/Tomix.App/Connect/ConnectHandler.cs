@@ -25,28 +25,8 @@ public sealed class ConnectHandler
 
     public TomixResult<ConnectSetResult> Set(ConnectSetRequest request)
     {
-        CliConnectionState? state;
-        if (!string.IsNullOrWhiteSpace(request.Profile))
-        {
-            var profiles = _store.LoadProfiles();
-            if (!profiles.TryGetValue(request.Profile, out var profile))
-                return TomixResult<ConnectSetResult>.Fail(
-                    "TOMIX_PROFILE_NOT_FOUND",
-                    $"Profile '{request.Profile}' not found",
-                    exitCode: 1);
-
-            state = new CliConnectionState(
-                profile.Server,
-                profile.Database,
-                NormalizeLocalPath(profile.Model),
-                profile.Auth,
-                Local: !string.IsNullOrWhiteSpace(profile.Model),
-                Profile: profile.Name,
-                profile.Workspace,
-                profile.WorkspaceFormat,
-                profile.WorkspaceAuth);
-        }
-        else if (!string.IsNullOrWhiteSpace(request.Model))
+        CliConnectionState state;
+        if (!string.IsNullOrWhiteSpace(request.Model))
         {
             state = new CliConnectionState(
                 null,
@@ -54,7 +34,7 @@ public sealed class ConnectHandler
                 NormalizeLocalPath(request.Model),
                 request.Auth,
                 Local: true,
-                Profile: null,
+                Profile: request.Profile,
                 request.Workspace,
                 request.WorkspaceFormat,
                 request.WorkspaceAuth);
@@ -67,7 +47,7 @@ public sealed class ConnectHandler
                 null,
                 request.Auth,
                 Local: true,
-                Profile: null,
+                Profile: request.Profile,
                 request.Workspace,
                 request.WorkspaceFormat,
                 request.WorkspaceAuth);
@@ -80,7 +60,7 @@ public sealed class ConnectHandler
                 null,
                 request.Auth,
                 Local: false,
-                Profile: null,
+                Profile: request.Profile,
                 request.Workspace,
                 request.WorkspaceFormat,
                 request.WorkspaceAuth);

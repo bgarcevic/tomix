@@ -62,8 +62,7 @@ public sealed class ConnectPlanHandler
                                       LooksLikeLocalModelPath(r.Server);
 
             // Local model + valueless -w: pick the remote mirror workspace.
-            if (workspaceValueless && primaryIsLocalModel &&
-                string.IsNullOrWhiteSpace(r.Profile))
+            if (workspaceValueless && primaryIsLocalModel)
                 return Outcome(r, reinterpreted, need: new ConnectNeed(ConnectNeedKind.MirrorWorkspace));
 
             // Local model + remote mirror workspace known but no dataset: pick or create one.
@@ -112,9 +111,6 @@ public sealed class ConnectPlanHandler
             if (r.Local)
                 return Outcome(r, reinterpreted, usageError: "--workspace is not supported with --local (PBI Desktop).");
 
-            if (!string.IsNullOrWhiteSpace(r.Profile))
-                return Outcome(r, reinterpreted, usageError: "--workspace cannot be combined with --profile. Activate the profile first, then set up workspace mode separately.");
-
             if (string.IsNullOrWhiteSpace(r.Server) && string.IsNullOrWhiteSpace(r.Database))
                 return Outcome(r, reinterpreted, usageError: "--workspace requires an explicit primary source (server+database or local path).");
 
@@ -137,7 +133,6 @@ public sealed class ConnectPlanHandler
 
         if (string.IsNullOrWhiteSpace(r.Server) &&
             string.IsNullOrWhiteSpace(r.Database) &&
-            string.IsNullOrWhiteSpace(r.Profile) &&
             string.IsNullOrWhiteSpace(r.WorkspaceValue) &&
             !r.Local)
         {
@@ -179,13 +174,10 @@ public sealed class ConnectPlanHandler
         // endpoints when a dataset is given (so the CLI opens that specific catalog, not the
         // whole workspace). A remote endpoint without a dataset is stored as-is without opening.
         ModelReference? validation = null;
-        if (string.IsNullOrWhiteSpace(r.Profile))
-        {
-            if (!string.IsNullOrWhiteSpace(model))
-                validation = new ModelReference(model);
-            else if (isRemoteEndpoint && !string.IsNullOrWhiteSpace(r.Database))
-                validation = ModelReference.Remote(remoteServer!, r.Database);
-        }
+        if (!string.IsNullOrWhiteSpace(model))
+            validation = new ModelReference(model);
+        else if (isRemoteEndpoint && !string.IsNullOrWhiteSpace(r.Database))
+            validation = ModelReference.Remote(remoteServer!, r.Database);
 
         return Outcome(r, reinterpreted, target: new ConnectTarget(
             Model: model,

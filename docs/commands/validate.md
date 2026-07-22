@@ -213,3 +213,13 @@ tx doctor
 
 Checks whether the local tomix environment is ready. When filing a bug,
 attach its output.
+
+`doctor` is strictly local and deterministic: it checks config-directory
+read/write access, configuration validity, profiles, sessions, cached
+authentication metadata, registered providers, terminal capabilities, and the
+cached update record. It never opens the OS keystore, refreshes credentials, or
+contacts a model/release service. Terminal capabilities are included in both
+text and JSON output. Warnings exit `0`; any failed health check exits `1`.
+
+It remains runnable when `config.json` is corrupt so the report can identify
+the failure and direct recovery with `tx config init --force`.

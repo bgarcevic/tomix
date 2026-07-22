@@ -29,7 +29,11 @@ public sealed class ConfigHandler
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
 
-        return TomixResult<ConfigListResult>.Ok(new ConfigListResult(sorted));
+        var unsupported = sorted.Keys
+            .Where(key => !ConfigKeys.IsKnown(key))
+            .ToList();
+
+        return TomixResult<ConfigListResult>.Ok(new ConfigListResult(sorted, unsupported));
     }
 
     public TomixResult<ConfigGetResult> Get(string key)
@@ -46,14 +50,15 @@ public sealed class ConfigHandler
         if (!ConfigKeys.IsKnown(key))
             return UnknownKey<ConfigSetResult>(key);
 
-        if (!TryValidateValue(key, value, out var error))
+        var normalized = NormalizeValue(key, value);
+        if (!TryValidateValue(key, normalized, out var error))
             return TomixResult<ConfigSetResult>.Fail("TOMIX_CONFIG_INVALID_VALUE", error, exitCode: 2);
 
         var values = _store.Load();
-        values[key] = value;
+        values[key] = normalized;
         _store.Save(values);
 
-        return TomixResult<ConfigSetResult>.Ok(new ConfigSetResult(key, value));
+        return TomixResult<ConfigSetResult>.Ok(new ConfigSetResult(key, normalized));
     }
 
     private static TomixResult<T> UnknownKey<T>(string key)
@@ -68,11 +73,11 @@ public sealed class ConfigHandler
 
         switch (key)
         {
-            case ConfigKeys.DefaultFormat when value is not ("human" or "json"):
-                error = "defaultFormat must be 'human' or 'json'.";
+            case ConfigKeys.DefaultFormat when value is not ("text" or "json"):
+                error = "defaultFormat must be 'text' or 'json'.";
                 return false;
 
-            case ConfigKeys.NoColor or ConfigKeys.Telemetry or ConfigKeys.HideWarnings or ConfigKeys.UpdateCheck
+            case ConfigKeys.NoColor or ConfigKeys.UpdateCheck
                 when !bool.TryParse(value, out _):
                 error = $"{key} must be 'true' or 'false'.";
                 return false;
@@ -81,4 +86,13 @@ public sealed class ConfigHandler
                 return true;
         }
     }
+
+    private static string NormalizeValue(string key, string value)
+        => key.Equals(ConfigKeys.DefaultFormat, StringComparison.OrdinalIgnoreCase) &&
+           value.Equals("human", StringComparison.OrdinalIgnoreCase)
+            ? "text"
+            : value.ToLowerInvariant() is "text" or "json" &&
+              key.Equals(ConfigKeys.DefaultFormat, StringComparison.OrdinalIgnoreCase)
+                ? value.ToLowerInvariant()
+                : value;
 }

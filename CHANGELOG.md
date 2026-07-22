@@ -12,6 +12,13 @@ and the API surface that major versions protect.
 
 ### Changed (breaking)
 
+- Removed the inert profile policy flags/fields (`autoFormat`, mutation
+  validation/BPA, deploy BPA, refresh annotations, and spinner). Profiles now
+  contain connection state only; Desktop `Local` and workspace state round-trip.
+- Removed unsupported config keys `telemetry`, `activeProfile`, and
+  `hideWarnings` from the accepted catalog. Existing entries remain on disk and
+  are labeled unsupported by `config show`.
+
 - The bundled BPA catalog is now embedded in the application. A `bpa-rules.json`
   file beside the executable no longer overrides the defaults; use `--rules`,
   model rule annotations, or `bpa rules` for explicit customization.
@@ -24,9 +31,18 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `defaultFormat=text|json` now controls implicit command output (`human` is
+  normalized to `text`); an explicit `--output-format` always wins.
+- `tx doctor` is now a no-network local health report covering config access and
+  validity, profiles, sessions, cached auth metadata, providers, terminal
+  capabilities, and cached update information. Corrupt-config recovery keeps
+  help/version, doctor, `config paths`, and `config init --force` usable.
+- Conservative session pruning now shares one selector between dry-run and
+  deletion: default removes only dead well-formed PID sessions, while `--all`
+  removes every non-current session.
+
 - `tx update` — self-update. Detects the install type: a dotnet global tool runs `dotnet tool update -g Tomix.Cli`; a standalone binary (install.sh/install.ps1) downloads the matching release asset, verifies it against the published `checksums.txt`, and swaps the binary in place (Windows-safe rename-then-replace). `tx update --check` previews the latest version and the release notes for every version between installed and latest, flagging breaking changes (conventional-commit `!` markers, "breaking change" phrases, or a major-version bump); it always exits 0 — scripts read `updateAvailable` from `--output-format json`. `--version <v>` targets a specific release (downgrades require `--yes`). New `TOMIX_UPDATE_*` diagnostic codes.
 - Update notice: `tx` now checks GitHub Releases for a newer version at most once per 24 hours (cached in `~/.tomix/update-check.json`) and prints a one-line notice on stderr after commands when an update is available. The notice never delays or fails a command (the network refresh runs after the command completes, capped at 2 seconds, all errors swallowed) and is suppressed for `json`/`csv` output, `--quiet`, redirected stderr, `CI` environments, dev builds, and via `TOMIX_NO_UPDATE_CHECK=1` or the new `updateCheck` config key (`tx config set updateCheck false`).
-- `tx doctor` gains an `update` check comparing the installed version against the latest GitHub release (3-second timeout; network failure produces a warning, never a failing exit code), and reports `Latest version:` / `latestVersion` when known.
 - Releases now publish the `Tomix.Cli` package to nuget.org (when the `NUGET_API_KEY` repository secret is configured), making `dotnet tool install -g Tomix.Cli` a real install channel alongside the GitHub Release binaries.
 - `tx bpa run --trx <path>` is implemented (previously parsed but ignored): writes a VSTEST `.trx` file with one failed test per violated rule (the message lists the violating objects), an error-outcome test per rule that failed to compile or evaluate, and a single passed summary test on a clean run. `tx validate --trx` — which previously wrote only an empty run summary — now emits real per-issue results (errors → Failed, analyzer warnings → Warning outcome). Both are ingestible by Azure DevOps `PublishTestResults`.
 - Recent connections: every successful `tx connect` records the resolved connection in `~/.tomix/recent-connections.json` (most-recent-first, deduped by target, capped at 20, shared across sessions). The previously dormant global `--recent` option (alias `--recents`) is now live: `tx connect --recent` opens an interactive picker on stderr (or lists the entries when prompts are unavailable — `--non-interactive`, redirected stdin, or `--output-format json`), `tx connect --recent <n>` reconnects to the Nth most recent directly, validating the target before replacing the active connection. `connect --recent --output-format json` emits a `{"connections":[...]}` contract with 1-based `index` and `lastUsed`. On model-consuming commands (`ls`, `get`, `find`, `deps`, `format`, `add`, `set`, `replace`, `rm`, `mv`, `load`, `save`, `stage`, `validate`, `bpa`, `script`, `refresh`), `--recent` supplies the model source for that invocation without touching the active connection; on `deploy` it picks the deploy source while `--server`/`--database` keep addressing the target.

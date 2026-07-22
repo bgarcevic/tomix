@@ -161,27 +161,91 @@ public sealed class ConfigHandlerTests
     {
         var handler = NewHandler(out var path);
 
-        var result = handler.Get(ConfigKeys.ActiveProfile);
+        var result = handler.Get(ConfigKeys.NoColor);
 
         Assert.True(result.Success);
         Assert.Null(result.Data!.Value);
     }
 
     [Fact]
-    public void List_ReturnsStoredValues()
+    public void List_PreservesAndMarksUnsupportedLegacyValues()
     {
         var handler = NewHandler(out var path);
         try
         {
-            handler.Set(ConfigKeys.NoColor, "true");
-            handler.Set(ConfigKeys.Telemetry, "false");
+            var store = new TomixConfigStore(path);
+            store.Save(new Dictionary<string, string>
+            {
+                [ConfigKeys.NoColor] = "true",
+                ["telemetry"] = "false"
+            });
+
+            handler.Set(ConfigKeys.UpdateCheck, "true");
 
             var list = handler.List();
 
             Assert.True(list.Success);
-            Assert.Equal(2, list.Data!.Values.Count);
+            Assert.Equal(3, list.Data!.Values.Count);
             Assert.Equal("true", list.Data.Values[ConfigKeys.NoColor]);
-            Assert.Equal("false", list.Data.Values[ConfigKeys.Telemetry]);
+            Assert.Equal("false", list.Data.Values["telemetry"]);
+            Assert.Equal(["telemetry"], list.Data.UnsupportedKeys);
+            Assert.Equal("false", store.Load()["telemetry"]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("telemetry")]
+    [InlineData("activeProfile")]
+    [InlineData("hideWarnings")]
+    public void Set_RemovedLegacyKey_IsRejected(string key)
+    {
+        var handler = NewHandler(out var path);
+        try
+        {
+            var result = handler.Set(key, "true");
+
+            Assert.False(result.Success);
+            Assert.Equal("TOMIX_CONFIG_UNKNOWN_KEY", result.Diagnostics.Single().Code);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Load_LegacyHumanFormat_NormalizesToText()
+    {
+        var handler = NewHandler(out var path);
+        try
+        {
+            File.WriteAllText(path, "{ \"defaultFormat\": \"human\" }");
+
+            var result = handler.Get(ConfigKeys.DefaultFormat);
+
+            Assert.Equal("text", result.Data!.Value);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Set_LegacyHumanFormat_PersistsText()
+    {
+        var handler = NewHandler(out var path);
+        try
+        {
+            var result = handler.Set(ConfigKeys.DefaultFormat, "human");
+
+            Assert.True(result.Success);
+            Assert.Equal("text", result.Data!.Value);
+            Assert.Equal("text", new TomixConfigStore(path).Load()[ConfigKeys.DefaultFormat]);
         }
         finally
         {

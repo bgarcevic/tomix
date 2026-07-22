@@ -19,7 +19,19 @@ tx config <show|set|init|paths>
 ```sh
 tx config show
 tx config set noColor true
+tx config set defaultFormat json
+tx config paths --output-format json
 ```
+
+Supported keys are `defaultFormat` (`text` or `json`), `noColor`, `updateCheck`,
+and the non-secret authentication settings `auth.clientId`, `auth.tenant`, and
+`auth.authority`. An explicit `--output-format` always overrides
+`defaultFormat`; the legacy value `human` is read as `text`.
+
+Unknown legacy entries are preserved when another setting is changed and are
+shown with `(unsupported)` by `config show`. If `config.json` is corrupt,
+`--help`, `--version`, `doctor`, `config paths`, and `config init --force`
+remain available; other commands fail with `TOMIX_CONFIG_CORRUPT`.
 
 ## `profile` — named connection profiles
 
@@ -40,17 +52,19 @@ tx profile <list|show|set|remove>
 |--------|-------------|
 | `--desc, --description <text>` | Human-readable description of this profile. |
 | `--from-active` | Save the current active connection as this profile. |
-| `--auto-format <true\|false>` | Override `autoFormat` (`null` to clear). |
-| `--validate-on-mutation <true\|false>` | Override `validateOnMutation`. |
-| `--bpa-on-mutation` / `--bpa-on-deploy` | Override `bpa.onMutation` / `bpa.onDeploy`. |
-| `--vertipaq-on-refresh <true\|false>` | Override `vertipaqOnRefresh`. |
-| `--spinner <true\|false>` | Override `spinner`. |
 
 ```sh
 tx profile set dev -s DevWorkspace -d Sales
 tx profile set dev --from-active --desc "Dev workspace"
 tx connect --profile dev
 ```
+
+A new profile must contain a usable remote, local-model, or Desktop target.
+`--from-active` copies the full active state, including Desktop `Local` mode and
+workspace mirroring. Explicit `-s`/`-d`/`--model`/`--auth` values override the
+copied values. Activating a profile expands it through normal connect planning,
+so local paths and remote databases are validated before the active session is
+replaced. Legacy profiles with a model path are inferred to be local.
 
 ## `init` — scaffold a new model
 
@@ -74,8 +88,12 @@ tx init ./my-model --serialization pbip
 ## `completion` — shell completion
 
 ```
-tx completion [bash|zsh|fish|powershell]
+tx completion <bash|zsh|fish|powershell>
 ```
+
+The shell argument is required. Completion scripts are always text; an
+explicit non-text `--output-format` is rejected, and a configured JSON default
+does not alter the generated script.
 
 ```sh
 tx completion bash >> ~/.bashrc

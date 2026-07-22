@@ -8,8 +8,13 @@ public sealed class CliStateStore
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private readonly string _configDirectory;
+    private readonly string? _currentSessionId;
 
-    public CliStateStore(string configDirectory) => _configDirectory = configDirectory;
+    public CliStateStore(string configDirectory, string? currentSessionId = null)
+    {
+        _configDirectory = configDirectory;
+        _currentSessionId = currentSessionId;
+    }
 
     public const int MaxRecentConnections = 20;
 
@@ -23,6 +28,9 @@ public sealed class CliStateStore
     {
         get
         {
+            if (!string.IsNullOrWhiteSpace(_currentSessionId))
+                return _currentSessionId.Trim();
+
             var named = Environment.GetEnvironmentVariable("TOMIX_SESSION");
             if (string.IsNullOrWhiteSpace(named))
                 named = Environment.GetEnvironmentVariable("TE_SESSION");
@@ -63,7 +71,13 @@ public sealed class CliStateStore
 
         return profiles is null
             ? NewProfileMap()
-            : new Dictionary<string, CliProfile>(profiles, StringComparer.OrdinalIgnoreCase);
+            : profiles.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value with
+                {
+                    Local = pair.Value.Local || !string.IsNullOrWhiteSpace(pair.Value.Model)
+                },
+                StringComparer.OrdinalIgnoreCase);
     }
 
     public void SaveProfiles(IDictionary<string, CliProfile> profiles)
@@ -171,41 +185,36 @@ public sealed class CliStateStore
             .ToList();
     }
 
-    public int PruneSessions(bool all, bool dryRun = false)
+    public int PruneSessions(bool all)
+        => PruneSessions(SelectPruneCandidates(all));
+
+    public static int PruneSessions(IReadOnlyList<SessionFileInfo> candidates)
     {
-        if (!Directory.Exists(SessionsDirectory))
-            return 0;
+        foreach (var candidate in candidates)
+            File.Delete(candidate.Path);
 
-        var removed = 0;
-        foreach (var file in Directory.EnumerateFiles(SessionsDirectory, "*.json"))
-        {
-            if (file.Equals(CurrentSessionFile, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var id = Path.GetFileNameWithoutExtension(file);
-            if (!all && !IsDeadPidSession(id))
-                continue;
-
-            if (!dryRun)
-                File.Delete(file);
-            removed++;
-        }
-
-        return removed;
+        return candidates.Count;
     }
+
+    public IReadOnlyList<SessionFileInfo> SelectPruneCandidates(bool all)
+        => ListSessions()
+            .Where(session => !session.Current && (all || IsDeadPidSession(session.SessionId)))
+            .ToList();
 
     private static bool IsDeadPidSession(string sessionId)
     {
         if (!sessionId.StartsWith("pid-", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        // A pid session whose suffix is not a pid can never belong to a live shell.
-        if (!int.TryParse(sessionId["pid-".Length..], out var pid))
-            return true;
+        var suffix = sessionId["pid-".Length..];
+        if (suffix.Length == 0 || suffix.Any(character => !char.IsAsciiDigit(character)) ||
+            !int.TryParse(suffix, out var pid) || pid <= 0)
+            return false;
 
         try
         {
-            return System.Diagnostics.Process.GetProcessById(pid).HasExited;
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            return process.HasExited;
         }
         catch (ArgumentException)
         {

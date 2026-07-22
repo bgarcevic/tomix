@@ -1,137 +1,115 @@
+using Tomix.App.Config;
 using Tomix.App.Doctor;
+using Tomix.App.State;
 using Tomix.App.Update;
 using Tomix.Core.Doctor;
-using Tomix.Core.Update;
 
 namespace Tomix.App.Tests;
 
 public sealed class DoctorHandlerTests : IDisposable
 {
+    private static readonly DoctorTerminalCapabilities Terminal = new(true, true, "TrueColor");
     private readonly string _dir = Directory.CreateTempSubdirectory("tomix-doctor-tests").FullName;
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 
-    [Theory]
-    [InlineData("1.0.0")]
-    [InlineData("0.1.0-alpha.1")]
-    [InlineData("2.3.4-beta.5")]
-    public void Handle_ReturnsDoctorResult(string version)
+    private DoctorHandler CreateHandler(
+        string? directory = null,
+        IReadOnlyList<string>? providers = null,
+        string? configLoadError = null)
     {
-        var handler = new DoctorHandler(_dir);
-
-        var result = handler.Handle(version);
-
-        Assert.NotNull(result.Data);
-        Assert.Equal(version, result.Data.Version);
-        Assert.NotEmpty(result.Data.Checks);
+        var dir = directory ?? _dir;
+        return new DoctorHandler(
+            dir,
+            new TomixConfigStore(Path.Combine(dir, "config.json")),
+            new CliStateStore(dir),
+            new UpdateCheckStore(dir),
+            Path.Combine(dir, "auth", "auth-state.json"),
+            providers ?? ["FakeModelProvider"],
+            configLoadError);
     }
 
     [Fact]
-    public void Handle_IncludesRuntimeCheck()
+    public void Handle_ReportsEveryLocalCheckAndTerminalParity()
     {
-        var handler = new DoctorHandler(_dir);
+        var result = CreateHandler().Handle("1.0.0", Terminal);
 
-        var result = handler.Handle("1.0.0");
-
-        Assert.Contains(result.Data!.Checks, check =>
-            check.Name == "runtime" &&
-            check.Status == DoctorCheckStatus.Pass);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(Terminal, result.Data!.Terminal);
+        Assert.All(
+            new[] { "runtime", "operating-system", "config-directory", "configuration", "profiles", "sessions", "authentication", "model-providers", "terminal", "update-cache" },
+            name => Assert.Contains(result.Data.Checks, check => check.Name == name));
     }
 
     [Fact]
-    public void Handle_ReportsTheInjectedConfigDirectory()
+    public void Handle_WarningsDoNotFail()
     {
-        var handler = new DoctorHandler(_dir);
+        var result = CreateHandler().Handle("1.0.0", Terminal);
 
-        var result = handler.Handle("1.0.0");
-
-        Assert.Equal(_dir, result.Data!.ConfigDirectory);
-        Assert.Contains(result.Data.Checks, check =>
-            check.Name == "config-directory" &&
-            check.Status == DoctorCheckStatus.Pass &&
-            check.Message == _dir);
+        Assert.Contains(result.Data!.Checks, check => check.Status == DoctorCheckStatus.Warning);
+        Assert.Equal(0, result.ExitCode);
     }
 
     [Fact]
-    public void Handle_WithoutReleaseSource_SkipsUpdateCheck()
+    public void Handle_UsesCachedUpdateInformationOnly()
     {
-        var handler = new DoctorHandler(_dir);
+        new UpdateCheckStore(_dir).Save("2.0.0");
 
-        var result = handler.Handle("1.0.0");
-
-        Assert.Null(result.Data!.LatestVersion);
-        Assert.DoesNotContain(result.Data.Checks, check => check.Name == "update");
-    }
-
-    [Fact]
-    public void Handle_WarnsWhenANewerReleaseExists()
-    {
-        var handler = new DoctorHandler(_dir, new FakeReleaseSource("2.0.0"), InstallKind.Standalone);
-
-        var result = handler.Handle("1.0.0");
+        var result = CreateHandler().Handle("1.0.0", Terminal);
 
         Assert.Equal("2.0.0", result.Data!.LatestVersion);
         Assert.Contains(result.Data.Checks, check =>
-            check.Name == "update" &&
-            check.Status == DoctorCheckStatus.Warning &&
-            check.Message.Contains("2.0.0"));
-        Assert.Equal(0, result.ExitCode);
+            check.Name == "update-cache" && check.Status == DoctorCheckStatus.Warning);
     }
 
     [Fact]
-    public void Handle_PassesWhenUpToDate()
+    public void Handle_CorruptStartupConfigFailsHealthCheck()
     {
-        var handler = new DoctorHandler(_dir, new FakeReleaseSource("1.0.0"), InstallKind.Standalone);
+        var result = CreateHandler(configLoadError: "Config file is corrupt").Handle("1.0.0", Terminal);
 
-        var result = handler.Handle("1.0.0");
-
-        Assert.Equal("1.0.0", result.Data!.LatestVersion);
-        Assert.Contains(result.Data.Checks, check =>
-            check.Name == "update" &&
-            check.Status == DoctorCheckStatus.Pass);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(result.Data!.Checks, check =>
+            check.Name == "configuration" && check.Status == DoctorCheckStatus.Fail);
     }
 
     [Fact]
-    public void Handle_WarnsWithoutFailingWhenTheLookupThrows()
+    public void Handle_InvalidProfilesSessionsAndAuthMetadataFail()
     {
-        var handler = new DoctorHandler(_dir, new FakeReleaseSource(latestVersion: null, throws: true), InstallKind.Standalone);
+        File.WriteAllText(Path.Combine(_dir, "profiles.json"), "not json");
+        Directory.CreateDirectory(Path.Combine(_dir, "sessions"));
+        File.WriteAllText(Path.Combine(_dir, "sessions", "named.json"), "not json");
+        Directory.CreateDirectory(Path.Combine(_dir, "auth"));
+        File.WriteAllText(Path.Combine(_dir, "auth", "auth-state.json"), "not json");
 
-        var result = handler.Handle("1.0.0");
+        var result = CreateHandler().Handle("1.0.0", Terminal);
 
-        Assert.Null(result.Data!.LatestVersion);
-        Assert.Contains(result.Data.Checks, check =>
-            check.Name == "update" &&
-            check.Status == DoctorCheckStatus.Warning);
-        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(1, result.ExitCode);
+        Assert.All(
+            new[] { "profiles", "sessions", "authentication" },
+            name => Assert.Contains(result.Data!.Checks, check =>
+                check.Name == name && check.Status == DoctorCheckStatus.Fail));
     }
 
     [Fact]
-    public void Handle_SkipsUpdateCheckInDevelopmentInstalls()
+    public void Handle_NoRegisteredProvidersFails()
     {
-        var handler = new DoctorHandler(_dir, new FakeReleaseSource("2.0.0"), InstallKind.Development);
+        var result = CreateHandler(providers: []).Handle("1.0.0", Terminal);
 
-        var result = handler.Handle("1.0.0");
-
-        Assert.Null(result.Data!.LatestVersion);
-        Assert.DoesNotContain(result.Data.Checks, check => check.Name == "update");
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(result.Data!.Checks, check =>
+            check.Name == "model-providers" && check.Status == DoctorCheckStatus.Fail);
     }
 
-    private sealed class FakeReleaseSource(string? latestVersion, bool throws = false) : IReleaseSource
+    [Fact]
+    public void Handle_UnwritableConfigPathFails()
     {
-        public Task<ReleaseInfo?> GetLatestAsync(CancellationToken cancellationToken)
-            => throws
-                ? Task.FromException<ReleaseInfo?>(new HttpRequestException("offline"))
-                : Task.FromResult(latestVersion is null
-                    ? null
-                    : new ReleaseInfo(latestVersion, null, null, null, Prerelease: false));
+        var path = Path.Combine(_dir, "not-a-directory");
+        File.WriteAllText(path, "file");
 
-        public Task<IReadOnlyList<ReleaseInfo>> ListReleasesAsync(CancellationToken cancellationToken)
-            => Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
+        var result = CreateHandler(directory: path).Handle("1.0.0", Terminal);
 
-        public Task<byte[]> DownloadAssetAsync(string version, string assetName, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public Task<string> DownloadChecksumsAsync(string version, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(result.Data!.Checks, check =>
+            check.Name == "config-directory" && check.Status == DoctorCheckStatus.Fail);
     }
 }

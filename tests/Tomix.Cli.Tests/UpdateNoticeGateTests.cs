@@ -71,7 +71,11 @@ public sealed class UpdateNoticeGateTests
         var root = new RootCommand("test");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
-        root.Subcommands.Add(new DoctorCommand("0.1.0", TestServices.Create().ConfigDirectory).Build());
+        var services = TestServices.Create();
+        root.Subcommands.Add(new DoctorCommand(
+            "0.1.0", services.ConfigDirectory, services.ConfigStore, services.State,
+            services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth", "auth-state.json"),
+            ["FakeProvider"]).Build());
         return root.Parse(args);
     }
 

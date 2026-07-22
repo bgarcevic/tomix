@@ -7,9 +7,6 @@ public static class ConfigKeys
 {
     public const string DefaultFormat = "defaultFormat";
     public const string NoColor = "noColor";
-    public const string Telemetry = "telemetry";
-    public const string ActiveProfile = "activeProfile";
-    public const string HideWarnings = "hideWarnings";
 
     /// <summary>Set to <c>false</c> to disable the throttled update check and notice.</summary>
     public const string UpdateCheck = "updateCheck";
@@ -27,14 +24,11 @@ public static class ConfigKeys
     [
         DefaultFormat,
         NoColor,
-        Telemetry,
-        ActiveProfile,
-        HideWarnings,
         UpdateCheck,
         AuthClientId,
         AuthTenant,
         AuthAuthority
     ];
 
-    public static bool IsKnown(string key) => All.Contains(key);
+    public static bool IsKnown(string key) => All.Contains(key, StringComparer.OrdinalIgnoreCase);
 }

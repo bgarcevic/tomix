@@ -2,6 +2,7 @@ using System.CommandLine;
 using Spectre.Console;
 using Tomix.App.Connect;
 using Tomix.App.Info;
+using Tomix.App.Profile;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Authentication;
@@ -134,10 +135,11 @@ internal sealed class ConnectCommand : ICommandModule
 
             // ArgumentArity.ZeroOrOne surfaces both "absent" and "bare -w" as null from GetValue;
             // gate on GetResult so a valueless -w (present, no value) is distinguishable from absent.
+            var profileName = parseResult.GetValue(profileOption);
             var request = new ConnectPlanRequest(
                 Server: parseResult.GetValue(serverArgument),
                 Database: parseResult.GetValue(databaseArgument),
-                Profile: parseResult.GetValue(profileOption),
+                Profile: profileName,
                 WorkspaceValue: parseResult.GetValue(workspaceOption),
                 WorkspaceSpecified: parseResult.GetResult(workspaceOption) is not null,
                 Local: parseResult.GetValue(localOption),
@@ -146,6 +148,35 @@ internal sealed class ConnectCommand : ICommandModule
                 WorkspaceFormat: parseResult.GetValue(workspaceFormatOption),
                 WorkspaceAuth: parseResult.GetValue(workspaceAuthOption),
                 CanPrompt: InteractionGate.CanPrompt(parseResult, format));
+
+            if (!string.IsNullOrWhiteSpace(profileName))
+            {
+                if (!string.IsNullOrWhiteSpace(request.Server) ||
+                    !string.IsNullOrWhiteSpace(request.Database) ||
+                    request.WorkspaceSpecified || request.Local || request.Remote ||
+                    !string.IsNullOrWhiteSpace(request.Auth) ||
+                    !string.IsNullOrWhiteSpace(request.WorkspaceFormat) ||
+                    !string.IsNullOrWhiteSpace(request.WorkspaceAuth))
+                    return RenderWorkspaceOptionError(
+                        "--profile cannot be combined with a server/database, --workspace, --local, --remote, or auth/workspace overrides.");
+
+                var resolved = new ProfileHandler(_state).Resolve(profileName);
+                if (!resolved.Success)
+                    return CommandOutput.Render(resolved, format, errorFormat, _ => { });
+
+                var profile = resolved.Data!.Profile;
+                request = request with
+                {
+                    Server = profile.Model ?? profile.Server,
+                    Database = profile.Database,
+                    WorkspaceValue = profile.Workspace,
+                    WorkspaceSpecified = !string.IsNullOrWhiteSpace(profile.Workspace),
+                    Local = profile.Local && string.IsNullOrWhiteSpace(profile.Model),
+                    Auth = profile.Auth,
+                    WorkspaceFormat = profile.WorkspaceFormat,
+                    WorkspaceAuth = profile.WorkspaceAuth
+                };
+            }
 
             // Plan/resolve loop: each pass either reports the first missing piece (resolved here
             // by a prompt or Desktop discovery, then folded back into the request) or yields a

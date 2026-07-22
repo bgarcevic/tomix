@@ -11,11 +11,10 @@ public sealed class ProfileHandlerTests
         string? database = null,
         string? model = null,
         string? auth = null,
+        bool? local = null,
         bool fromActive = false)
         => new(name, server, database, model, auth,
-            Description: null, AutoFormat: null, ValidateOnMutation: null,
-            BpaOnMutation: null, BpaOnDeploy: null, VertipaqOnRefresh: null,
-            Spinner: null, FromActive: fromActive);
+            Description: null, Local: local, FromActive: fromActive);
 
     private static void WithStore(Action<CliStateStore> test)
     {
@@ -58,6 +57,19 @@ public sealed class ProfileHandlerTests
     }
 
     [Fact]
+    public void Set_NewProfileRequiresUsableTarget()
+    {
+        WithStore(store =>
+        {
+            var result = new ProfileHandler(store).Set(Request());
+
+            Assert.False(result.Success);
+            Assert.Equal(2, result.ExitCode);
+            Assert.Equal("TOMIX_PROFILE_TARGET_REQUIRED", result.Diagnostics.Single().Code);
+        });
+    }
+
+    [Fact]
     public void Set_FromActive_CopiesActiveConnection()
     {
         WithStore(store =>
@@ -72,6 +84,51 @@ public sealed class ProfileHandlerTests
             Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", saved.Server);
             Assert.Equal("Sales", saved.Database);
             Assert.Equal("interactive", saved.Auth);
+            Assert.False(saved.Local);
+        });
+    }
+
+    [Fact]
+    public void Set_FromActive_PreservesDesktopLocalMode()
+    {
+        WithStore(store =>
+        {
+            store.SaveCurrentSession(new CliConnectionState(
+                Server: "localhost:52123", Database: "DesktopModel", Model: null,
+                Auth: null, Local: true, Profile: null));
+
+            var result = new ProfileHandler(store).Set(Request(fromActive: true));
+
+            Assert.True(result.Success);
+            Assert.True(store.LoadProfiles()["dev"].Local);
+        });
+    }
+
+    [Fact]
+    public void LoadProfiles_LegacyModelInfersLocalAndDropsPolicyFieldsOnSave()
+    {
+        WithStore(store =>
+        {
+            File.WriteAllText(store.ProfilesFile,
+                """
+                {
+                  "legacy": {
+                    "Name": "legacy",
+                    "Model": "/models/sales",
+                    "AutoFormat": true,
+                    "Spinner": false
+                  }
+                }
+                """);
+
+            var loaded = store.LoadProfiles()["legacy"];
+            Assert.True(loaded.Local);
+
+            store.SaveProfiles(store.LoadProfiles());
+            var json = File.ReadAllText(store.ProfilesFile);
+            Assert.DoesNotContain("AutoFormat", json);
+            Assert.DoesNotContain("Spinner", json);
+            Assert.Contains("\"Local\": true", json);
         });
     }
 
@@ -93,6 +150,24 @@ public sealed class ProfileHandlerTests
     }
 
     [Fact]
+    public void Set_FromActive_ExplicitModelReplacesRemoteTarget()
+    {
+        WithStore(store =>
+        {
+            store.SaveCurrentSession(new CliConnectionState(
+                "powerbi://api.powerbi.com/v1.0/myorg/ws", "Sales", Model: null,
+                Auth: null, Local: false, Profile: null));
+
+            var result = new ProfileHandler(store).Set(Request(model: "/models/local", fromActive: true));
+
+            Assert.True(result.Success);
+            Assert.Null(result.Data!.Profile.Server);
+            Assert.Equal("/models/local", result.Data.Profile.Model);
+            Assert.True(result.Data.Profile.Local);
+        });
+    }
+
+    [Fact]
     public void Set_FromActive_PreservesWorkspaceState_AndConnectRestoresIt()
     {
         WithStore(store =>
@@ -109,9 +184,10 @@ public sealed class ProfileHandlerTests
             Assert.Equal("tmdl", saved.WorkspaceFormat);
             Assert.Equal("interactive", saved.WorkspaceAuth);
 
+            var profile = new ProfileHandler(store).Resolve("dev").Data!.Profile;
             var connect = new Connect.ConnectHandler(store).Set(new Connect.ConnectSetRequest(
-                Server: null, Database: null, Model: null, Auth: null, Local: false, Profile: "dev",
-                Workspace: null, WorkspaceFormat: null, WorkspaceAuth: null));
+                profile.Server, profile.Database, profile.Model, profile.Auth, profile.Local, profile.Name,
+                profile.Workspace, profile.WorkspaceFormat, profile.WorkspaceAuth));
 
             Assert.True(connect.Success);
             var session = store.LoadCurrentSession();

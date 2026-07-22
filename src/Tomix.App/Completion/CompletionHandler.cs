@@ -11,8 +11,14 @@ public sealed class CompletionHandler
     private static readonly IReadOnlyList<string> SupportedShells =
         ["bash", "zsh", "powershell", "pwsh", "fish"];
 
-    public TomixResult<CompletionResult> Generate(string shell, IReadOnlyList<string> commands)
+    public TomixResult<CompletionResult> Generate(string shell)
     {
+        if (string.IsNullOrWhiteSpace(shell))
+            return TomixResult<CompletionResult>.Fail(
+                code: "TOMIX_COMPLETION_SHELL_REQUIRED",
+                message: "A shell is required. Expected one of: bash, zsh, fish, or powershell.",
+                exitCode: 2);
+
         var normalized = shell.Trim().ToLowerInvariant();
 
         if (!SupportedShells.Contains(normalized))

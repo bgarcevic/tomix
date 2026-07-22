@@ -162,6 +162,19 @@ public class ConnectPlanHandlerTests
         Assert.Null(plan.Target);
     }
 
+    [Fact]
+    public void Plan_ExpandedRemoteProfileValidatesDatabaseBeforeActivation()
+    {
+        var plan = ConnectPlanHandler.Plan(Request(
+            server: "powerbi://api.powerbi.com/v1.0/myorg/Production",
+            database: "Sales",
+            profile: "prod"));
+
+        Assert.NotNull(plan.Target?.Validation);
+        Assert.Equal("Sales", plan.Target!.Validation!.Database);
+        Assert.Equal("prod", plan.Target.Profile);
+    }
+
     // --- --remote -----------------------------------------------------------------------------
 
     [Fact]
@@ -341,10 +354,16 @@ public class ConnectPlanHandlerTests
             ConnectPlanHandler.Plan(Request(server: "localhost:51542", database: "m", workspaceValue: "./mirror", workspaceSpecified: true, local: true)).UsageError);
 
     [Fact]
-    public void Plan_WorkspaceWithProfile_IsUsageError()
-        => Assert.Equal(
-            "--workspace cannot be combined with --profile. Activate the profile first, then set up workspace mode separately.",
-            ConnectPlanHandler.Plan(Request(server: "MyWorkspace", database: "m", profile: "prod", workspaceValue: "./mirror", workspaceSpecified: true)).UsageError);
+    public void Plan_ExpandedProfileWorkspaceUsesNormalPlanning()
+    {
+        var plan = ConnectPlanHandler.Plan(Request(
+            server: "MyWorkspace", database: "m", profile: "prod",
+            workspaceValue: "./mirror", workspaceSpecified: true));
+
+        Assert.Null(plan.UsageError);
+        Assert.Equal("prod", plan.Target!.Profile);
+        Assert.NotNull(plan.Target.Validation);
+    }
 
     // A path-like -w value with no server would be reinterpreted as the model, so a bare
     // (non-path) mirror name is the input that actually reaches the matrix check.
@@ -421,13 +440,12 @@ public class ConnectPlanHandlerTests
     }
 
     [Fact]
-    public void Plan_Profile_SkipsValidation()
+    public void Plan_ProfileMetadataDoesNotCreateATargetByItself()
     {
         var plan = ConnectPlanHandler.Plan(Request(profile: "prod"));
 
-        Assert.NotNull(plan.Target);
-        Assert.Null(plan.Target!.Validation);
-        Assert.Equal("prod", plan.Target.Profile);
+        Assert.True(plan.ShowCurrent);
+        Assert.Null(plan.Target);
     }
 
     [Fact]
