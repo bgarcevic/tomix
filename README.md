@@ -8,6 +8,9 @@ Desktop instance running on your machine.
 Semantic models are code. They deserve tooling that works where code lives:
 in a terminal, in scripts, in CI, in a diff.
 
+Read the full [documentation](https://bgarcevic.github.io/tomix-cli/) for
+installation, quickstart guides, command references, and scripting examples.
+
 ```
 $ tx connect ./samples/basic-tmdl
 Model: (unnamed)
