@@ -24,6 +24,21 @@ The bundled catalog is embedded in the application and cannot be overridden by
 placing a file beside the executable. Use `--rules`, model rule annotations, or
 the `bpa rules` commands for explicit customization.
 
+Models can carry their own rules: the `BestPracticeAnalyzer` annotation embeds
+rule definitions directly, and the `BestPracticeAnalyzer_ExternalRuleFiles`
+annotation lists rule files to load. Relative external-file paths resolve
+against the model's folder (not the current directory), and Windows-style
+separators (`..\.devops\bpa-rules.json`) work on every platform. When the same
+rule ID appears in more than one source, the higher-precedence source wins:
+ruleset < user rules (`--rules`, config-dir `bpa-rules.json`) < external files
+< model-embedded — so a model's own rules always override the ruleset copy.
+Among multiple external files, earlier entries in the annotation win. To detach
+a model from an external rule file, remove the annotation:
+
+```sh
+tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i "" --save
+```
+
 | Option | Description |
 |--------|-------------|
 | `-r, --rules <file>` | Path(s) or URL(s) to BPA rule file(s) in JSON format. |
@@ -52,7 +67,7 @@ tx bpa run --fix --save
 
 | Subcommand | Description |
 |------------|-------------|
-| `bpa rules list` | List BPA rules from all sources with status. |
+| `bpa rules list` | List BPA rules from all sources with status. With a model, also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. |
 | `bpa rules enable` / `bpa rules disable` | Re-enable or disable a built-in rule for the current user. |
 | `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
 

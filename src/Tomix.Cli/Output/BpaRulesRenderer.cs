@@ -15,10 +15,11 @@ internal static class BpaRulesRenderer
         if (result.Rules.Count == 0)
         {
             AnsiConsole.MarkupLine(Styling.Warning("No BPA rules available."));
+            RenderListDiagnostics(result);
             return;
         }
 
-        var table = Styling.NewTable("ID", "Name", "Category", "Severity");
+        var table = Styling.NewTable("ID", "Name", "Category", "Severity", "Source");
 
         foreach (var r in result.Rules)
         {
@@ -26,12 +27,23 @@ internal static class BpaRulesRenderer
                 Styling.MarkupEscape(Truncate(r.Id, 45)),
                 Styling.MarkupEscape(Truncate(r.Name, 55)),
                 Styling.MarkupEscape(Truncate(r.Category, 20)),
-                SeverityMarkup(r.Severity));
+                SeverityMarkup(r.Severity),
+                Styling.MarkupEscape(Truncate(r.Source, 28)));
         }
 
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"  {Styling.KeyValue("Total rules:", result.Rules.Count.ToString())}");
+        RenderListDiagnostics(result);
+    }
+
+    private static void RenderListDiagnostics(BpaRulesListResult result)
+    {
+        if (result.Diagnostics is not { Count: > 0 } diagnostics)
+            return;
+
+        foreach (var diagnostic in diagnostics)
+            AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(diagnostic))}");
     }
 
     public static void RenderDisable(BpaRulesDisableResult result)
@@ -81,11 +93,18 @@ internal static class BpaRulesRenderer
     /// omission of empty fields are the output contract — keep stable (guarded by BpaJsonContractTests).
     /// </summary>
     internal static object ToListJson(BpaRulesListResult result)
-        => new
+    {
+        var json = new Dictionary<string, object?>
         {
-            rules = result.Rules.Select(ProjectRuleInfo),
-            summary = result.Summary
+            ["rules"] = result.Rules.Select(ProjectRuleInfo),
+            ["summary"] = result.Summary
         };
+
+        if (result.Diagnostics is { Count: > 0 })
+            json["diagnostics"] = result.Diagnostics;
+
+        return json;
+    }
 
     internal static object ToDisableJson(BpaRulesDisableResult result)
         => new

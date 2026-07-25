@@ -283,6 +283,75 @@ public sealed class BpaEngineTests
     }
 
     [Fact]
+    public void Evaluate_MissingAnnotationInConvert_EvaluatesFalseWithoutError()
+    {
+        // Vertipaq-style rules parse annotations that only exist after a statistics run; on a
+        // model without them GetAnnotation must return null (Convert.ToInt64(null) is 0) so the
+        // rule evaluates to false instead of erroring on every object.
+        var big = new ModelObject("Big", ModelObjectKind.Column, "T/Big",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: "Big",
+            Children: [],
+            Properties: new Dictionary<string, string>
+            {
+                ["ObjectType"] = "DataColumn",
+                ["Annotation:Vertipaq_Cardinality"] = "200000"
+            });
+        var plain = new ModelObject("Plain", ModelObjectKind.Column, "T/Plain",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: "Plain",
+            Children: [],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "DataColumn" });
+        var table = new ModelObject("T", ModelObjectKind.Table, "T",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
+            Children: [big, plain],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "Table" });
+        var snapshot = new ModelSnapshot("M", 1601, [table]);
+
+        var rules = new List<BpaRule>
+        {
+            new("HIGH_CARDINALITY", "High cardinality", "Performance", BpaSeverity.Warning, ["Column"],
+                Expression: "Convert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) > 100000")
+        };
+
+        var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
+
+        var violation = Assert.Single(result.Violations);
+        Assert.Equal("T/Big", violation.ObjectPath);
+        Assert.Equal(0, result.RuleErrors);
+    }
+
+    [Fact]
+    public void Evaluate_FormatStringRule_HonorsFormatStringExpression()
+    {
+        // A measure with a dynamic format string satisfies the format-string rule even though
+        // its static FormatString is empty (upstream rules check both properties).
+        var dynamicFormat = new ModelObject("Dynamic", ModelObjectKind.Measure, "T/Dynamic",
+            Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string> { ["FormatStringExpression"] = "\"0.0%\"" });
+        var unformatted = new ModelObject("Plain", ModelObjectKind.Measure, "T/Plain",
+            Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string>());
+        var table = new ModelObject("T", ModelObjectKind.Table, "T",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
+            Children: [dynamicFormat, unformatted],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "Table" });
+        var snapshot = new ModelSnapshot("M", 1601, [table]);
+
+        var rules = new List<BpaRule>
+        {
+            new("PROVIDE_FORMAT_STRING_FOR_MEASURES", "Format measures", "Formatting", BpaSeverity.Error, ["Measure"],
+                Expression: "not IsHidden \r\nand not Table.IsHidden \r\nand string.IsNullOrWhitespace(FormatString) \r\nand string.IsNullOrWhitespace(FormatStringExpression)")
+        };
+
+        var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
+
+        var violation = Assert.Single(result.Violations);
+        Assert.Equal("T/Plain", violation.ObjectPath);
+        Assert.Equal(0, result.RuleErrors);
+    }
+
+    [Fact]
     public void Evaluate_GlobalDisable_EmitsDisabledRuleAndSkipsEvaluation()
     {
         var snapshot = CreateSnapshotWithColumn(

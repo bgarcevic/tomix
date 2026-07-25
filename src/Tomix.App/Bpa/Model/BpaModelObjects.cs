@@ -26,9 +26,14 @@ public abstract class BpaObject
 
     public bool IsHidden { get; internal set; }
 
-    /// <summary>Reads an annotation value off the originating snapshot object (empty when absent).</summary>
-    public string GetAnnotation(string name)
-        => Source.Property($"Annotation:{name}") ?? "";
+    /// <summary>
+    /// Reads an annotation value off the originating snapshot object. Returns null when the
+    /// annotation is absent — matching the TOM-style semantics rule expressions are written
+    /// against, where e.g. <c>Convert.ToInt64(GetAnnotation("Vertipaq_RowCount"))</c> yields 0
+    /// for a model that has no such annotation instead of throwing on an empty string.
+    /// </summary>
+    public string? GetAnnotation(string name)
+        => Source.Property($"Annotation:{name}");
 }
 
 public sealed class BpaColumn : BpaObject
@@ -80,6 +85,10 @@ public sealed class BpaMeasure : BpaObject
 {
     public string DataType { get; internal set; } = "";
     public string FormatString { get; internal set; } = "";
+
+    /// <summary>The dynamic format-string DAX expression (empty when the measure has none).</summary>
+    public string FormatStringExpression { get; internal set; } = "";
+
     public string Expression { get; internal set; } = "";
 
     /// <summary>The unqualified DAX name, e.g. <c>[Sales Amount]</c>.</summary>

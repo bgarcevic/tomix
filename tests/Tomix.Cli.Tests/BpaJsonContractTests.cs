@@ -137,6 +137,24 @@ public sealed class BpaJsonContractTests
         Assert.Equal("fix()", second.GetProperty("fixExpression").GetString());
 
         Assert.Equal(2, root.GetProperty("summary").GetProperty("total").GetInt32());
+
+        // No rule-load diagnostics -> the field is omitted entirely.
+        Assert.False(root.TryGetProperty("diagnostics", out _));
+    }
+
+    [Fact]
+    public void RulesListJson_IncludesDiagnosticsWhenPresent()
+    {
+        var result = new BpaRulesListResult(
+            Rules: [],
+            Summary: new BpaRulesSummary(Total: 0, Active: 0, Disabled: 0, Ignored: 0),
+            Diagnostics: ["External rule file not found: rules.json"]);
+
+        var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRulesRenderer.ToListJson(result))).RootElement;
+
+        var diagnostics = root.GetProperty("diagnostics");
+        Assert.Equal(1, diagnostics.GetArrayLength());
+        Assert.Contains("rules.json", diagnostics[0].GetString());
     }
 
     [Fact]

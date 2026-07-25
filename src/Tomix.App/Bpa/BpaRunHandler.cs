@@ -79,11 +79,18 @@ public sealed class BpaRunHandler
             await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
+            // A staged run analyzes a working copy under the config directory, but the annotation's
+            // relative external-rule paths are anchored at the original model, so resolve from that
+            // instead of the copy.
+            var ruleBaseDirectory = context.Staging is null
+                ? BpaModelRuleLoader.ResolveBaseDirectory(session, request.Model)
+                : await ResolveStagedRuleBaseDirectoryAsync(request.Model, cancellationToken);
+
             IReadOnlyList<BpaRule> rules;
             IReadOnlyList<string> loadDiagnostics;
             try
             {
-                (rules, loadDiagnostics) = await LoadRulesAsync(request, snapshot, cancellationToken).ConfigureAwait(false);
+                (rules, loadDiagnostics) = await LoadRulesAsync(request, snapshot, ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
             {
@@ -151,9 +158,44 @@ public sealed class BpaRunHandler
         });
     }
 
+    /// <summary>
+    /// The folder a staged run's relative external-rule paths resolve against: the original model's
+    /// own source folder, which for a .pbip/.pbism/project-root reference is the nested definition
+    /// folder rather than the reference itself. Opening a local model only resolves paths (the
+    /// database is deserialized lazily), so probing it here stays cheap.
+    /// </summary>
+    private async Task<string?> ResolveStagedRuleBaseDirectoryAsync(
+        ModelReference model,
+        CancellationToken cancellationToken)
+    {
+        if (model.IsLocalPath)
+        {
+            try
+            {
+                // Provider matching itself touches the filesystem — resolving a .pbip reference
+                // reads the file and enumerates sibling folders — so it stays inside the guard:
+                // this is a best-effort probe and an unreadable original must not fail the run.
+                if (_providers.ResolveSingle(model) is { } provider)
+                {
+                    await using var probe = await provider.OpenAsync(model, cancellationToken);
+                    return BpaModelRuleLoader.ResolveBaseDirectory(probe, model);
+                }
+            }
+            catch (Exception ex) when (ex
+                is IOException or NotSupportedException or UnauthorizedAccessException
+                or AmbiguousModelProviderException)
+            {
+                // The original may be gone, unreadable, or ambiguously claimed; fall back below.
+            }
+        }
+
+        return BpaModelRuleLoader.ResolveBaseDirectory(session: null, model);
+    }
+
     private async Task<(IReadOnlyList<BpaRule> Rules, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
         BpaRunRequest request,
         ModelSnapshot snapshot,
+        string? modelRuleBaseDirectory,
         CancellationToken cancellationToken)
     {
         var collections = new List<BpaRuleCollection>();
@@ -194,8 +236,9 @@ public sealed class BpaRunHandler
         {
             var model = await BpaModelRuleLoader.LoadAsync(
                 snapshot.Properties,
-                ModelBaseDirectory(request.Model),
+                modelRuleBaseDirectory,
                 request.AllowExternalRules,
+                BpaRuleHintContext.Run,
                 _httpClient,
                 cancellationToken).ConfigureAwait(false);
 
@@ -204,23 +247,6 @@ public sealed class BpaRunHandler
         }
 
         return (BpaRuleResolver.Resolve(collections), diagnostics);
-    }
-
-    private static string? ModelBaseDirectory(ModelReference model)
-    {
-        if (!model.IsLocalPath)
-            return null;
-
-        try
-        {
-            return Directory.Exists(model.Value)
-                ? model.Value
-                : Path.GetDirectoryName(Path.GetFullPath(model.Value));
-        }
-        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
-        {
-            return null;
-        }
     }
 
     private static bool TryParseFailOn(

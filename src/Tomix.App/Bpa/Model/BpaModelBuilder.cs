@@ -192,6 +192,7 @@ public static class BpaModelBuilder
             IsHidden = obj.Hidden,
             DataType = obj.Property("DataType") ?? "",
             FormatString = obj.Property("FormatString") ?? "",
+            FormatStringExpression = obj.Property("FormatStringExpression") ?? "",
             Expression = obj.Expression ?? "",
             DaxObjectName = $"[{obj.Name}]",
         };

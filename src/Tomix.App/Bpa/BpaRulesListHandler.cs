@@ -17,7 +17,8 @@ public sealed record BpaRulesListRequest(
 
 public sealed record BpaRulesListResult(
     IReadOnlyList<BpaRuleInfo> Rules,
-    BpaRulesSummary Summary);
+    BpaRulesSummary Summary,
+    IReadOnlyList<string>? Diagnostics = null);
 
 public sealed record BpaRulesSummary(
     int Total,
@@ -73,10 +74,33 @@ public sealed class BpaRulesListHandler
 
         return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
-            // When a model is supplied, rules listed in its model-level ignore annotation are disabled.
-            var disabled = await ReadDisabledRuleIdsAsync(request.Model, cancellationToken).ConfigureAwait(false);
+            // When a model is supplied, rules listed in its model-level ignore annotation are
+            // disabled, and the model's own rule sources (embedded + external files) are listed
+            // alongside the ruleset. Remote external files are never fetched here; the loader
+            // reports them as skipped.
+            var disabled = new HashSet<string>(_userRules.GetDisabled(), StringComparer.OrdinalIgnoreCase);
+            var diagnostics = new List<string>();
+            var loaded = new List<LoadedRule>(rules);
 
-            var allRules = rules.Select(r =>
+            if (request.Model is not null && _providers.ResolveSingle(request.Model) is { } provider)
+            {
+                await using var session = await provider.OpenAsync(request.Model, cancellationToken);
+                var snapshot = await session.GetSnapshotAsync(cancellationToken);
+                disabled.UnionWith(BpaIgnoreStore.ReadRuleIds(snapshot.Properties));
+
+                var model = await BpaModelRuleLoader.LoadAsync(
+                    snapshot.Properties,
+                    BpaModelRuleLoader.ResolveBaseDirectory(session, request.Model),
+                    allowExternal: false,
+                    BpaRuleHintContext.List,
+                    _httpClient,
+                    cancellationToken).ConfigureAwait(false);
+                loaded.AddRange(model.Collections.SelectMany(
+                    c => c.Rules.Select(r => new LoadedRule(c.DisplayName, r))));
+                diagnostics.AddRange(model.Diagnostics);
+            }
+
+            var allRules = loaded.Select(r =>
             {
                 var isDisabled = disabled.Contains(r.Rule.Id);
                 return new BpaRuleInfo(
@@ -108,30 +132,11 @@ public sealed class BpaRulesListHandler
                     Total: allRules.Count,
                     Active: allRules.Count - disabledCount,
                     Disabled: disabledCount,
-                    Ignored: 0));
+                    Ignored: 0),
+                Diagnostics: diagnostics.Count > 0 ? diagnostics : null);
 
             return TomixResult<BpaRulesListResult>.Ok(result);
         });
-    }
-
-    private async Task<IReadOnlySet<string>> ReadDisabledRuleIdsAsync(
-        ModelReference? model,
-        CancellationToken cancellationToken)
-    {
-        // User-level disables apply regardless of model; model-level ignores add to them.
-        var disabled = new HashSet<string>(_userRules.GetDisabled(), StringComparer.OrdinalIgnoreCase);
-
-        if (model is null)
-            return disabled;
-
-        var provider = _providers.ResolveSingle(model);
-        if (provider is null)
-            return disabled;
-
-        await using var session = await provider.OpenAsync(model, cancellationToken);
-        var snapshot = await session.GetSnapshotAsync(cancellationToken);
-        disabled.UnionWith(BpaIgnoreStore.ReadRuleIds(snapshot.Properties));
-        return disabled;
     }
 
     private static async Task<IReadOnlyList<LoadedRule>> LoadRulesAsync(
