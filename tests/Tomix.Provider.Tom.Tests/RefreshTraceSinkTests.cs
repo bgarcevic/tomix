@@ -153,7 +153,6 @@ public sealed class RefreshTraceSinkTests
     [Fact]
     public void ProgressReportCurrent_WithIntegerData_Updates_RowCount_Live()
     {
-        var sink = NewSink(["BigTable"]);
         var reports = new List<RefreshProgress>();
         var progress = new SynchronousProgress(reports.Add);
         var sinkWithProgress = new RefreshTraceSink(["BigTable"], progress);

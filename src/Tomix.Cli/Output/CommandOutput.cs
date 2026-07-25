@@ -13,20 +13,11 @@ namespace Tomix.Cli.Output;
 internal static class CommandOutput
 {
     /// <summary>
-    /// Validates <paramref name="format"/>, writing an error to stderr if it is unrecognised.
-    /// Returns <c>false</c> so the command can exit with code 2 (invalid arguments).
+    /// Validates <paramref name="format"/>, writing an error to stderr if it is unrecognised or if
+    /// the command cannot render it (instead of silently falling back to text). <c>auto</c> is
+    /// always accepted. Returns <c>false</c> so the command can exit with code 2 (invalid
+    /// arguments). Honors the command's <c>--error-format</c> value.
     /// </summary>
-    public static bool TryValidateFormat(string format)
-        => ValidateFormatValue(format, errorFormat: null);
-
-    /// <summary>
-    /// Like <see cref="TryValidateFormat(string)"/>, but additionally rejects formats the command
-    /// cannot render (instead of silently falling back to text). <c>auto</c> is always accepted.
-    /// </summary>
-    public static bool TryValidateFormat(string format, string commandName, params string[] supported)
-        => ValidateFormat(format, errorFormat: null, commandName, supported);
-
-    /// <summary>Overload that honors the command's <c>--error-format</c> value.</summary>
     public static bool TryValidateFormat(ParseResult parseResult, string format, string commandName, params string[] supported)
         => ValidateFormat(format, parseResult.GetValue(GlobalOptions.ErrorFormat), commandName, supported);
 

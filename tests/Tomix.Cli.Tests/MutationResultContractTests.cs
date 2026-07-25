@@ -1,37 +1,38 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Tomix.App.Add;
-using Tomix.App.Bpa;
 using Tomix.App.Format;
 using Tomix.App.Mv;
 using Tomix.App.Replace;
 using Tomix.App.Rm;
 using Tomix.App.Script;
 using Tomix.App.Set;
+using Tomix.Cli.Output;
 
-namespace Tomix.App.Tests;
+namespace Tomix.Cli.Tests;
 
 /// <summary>
 /// JSON contract tests for mutation command result types.
 /// These protect the <c>--output-format json</c> output shape — especially the
 /// <c>saved</c> field (type <c>object</c>: null/true/path) and <c>staged</c> field
 /// (type <c>bool?</c>).
+/// <para>
+/// Serialization goes through <see cref="JsonOutput"/>, the same code path the commands use,
+/// so that omission driven by <c>[JsonIgnore(WhenWritingNull)]</c> is actually exercised. Do not
+/// substitute a locally-built <c>JsonSerializerOptions</c>: options that add a blanket
+/// <c>DefaultIgnoreCondition</c> make every "omits" assertion below pass whether or not the
+/// attribute is present.
+/// </para>
+/// <para>
+/// The <c>bpa</c> results are deliberately absent: <c>BpaRunResult</c> and
+/// <c>BpaRulesIgnoreResult</c> are never serialized directly — <c>BpaRunRenderer.ToJson</c> and
+/// <c>BpaRulesRenderer.ToIgnoreJson</c> project them onto anonymous objects that emit
+/// <c>saved</c>/<c>staged</c> unconditionally. That contract is pinned in
+/// <see cref="BpaJsonContractTests"/>.
+/// </para>
 /// </summary>
 public sealed class MutationResultContractTests
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
-    static MutationResultContractTests()
-    {
-        JsonOptions.Converters.Add(new JsonStringEnumConverter());
-    }
-
-    private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
+    private static string Serialize<T>(T value) => JsonOutput.Serialize(value);
 
     // ── Format: ObjectFormatResult ──────────────────────────────────────────
 
@@ -180,48 +181,6 @@ public sealed class MutationResultContractTests
         Assert.Contains("\"dryRun\": true", json);
         Assert.DoesNotContain("\"saved\"", json);
         Assert.DoesNotContain("\"staged\"", json);
-    }
-
-    // ── BPA: BpaRunResult ───────────────────────────────────────────────────
-
-    [Fact]
-    public void BpaRunResult_NotSaved_OmitsSavedAndStaged()
-    {
-        var result = new BpaRunResult([], "model", 5);
-        var json = Serialize(result);
-
-        Assert.DoesNotContain("\"saved\"", json);
-        Assert.DoesNotContain("\"staged\"", json);
-    }
-
-    [Fact]
-    public void BpaRunResult_SavedTrue_SerializesSavedAsBoolean()
-    {
-        var result = new BpaRunResult([], "model", 5, Saved: true);
-        var json = JsonDocument.Parse(Serialize(result));
-
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("saved").ValueKind);
-    }
-
-    [Fact]
-    public void BpaRunResult_StagedTrue_SerializesStagedAsBoolean()
-    {
-        var result = new BpaRunResult([], "model", 5, Staged: true);
-        var json = JsonDocument.Parse(Serialize(result));
-
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("staged").ValueKind);
-    }
-
-    // ── BPA: BpaRulesIgnoreResult ───────────────────────────────────────────
-
-    [Fact]
-    public void BpaRulesIgnoreResult_SavedObject_SerializesCorrectly()
-    {
-        var result = new BpaRulesIgnoreResult("RULE_1", true, true, ["RULE_1"], Saved: true, Staged: null, "model");
-        var json = JsonDocument.Parse(Serialize(result));
-
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("saved").ValueKind);
-        Assert.False(json.RootElement.TryGetProperty("staged", out _));
     }
 
     // ── Script: ScriptRunResult ─────────────────────────────────────────────

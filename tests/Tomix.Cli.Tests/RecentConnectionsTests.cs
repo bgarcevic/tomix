@@ -139,11 +139,31 @@ public sealed class RecentConnectionsTests
         Assert.Equal("Sales", syncTarget.Database);
     }
 
-    // A non-recent source keeps reading the active session (RecentEntry is null).
+    // The complementary branch: with no recent entry the resolver falls back to the active
+    // session in the store, so the sync target comes from the session rather than the source.
     [Fact]
-    public void CreateResolver_NonRecentSource_HasNullRecentEntry()
+    public void CreateResolver_NonRecentSource_ReadsActiveSession()
     {
-        var source = new RecentConnections.ModelSource("/models/x", null, null, RecentEntry: null);
-        Assert.Null(source.RecentEntry);
+        var services = TestServices.Create();
+        try
+        {
+            services.State.SaveCurrentSession(new CliConnectionState(
+                Server: null, Database: "Active", Model: "/models/active",
+                Auth: null, Local: true, Profile: null,
+                Workspace: "powerbi://api.powerbi.com/v1.0/myorg/active-mirror"));
+
+            var source = new RecentConnections.ModelSource("/models/x", null, null, RecentEntry: null);
+
+            var syncTarget = RecentConnections.CreateResolver(source, services.State).ResolveSyncTarget();
+
+            Assert.NotNull(syncTarget);
+            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/active-mirror", syncTarget!.Value);
+            Assert.Equal("Active", syncTarget.Database);
+        }
+        finally
+        {
+            if (Directory.Exists(services.ConfigDirectory))
+                Directory.Delete(services.ConfigDirectory, recursive: true);
+        }
     }
 }

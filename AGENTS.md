@@ -32,7 +32,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 | Add shared local paths or filesystem primitives | `/src/Tomix.Platform` | `CONTEXT.md` | BCL-only; no feature stores or external adapters |
 | Change command output | `/src/Tomix.Cli/Output`, `/tests/Tomix.Cli.Tests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts (`GetLsParityTests`, `PropertyCatalogTests`) |
 | Add TMDL or TOM support | `/src/Tomix.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
-| Add or change tests | `/tests` | `CONTEXT.md` | Prefer fast deterministic tests |
+| Add or change tests | `/tests` | `CONTEXT.md` (`Writing and maintaining tests`) | Prefer fast deterministic tests. Reuse the shared helpers, prefer `[Theory]` for input matrices, and prove a new test can fail before committing it |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
 | Change the docs site (pages, nav, theme) | `/docs`, `zensical.toml` | `docs/contributing.md` | Built with Zensical via uv; verify with `uv run zensical build --clean --strict` |
 | Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |

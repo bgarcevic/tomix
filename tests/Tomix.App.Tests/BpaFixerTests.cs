@@ -248,7 +248,9 @@ public sealed class BpaFixerTests
         var result = fixer.ApplyFixes(session, violations, rules);
 
         Assert.Equal(1, result.FixesApplied);
-        Assert.Null(session.LastSetPath?.Contains("T/B") == true ? "T/B" : null);
+
+        // Only the fixable violation is written; the CanFix: false one is never set.
+        Assert.Equal("T/A", session.LastSetPath);
     }
 
     [Fact]

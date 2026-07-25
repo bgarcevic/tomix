@@ -1,183 +1,108 @@
-using Tomix.Core.Results;
+using System.Text.RegularExpressions;
 
 namespace Tomix.App.Tests;
 
 /// <summary>
-/// Contract tests for the error codes emitted by mutation commands. The JSON envelope
-/// shape itself is pinned against the production serializer in
+/// Drift guard for the error codes emitted by <c>tx</c>. Codes are public API surface
+/// (see <c>docs/error-codes.md</c>), so every <c>TOMIX_*</c> literal in <c>src/</c> must be
+/// documented, and codes retired by the mutation-code migration must not come back.
+/// The JSON envelope shape itself is pinned against the production serializer in
 /// <c>Tomix.Cli.Tests.ErrorOutputContractTests</c>.
 /// </summary>
 public sealed class ErrorCodeContractTests
 {
-    // ── Mutation error codes ────────────────────────────────────────────────
-
-    [Theory]
-    [InlineData("TOMIX_MUTATION_UNSUPPORTED_PROVIDER")]
-    [InlineData("TOMIX_MUTATION_UNSUPPORTED")]
-    [InlineData("TOMIX_MUTATION_INVALID_VALUE")]
-    [InlineData("TOMIX_MUTATION_FAILED")]
-    [InlineData("TOMIX_MUTATION_SAVE_FAILED")]
-    public void MutationErrorCodes_AreValidUppercaseSnakeCase(string code)
-    {
-        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
-    }
-
-    // ── VertiPaq / VPAX error codes ─────────────────────────────────────────
+    private static readonly Regex TomixLiteral = new("\"(TOMIX_[A-Z0-9_]+)\"", RegexOptions.Compiled);
 
     /// <summary>
-    /// INVALID_FIELDS and INVALID_TOP are usage errors emitted by the CLI layer
-    /// (VertipaqCommand) rather than the handler; their actual emission through the
-    /// JSON error envelope is pinned in <c>Tomix.Cli.Tests.VertipaqCommandParseTests</c>.
+    /// Every <c>TOMIX_*</c> literal in production source — diagnostic codes and the supported
+    /// environment variables alike — is part of the documented surface. A new code that never
+    /// reaches <c>docs/error-codes.md</c> fails here.
     /// </summary>
-    [Theory]
-    [InlineData("TOMIX_VERTIPAQ_UNSUPPORTED_SOURCE")]
-    [InlineData("TOMIX_VERTIPAQ_FAILED")]
-    [InlineData("TOMIX_VERTIPAQ_TABLE_NOT_FOUND")]
-    [InlineData("TOMIX_VERTIPAQ_OPTIONS_CONFLICT")]
-    [InlineData("TOMIX_VERTIPAQ_INVALID_FIELDS")]
-    [InlineData("TOMIX_VERTIPAQ_INVALID_TOP")]
-    [InlineData("TOMIX_VPAX_READ_FAILED")]
-    [InlineData("TOMIX_VPAX_WRITE_FAILED")]
-    public void VertipaqErrorCodes_AreValidUppercaseSnakeCase(string code)
-    {
-        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
-    }
-
     [Fact]
-    public void MutationErrorCode_Failed_UsedForInvalidOperationException()
+    public void EveryTomixLiteralInSource_IsDocumented()
     {
-        var result = TomixResult<object>.Fail("TOMIX_MUTATION_FAILED", "Operation failed");
+        var documentation = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "error-codes.md"));
 
-        Assert.Equal("TOMIX_MUTATION_FAILED", result.Diagnostics.Single().Code);
+        var undocumented = SourceLiterals()
+            .Where(code => !documentation.Contains(code, StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(
+            undocumented.Count == 0,
+            $"Undocumented TOMIX_* literals in src/ — add them to docs/error-codes.md: {string.Join(", ", undocumented)}");
     }
-
-    [Fact]
-    public void MutationErrorCode_SaveFailed_HasExitCode2()
-    {
-        var result = TomixResult<object>.Fail("TOMIX_MUTATION_SAVE_FAILED", "IO error", exitCode: 2);
-
-        Assert.Equal(2, result.ExitCode);
-    }
-
-    // ── Query error codes ───────────────────────────────────────────────────
-
-    [Theory]
-    [InlineData("TOMIX_QUERY_REQUIRED")]
-    [InlineData("TOMIX_QUERY_INPUT_CONFLICT")]
-    [InlineData("TOMIX_QUERY_FILE_NOT_FOUND")]
-    [InlineData("TOMIX_QUERY_BAD_PARAM")]
-    [InlineData("TOMIX_QUERY_OUTPUT_FORMAT")]
-    [InlineData("TOMIX_QUERY_INVALID")]
-    [InlineData("TOMIX_QUERY_NO_REMOTE_TARGET")]
-    [InlineData("TOMIX_QUERY_UNSUPPORTED")]
-    [InlineData("TOMIX_QUERY_FAILED")]
-    public void QueryErrorCodes_AreValidUppercaseSnakeCase(string code)
-    {
-        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
-    }
-
-    // ── Regression-test error codes ─────────────────────────────────────────
-
-    [Theory]
-    [InlineData("TOMIX_TEST_PATH_NOT_FOUND")]
-    [InlineData("TOMIX_TEST_NONE_FOUND")]
-    [InlineData("TOMIX_TEST_BAD_PARAM")]
-    [InlineData("TOMIX_TEST_NO_REMOTE_TARGET")]
-    [InlineData("TOMIX_TEST_UNSUPPORTED")]
-    [InlineData("TOMIX_TEST_UPDATE_FAILED")]
-    public void TestErrorCodes_AreValidUppercaseSnakeCase(string code)
-    {
-        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
-        Assert.StartsWith("TOMIX_TEST_", code);
-    }
-
-    // ── Incremental-refresh error codes ─────────────────────────────────────
-
-    [Theory]
-    [InlineData("TOMIX_REFRESH_POLICY_NOT_FOUND")]
-    [InlineData("TOMIX_REFRESH_POLICY_INVALID")]
-    [InlineData("TOMIX_REFRESH_POLICY_UNSUPPORTED")]
-    [InlineData("TOMIX_REFRESH_POLICY_APPLY_FAILED")]
-    public void RefreshPolicyCodes_AreValidUppercaseSnakeCase(string code)
-    {
-        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
-        Assert.StartsWith("TOMIX_REFRESH_POLICY_", code);
-    }
-
-    [Fact]
-    public void RefreshPolicyInvalid_IncludesForceHint()
-    {
-        var result = TomixResult<object>.Fail(
-            "TOMIX_REFRESH_POLICY_INVALID",
-            "Refresh policy for 'Sales' has validation errors: ...",
-            hint: "Fix the reported issues or re-run with --force to save anyway.");
-
-        Assert.Contains("--force", result.Diagnostics.Single().Hint);
-    }
-
-    // ── Object lookup error codes ───────────────────────────────────────────
-
-    [Theory]
-    [InlineData("TOMIX_OBJECT_NOT_FOUND")]
-    [InlineData("TOMIX_OBJECT_AMBIGUOUS")]
-    public void ObjectLookupCodes_FollowTomixObjectPrefix(string code)
-    {
-        Assert.StartsWith("TOMIX_OBJECT_", code);
-    }
-
-    [Fact]
-    public void ObjectNotFound_IncludesHintInErrorJson()
-    {
-        var result = TomixResult<object>.Fail(
-            "TOMIX_OBJECT_NOT_FOUND",
-            "Object 'X' not found.",
-            hint: "Run 'tx ls' to list available objects.");
-
-        Assert.NotNull(result.Diagnostics.Single().Hint);
-    }
-
-    // ── Update error codes ──────────────────────────────────────────────────
-
-    [Theory]
-    [InlineData("TOMIX_UPDATE_CHECK_FAILED")]
-    [InlineData("TOMIX_UPDATE_VERSION_NOT_FOUND")]
-    [InlineData("TOMIX_UPDATE_UNSUPPORTED_INSTALL")]
-    [InlineData("TOMIX_UPDATE_TOOL_FAILED")]
-    [InlineData("TOMIX_UPDATE_DOWNLOAD_FAILED")]
-    [InlineData("TOMIX_UPDATE_CHECKSUM_MISMATCH")]
-    [InlineData("TOMIX_UPDATE_APPLY_FAILED")]
-    public void UpdateErrorCodes_AreValidUppercaseSnakeCase(string code)
-    {
-        Assert.Matches(@"^TOMIX_[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$", code);
-    }
-
-    // ── Deprecated/removed error codes (regression guard) ───────────────────
 
     /// <summary>
-    /// These codes were replaced by TOMIX_MUTATION_* codes and must NOT appear in
-    /// mutation command output. This test guards against accidental reintroduction.
+    /// The codes retired by the "Unified Mutation Error Codes" migration must not be emitted
+    /// again; the migration table in the docs is the source of truth for what is retired.
     /// </summary>
-    [Theory]
-    [InlineData("TOMIX_REPLACE_UNSUPPORTED")]
-    [InlineData("TOMIX_REPLACE_FAILED")]
-    [InlineData("TOMIX_REPLACE_SAVE_FAILED")]
-    [InlineData("TOMIX_SCRIPT_SAVE_UNSUPPORTED")]
-    [InlineData("TOMIX_SCRIPT_SAVE_FAILED")]
-    [InlineData("TOMIX_BPA_FIX_UNSUPPORTED")]
-    [InlineData("TOMIX_BPA_IGNORE_UNSUPPORTED")]
-    public void DeprecatedErrorCodes_AreNotUsedByMutationRunner(string deprecatedCode)
+    [Fact]
+    public void RetiredMutationErrorCodes_AreNotEmittedBySource()
     {
-        var activeCodes = new HashSet<string>
+        var retired = RetiredCodesFromDocs();
+        Assert.NotEmpty(retired); // guards against the docs table being renamed away
+
+        var resurrected = SourceLiterals().Intersect(retired, StringComparer.Ordinal).ToList();
+
+        Assert.True(
+            resurrected.Count == 0,
+            $"Retired error codes are emitted again by src/ — use the unified TOMIX_MUTATION_* codes: {string.Join(", ", resurrected)}");
+    }
+
+    /// <summary>Distinct <c>TOMIX_*</c> string literals across all production sources.</summary>
+    private static SortedSet<string> SourceLiterals()
+    {
+        var literals = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "src"), "*.cs", SearchOption.AllDirectories))
         {
-            "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
-            "TOMIX_MUTATION_UNSUPPORTED",
-            "TOMIX_MUTATION_INVALID_VALUE",
-            "TOMIX_MUTATION_FAILED",
-            "TOMIX_MUTATION_SAVE_FAILED",
-            "TOMIX_OBJECT_NOT_FOUND",
-            "TOMIX_OBJECT_AMBIGUOUS"
-        };
+            foreach (Match match in TomixLiteral.Matches(File.ReadAllText(file)))
+                literals.Add(match.Groups[1].Value);
+        }
 
-        Assert.DoesNotContain(deprecatedCode, activeCodes);
+        return literals;
+    }
+
+    /// <summary>
+    /// Old codes from the first column of the migration table in <c>docs/error-codes.md</c>.
+    /// Parsing stops at the next heading so the "What did not change" list — codes that are
+    /// still valid — is not treated as retired.
+    /// </summary>
+    private static SortedSet<string> RetiredCodesFromDocs()
+    {
+        var retired = new SortedSet<string>(StringComparer.Ordinal);
+        var inMigrationTable = false;
+
+        foreach (var line in File.ReadLines(Path.Combine(RepositoryRoot(), "docs", "error-codes.md")))
+        {
+            if (line.StartsWith("## Migration: Unified Mutation Error Codes", StringComparison.Ordinal))
+            {
+                inMigrationTable = true;
+                continue;
+            }
+
+            if (!inMigrationTable)
+                continue;
+
+            if (line.StartsWith('#'))
+                break;
+
+            var match = Regex.Match(line, @"^\|\s*`(TOMIX_[A-Z0-9_]+)`\s*\|");
+            if (match.Success)
+                retired.Add(match.Groups[1].Value);
+        }
+
+        return retired;
+    }
+
+    private static string RepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Tomix.slnx")))
+                return directory.FullName;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the repository root from the test output directory.");
     }
 }
