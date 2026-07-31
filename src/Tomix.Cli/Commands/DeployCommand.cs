@@ -4,6 +4,7 @@ using Tomix.App.Deploy;
 using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
+using Tomix.Core.Results;
 
 namespace Tomix.Cli.Commands;
 
@@ -71,6 +72,34 @@ internal sealed class DeployCommand : ICommandModule
         {
             Description = "Preview what would change on the remote target without deploying"
         };
+        var deployConnectionsOption = new Option<bool>("--deploy-connections")
+        {
+            Description = "Overwrite the target's data sources (default: keep the target's connection strings)"
+        };
+        var deployPartitionsOption = new Option<bool>("--deploy-partitions")
+        {
+            Description = "Overwrite the target's table partitions (default: keep the target's partitions and processed data)"
+        };
+        var deployPolicyPartitionsOption = new Option<bool>("--deploy-policy-partitions")
+        {
+            Description = "With --deploy-partitions: also overwrite incremental-refresh policy partitions, discarding processed data (default: keep them)"
+        };
+        var deploySharedExpressionsOption = new Option<bool>("--deploy-shared-expressions")
+        {
+            Description = "Overwrite the target's shared expressions / M parameters (default: keep the target's values)"
+        };
+        var deployRolesOption = new Option<bool>("--deploy-roles")
+        {
+            Description = "Overwrite the target's security roles (default: keep the target's roles)"
+        };
+        var deployRoleMembersOption = new Option<bool>("--deploy-role-members")
+        {
+            Description = "With --deploy-roles: also overwrite role members (default: keep the target's members)"
+        };
+        var deployFullOption = new Option<bool>("--deploy-full")
+        {
+            Description = "Overwrite everything, including incremental-refresh partitions (cannot be combined with other --deploy-* flags)"
+        };
 
         var command = new Command("deploy", "Deploy a semantic model to a workspace (--xmla for script-only, --skip-bpa to bypass)")
         {
@@ -83,12 +112,20 @@ internal sealed class DeployCommand : ICommandModule
             bpaRulesOption,
             forceOption,
             ciOption,
-            dryRunOption
+            dryRunOption,
+            deployConnectionsOption,
+            deployPartitionsOption,
+            deployPolicyPartitionsOption,
+            deploySharedExpressionsOption,
+            deployRolesOption,
+            deployRoleMembersOption,
+            deployFullOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
+            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             if (!CommandOutput.TryValidateFormat(parseResult, format, "deploy", OutputFormats.Text, OutputFormats.Json))
                 return 2;
@@ -124,6 +161,36 @@ internal sealed class DeployCommand : ICommandModule
             var database = parseResult.GetValue(GlobalOptions.Database);
             var dryRun = parseResult.GetValue(dryRunOption);
 
+            var deployFull = parseResult.GetValue(deployFullOption);
+            var granularFlags = new Option<bool>[]
+            {
+                deployConnectionsOption, deployPartitionsOption, deployPolicyPartitionsOption,
+                deploySharedExpressionsOption, deployRolesOption, deployRoleMembersOption
+            };
+            if (deployFull && granularFlags.Any(o => parseResult.GetResult(o) is { Implicit: false }))
+            {
+                // Same rendering pipeline as the handler's flag-dependency errors so all
+                // deploy flag failures look alike (and stay structured under JSON output).
+                return CommandOutput.Render(
+                    TomixResult<DeployModelResult>.Fail(
+                        "TOMIX_DEPLOY_INVALID_FLAGS",
+                        "--deploy-full cannot be combined with other --deploy-* flags.",
+                        exitCode: 2),
+                    format,
+                    errorFormat,
+                    data => DeployRenderer.Render(data, reference.Value));
+            }
+
+            var deployOptions = deployFull
+                ? ModelDeployOptions.Full
+                : new ModelDeployOptions(
+                    DeployConnections: parseResult.GetValue(deployConnectionsOption),
+                    DeployPartitions: parseResult.GetValue(deployPartitionsOption),
+                    DeploySharedExpressions: parseResult.GetValue(deploySharedExpressionsOption),
+                    DeployRoles: parseResult.GetValue(deployRolesOption),
+                    DeployRoleMembers: parseResult.GetValue(deployRoleMembersOption),
+                    DeployPolicyPartitions: parseResult.GetValue(deployPolicyPartitionsOption));
+
             if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
                 "Deploy", $"{database ?? reference.Value} to {server ?? "workspace"}",
                 parseResult.GetValue(GlobalOptions.Yes),
@@ -146,7 +213,8 @@ internal sealed class DeployCommand : ICommandModule
                         parseResult.GetValue(xmlaOption),
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(ciOption),
-                        dryRun),
+                        dryRun,
+                        deployOptions),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 
@@ -162,6 +230,7 @@ internal sealed class DeployCommand : ICommandModule
             return CommandOutput.Render(
                 result,
                 format,
+                errorFormat,
                 data => DeployRenderer.Render(data, reference.Value));
         });
 

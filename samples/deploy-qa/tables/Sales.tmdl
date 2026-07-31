@@ -1,0 +1,30 @@
+/// Refresh-policy table. Its partitions are the ones a metadata deploy must never discard: on a refreshed target they hold processed incremental-refresh data.
+table Sales
+
+	refreshPolicy
+		policyType: basic
+		rollingWindowGranularity: year
+		rollingWindowPeriods: 3
+		incrementalGranularity: month
+		incrementalPeriods: 2
+		sourceExpression = let Source = #table(type table [OrderDate = datetime, CustomerID = Int64.Type, Amount = number], {{#datetime(2024, 6, 1, 0, 0, 0), 1, 100}}), Filtered = Table.SelectRows(Source, each [OrderDate] >= RangeStart and [OrderDate] < RangeEnd) in Filtered
+
+	measure 'Total Amount' = SUM ( Sales[Amount] )
+		formatString: #,0.00
+
+	column OrderDate
+		dataType: dateTime
+		sourceColumn: OrderDate
+
+	column CustomerID
+		dataType: int64
+		sourceColumn: CustomerID
+
+	column Amount
+		dataType: double
+		sourceColumn: Amount
+
+	partition Sales = m
+		mode: import
+		source = let Source = #table(type table [OrderDate = datetime, CustomerID = Int64.Type, Amount = number], {{#datetime(2024, 6, 1, 0, 0, 0), 1, 100}}), Filtered = Table.SelectRows(Source, each [OrderDate] >= RangeStart and [OrderDate] < RangeEnd) in Filtered
+

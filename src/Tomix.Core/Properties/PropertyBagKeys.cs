@@ -8,6 +8,7 @@ namespace Tomix.Core.Properties;
 public static class PropertyBagKeys
 {
     public const string DataType = "DataType";
+    public const string ColumnType = "ColumnType";
     public const string FormatString = "FormatString";
     public const string DisplayFolder = "DisplayFolder";
     public const string DataCategory = "DataCategory";

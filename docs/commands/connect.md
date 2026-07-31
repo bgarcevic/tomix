@@ -41,9 +41,13 @@ tx deploy [model] [options]
 
 Runs the BPA gate before deploying (configured via `.te-bpa.json`).
 
+Without `-s/--server`, the target comes from the active connection: a remote connection
+deploys to itself, and a local connection with a workspace-mode mirror deploys to the
+mirror.
+
 | Option | Description |
 |--------|-------------|
-| `--dry-run` | Preview what would change on the remote target. |
+| `--dry-run` | Preview what the deploy would change on the target (`+` = added to the target, `-` = removed from it). Reports every difference, without accounting for what [granular deployment](#granular-deployment) preserves — see the caveat below. |
 | `--xmla <file>` | Generate the XMLA/TMSL script to a file instead of deploying (`-` for stdout). |
 | `--create-only` | Only create a new model; fail if it already exists. |
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or auto-fix violations before deploying. |
@@ -57,6 +61,61 @@ tx deploy ./model.tmdl --dry-run
 tx deploy --server MyWorkspace --database Sales
 tx deploy ./model.bim --xmla deploy.xmla
 ```
+
+### Granular deployment
+
+When the target model already exists, `deploy` preserves everything the target owns by
+default: partitions (including processed incremental-refresh data), data source connection
+strings, shared expressions (M parameters), roles, and role members. Only the model
+structure — tables, columns, measures, relationships — is overwritten. Each aspect can be
+opted into deployment individually:
+
+| Option | Description |
+|--------|-------------|
+| `--deploy-connections` | Overwrite the target's data sources. Default keeps the target's connection strings and bound credentials. |
+| `--deploy-partitions` | Overwrite the target's table partitions. Default keeps the target's partitions and their processed data. Calculated tables and calculation groups are exempt: their partitions *are* model structure (a DAX expression), so they always deploy from the source. |
+| `--deploy-policy-partitions` | With `--deploy-partitions`: also overwrite incremental-refresh policy partitions. Default keeps them even when other partitions deploy, so processed history is never discarded by accident. |
+| `--deploy-shared-expressions` | Overwrite the target's shared expressions (M parameters). Default keeps the target's values; expressions new in the source always deploy. |
+| `--deploy-roles` | Overwrite the target's security roles. Default keeps the target's roles untouched. |
+| `--deploy-role-members` | With `--deploy-roles`: also overwrite role members. Default keeps the target's membership even when role definitions deploy. |
+| `--deploy-full` | Overwrite everything from the source, including incremental-refresh partitions. Cannot be combined with the other `--deploy-*` flags. |
+
+Preservation only applies to an existing target; the first deploy of a model always ships
+the full source. `--xmla` reads the target when any aspect is preserved so the generated
+script matches what a real deploy would execute — use `--deploy-full` to generate a script
+offline. Generated scripts never contain credentials: only a direct deploy carries
+restricted connection-string information. On targets with `dataSource` objects (Azure AS,
+SSAS — Power BI and Fabric models keep connections in M instead), this means an `--xmla`
+script is **not** equivalent to a direct deploy: `createOrReplace` replaces each data
+source with the credential-stripped copy in the script, so executing it disconnects those
+data sources until credentials are re-entered on the server. Prefer a direct deploy when
+data sources are in play; treat `--xmla` output as a preview or an
+audit artifact there, not a deployment vehicle.
+
+```sh
+tx deploy ./model.tmdl                                   # promote structure, keep target data and config
+tx deploy ./model.tmdl --deploy-roles                    # also push RLS definitions, keep members
+tx deploy ./model.tmdl --deploy-partitions               # push partitions, keep incremental-refresh data
+tx deploy ./model.tmdl --deploy-full                     # overwrite everything (first-deploy semantics)
+```
+
+!!! warning "`--dry-run` does not yet account for preservation"
+
+    The preview compares the source against the target and lists every difference it finds,
+    including in aspects the deploy will keep. A target whose connection strings, M parameter
+    values, or role members differ from the source therefore shows those as changes even
+    under the preserving default, where they will not be touched.
+
+    It errs toward listing too much, never too little, so it will not report data as safe
+    that is about to be overwritten. But it cannot currently be used to confirm preservation
+    is working. To see exactly what a deploy would send, generate the payload — it reads the
+    target and applies the same merge the deploy does:
+
+    ```sh
+    tx deploy ./model.tmdl --xmla preview.xmla --yes
+    ```
+
+    Tracked in [issue #128](https://github.com/bgarcevic/tomix-cli/issues/128).
 
 ## `refresh` — trigger a data refresh
 

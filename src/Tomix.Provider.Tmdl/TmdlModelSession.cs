@@ -114,8 +114,8 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
         CancellationToken cancellationToken)
         => TomModelDeployer.DeployAsync(GetDatabase(), request, _tokenProvider, cancellationToken);
 
-    public string GenerateScript(ModelDeployRequest request)
-        => TomModelDeployer.GenerateScript(GetDatabase(), request);
+    public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken)
+        => TomModelDeployer.GenerateScriptAsync(GetDatabase(), request, _tokenProvider, cancellationToken);
 
     private Database GetDatabase()
     {

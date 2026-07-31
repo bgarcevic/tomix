@@ -7,6 +7,10 @@ Small sample models used by tests and documentation.
 - `basic-tmdl/` — minimal TMDL folder model (3 tables, 4 measures); the primary test fixture.
 - `basic-tmdl.bim` — the same model as a single BIM file.
 - `Artificial Intelligence Sample.*` — a PBIP project (report + semantic model) for realistic-scale scenarios.
+- `deploy-qa/` — TMDL folder carrying one of every aspect `tx deploy` can preserve: shared
+  expressions, roles with table permissions, plain and multi-partition tables, a refresh-policy
+  table, and a calculated table. Deployed to a sandbox it becomes the target that makes granular
+  deployment QA conclusive. See `/scripts/qa/README.md`.
 
 ## Responsibilities
 

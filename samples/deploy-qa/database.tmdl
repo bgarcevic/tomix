@@ -1,0 +1,3 @@
+database deploy-qa
+	compatibilityLevel: 1601
+	compatibilityMode: powerBI

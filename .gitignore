@@ -142,3 +142,11 @@ _NCrunch*
 site/
 .cache/
 .venv/
+
+# Deploy QA output. Generated TMSL carries the full structure of whatever model was
+# pointed at — table, column and measure names plus DAX/M — so a real model's scripts
+# must never land in this public repo. scripts/qa/deploy-script-matrix.sh writes here
+# by default. Anchored to the repo root: unanchored, it also swallows the checked-in
+# samples/deploy-qa fixture, which is the input to that harness rather than its output.
+/deploy-qa/
+*.xmla

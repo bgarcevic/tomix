@@ -1,0 +1,12 @@
+/// Environment-specific parameter. A real target's value belongs to the target, so a preserving deploy must not overwrite it.
+expression Environment = "development" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+
+/// Second parameter, so preservation is visibly per-name rather than whole-collection.
+expression WarehouseName = "qa_warehouse_dev" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+
+/// Lower bound required by the refresh policy on Sales.
+expression RangeStart = #datetime(2024, 1, 1, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]
+
+/// Upper bound required by the refresh policy on Sales.
+expression RangeEnd = #datetime(2025, 1, 1, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]
+

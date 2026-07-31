@@ -1,0 +1,15 @@
+/// Calculated table. Calculated partitions always come from the source, whatever the deploy flags say.
+table 'Sales Summary'
+
+	column Country
+		isNameInferred
+		sourceColumn: Country
+
+	column Amount
+		isNameInferred
+		sourceColumn: Amount
+
+	partition 'Sales Summary' = calculated
+		mode: import
+		source = SUMMARIZECOLUMNS ( Customers[Country], "Amount", SUM ( Sales[Amount] ) )
+

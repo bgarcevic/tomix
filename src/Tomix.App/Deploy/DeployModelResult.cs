@@ -16,4 +16,6 @@ public sealed record DeployModelResult(
     string? ScriptPath,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Script,
-    DiffModelResult? Diff = null);
+    DiffModelResult? Diff = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? DiffError = null);

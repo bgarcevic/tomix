@@ -233,8 +233,8 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
         CancellationToken cancellationToken)
         => TomModelDeployer.DeployAsync(_database, request, _tokenProvider, cancellationToken);
 
-    public string GenerateScript(ModelDeployRequest request)
-        => TomModelDeployer.GenerateScript(_database, request);
+    public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken)
+        => TomModelDeployer.GenerateScriptAsync(_database, request, _tokenProvider, cancellationToken);
 
     public Task<ModelRefreshResult> RefreshAsync(
         ModelRefreshRequest request,

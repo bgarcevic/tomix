@@ -1,0 +1,22 @@
+/// Ordinary import table with a single partition whose query reads the Environment parameter.
+table Customers
+
+	measure 'Customer Count' = COUNTROWS ( Customers )
+		formatString: #,0
+
+	column CustomerID
+		dataType: int64
+		sourceColumn: CustomerID
+
+	column CustomerName
+		dataType: string
+		sourceColumn: CustomerName
+
+	column Country
+		dataType: string
+		sourceColumn: Country
+
+	partition Customers = m
+		mode: import
+		source = let Source = #table(type table [CustomerID = Int64.Type, CustomerName = text, Country = text], {{1, "Contoso (" & Environment & ")", "DK"}, {2, "Fabrikam (" & Environment & ")", "SE"}}) in Source
+

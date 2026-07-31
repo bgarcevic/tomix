@@ -1,0 +1,4 @@
+/// Second role with no table permissions, so role preservation is visibly whole-collection.
+role 'QA Admin'
+	modelPermission: read
+

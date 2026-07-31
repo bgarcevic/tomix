@@ -36,10 +36,16 @@ internal static class DeployRenderer
                 foreach (var change in result.Diff.Changes)
                     RenderDiffChange(change);
             }
+            else if (result.DiffError is not null)
+            {
+                AnsiConsole.MarkupLine(Styling.Warning(
+                    $"Diff unavailable: {Styling.MarkupEscape(result.DiffError)}"));
+                AnsiConsole.MarkupLine(Styling.Muted("Showing deploy plan only."));
+            }
             else
             {
                 AnsiConsole.MarkupLine(Styling.Muted(
-                    "Remote target not reachable or not specified — showing deploy plan only."));
+                    "No remote target specified — showing deploy plan only."));
             }
 
             return;

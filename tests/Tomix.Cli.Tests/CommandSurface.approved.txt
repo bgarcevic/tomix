@@ -189,6 +189,13 @@ Deploy a semantic model to a workspace (--xmla for script-only, --skip-bpa to by
   opt --force  Force deployment, bypassing validation checks
   opt --ci <ci>  Emit CI logging commands to stderr: vsts (Azure DevOps), github (GitHub Actions)
   opt --dry-run  Preview what would change on the remote target without deploying
+  opt --deploy-connections  Overwrite the target's data sources (default: keep the target's connection strings)
+  opt --deploy-partitions  Overwrite the target's table partitions (default: keep the target's partitions and processed data)
+  opt --deploy-policy-partitions  With --deploy-partitions: also overwrite incremental-refresh policy partitions, discarding processed data (default: keep them)
+  opt --deploy-shared-expressions  Overwrite the target's shared expressions / M parameters (default: keep the target's values)
+  opt --deploy-roles  Overwrite the target's security roles (default: keep the target's roles)
+  opt --deploy-role-members  With --deploy-roles: also overwrite role members (default: keep the target's members)
+  opt --deploy-full  Overwrite everything, including incremental-refresh partitions (cannot be combined with other --deploy-* flags)
 
 # tx deps
 Analyze object dependencies (upstream/downstream)

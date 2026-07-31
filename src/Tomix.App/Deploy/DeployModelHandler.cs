@@ -31,6 +31,19 @@ public sealed class DeployModelHandler
         DeployModelRequest request,
         CancellationToken cancellationToken)
     {
+        var deployOptions = request.DeployOptions ?? ModelDeployOptions.Preserve;
+        if (deployOptions.DeployRoleMembers && !deployOptions.DeployRoles)
+            return TomixResult<DeployModelResult>.Fail(
+                "TOMIX_DEPLOY_INVALID_FLAGS",
+                "--deploy-role-members requires --deploy-roles: members cannot be overwritten while the target's role definitions are preserved.",
+                exitCode: 2);
+
+        if (deployOptions.DeployPolicyPartitions && !deployOptions.DeployPartitions)
+            return TomixResult<DeployModelResult>.Fail(
+                "TOMIX_DEPLOY_INVALID_FLAGS",
+                "--deploy-policy-partitions requires --deploy-partitions.",
+                exitCode: 2);
+
         if (request.Model.Value.Length == 0)
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_MODEL",
@@ -74,31 +87,63 @@ public sealed class DeployModelHandler
             server,
             database,
             request.CreateOnly,
-            request.Force);
+            request.Force,
+            deployOptions);
 
         if (request.DryRun)
         {
             DiffModelResult? diff = null;
+            string? diffError = null;
 
             if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(database))
             {
-                var remoteRef = ModelReference.Remote(server, database);
+                // Normalize so a bare workspace name (-s MyWorkspace) becomes a real endpoint,
+                // matching what the deployer does internally. The reference has to read as
+                // remote for the diff to treat the target as a processed database.
+                var remoteRef = ModelReference.Remote(
+                    ModelReference.NormalizeEndpoint(server), database);
                 var diffHandler = new DiffModelHandler(_providers);
+                // Target first: the dry run answers "what will this deploy change on the
+                // target", so added/removed/old→new must read in the deploy's direction.
                 var diffResult = await diffHandler.HandleAsync(
-                    new DiffModelRequest(request.Model, remoteRef),
+                    new DiffModelRequest(remoteRef, request.Model),
                     cancellationToken);
 
                 if (diffResult.Success)
                     diff = diffResult.Data;
+                else
+                    // Keep the reason: "target unreachable" and "diff failed" are different
+                    // situations and the dry-run output should not conflate them.
+                    diffError = diffResult.Diagnostics.Count > 0 ? diffResult.Diagnostics[0].Message : null;
             }
 
             return TomixResult<DeployModelResult>.Ok(new DeployModelResult(
-                server, database ?? request.Model.Value, "dry-run", null, null, null, diff));
+                server, database ?? request.Model.Value, "dry-run", null, null, null, diff, diffError));
         }
 
         if (!string.IsNullOrWhiteSpace(request.XmlaOutput))
         {
-            var script = deployer.GenerateScript(deployRequest);
+            string script;
+            try
+            {
+                // Preservation options require reading the target so the script matches what a
+                // real deploy would execute; a full deploy is scripted offline.
+                script = await deployer.GenerateScriptAsync(deployRequest, cancellationToken);
+            }
+            catch (AuthenticationRequiredException ex)
+            {
+                return TomixResult<DeployModelResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
+                    hint: "Run 'tx auth login' to authenticate, or use --deploy-full to script without reading the target.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException and not ModelLoadException)
+            {
+                return TomixResult<DeployModelResult>.Fail(
+                    "TOMIX_DEPLOY_FAILED",
+                    $"Cannot read target '{server}' to build the script: {ex.InnerException?.Message ?? ex.Message}",
+                    exitCode: 1,
+                    hint: "The script must reflect preserved target objects. Use --deploy-full to script without reading the target.");
+            }
+
             var scriptPath = request.XmlaOutput;
 
             if (scriptPath == "-")
@@ -253,7 +298,16 @@ public sealed class DeployModelHandler
 
         var session = resolveSession();
         if (session is not null)
-            return (session.Server, session.Database ?? request.Database);
+        {
+            if (!string.IsNullOrWhiteSpace(session.Server))
+                return (session.Server, session.Database ?? request.Database);
+
+            // Local primary with a remote workspace-mode mirror: deploy targets the mirror,
+            // matching refresh's primary-if-remote-else-secondary resolution.
+            var mirror = ActiveModelResolver.ResolveSyncTarget(session);
+            if (mirror is not null && mirror.IsRemote)
+                return (mirror.Value, mirror.Database ?? request.Database);
+        }
 
         return (null, request.Database);
     }

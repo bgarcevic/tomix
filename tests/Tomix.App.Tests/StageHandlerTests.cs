@@ -209,7 +209,7 @@ public sealed class StageHandlerTests
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
             => Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "updated", 42));
 
-        public string GenerateScript(ModelDeployRequest request) => "";
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
     }
 
     private sealed class StubExportProvider : IModelProvider

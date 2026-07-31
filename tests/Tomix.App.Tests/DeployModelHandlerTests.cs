@@ -32,6 +32,170 @@ public sealed class DeployModelHandlerTests
         Assert.Equal(2, result.ExitCode);
     }
 
+    /// <summary>
+    /// A local active connection with a remote workspace-mode mirror (the edit-locally,
+    /// deploy-to-workspace workflow) must resolve the mirror as the deploy target instead of
+    /// failing with TOMIX_DEPLOY_NO_TARGET, matching refresh's target resolution.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_LocalSessionWithRemoteMirror_TargetsMirror()
+    {
+        var session = new Tomix.App.State.CliConnectionState(
+            Server: null,
+            Database: "Bosteder",
+            Model: "samples/basic-tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/sandbox");
+
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState, () => session);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: null,
+                Database: null,
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/sandbox", result.Data!.Server);
+        Assert.Equal("Bosteder", result.Data.Database);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReturnsFail_WhenRoleMembersWithoutRoles()
+    {
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null,
+                DeployOptions: new ModelDeployOptions(DeployRoleMembers: true)),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_DEPLOY_INVALID_FLAGS", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReturnsFail_WhenPolicyPartitionsWithoutPartitions()
+    {
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null,
+                DeployOptions: new ModelDeployOptions(DeployPolicyPartitions: true)),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_DEPLOY_INVALID_FLAGS", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_FullOptions_PassValidation()
+    {
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null,
+                DeployOptions: ModelDeployOptions.Full),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+    }
+
+    /// <summary>
+    /// The dry-run diff answers "what will this deploy change on the target": an object that
+    /// exists in the source but not on the target must read as "added" (it will be added to
+    /// the target), not "removed".
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_DryRun_DiffsInDeployDirection()
+    {
+        var source = SnapshotWithMeasure(includeMeasure: true);
+        var target = SnapshotWithMeasure(includeMeasure: false);
+        var provider = new DirectionalDeployProvider(
+            reference => reference.Value == "local-model" ? source : target);
+
+        var handler = new DeployModelHandler([provider], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("local-model"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null,
+                DryRun: true),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var change = Assert.Single(result.Data!.Diff!.Changes);
+        Assert.Equal("added", change.Action);
+        Assert.Equal("Sales/Total Sales", change.Path);
+    }
+
+    private static ModelSnapshot SnapshotWithMeasure(bool includeMeasure)
+    {
+        var children = new List<ModelObject>();
+        if (includeMeasure)
+            children.Add(new ModelObject(
+                "Total Sales", ModelObjectKind.Measure, "Sales/Total Sales",
+                Detail: null, Expression: "SUM(Sales[Amount])", Description: null, Hidden: false,
+                SourceColumn: null, Children: []));
+
+        var table = new ModelObject(
+            "Sales", ModelObjectKind.Table, "Sales",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: children);
+
+        return new ModelSnapshot("stub", 1601, [table]);
+    }
+
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenNoProviderMatches()
     {
@@ -216,11 +380,42 @@ public sealed class DeployModelHandlerTests
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
             => throw Load();
 
-        public string GenerateScript(ModelDeployRequest request)
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
             => throw Load();
 
         private static ModelLoadException Load()
             => new("Cannot load model from 'broken.bim': unparsable.", new InvalidOperationException("inner"));
+    }
+
+    /// <summary>
+    /// Serves a different snapshot per reference so the dry-run diff sees distinct source and
+    /// target models; deploy-capable because the handler requires it of the source session.
+    /// </summary>
+    private sealed class DirectionalDeployProvider(Func<ModelReference, ModelSnapshot> snapshots) : IModelProvider
+    {
+        public bool CanOpen(ModelReference _) => true;
+
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
+            => Task.FromResult<IModelSession>(new DirectionalDeploySession(snapshots(reference)));
+    }
+
+    private sealed class DirectionalDeploySession(ModelSnapshot snapshot) : IModelSession, IModelDeploySession
+    {
+        public string SourcePath => "";
+
+        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
+            => Task.FromResult(new ModelSummary("stub", 1601, 1, 0, 1, 0, 0));
+
+        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
+            => Task.FromResult(snapshot);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
+            => Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "created", 42));
+
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
+            => Task.FromResult("{}");
     }
 
     private sealed class StubDeployProvider : IModelProvider
@@ -246,8 +441,8 @@ public sealed class DeployModelHandlerTests
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
             => Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "created", 42));
 
-        public string GenerateScript(ModelDeployRequest request)
-            => $"{{\"createOrReplace\":{{\"object\":{{\"database\":\"{request.Database ?? "stub"}\"}},\"database\":{{\"name\":\"{request.Database ?? "stub"}\",\"compatibilityLevel\":1601}}}}}}";
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
+            => Task.FromResult($"{{\"createOrReplace\":{{\"object\":{{\"database\":\"{request.Database ?? "stub"}\"}},\"database\":{{\"name\":\"{request.Database ?? "stub"}\",\"compatibilityLevel\":1601}}}}}}");
     }
 
     private sealed class StubDeployOnlyProvider : IModelProvider
@@ -287,8 +482,8 @@ public sealed class DeployModelHandlerTests
             return Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "created", 42));
         }
 
-        public string GenerateScript(ModelDeployRequest request)
-            => $"{{\"createOrReplace\":{{\"object\":{{\"database\":\"{request.Database ?? "stub"}\"}},\"database\":{{\"name\":\"{request.Database ?? "stub"}\",\"compatibilityLevel\":1601}}}}}}";
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
+            => Task.FromResult($"{{\"createOrReplace\":{{\"object\":{{\"database\":\"{request.Database ?? "stub"}\"}},\"database\":{{\"name\":\"{request.Database ?? "stub"}\",\"compatibilityLevel\":1601}}}}}}");
 
         private static ModelObject EmptyRole()
             => new("Empty", ModelObjectKind.Role, "Roles/Empty",

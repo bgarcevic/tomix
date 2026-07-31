@@ -172,7 +172,7 @@ public sealed class SaveModelHandlerTests
             throw new InvalidOperationException("Deploy failed for test purposes.");
         }
 
-        public string GenerateScript(ModelDeployRequest request) => "";
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
     }
 
     private sealed class StubExportOnlyProvider : IModelProvider

@@ -31,7 +31,10 @@ internal static class WorkspaceSync
         try
         {
             await deployer.DeployAsync(
-                new ModelDeployRequest(syncTarget.Value, syncTarget.Database, CreateOnly: false, Force: force),
+                // Full overwrite: the session's model came from this same workspace plus the
+                // user's mutations; preserving target objects would silently revert them.
+                new ModelDeployRequest(syncTarget.Value, syncTarget.Database, CreateOnly: false, Force: force,
+                    Options: ModelDeployOptions.Full),
                 cancellationToken);
 
             return (true, targetLabel, null);

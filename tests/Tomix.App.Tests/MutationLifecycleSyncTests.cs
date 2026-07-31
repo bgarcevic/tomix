@@ -22,6 +22,27 @@ public sealed class MutationLifecycleSyncTests
         Assert.Null(outcome.SyncWarning);
     }
 
+    /// <summary>
+    /// Drift guard for the one deploy in the product that is deliberately NOT preserve-by-default.
+    /// The mutation the user just made may be to a partition, a data source, or a role member, and
+    /// preserving those on the mirror would silently discard the edit they asked for. Granular
+    /// deployment made <c>Preserve</c> the default everywhere else, so this line is one careless
+    /// "make it consistent" away from breaking, and nothing else would notice.
+    ///
+    /// Note the cost this accepts: a mirror carrying incremental-refresh partitions loses their
+    /// processed data on every synced mutation. See issue #129.
+    /// </summary>
+    [Fact]
+    public async Task CompleteAsync_SyncsAsFullDeploy_NotPreserving()
+    {
+        var session = new StubMutationSession(deploySucceeds: true);
+
+        await MutationLifecycle.CompleteAsync(
+            session, NewSaveContext(SyncTarget), "set", "set X", CancellationToken.None);
+
+        Assert.Equal(ModelDeployOptions.Full, session.LastDeployRequest?.EffectiveOptions);
+    }
+
     [Fact]
     public async Task CompleteAsync_SetsWarning_WhenDeployFails()
     {
@@ -144,6 +165,8 @@ public sealed class MutationLifecycleSyncTests
 
         public StubMutationSession(bool deploySucceeds) => _deploySucceeds = deploySucceeds;
 
+        public ModelDeployRequest? LastDeployRequest { get; private set; }
+
         public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
             => new(request.Path, Changed: true);
 
@@ -161,13 +184,14 @@ public sealed class MutationLifecycleSyncTests
 
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
         {
+            LastDeployRequest = request;
             if (_deploySucceeds)
                 return Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "updated", 42));
 
             throw new InvalidOperationException("Deploy failed for test purposes.");
         }
 
-        public string GenerateScript(ModelDeployRequest request) => "";
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
     }
 
     private sealed class CancellingDeploySession : IModelDeploySession
@@ -175,7 +199,7 @@ public sealed class MutationLifecycleSyncTests
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
             => throw new OperationCanceledException();
 
-        public string GenerateScript(ModelDeployRequest request) => "";
+        public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
     }
 
     private sealed class StubNonDeployMutationSession : IModelMutationSession

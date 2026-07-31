@@ -1,0 +1,19 @@
+/// Two manual partitions, so a partition deploy is visibly a whole-collection replacement rather than a per-partition merge.
+table Products
+
+	column ProductID
+		dataType: int64
+		sourceColumn: ProductID
+
+	column ProductName
+		dataType: string
+		sourceColumn: ProductName
+
+	partition Products-Current = m
+		mode: import
+		source = let Source = #table(type table [ProductID = Int64.Type, ProductName = text], {{1, "Widget"}}) in Source
+
+	partition Products-Archive = m
+		mode: import
+		source = let Source = #table(type table [ProductID = Int64.Type, ProductName = text], {{2, "Discontinued Widget"}}) in Source
+

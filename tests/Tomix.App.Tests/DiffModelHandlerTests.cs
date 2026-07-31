@@ -68,6 +68,146 @@ public sealed class DiffModelHandlerTests
         return new ModelSnapshot("stub", 1601, [sales]);
     }
 
+    /// <summary>
+    /// Snapshot paths are not globally unique: a table named "Alder" with a column "Alder" and
+    /// the default partition "Alder" produces three distinct objects sharing the path
+    /// "Alder/Alder". Diff must key by kind+path instead of crashing on the duplicate
+    /// ("An item with the same key has already been added").
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_ToleratesSameNamedSiblings_AndComparesLikeWithLike()
+    {
+        var changes = await Diff(
+            SelfNamedTableSnapshot(columnHidden: false),
+            SelfNamedTableSnapshot(columnHidden: true));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("modified", change.Action);
+        Assert.Equal("IsHidden", change.Path);
+        Assert.Equal("Column/Alder/Alder", change.ObjectType);
+    }
+
+    private static ModelSnapshot SelfNamedTableSnapshot(bool columnHidden)
+    {
+        var column = new ModelObject(
+            "Alder", ModelObjectKind.Column, "Alder/Alder",
+            Detail: "int64", Expression: null, Description: null, Hidden: columnHidden,
+            SourceColumn: "Alder", Children: []);
+        var partition = new ModelObject(
+            "Alder", ModelObjectKind.Partition, "Alder/Alder",
+            Detail: "m", Expression: "let Source = Sql in Source", Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var table = new ModelObject(
+            "Alder", ModelObjectKind.Table, "Alder",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [column, partition]);
+
+        return new ModelSnapshot("stub", 1601, [table]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_IgnoresMeasureDataType_WhenLiveTargetIsUnprocessed()
+    {
+        // A measure's data type is engine-computed at process time; source files carry none.
+        // Against a live database, absent-vs-present is processing state, not an authored change
+        // (both-present changes are still reported — see HandleAsync_ReportsCatalogDiffableChanges).
+        var unprocessed = Snapshot(measureBag: new Dictionary<string, string>
+        {
+            [PropertyBagKeys.FormatString] = "#,0"
+        });
+        var processed = Snapshot(measureBag: new Dictionary<string, string>
+        {
+            [PropertyBagKeys.FormatString] = "#,0",
+            [PropertyBagKeys.DataType] = "Decimal"
+        });
+
+        Assert.Empty(await DiffAgainstLiveTarget(unprocessed, processed));
+        Assert.Empty(await DiffAgainstLiveTarget(processed, unprocessed));
+    }
+
+    /// <summary>
+    /// The suppression is scoped to live targets: between two authored sources, a data type on
+    /// only one side is an authored difference, and hiding it would report unequal models as
+    /// identical.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_ReportsMeasureDataType_BetweenTwoAuthoredSources()
+    {
+        var without = Snapshot(measureBag: new Dictionary<string, string>());
+        var with = Snapshot(measureBag: new Dictionary<string, string>
+        {
+            [PropertyBagKeys.DataType] = "Decimal"
+        });
+
+        var change = Assert.Single(await Diff(without, with));
+        Assert.Equal("DataType", change.Path);
+        Assert.Equal("Decimal", change.NewValue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_IgnoresCalculatedTableColumns_PresentOnLiveTargetOnly()
+    {
+        // Calculated-table columns are materialized by the engine when the table's expression
+        // is evaluated, so a processed database has them while the source files don't. Only
+        // the authored (regular) column counts as a real addition.
+        var changes = await DiffAgainstLiveTarget(
+            CalcTableSnapshot(withEngineColumns: false),
+            CalcTableSnapshot(withEngineColumns: true));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("added", change.Action);
+        Assert.Equal("PnL/Authored", change.Path);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsCalculatedTableColumns_BetweenTwoAuthoredSources()
+    {
+        var changes = await Diff(
+            CalcTableSnapshot(withEngineColumns: false),
+            CalcTableSnapshot(withEngineColumns: true));
+
+        Assert.Contains(changes, c => c.Action == "added" && c.Path == "PnL/Group");
+        Assert.Contains(changes, c => c.Action == "added" && c.Path == "PnL/Authored");
+    }
+
+    [Fact]
+    public async Task HandleAsync_ComparesCalculatedTableColumns_PresentOnBothSides()
+    {
+        var changes = await Diff(
+            CalcTableSnapshot(withEngineColumns: true, engineColumnHidden: false),
+            CalcTableSnapshot(withEngineColumns: true, engineColumnHidden: true));
+
+        var change = Assert.Single(changes, c => c.ObjectType == "Column/PnL/Group");
+        Assert.Equal("IsHidden", change.Path);
+    }
+
+    private static ModelSnapshot CalcTableSnapshot(bool withEngineColumns, bool engineColumnHidden = false)
+    {
+        var children = new List<ModelObject>();
+        if (withEngineColumns)
+        {
+            children.Add(new ModelObject(
+                "Group", ModelObjectKind.Column, "PnL/Group",
+                Detail: "string", Expression: null, Description: null, Hidden: engineColumnHidden,
+                SourceColumn: null, Children: [],
+                Properties: new Dictionary<string, string>
+                {
+                    [PropertyBagKeys.ColumnType] = "CalculatedTableColumn"
+                }));
+            children.Add(new ModelObject(
+                "Authored", ModelObjectKind.Column, "PnL/Authored",
+                Detail: "string", Expression: null, Description: null, Hidden: false,
+                SourceColumn: "Authored", Children: []));
+        }
+
+        var table = new ModelObject(
+            "PnL", ModelObjectKind.Table, "PnL",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: children);
+
+        return new ModelSnapshot("stub", 1601, [table]);
+    }
+
     [Fact]
     public async Task HandleAsync_ReportsNoChanges_WhenBagsMatch()
     {
@@ -92,11 +232,20 @@ public sealed class DiffModelHandlerTests
         Assert.Equal(0, provider.OpenCount);
     }
 
-    private static async Task<IReadOnlyList<DiffChange>> Diff(ModelSnapshot left, ModelSnapshot right)
+    private static Task<IReadOnlyList<DiffChange>> Diff(ModelSnapshot left, ModelSnapshot right)
+        => Diff(left, right, new ModelReference("right"));
+
+    /// <summary>Right side is a processed database, which is what enables engine-state suppression.</summary>
+    private static Task<IReadOnlyList<DiffChange>> DiffAgainstLiveTarget(
+        ModelSnapshot left, ModelSnapshot right)
+        => Diff(left, right, ModelReference.Remote("powerbi://api.powerbi.com/v1.0/myorg/ws", "db"));
+
+    private static async Task<IReadOnlyList<DiffChange>> Diff(
+        ModelSnapshot left, ModelSnapshot right, ModelReference rightReference)
     {
         var handler = new DiffModelHandler([new SnapshotProvider(left, right)]);
         var result = await handler.HandleAsync(
-            new DiffModelRequest(new ModelReference("left"), new ModelReference("right")),
+            new DiffModelRequest(new ModelReference("left"), rightReference),
             CancellationToken.None);
 
         Assert.True(result.Success);

@@ -130,11 +130,14 @@ public sealed class StageHandler
             {
                 var sw = Stopwatch.StartNew();
                 var deployResult = await deployer.DeployAsync(
+                    // Full overwrite: the staged model was pulled from this same workspace, so
+                    // preserving target objects would silently revert staged changes to them.
                     new ModelDeployRequest(
                         manifest.SourceEndpoint,
                         manifest.SourceDatabase,
                         CreateOnly: false,
-                        Force: force),
+                        Force: force,
+                        Options: ModelDeployOptions.Full),
                     cancellationToken);
                 sw.Stop();
 

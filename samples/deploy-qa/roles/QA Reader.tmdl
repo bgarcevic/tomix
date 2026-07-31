@@ -1,0 +1,6 @@
+/// Row-level security definition. Preserved by default because target RLS is usually configured per environment.
+role 'QA Reader'
+	modelPermission: read
+
+	tablePermission Customers = Customers[Country] = "DK"
+

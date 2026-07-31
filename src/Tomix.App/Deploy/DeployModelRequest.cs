@@ -14,4 +14,5 @@ public sealed record DeployModelRequest(
     string? XmlaOutput,
     bool Force,
     string? Ci,
-    bool DryRun = false);
+    bool DryRun = false,
+    ModelDeployOptions? DeployOptions = null);

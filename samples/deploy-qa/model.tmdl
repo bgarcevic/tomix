@@ -1,0 +1,13 @@
+/// Fixture for QA of granular deployment. Every aspect deploy can preserve is present here: shared expressions, roles with table permissions, ordinary partitions, and a refresh-policy table. See scripts/qa/README.md.
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+
+ref table Customers
+ref table Products
+ref table Sales
+ref table 'Sales Summary'
+
+ref role 'QA Reader'
+ref role 'QA Admin'
+
