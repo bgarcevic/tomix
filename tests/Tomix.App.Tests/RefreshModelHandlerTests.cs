@@ -102,6 +102,35 @@ public sealed class RefreshModelHandlerTests
     }
 
     [Fact]
+    public void ResolveTarget_ReturnsNull_WhenExplicitLocalModelIsNotTheSessionPrimary()
+    {
+        // An explicit unrelated local source must not fall back to refreshing the
+        // session's workspace mirror (#134).
+        var dir = NewTempDir();
+        try
+        {
+            var store = new CliStateStore(dir);
+            store.SaveCurrentSession(new CliConnectionState(
+                Server: null,
+                Database: "MyModel",
+                Model: "./my-model.tmdl",
+                Auth: null,
+                Local: true,
+                Profile: null,
+                Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+                WorkspaceFormat: null,
+                WorkspaceAuth: null));
+            var resolver = new ActiveModelResolver(store);
+            var request = Request(model: Path.Combine(Path.GetTempPath(), "unrelated.tmdl"));
+
+            var target = RefreshModelHandler.ResolveTarget(request, resolver);
+
+            Assert.Null(target);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void ResolveTarget_ReturnsNull_WhenPrimaryLocalAndNoSecondary()
     {
         var dir = NewTempDir();
@@ -189,8 +218,9 @@ public sealed class RefreshModelHandlerTests
         TablePartition[]? partitions = null,
         bool dryRun = false,
         string? server = null,
-        string? database = null) =>
-        new(Model: null,
+        string? database = null,
+        string? model = null) =>
+        new(Model: model,
             Server: server,
             Database: database,
             Auth: null,

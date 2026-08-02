@@ -184,7 +184,9 @@ public sealed class RefreshModelHandler
         if (primary.IsRemote)
             return primary;
 
-        var secondary = resolver.ResolveSyncTarget();
+        // The mirror fallback only applies when the local primary IS the session's primary
+        // model — an explicit unrelated local source must not refresh the session's mirror.
+        var secondary = resolver.ResolveSyncTarget(primary);
         if (secondary is null || !secondary.IsRemote)
             return null;
 

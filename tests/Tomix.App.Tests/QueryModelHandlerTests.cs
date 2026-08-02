@@ -27,6 +27,40 @@ public sealed class QueryModelHandlerTests
             Profile: null,
             Workspace: null);
 
+    private static readonly Func<CliConnectionState?> WorkspaceState =
+        () => new CliConnectionState(
+            Server: null,
+            Database: "MyModel",
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws");
+
+    [Fact]
+    public void ResolveTarget_PicksMirror_WhenLocalPrimaryIsTheSessionPrimary()
+    {
+        var resolver = new ActiveModelResolver(WorkspaceState);
+
+        var target = QueryModelHandler.ResolveTarget(null, null, null, resolver);
+
+        Assert.NotNull(target);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", target!.Value);
+    }
+
+    [Fact]
+    public void ResolveTarget_ReturnsNull_WhenExplicitLocalModelIsNotTheSessionPrimary()
+    {
+        // An explicit unrelated local source must not fall back to querying the
+        // session's workspace mirror (#134).
+        var resolver = new ActiveModelResolver(WorkspaceState);
+
+        var target = QueryModelHandler.ResolveTarget(
+            Path.Combine(Path.GetTempPath(), "unrelated.tmdl"), null, null, resolver);
+
+        Assert.Null(target);
+    }
+
     [Fact]
     public async Task HandleAsync_ReturnsRequired_WhenQueryBlank()
     {

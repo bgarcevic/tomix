@@ -104,7 +104,11 @@ tx connect MyWorkspace Sales -w ./model.tmdl   # remote primary, local mirror
 tx connect ./model.tmdl -w                     # pick the target interactively
 ```
 
-Individual commands can skip the mirror with `--no-sync`.
+Individual commands can skip the mirror with `--no-sync`. The mirror only
+applies to the session's primary model: a command addressed at an explicit
+source (a model path or `-s`/`-d`) that resolves to something other than the
+primary never uses the mirror — neither syncing a save to it nor falling back
+to it for refresh, query, or statistics.
 
 ## Non-interactive contexts
 

@@ -173,10 +173,12 @@ internal sealed class VertipaqCommand : ICommandModule
                     server = ModelReference.NormalizeEndpoint(server);
 
                 // Seed with the picked --recent entry (if any) so the workspace-primary read side
-                // (syncTarget) comes from that entry's mirror, not the active session's.
+                // (syncTarget) comes from that entry's mirror, not the active session's. The
+                // mirror only applies when the model IS the session's primary — statistics for
+                // an explicit unrelated source must not be read from the session's mirror.
                 var resolver = RecentConnections.CreateResolver(source, _state);
                 reference = resolver.ResolveReference(source.Model, source.Database, server);
-                syncTarget = resolver.ResolveSyncTarget();
+                syncTarget = resolver.ResolveSyncTarget(reference);
             }
             else
             {

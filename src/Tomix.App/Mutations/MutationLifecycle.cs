@@ -92,11 +92,13 @@ public static class MutationLifecycle
 
         // Workspace mirror sync target, resolved from the active connection (suppressed by --no-sync).
         // --save-to writes a copy to a side location and leaves the connected source untouched, so
-        // it must not deploy the mutation to the mirror either. Only consumed by the Save branch
-        // of CompleteAsync; harmless on other modes.
+        // it must not deploy the mutation to the mirror either. The model-aware overload applies the
+        // same reasoning to the source itself: a model addressed explicitly (path / --server /
+        // --database) that is not the session's primary must never be deployed over the session's
+        // mirror. Only consumed by the Save branch of CompleteAsync; harmless on other modes.
         var syncTarget = options.NoSync || !string.IsNullOrWhiteSpace(options.SaveTo)
             ? null
-            : ActiveModelResolver.ResolveSyncTarget(connection);
+            : ActiveModelResolver.ResolveSyncTarget(connection, source);
 
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(

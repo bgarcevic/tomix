@@ -150,6 +150,21 @@ public sealed class MutationLifecycleSyncTests
         Assert.Null(begin.Context!.SyncTarget);
     }
 
+    [Fact]
+    public async Task BeginAsync_SkipsSyncTarget_WhenSourceIsNotTheSessionPrimary()
+    {
+        // A save addressed with an explicit source (-s/-d or a model path) is not an edit to
+        // the session's primary model; deploying it to the session's mirror would replace the
+        // mirrored model with an unrelated one (#134).
+        var begin = await MutationLifecycle.BeginAsync(
+            [], new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/sandbox", "model-a"),
+            new MutationOptions(Save: true, SaveTo: null, Stage: false, Revert: false, Serialization: "", Force: false),
+            new Tomix.App.State.StagingStore(Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"), WorkspaceConnection(), CancellationToken.None);
+
+        Assert.Equal(MutationMode.Save, begin.Mode);
+        Assert.Null(begin.Context!.SyncTarget);
+    }
+
     private static Tomix.App.State.CliConnectionState WorkspaceConnection()
         => new(
             Server: null, Database: "MyModel", Model: "/local/model", Auth: null,

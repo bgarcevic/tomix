@@ -105,7 +105,9 @@ internal sealed class SaveCommand : ICommandModule
             var resolver = RecentConnections.CreateResolver(source, _state);
             var reference = resolver.ResolveReference(source.Model, source.Database, source.Server);
 
-            var syncTarget = noSync ? null : resolver.ResolveSyncTarget();
+            // The mirror only applies when the model being saved is the session's primary —
+            // a one-shot save of an explicit -s/-d source must not deploy over the mirror.
+            var syncTarget = noSync ? null : resolver.ResolveSyncTarget(reference);
 
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
