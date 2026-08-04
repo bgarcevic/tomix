@@ -86,8 +86,21 @@ public sealed class TmdlModelProvider : IModelProvider
             yield return path;
 
         var directory = Path.GetDirectoryName(pbipPath)!;
-        foreach (var semanticModel in Directory.EnumerateDirectories(directory, "*.SemanticModel"))
+        foreach (var semanticModel in ListSemanticModelDirectories(directory))
             yield return Path.GetFileName(semanticModel);
+    }
+
+    private static string[] ListSemanticModelDirectories(string directory)
+    {
+        try
+        {
+            return Directory.GetDirectories(directory, "*.SemanticModel");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // CanOpen must not throw: an unlistable directory contributes no candidates.
+            return [];
+        }
     }
 
     private static IEnumerable<string> ReadSemanticModelArtifacts(string pbipPath)
@@ -120,8 +133,10 @@ public sealed class TmdlModelProvider : IModelProvider
         {
             return JsonDocument.Parse(File.ReadAllText(path));
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
+            // CanOpen must not throw: an unreadable or malformed .pbip means its artifact
+            // list contributes no candidates, not that provider matching crashes.
             return null;
         }
     }

@@ -19,11 +19,11 @@ public sealed class DiffModelHandler
         CancellationToken cancellationToken)
     {
         // Resolve both sides before opening either one so invalid input never performs connection work.
-        var leftProvider = _providers.ResolveSingle(request.Left);
+        var leftProvider = _providers.ResolveSingleProvider(request.Left);
         if (leftProvider is null)
             return NoProvider(request.Left);
 
-        var rightProvider = _providers.ResolveSingle(request.Right);
+        var rightProvider = _providers.ResolveSingleProvider(request.Right);
         if (rightProvider is null)
             return NoProvider(request.Right);
 

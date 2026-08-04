@@ -37,7 +37,7 @@ public static class ModelSessionRunner
         string? noProviderHint,
         CancellationToken cancellationToken)
     {
-        var provider = providers.ResolveSingle(model);
+        var provider = providers.ResolveSingleProvider(model);
         if (provider is null)
             return TomixResult<TResult>.Fail(
                 "TOMIX_NO_PROVIDER",

@@ -13,6 +13,14 @@ public interface IModelProvider
     /// resolution. Implementations must therefore be cheap, synchronous, and side-effect-free. They
     /// may inspect local filesystem metadata, but must not access the network, authenticate, deserialize
     /// a model, or otherwise open the model.
+    /// <para>
+    /// This is a total predicate: it must never throw. Callers (see
+    /// <see cref="ModelProviderResolver.ResolveSingle"/>) invoke it on every registered provider with
+    /// no exception handling, so an I/O or permission error while probing a candidate means the
+    /// reference cannot be resolved from that candidate — return <see langword="false"/> (or fall
+    /// through to other candidates), never propagate the exception. Report unreadable sources from
+    /// <see cref="OpenAsync"/> instead, where a <see cref="ModelLoadException"/> is the contract.
+    /// </para>
     /// </remarks>
     /// <param name="reference">The model reference to classify.</param>
     /// <returns><see langword="true"/> when this provider owns the reference; otherwise, <see langword="false"/>.</returns>

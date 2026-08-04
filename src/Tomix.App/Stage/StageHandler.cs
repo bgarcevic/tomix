@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -111,7 +112,7 @@ public sealed class StageHandler
                 1);
 
         var workingReference = new ModelReference(manifest.WorkingCopy);
-        var provider = providers.ResolveSingle(workingReference);
+        var provider = providers.ResolveSingleProvider(workingReference);
         if (provider is null)
             return TomixResult<StageCommitResult>.Fail(
                 "TOMIX_NO_PROVIDER", $"No provider can open working copy: {manifest.WorkingCopy}", 2,

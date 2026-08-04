@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tomix.App.Diagnostics;
+using Tomix.App.Models;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -82,7 +83,7 @@ public sealed class BpaRulesListHandler
             var diagnostics = new List<string>();
             var loaded = new List<LoadedRule>(rules);
 
-            if (request.Model is not null && _providers.ResolveSingle(request.Model) is { } provider)
+            if (request.Model is not null && _providers.ResolveSingleProvider(request.Model) is { } provider)
             {
                 await using var session = await provider.OpenAsync(request.Model, cancellationToken);
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);

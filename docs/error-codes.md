@@ -253,9 +253,9 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_NO_PROVIDER` | 2 | No registered provider can open the model. |
+| `TOMIX_NO_PROVIDER` | 2 | No registered provider can open the model. A model source that exists on disk but cannot be read reports `TOMIX_MODEL_LOAD_FAILED` instead, naming the unreadable path. |
 | `TOMIX_PROVIDER_AMBIGUOUS` | 1 | More than one registered provider claims the model reference. Provider `CanOpen` contracts are mutually exclusive, so this indicates a provider-registration bug, not a problem with the model. |
-| `TOMIX_MODEL_LOAD_FAILED` | 2 | A provider matched the model but its source could not be loaded (unparsable TMDL/BIM, unresolvable references, unreadable file). The provider's message describes what failed; the command never ran. |
+| `TOMIX_MODEL_LOAD_FAILED` | 2 | The model source could not be loaded: a provider matched but loading failed (unparsable TMDL/BIM, unresolvable references), or the source exists on disk but cannot be read at all (permissions), in which case no provider matched and the message names the unreadable path. The command never ran. |
 | `TOMIX_NO_MODEL` | 2 | No model reference was provided and none could be inferred. |
 | `TOMIX_CONNECT_FAILED` | 1 | `connect` failed to establish a session. |
 | `TOMIX_INTERACTIVE_REQUIRED` | 1 | An interactive-only flow (`connect --remote`, a valueless `-w`) was invoked without a TTY (e.g. `--non-interactive`, `--quiet`, redirected input, or json/csv output). Pass the workspace/model explicitly. |

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tomix.App.Diagnostics;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Bpa;
@@ -66,7 +67,7 @@ public sealed class BpaRunHandler
         }
 
         var context = begin.Context!;
-        var provider = _providers.ResolveSingle(context.EffectiveModel);
+        var provider = _providers.ResolveSingleProvider(context.EffectiveModel);
         if (provider is null)
             return TomixResult<BpaRunResult>.Fail(
                 "TOMIX_NO_PROVIDER",
@@ -175,7 +176,7 @@ public sealed class BpaRunHandler
                 // Provider matching itself touches the filesystem — resolving a .pbip reference
                 // reads the file and enumerates sibling folders — so it stays inside the guard:
                 // this is a best-effort probe and an unreadable original must not fail the run.
-                if (_providers.ResolveSingle(model) is { } provider)
+                if (_providers.ResolveSingleProvider(model) is { } provider)
                 {
                     await using var probe = await provider.OpenAsync(model, cancellationToken);
                     return BpaModelRuleLoader.ResolveBaseDirectory(probe, model);
@@ -183,9 +184,10 @@ public sealed class BpaRunHandler
             }
             catch (Exception ex) when (ex
                 is IOException or NotSupportedException or UnauthorizedAccessException
-                or AmbiguousModelProviderException)
+                or AmbiguousModelProviderException or ModelLoadException)
             {
-                // The original may be gone, unreadable, or ambiguously claimed; fall back below.
+                // The original may be gone, unreadable (ResolveSingleProvider reports that as
+                // ModelLoadException), or ambiguously claimed; fall back below.
             }
         }
 

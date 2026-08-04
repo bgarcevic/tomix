@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Platform.Configuration;
 
@@ -57,7 +58,7 @@ public sealed class StagingStore
             var workingRoot = Path.Combine(modelDirectory, "working");
             Directory.CreateDirectory(workingRoot);
 
-            var provider = providers.ResolveSingle(source)
+            var provider = providers.ResolveSingleProvider(source)
                 ?? throw new InvalidOperationException($"No provider can open model: {source.Value}");
 
             await using var session = await provider.OpenAsync(source, cancellationToken);

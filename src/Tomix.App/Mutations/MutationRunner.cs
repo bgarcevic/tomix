@@ -1,4 +1,5 @@
 using Tomix.App.Diagnostics;
+using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -54,7 +55,7 @@ public static class MutationRunner
         }
 
         var context = begin.Context!;
-        var provider = providers.ResolveSingle(context.EffectiveModel);
+        var provider = providers.ResolveSingleProvider(context.EffectiveModel);
         if (provider is null)
             return TomixResult<TResult>.Fail(
                 "TOMIX_NO_PROVIDER",

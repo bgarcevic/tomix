@@ -1,3 +1,4 @@
+using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
@@ -64,7 +65,7 @@ public sealed class RefreshModelHandler
                 exitCode: 2,
                 hint: "Use -s <workspace> -d <model> to target a deployed model.");
 
-        var provider = _providers.ResolveSingle(target);
+        var provider = _providers.ResolveSingleProvider(target);
         if (provider is null)
             return TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",

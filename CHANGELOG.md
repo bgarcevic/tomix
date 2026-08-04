@@ -127,6 +127,13 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- An unreadable model source (e.g. a permission-denied `.pbip`) no longer crashes with the
+  generic "Unexpected error / report a bug" fallback. Provider matching treats an unreadable
+  candidate as unresolvable (an unreadable `.pbip` still opens when a sibling
+  `*.SemanticModel` folder resolves), and a model source that exists on disk but cannot be
+  read now reports `TOMIX_MODEL_LOAD_FAILED` (exit 2) naming the file, from every command
+  that resolves a model. `IModelProvider.CanOpen` is now documented as a must-not-throw
+  total predicate.
 - Destructive confirmations (`rm`, `replace`, `deploy`, `update`, `incremental-refresh rm`, and connect's workspace-overwrite) now fail fast with "Pass --yes to confirm ..." in every non-promptable context — `--quiet`, `--output-format json`/`csv`, and redirected stdin/stderr — instead of blocking on a prompt (or prompting mid-JSON). Previously only `--non-interactive` and redirected stdin were detected; they now share the interaction gate used by `session clear`/`prune` and `stage discard`. `--yes` still bypasses, the error still goes to stderr, and the prompt still defaults to no.
 - `tx connect` honors `--error-format json` on connection-validation failures (it previously printed text errors to stderr regardless).
 - In-place `--save` against a remote model (`powerbi://`/`asazure://`) actually persists now.

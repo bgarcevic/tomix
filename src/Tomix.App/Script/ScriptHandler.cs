@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Tomix.App.Diagnostics;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Models;
@@ -68,7 +69,7 @@ public sealed class ScriptHandler
         }
 
         var context = begin.Context!;
-        var provider = _providers.ResolveSingle(context.EffectiveModel);
+        var provider = _providers.ResolveSingleProvider(context.EffectiveModel);
         if (provider is null)
             return TomixResult<ScriptRunResult>.Fail(
                 "TOMIX_NO_PROVIDER",

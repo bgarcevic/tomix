@@ -1,3 +1,4 @@
+using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
@@ -60,7 +61,7 @@ public sealed class QueryModelHandler
                 exitCode: 2,
                 hint: "Use -s <workspace> -d <model>, connect to a local instance with -s localhost:<port>, or deploy the local model first ('tx deploy').");
 
-        var provider = _providers.ResolveSingle(target);
+        var provider = _providers.ResolveSingleProvider(target);
         if (provider is null)
             return TomixResult<QueryModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",

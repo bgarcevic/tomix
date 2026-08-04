@@ -1,5 +1,6 @@
 using Tomix.App.Bpa;
 using Tomix.App.Diff;
+using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
 using Tomix.Core.Bpa;
@@ -51,7 +52,7 @@ public sealed class DeployModelHandler
                 exitCode: 2,
                 hint: "Specify a model path or use --recent.");
 
-        var provider = _providers.ResolveSingle(request.Model);
+        var provider = _providers.ResolveSingleProvider(request.Model);
         if (provider is null)
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",
