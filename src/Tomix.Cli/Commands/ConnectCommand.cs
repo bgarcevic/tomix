@@ -178,6 +178,10 @@ internal sealed class ConnectCommand : ICommandModule
                 };
             }
 
+            // Set when Desktop discovery resolved the endpoint, so its report name can be cached in
+            // the session. Not part of the plan request: it is display state, not a planning input.
+            PowerBiDesktopInstance? desktopInstance = null;
+
             // Plan/resolve loop: each pass either reports the first missing piece (resolved here
             // by a prompt or Desktop discovery, then folded back into the request) or yields a
             // terminal outcome to act on.
@@ -252,20 +256,37 @@ internal sealed class ConnectCommand : ICommandModule
                     case ConnectNeedKind.DesktopDiscovery:
                         {
                             AnsiConsole.MarkupLine(Styling.Value("Discovering Power BI Desktop instances..."));
-                            var endpoints = PowerBiDesktopDiscovery.DiscoverEndpoints();
-                            if (endpoints.Count == 0)
+                            var instances = PowerBiDesktopDiscovery.DiscoverInstances();
+                            if (instances.Count == 0)
                             {
                                 ErrConsole().MarkupLine(Styling.Error("No running Power BI Desktop instances found. Start Power BI Desktop and open a report, then retry."));
                                 return 1;
                             }
 
-                            if (endpoints.Count > 1 && string.IsNullOrWhiteSpace(request.Database))
+                            var instance = instances[0];
+                            if (instances.Count > 1)
                             {
-                                ErrConsole().MarkupLine(Styling.Error("Multiple Power BI Desktop instances found. Specify a semantic model name."));
-                                return 1;
+                                // A Desktop model cannot be selected by name — over XMLA its
+                                // database is a GUID and its model is always "Model" — so the
+                                // choice has to be made per instance, by report name.
+                                if (!InteractionGate.CanPrompt(parseResult, format))
+                                {
+                                    // The endpoint goes in as connect's positional server, e.g.
+                                    // `tx connect localhost:59962`; `--server` is a global option
+                                    // that this command does not read as its target.
+                                    ErrConsole().MarkupLine(Styling.Error(
+                                        "Multiple Power BI Desktop instances found. Connect to one directly, e.g. 'tx connect localhost:<port>':"));
+                                    foreach (var found in instances)
+                                        ErrConsole().MarkupLine(Styling.Muted($"  {ConnectPrompts.DescribeInstance(found)}"));
+                                    return 1;
+                                }
+
+                                instance = await ConnectPrompts.PickDesktopInstanceAsync(
+                                    ErrConsole(), instances, cancellationToken);
                             }
 
-                            request = request with { Server = endpoints[0] };
+                            desktopInstance = instance;
+                            request = request with { Server = instance.Endpoint };
                             break;
                         }
                 }
@@ -355,7 +376,9 @@ internal sealed class ConnectCommand : ICommandModule
                     target.Profile,
                     workspace,
                     target.WorkspaceFormat,
-                    target.WorkspaceAuth));
+                    target.WorkspaceAuth,
+                    desktopInstance?.ReportName,
+                    desktopInstance?.PortFile));
 
                 if (format != OutputFormats.Text)
                     return CommandOutput.Render(
@@ -377,7 +400,9 @@ internal sealed class ConnectCommand : ICommandModule
                 target.Profile,
                 workspace,
                 target.WorkspaceFormat,
-                target.WorkspaceAuth));
+                target.WorkspaceAuth,
+                desktopInstance?.ReportName,
+                desktopInstance?.PortFile));
 
             if (!setResult.Success)
                 return CommandOutput.Render(setResult, format, _ => { });
@@ -453,6 +478,8 @@ internal sealed class ConnectCommand : ICommandModule
             connection.Workspace,
             connection.WorkspaceFormat,
             connection.WorkspaceAuth));
+        // No report cache to replay: recents deliberately do not store one, since Desktop's port
+        // changes on every start.
 
         if (!setResult.Success)
             return CommandOutput.Render(setResult, format, _ => { });

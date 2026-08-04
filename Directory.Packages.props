@@ -21,6 +21,7 @@
     <PackageVersion Include="Spectre.Console.Testing" Version="0.57.2" />
     <PackageVersion Include="System.CommandLine" Version="2.0.10" />
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.3" />
+    <PackageVersion Include="System.Management" Version="10.0.10" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />

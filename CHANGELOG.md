@@ -144,6 +144,32 @@ and the API surface that major versions protect.
   read now reports `TOMIX_MODEL_LOAD_FAILED` (exit 2) naming the file, from every command
   that resolves a model. `IModelProvider.CanOpen` is now documented as a must-not-throw
   total predicate.
+- `tx connect --local` now actually connects to a running Power BI Desktop instance. Three
+  independent bugs each broke it on their own:
+  - Microsoft Store installs were never found. They keep their AnalysisServices workspace under
+    `%USERPROFILE%\Microsoft\Power BI Desktop Store App\...`, while only the MSI location under
+    `%LOCALAPPDATA%` was probed. All known install variants are now probed.
+  - `msmdsrv.port.txt` is UTF-16LE with no BOM, so reading it as text produced digits interleaved
+    with NUL characters and **every** port failed to parse — including on MSI installs. Ports are
+    now parsed from raw bytes and any of the encodings Desktop may write is accepted.
+  - The discovered `localhost:<port>` endpoint was discarded when the session was saved, so
+    `tx connect --local` reported success but left a session that no later command could resolve.
+    The endpoint is now persisted.
+  Instances that have since exited are skipped instead of being offered as dead endpoints, and
+  filesystem errors while probing report "none found" rather than escaping as an unhandled
+  exception.
+- `tx connect` shows the report name for a Power BI Desktop session (`Active: Sales Overview
+  (localhost:59962)`), since the port alone says nothing about which report is open. The name is
+  cached when `--local` connects, then revalidated on every read — so it stays a cheap local check
+  rather than a ~220ms WMI query. Revalidation requires both that the instance's `msmdsrv.port.txt`
+  still holds that port and that something is still listening on it, so a name is never shown for a
+  report that has been closed or for a different instance that reused the port (Desktop picks a new
+  port on each start). The cache is internal: it is stripped from command output and from recents.
+- `tx connect --local` with several reports open now shows a picker labelled by report name
+  (listing the instances instead when not on a TTY, so one can be connected to directly with
+  `tx connect localhost:<port>`). It previously failed with "Specify a semantic model name" — advice it could
+  not honor, because over XMLA a Desktop database is named by a GUID and its model is always
+  literally `Model`; a supplied name was ignored and the first instance found was used regardless.
 - Destructive confirmations (`rm`, `replace`, `deploy`, `update`, `incremental-refresh rm`, and connect's workspace-overwrite) now fail fast with "Pass --yes to confirm ..." in every non-promptable context — `--quiet`, `--output-format json`/`csv`, and redirected stdin/stderr — instead of blocking on a prompt (or prompting mid-JSON). Previously only `--non-interactive` and redirected stdin were detected; they now share the interaction gate used by `session clear`/`prune` and `stage discard`. `--yes` still bypasses, the error still goes to stderr, and the prompt still defaults to no.
 - `tx connect` honors `--error-format json` on connection-validation failures (it previously printed text errors to stderr regardless).
 - In-place `--save` against a remote model (`powerbi://`/`asazure://`) actually persists now.

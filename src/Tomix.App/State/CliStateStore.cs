@@ -122,7 +122,10 @@ public sealed class CliStateStore
             .Where(entry => !string.Equals(RecentKey(entry.Connection), key, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        entries.Insert(0, new RecentConnection(state, DateTimeOffset.UtcNow));
+        // Recents are reconnection targets, not display state: Desktop picks a new port on every
+        // start, so a cached report name is worthless here and its port-file path would leak into
+        // `connect --recent --output-format json`.
+        entries.Insert(0, new RecentConnection(state.WithoutReportCache(), DateTimeOffset.UtcNow));
         if (entries.Count > MaxRecentConnections)
             entries.RemoveRange(MaxRecentConnections, entries.Count - MaxRecentConnections);
 

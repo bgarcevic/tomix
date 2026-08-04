@@ -8,6 +8,9 @@
   <ItemGroup>
     <PackageReference Include="Dax.Formatter" />
     <PackageReference Include="System.Linq.Dynamic.Core" />
+    <!-- Windows-only, and used only by Connect/PowerBiDesktopProcesses to read the msmdsrv
+         command line. Guarded by OperatingSystem.IsWindows(); no-ops elsewhere. -->
+    <PackageReference Include="System.Management" />
   </ItemGroup>
 
   <ItemGroup>

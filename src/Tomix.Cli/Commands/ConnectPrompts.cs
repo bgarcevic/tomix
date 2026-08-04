@@ -65,6 +65,34 @@ internal static class ConnectPrompts
     }
 
     /// <summary>
+    /// A running Desktop instance as one line: the report name when it could be read, with the
+    /// endpoint always shown so it can be passed to <c>--server</c>.
+    /// </summary>
+    public static string DescribeInstance(PowerBiDesktopInstance instance)
+        => instance.ReportName is null
+            ? instance.Endpoint
+            : $"{instance.ReportName}  ({instance.Endpoint})";
+
+    /// <summary>
+    /// Prompts for one of several running Power BI Desktop instances. Unlike the model picker
+    /// there is no listing call and nothing can fail: the instances are already known, so this
+    /// always returns one of them.
+    /// </summary>
+    public static async Task<PowerBiDesktopInstance> PickDesktopInstanceAsync(
+        IAnsiConsole console,
+        IReadOnlyList<PowerBiDesktopInstance> instances,
+        CancellationToken cancellationToken)
+    {
+        var prompt = new SelectionPrompt<PowerBiDesktopInstance>()
+            .Title("Select a [green]Power BI Desktop[/] instance:")
+            .PageSize(15)
+            .UseConverter(instance => Styling.MarkupEscape(DescribeInstance(instance)));
+        prompt.AddChoices(instances);
+
+        return await console.PromptAsync(prompt, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Prompts for a semantic model on <paramref name="endpoint"/>. When
     /// <paramref name="allowCreateNew"/> is set, offers a "create new" entry that opens a text
     /// prompt pre-filled with <paramref name="suggestedNewName"/>. When

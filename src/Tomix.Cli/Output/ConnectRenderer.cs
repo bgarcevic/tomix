@@ -118,10 +118,17 @@ internal static class ConnectRenderer
         }
         else
         {
+            // For a Power BI Desktop session the port alone says nothing about which report is
+            // open, so lead with the cached report name when it is still valid. ConnectHandler.Show
+            // clears it otherwise, so reaching here means it does describe the live instance.
+            var target = connection.ReportName is { } report
+                ? $"{Styling.MarkupEscape(report)}  ({Styling.MarkupEscape(connection.Server ?? "")})"
+                : Styling.MarkupEscape(connection.Server ?? "");
+
             AnsiConsole.MarkupLine(Styling.Success(
                 string.IsNullOrWhiteSpace(connection.Database)
-                    ? $"Active: {Styling.MarkupEscape(connection.Server ?? "")}"
-                    : $"Active: {Styling.MarkupEscape(connection.Server ?? "")} / {Styling.MarkupEscape(connection.Database)}"));
+                    ? $"Active: {target}"
+                    : $"Active: {target} / {Styling.MarkupEscape(connection.Database)}"));
         }
 
         if (!string.IsNullOrWhiteSpace(connection.Workspace))

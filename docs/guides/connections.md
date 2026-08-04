@@ -25,6 +25,42 @@ On a TTY you can pick interactively: `tx connect --remote` lists workspaces
 and models from your tenant; `tx connect MyWorkspace` (no database) lists that
 workspace's models.
 
+### Power BI Desktop
+
+`tx connect --local` finds running Desktop instances and connects without a
+token. Both the Microsoft Store and MSI/Download Center installs are detected.
+A report must be open — Desktop only starts its local Analysis Services engine
+once a report is loaded, and instances that have since closed are skipped.
+
+The connection is stored as the instance's `localhost:<port>` endpoint. Desktop
+picks a new port each time it starts, so re-run `tx connect --local` after
+restarting it.
+
+`tx connect` shows which report you are on:
+
+```text
+Active: Markedsdata  (localhost:50987)
+```
+
+The name is remembered from when you connected and rechecked each time it is
+shown, so it disappears rather than going stale — whether that report was closed
+or a different instance has since taken the port. Connecting to an endpoint
+directly (`tx connect localhost:50987`) skips discovery, so no name is recorded.
+
+With more than one report open you get a picker, labelled by report name:
+
+```text
+Select a Power BI Desktop instance:
+  > Sales Overview      (localhost:59962)
+    Finance Monthly     (localhost:60415)
+```
+
+Off a TTY the instances are listed instead, so you can connect to one directly:
+`tx connect localhost:59962`. Note a Desktop instance cannot be selected by
+model name — over XMLA its database is named by a GUID and its model is always
+literally `Model`, so the report name (the Desktop window title) is the only
+label that distinguishes them.
+
 ```sh
 tx connect                    # show the current connection
 tx connect --clear            # forget it
