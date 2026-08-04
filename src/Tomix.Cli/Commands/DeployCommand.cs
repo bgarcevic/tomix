@@ -193,8 +193,7 @@ internal sealed class DeployCommand : ICommandModule
 
             if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
                 "Deploy", $"{database ?? reference.Value} to {server ?? "workspace"}",
-                parseResult.GetValue(GlobalOptions.Yes),
-                parseResult.GetValue(GlobalOptions.NonInteractive)))
+                parseResult, format))
                 return 1;
 
             var spinnerLabel = dryRun ? "Previewing deployment..." : "Deploying model...";

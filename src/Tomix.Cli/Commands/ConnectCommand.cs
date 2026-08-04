@@ -319,8 +319,7 @@ internal sealed class ConnectCommand : ICommandModule
 
                         if (!force && !ConfirmationHelper.ConfirmOrAbort(
                             "Overwrite workspace target", $"'{database}' on {workspace}",
-                            parseResult.GetValue(GlobalOptions.Yes),
-                            parseResult.GetValue(GlobalOptions.NonInteractive)))
+                            parseResult, format))
                         {
                             ErrConsole().MarkupLine(Styling.Guidance(
                                 "Aborted; connection unchanged. Re-run without -w to connect without the workspace, or pass --force to overwrite it."));

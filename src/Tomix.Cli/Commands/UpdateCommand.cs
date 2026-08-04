@@ -105,8 +105,8 @@ internal sealed class UpdateCommand : ICommandModule
         if (!ConfirmationHelper.ConfirmOrAbort(
             action,
             $"tx {_version} -> {resolvedTarget}",
-            parseResult.GetValue(GlobalOptions.Yes),
-            parseResult.GetValue(GlobalOptions.NonInteractive)))
+            parseResult,
+            formatValue))
         {
             return 1;
         }

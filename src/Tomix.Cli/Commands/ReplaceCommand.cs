@@ -113,9 +113,7 @@ internal sealed class ReplaceCommand : ICommandModule
             var dryRun = parseResult.GetValue(dryRunOption);
 
             if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
-                "Replace", $"'{pattern}'",
-                parseResult.GetValue(GlobalOptions.Yes),
-                parseResult.GetValue(GlobalOptions.NonInteractive)))
+                "Replace", $"'{pattern}'", parseResult, formatValue))
                 return 1;
 
             if (!RecentConnections.TryResolveModel(

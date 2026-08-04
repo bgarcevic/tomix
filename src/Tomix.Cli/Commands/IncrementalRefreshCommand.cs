@@ -296,9 +296,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             var revert = parseResult.GetValue(revertOption);
 
             if (!revert && !ConfirmationHelper.ConfirmOrAbort(
-                "Remove incremental refresh policy from", table,
-                parseResult.GetValue(GlobalOptions.Yes),
-                parseResult.GetValue(GlobalOptions.NonInteractive)))
+                "Remove incremental refresh policy from", table, parseResult, formatValue))
                 return 1;
 
             var reference = new ActiveModelResolver(_state).ResolveReference(

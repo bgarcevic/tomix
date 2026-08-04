@@ -23,17 +23,6 @@ internal static class ConfirmationHelper
             parseResult.GetValue(GlobalOptions.Yes),
             promptForbidden: !InteractionGate.CanPrompt(parseResult, outputFormat));
 
-    public static bool ConfirmOrAbort(
-        string action,
-        string subject,
-        bool yes,
-        bool nonInteractive)
-        => Confirm(
-            action,
-            subject,
-            yes,
-            promptForbidden: nonInteractive || Console.IsInputRedirected);
-
     private static bool Confirm(
         string action,
         string subject,

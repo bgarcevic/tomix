@@ -114,9 +114,7 @@ internal sealed class RmCommand : ICommandModule
             var dryRun = parseResult.GetValue(dryRunOption);
 
             if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
-                "Remove", path,
-                parseResult.GetValue(GlobalOptions.Yes),
-                parseResult.GetValue(GlobalOptions.NonInteractive)))
+                "Remove", path, parseResult, formatValue))
                 return 1;
 
             if (!RecentConnections.TryResolveModel(
