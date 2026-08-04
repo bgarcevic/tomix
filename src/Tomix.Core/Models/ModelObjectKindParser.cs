@@ -21,6 +21,8 @@ public static class ModelObjectKindParser
             case "kpi": kind = ModelObjectKind.Kpi; return true;
             case "tablepermission": kind = ModelObjectKind.TablePermission; return true;
             case "calendar": kind = ModelObjectKind.Calendar; return true;
+            case "expression": kind = ModelObjectKind.Expression; return true;
+            case "function": kind = ModelObjectKind.Function; return true;
             case "relationship": kind = ModelObjectKind.Relationship; return true;
             case "role": kind = ModelObjectKind.Role; return true;
             case "perspective": kind = ModelObjectKind.Perspective; return true;

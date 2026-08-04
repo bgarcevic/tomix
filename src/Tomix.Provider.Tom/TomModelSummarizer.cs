@@ -86,6 +86,8 @@ public static class TomModelSummarizer
         objects.AddRange(model.Cultures.Select(c =>
             Leaf(c.Name, ModelObjectKind.Culture, $"Cultures/{Segment(c.Name)}", detail: null)));
         objects.AddRange(model.DataSources.Select(BuildDataSource));
+        objects.AddRange(model.Expressions.Select(BuildNamedExpression));
+        objects.AddRange(model.Functions.Select(BuildFunction));
 
         var modelProps = new Dictionary<string, string>
         {
@@ -473,6 +475,54 @@ public static class TomModelSummarizer
                 [PropDataSourceType] = dataSource is StructuredDataSource ? "Structured" : "Provider",
                 [PropObjectType] = "DataSource"
             });
+
+    private static ModelObject BuildNamedExpression(NamedExpression expression)
+    {
+        var props = new Dictionary<string, string>
+        {
+            [PropertyBagKeys.ExpressionKind] = expression.Kind.ToString(),
+            [PropertyBagKeys.RemoteParameterName] = expression.RemoteParameterName ?? "",
+            [PropLineageTag] = expression.LineageTag ?? "",
+            [PropertyBagKeys.SourceLineageTag] = expression.SourceLineageTag ?? "",
+            [PropObjectType] = "NamedExpression"
+        };
+        AddAnnotations(props, expression.Annotations);
+
+        return new ModelObject(
+            expression.Name,
+            ModelObjectKind.Expression,
+            $"Expressions/{Segment(expression.Name)}",
+            Detail: expression.Kind.ToString(),
+            Expression: expression.Expression,
+            Description: Desc(expression.Description),
+            Hidden: false,
+            SourceColumn: null,
+            Children: [],
+            Properties: props);
+    }
+
+    private static ModelObject BuildFunction(Function function)
+    {
+        var props = new Dictionary<string, string>
+        {
+            [PropLineageTag] = function.LineageTag ?? "",
+            [PropertyBagKeys.SourceLineageTag] = function.SourceLineageTag ?? "",
+            [PropObjectType] = "Function"
+        };
+        AddAnnotations(props, function.Annotations);
+
+        return new ModelObject(
+            function.Name,
+            ModelObjectKind.Function,
+            $"Functions/{Segment(function.Name)}",
+            Detail: null,
+            Expression: function.Expression,
+            Description: Desc(function.Description),
+            Hidden: function.IsHidden,
+            SourceColumn: null,
+            Children: [],
+            Properties: props);
+    }
 
     private static (string Name, string Type) PartitionDataSource(Partition partition)
         => partition.Source is QueryPartitionSource { DataSource: { } ds }

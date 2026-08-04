@@ -31,6 +31,16 @@ and the API surface that major versions protect.
 
 ### Added
 
+- Shared M expressions and DAX user-defined functions are now visible to the
+  read side: `tx ls Expressions` / `tx ls Functions` list them, `tx get
+  "Expressions/<name>"` inspects them, `tx find` searches their names,
+  expressions, and descriptions, and `--type expression|function` filters by
+  kind. Expressions surface `expression`, `kind`, `remoteParameterName`,
+  `lineageTag`, and `sourceLineageTag`; functions surface `expression`,
+  `isHidden`, `lineageTag`, and `sourceLineageTag` — all writable via `tx set`.
+  `tx ls DataSources` now resolves as a container keyword too (previously it
+  silently returned no objects). New snapshot keys are additive; existing
+  JSON/CSV keys and their order are unchanged.
 - Columns now expose their full writable scalar property surface. `tx set`
   accepts `sourceColumn`, `dataType`, `dataCategory`, `summarizeBy`,
   `sortByColumn` (by sibling column name; empty clears), `lineageTag`,

@@ -211,7 +211,8 @@ public sealed class FormatModelHandler
             return valid;
         }
 
-        language = type == ModelObjectKind.Partition
+        // Partitions and shared expressions carry M; everything else defaults to DAX.
+        language = type is ModelObjectKind.Partition or ModelObjectKind.Expression
             ? FormatterLanguages.PowerQuery
             : FormatterLanguages.Dax;
         error = "";

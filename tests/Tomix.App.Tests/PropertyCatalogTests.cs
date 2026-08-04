@@ -71,6 +71,10 @@ public sealed class PropertyCatalogTests
         "name,description,modelPermission,rlsExpression,members")]
     [InlineData(ModelObjectKind.Hierarchy,
         "name,description,isHidden,detail,expression,displayFolder")]
+    [InlineData(ModelObjectKind.Expression,
+        "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.Function,
+        "name,description,isHidden,expression,lineageTag,sourceLineageTag")]
     public void For_PinsThePropertyContractPerKind(ModelObjectKind kind, string expectedKeys)
     {
         Assert.Equal(expectedKeys.Split(','), ModelPropertyCatalog.For(kind).Select(d => d.JsonKey));
@@ -193,6 +197,11 @@ public sealed class PropertyCatalogTests
             ModelPropertyCatalog.WritableTokens(ModelObjectKind.Column));
         Assert.Equal(["name", "expression"],
             ModelPropertyCatalog.WritableTokens(ModelObjectKind.Partition));
+        Assert.Equal(["name", "description", "expression", "kind", "remoteParameterName",
+                "lineageTag", "sourceLineageTag"],
+            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Expression));
+        Assert.Equal(["name", "description", "isHidden", "expression", "lineageTag", "sourceLineageTag"],
+            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Function));
         Assert.Empty(ModelPropertyCatalog.WritableTokens(ModelObjectKind.Role));
     }
 

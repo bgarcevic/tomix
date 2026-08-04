@@ -41,12 +41,15 @@ public sealed class CatalogWritableAgreementTests
             ["isDefaultImage"] = "false",
             ["displayOrdinal"] = "2",
             ["sourceProviderType"] = "int",
-            ["isDataTypeInferred"] = "false"
+            ["isDataTypeInferred"] = "false",
+            ["kind"] = "M",
+            ["remoteParameterName"] = "RemoteParam"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
         => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column,
-            ModelObjectKind.Hierarchy, ModelObjectKind.Partition);
+            ModelObjectKind.Hierarchy, ModelObjectKind.Partition,
+            ModelObjectKind.Expression, ModelObjectKind.Function);
 
     [Theory]
     [MemberData(nameof(CatalogedKinds))]
@@ -125,12 +128,15 @@ public sealed class CatalogWritableAgreementTests
         ModelObjectKind.Column => ("T/C", ModelObjectKind.Column),
         ModelObjectKind.Hierarchy => ("T/H", ModelObjectKind.Hierarchy),
         ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
+        ModelObjectKind.Expression => ("Expressions/E", null),
+        ModelObjectKind.Function => ("Functions/F", null),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
     private static Database NewDatabase()
     {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
+        // 1702+ so the fixture can carry DAX user-defined functions.
+        var db = new Database { Name = "M", CompatibilityLevel = 1702, Model = new Model { Name = "Model" } };
         var table = new Table { Name = "T" };
         table.Partitions.Add(new Partition
         {
@@ -144,6 +150,13 @@ public sealed class CatalogWritableAgreementTests
         hierarchy.Levels.Add(new Level { Name = "L", Column = table.Columns["C"] });
         table.Hierarchies.Add(hierarchy);
         db.Model.Tables.Add(table);
+        db.Model.Expressions.Add(new NamedExpression
+        {
+            Name = "E",
+            Kind = ExpressionKind.M,
+            Expression = "\"v\" meta [IsParameterQuery=true]"
+        });
+        db.Model.Functions.Add(new Function { Name = "F", Expression = "(x) => x" });
         return db;
     }
 }

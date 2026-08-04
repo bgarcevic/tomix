@@ -183,6 +183,34 @@ public sealed class FormatModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_TypeExpression_DefaultsToPowerQuery()
+    {
+        // Shared expressions are M, so --type expression without --lang must pick the
+        // Power Query formatter, not the DAX default.
+        var formatter = new RecordingFormatter();
+        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], formatter, TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: null,
+                Language: "",
+                Type: ModelObjectKind.Expression,
+                Long: true,
+                Semicolons: false,
+                NoSpaceAfterFunction: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var model = Assert.IsType<ModelFormatResult>(result.Data);
+        Assert.Equal("Environment", Assert.Single(model.Results).Measure);
+        Assert.Equal("powerquery", Assert.Single(formatter.Requests).Language);
+    }
+
+    [Fact]
     public async Task HandleAsync_ObjectPathNotFound_ReturnsObjectNotFoundCode()
     {
         var handler = new FormatModelHandler(
@@ -296,8 +324,12 @@ public sealed class FormatModelHandlerTests
             "Sales", ModelObjectKind.Table, "Sales",
             Detail: "regular", Expression: null, Description: null, Hidden: false,
             SourceColumn: null, Children: [amount, totalSales, orderCount, partition]);
+        var sharedExpression = new ModelObject(
+            "Environment", ModelObjectKind.Expression, "Expressions/Environment",
+            Detail: "M", Expression: "\"dev\" meta [IsParameterQuery=true]", Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
 
-        return new ModelSnapshot("stub", 1601, [sales]);
+        return new ModelSnapshot("stub", 1601, [sales, sharedExpression]);
     }
 
     private sealed class RecordingFormatter : IExpressionFormatterClient

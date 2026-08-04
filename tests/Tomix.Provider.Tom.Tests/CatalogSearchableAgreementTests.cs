@@ -252,13 +252,24 @@ public sealed class CatalogSearchableAgreementTests
         dataSource.Annotations.Add(new Annotation { Name = "DsTag", Value = "drift data source annotation" });
         db.Model.DataSources.Add(dataSource);
 
-        db.Model.Expressions.Add(new NamedExpression
+        var namedExpression = new NamedExpression
         {
             Name = "driftParameter",
             Kind = ExpressionKind.M,
             Expression = "\"driftValue\" meta [IsParameterQuery=true]",
             Description = "drift shared expression description"
-        });
+        };
+        namedExpression.Annotations.Add(new Annotation { Name = "ExprTag", Value = "drift expression annotation" });
+        db.Model.Expressions.Add(namedExpression);
+
+        var function = new Function
+        {
+            Name = "driftFn",
+            Expression = "(x) => x + 1 // drift",
+            Description = "drift function description"
+        };
+        function.Annotations.Add(new Annotation { Name = "FnTag", Value = "drift function annotation" });
+        db.Model.Functions.Add(function);
 
         return db;
     }

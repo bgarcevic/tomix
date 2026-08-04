@@ -56,9 +56,12 @@ public static class DaxExpressions
                 }
                 break;
 
-            // Calculated columns and calculation items carry their DAX directly on Expression.
+            // Calculated columns, calculation items, and user-defined function bodies carry
+            // their DAX directly on Expression. Shared expressions (ModelObjectKind.Expression)
+            // are M and must never be scanned as DAX.
             case ModelObjectKind.Column:
             case ModelObjectKind.CalculationItem:
+            case ModelObjectKind.Function:
                 if (!string.IsNullOrWhiteSpace(obj.Expression))
                     yield return new DaxSite("Expression", obj.Expression!);
                 break;

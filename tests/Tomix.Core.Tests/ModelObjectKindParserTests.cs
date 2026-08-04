@@ -24,6 +24,8 @@ public sealed class ModelObjectKindParserTests
     [InlineData("kpi", ModelObjectKind.Kpi)]
     [InlineData("tablepermission", ModelObjectKind.TablePermission)]
     [InlineData("calendar", ModelObjectKind.Calendar)]
+    [InlineData("expression", ModelObjectKind.Expression)]
+    [InlineData("function", ModelObjectKind.Function)]
     public void TryParse_KnownStrings(string value, ModelObjectKind expected)
     {
         Assert.True(ModelObjectKindParser.TryParse(value, out var kind));
@@ -41,7 +43,8 @@ public sealed class ModelObjectKindParserTests
 
     [Theory]
     [InlineData("kpis")]
-    [InlineData("expression")]
+    [InlineData("expressions")]
+    [InlineData("functions")]
     [InlineData("")]
     public void TryParse_UnknownStrings_ReturnFalse(string value)
     {

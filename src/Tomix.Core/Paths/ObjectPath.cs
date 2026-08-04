@@ -103,7 +103,10 @@ public sealed record PathSegment(string Text, bool IsQuoted)
             ["Perspectives"] = ModelObjectKind.Perspective,
             ["Cultures"] = ModelObjectKind.Culture,
             ["Levels"] = ModelObjectKind.Level,
-            ["Members"] = ModelObjectKind.RoleMember
+            ["Members"] = ModelObjectKind.RoleMember,
+            ["DataSources"] = ModelObjectKind.DataSource,
+            ["Expressions"] = ModelObjectKind.Expression,
+            ["Functions"] = ModelObjectKind.Function
         };
 
     /// <summary>True when the segment is an unquoted name containing <c>*</c> or <c>?</c>.</summary>

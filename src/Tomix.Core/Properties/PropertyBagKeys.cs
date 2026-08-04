@@ -51,5 +51,7 @@ public static class PropertyBagKeys
     public const string RefreshPolicyPollingExpression = "RefreshPolicyPollingExpression";
     public const string NoSelectionExpression = "NoSelectionExpression";
     public const string MultipleOrEmptySelectionExpression = "MultipleOrEmptySelectionExpression";
+    public const string ExpressionKind = "ExpressionKind";
+    public const string RemoteParameterName = "RemoteParameterName";
     public const string AnnotationPrefix = "Annotation:";
 }

@@ -108,6 +108,24 @@ public sealed class DepsModelHandlerTests
     }
 
     [Fact]
+    public async Task Upstream_CoversFunctionBodies()
+    {
+        // NetOf = "(x) => [Total] * x" -> the UDF body's DAX is scanned like any expression.
+        var result = await Run(Request("Functions/NetOf"));
+
+        var dep = Assert.Single(result.Data!.Upstream);
+        Assert.Equal("Sales/Total", dep.Path);
+    }
+
+    [Fact]
+    public async Task Downstream_IncludesFunctionsReferencingTheObject()
+    {
+        var result = await Run(Request("Sales/Total", downstreamOnly: true));
+
+        Assert.Contains("Functions/NetOf", Paths(result.Data!.Downstream));
+    }
+
+    [Fact]
     public async Task Unused_ListsUnreferencedMeasuresButNotUsedObjects()
     {
         var result = await Run(Request(path: null, unused: true));
@@ -233,7 +251,11 @@ public sealed class DepsModelHandlerTests
                     ["ToColumn"] = "Region[RegionKey]"
                 });
 
-            return Task.FromResult(new ModelSnapshot("stub", 1601, [sales, region, relationship]));
+            var function = new ModelObject(
+                "NetOf", ModelObjectKind.Function, "Functions/NetOf",
+                null, "(x) => [Total] * x", null, false, null, []);
+
+            return Task.FromResult(new ModelSnapshot("stub", 1601, [sales, region, relationship, function]));
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

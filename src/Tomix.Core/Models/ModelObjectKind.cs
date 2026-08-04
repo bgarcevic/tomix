@@ -20,5 +20,7 @@ public enum ModelObjectKind
     DataSource,
     Kpi,
     TablePermission,
-    Calendar
+    Calendar,
+    Expression,
+    Function
 }

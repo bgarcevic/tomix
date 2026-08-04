@@ -12,7 +12,7 @@ tx ls [path-filter] [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `partition`, `relationship`, `role`, `perspective`, `culture`, `kpi`, `tablepermission`, `calendar`. |
+| `--type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `partition`, `relationship`, `role`, `perspective`, `culture`, `kpi`, `tablepermission`, `calendar`, `expression`, `function`. |
 | `--paths-only` | One object path per line, suitable for piping. |
 | `--no-multiline` | Collapse multi-line cell content (e.g. measure expressions) to a single line. Text output only. |
 
@@ -20,6 +20,8 @@ tx ls [path-filter] [model] [options]
 tx ls                                # everything
 tx ls --type table --paths-only
 tx ls Sales/Measures                 # children of a container
+tx ls Expressions                    # shared M expressions (parameters)
+tx ls Functions                      # DAX user-defined functions
 tx ls "Sa*"                          # wildcard filter
 ```
 
@@ -37,7 +39,9 @@ tx get <path> [model] [options]
 Each object kind has its own property set: measures include `expression`,
 `formatString`, `detailRowsExpression`, and the KPI expressions; relationships
 include their endpoint columns, cardinality, `crossFilteringBehavior`, and
-`isActive`; roles include `modelPermission` and `rlsExpression`. Object
+`isActive`; roles include `modelPermission` and `rlsExpression`; shared
+expressions include `expression`, `kind`, and `remoteParameterName`; DAX
+functions include `expression` and `isHidden`. Object
 annotations are appended as `annotation:<name>` entries in text and JSON
 output (CSV keeps the fixed per-kind columns).
 
@@ -46,6 +50,7 @@ tx get "Sales/Total Sales"
 tx get "Sales/Total Sales" -q expression
 tx get "Sales/Total Sales" -q annotation:PBI_FormatHint
 tx get "Relationships/rel-customers"
+tx get "Expressions/Environment" -q expression   # a shared M parameter's value
 tx get Sales --output-format tmdl    # the object as TMDL
 ```
 
@@ -65,8 +70,9 @@ tx find <pattern> [model] [options]
 
 Searches every scope site `tx replace` can rewrite — including partition
 expressions, KPI expressions, detail-rows and format-string definitions,
-refresh-policy M, calculation-group selection expressions, and RLS filter
-expressions — so a find preview is also a replace preview. Relationship
+refresh-policy M, calculation-group selection expressions, RLS filter
+expressions, shared M expressions, and DAX user-defined functions — so a
+find preview is also a replace preview. Relationship
 names are skipped (synthesized from endpoints, not authored text), but
 relationship annotations are searched under `--in annotations`.
 

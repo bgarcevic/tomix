@@ -163,6 +163,27 @@ public static class ModelPropertyCatalog
         new("filterExpression", "FilterExpression", o => o.Expression ?? "", Writable: true, Searchable: true, SearchScope: ExpressionsScope)
     ];
 
+    private static readonly IReadOnlyList<PropertyDescriptor> NamedExpression =
+    [
+        Name(writable: true),
+        Description(writable: true),
+        Expression(writable: true),
+        new("kind", "Kind", o => Bag(o, PropertyBagKeys.ExpressionKind), Writable: true, Diffable: true),
+        new("remoteParameterName", "RemoteParameterName", o => Bag(o, PropertyBagKeys.RemoteParameterName), Writable: true, Diffable: true),
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
+    ];
+
+    private static readonly IReadOnlyList<PropertyDescriptor> Function =
+    [
+        Name(writable: true),
+        Description(writable: true),
+        IsHidden(writable: true),
+        Expression(writable: true),
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
+    ];
+
     private static readonly IReadOnlyList<PropertyDescriptor> Generic =
     [
         Name(writable: false),
@@ -186,6 +207,8 @@ public static class ModelPropertyCatalog
         ModelObjectKind.Role => Role,
         ModelObjectKind.Kpi => Kpi,
         ModelObjectKind.TablePermission => TablePermission,
+        ModelObjectKind.Expression => NamedExpression,
+        ModelObjectKind.Function => Function,
         _ => Generic
     };
 
@@ -224,6 +247,7 @@ public static class ModelPropertyCatalog
     {
         ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
             or ModelObjectKind.Hierarchy or ModelObjectKind.Partition
+            or ModelObjectKind.Expression or ModelObjectKind.Function
             => For(kind).Where(d => d.Writable).Select(d => d.JsonKey).ToList(),
         _ => []
     };

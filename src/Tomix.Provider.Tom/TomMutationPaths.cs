@@ -86,6 +86,8 @@ internal static partial class TomMutationPaths
         ModelObjectKind.RoleMember => "member",
         ModelObjectKind.Perspective => "perspective",
         ModelObjectKind.Culture => "culture",
+        ModelObjectKind.Expression => "expression",
+        ModelObjectKind.Function => "function",
         // ModelObjectKind.DataSource is deliberately unmapped: 'datasources/<Name>' cannot decide
         // between ProviderDataSource and StructuredDataSource, so an explicit -t is required.
         _ => null
@@ -94,7 +96,7 @@ internal static partial class TomMutationPaths
     /// <summary>
     /// Container keywords recognized only for add-path type inference. These live here instead of
     /// <see cref="PathSegment"/> so ls/find path semantics (where a table may be literally named
-    /// e.g. 'Expressions') are unaffected. Quoting a segment disables the keyword meaning.
+    /// e.g. 'CalcItems') are unaffected. Quoting a segment disables the keyword meaning.
     /// </summary>
     private static readonly IReadOnlyDictionary<string, string> SupplementalKeywords =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -103,8 +105,6 @@ internal static partial class TomMutationPaths
             ["CalcGroups"] = "calcgroup",
             ["CalculationItems"] = "calcitem",
             ["CalcItems"] = "calcitem",
-            ["Expressions"] = "expression",
-            ["Functions"] = "function",
             ["Calendars"] = "calendar",
             ["KPIs"] = "kpi",
             ["KPI"] = "kpi",

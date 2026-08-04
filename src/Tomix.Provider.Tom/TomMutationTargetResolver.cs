@@ -24,10 +24,7 @@ internal sealed class TomMutationTargetResolver
             $"Object not found: {path}",
             hint: "Run 'tx ls' to list objects. Quote names containing '/'; pass --type to target a specific object kind.");
 
-    /// <summary>
-    /// The object kinds mutation paths can address. A superset of <see cref="ModelObjectKind"/>:
-    /// named expressions and functions have container keywords but no public kind.
-    /// </summary>
+    /// <summary>The object kinds mutation paths can address; mirrors <see cref="ModelObjectKind"/>.</summary>
     private enum MutationTargetKind
     {
         Table, Measure, Column, Hierarchy, Partition, CalculationItem, Level,
@@ -276,6 +273,8 @@ internal sealed class TomMutationTargetResolver
         ModelObjectKind.Kpi => MutationTargetKind.Kpi,
         ModelObjectKind.TablePermission => MutationTargetKind.TablePermission,
         ModelObjectKind.Calendar => MutationTargetKind.Calendar,
+        ModelObjectKind.Expression => MutationTargetKind.Expression,
+        ModelObjectKind.Function => MutationTargetKind.Function,
         _ => null
     };
 
@@ -290,9 +289,6 @@ internal sealed class TomMutationTargetResolver
             ["CalcGroups"] = MutationTargetKind.Table,
             ["CalculationItems"] = MutationTargetKind.CalculationItem,
             ["CalcItems"] = MutationTargetKind.CalculationItem,
-            ["Expressions"] = MutationTargetKind.Expression,
-            ["Functions"] = MutationTargetKind.Function,
-            ["DataSources"] = MutationTargetKind.DataSource,
             // Singular KPI included so the ls path 'Table/Measure/KPI' resolves as-is.
             ["KPIs"] = MutationTargetKind.Kpi,
             ["KPI"] = MutationTargetKind.Kpi,

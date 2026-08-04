@@ -41,7 +41,8 @@ internal sealed class LsCommand : ICommandModule
         var typeOption = new Option<string?>("--type")
         {
             Description = "Filter by type: table, measure, column, calculatedcolumn, hierarchy, " +
-                          "partition, relationship, role, perspective, culture, kpi, tablepermission, calendar."
+                          "partition, relationship, role, perspective, culture, kpi, tablepermission, " +
+                          "calendar, expression, function."
         };
 
         var pathsOnlyOption = new Option<bool>("--paths-only")
