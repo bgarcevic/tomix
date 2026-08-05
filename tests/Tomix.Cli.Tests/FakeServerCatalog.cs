@@ -13,9 +13,15 @@ internal sealed class FakeServerCatalog : IServerCatalog
     /// <summary>When set, <see cref="ListDatabasesAsync"/> throws it (simulates auth/XMLA failure).</summary>
     public Exception? Failure { get; init; }
 
+    /// <summary>How many times the XMLA listing ran — 0 proves the REST fast path was used.</summary>
+    public int ListCount { get; private set; }
+
     public bool CanList(ModelReference endpoint) => true;
 
     public Task<IReadOnlyList<ServerDatabaseInfo>> ListDatabasesAsync(
         ModelReference endpoint, CancellationToken cancellationToken)
-        => Failure is null ? Task.FromResult(_databases) : Task.FromException<IReadOnlyList<ServerDatabaseInfo>>(Failure);
+    {
+        ListCount++;
+        return Failure is null ? Task.FromResult(_databases) : Task.FromException<IReadOnlyList<ServerDatabaseInfo>>(Failure);
+    }
 }

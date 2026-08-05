@@ -182,6 +182,11 @@ internal sealed class ConnectCommand : ICommandModule
             // the session. Not part of the plan request: it is display state, not a planning input.
             PowerBiDesktopInstance? desktopInstance = null;
 
+            // Set when the workspace came from the picker. Only its REST group id is interesting:
+            // it unlocks the fast dataset listing for the model picker on the next pass. The plan
+            // request keeps only the XMLA endpoint, which is not enough to address the REST API.
+            WorkspaceInfo? pickedWorkspace = null;
+
             // Plan/resolve loop: each pass either reports the first missing piece (resolved here
             // by a prompt or Desktop discovery, then folded back into the request) or yields a
             // terminal outcome to act on.
@@ -213,6 +218,7 @@ internal sealed class ConnectCommand : ICommandModule
                             var picked = await PickWorkspaceAsync(cancellationToken);
                             if (picked is null)
                                 return 1;
+                            pickedWorkspace = picked;
                             request = request with { WorkspaceValue = picked.XmlaEndpoint };
                             break;
                         }
@@ -222,6 +228,7 @@ internal sealed class ConnectCommand : ICommandModule
                             var suggestion = ConnectPrompts.SuggestMirrorDatabaseName(need.SuggestionModelName!, _cachedUsername());
                             var selection = await PickDatabaseAsync(
                                 ModelReference.Remote(need.Endpoint!),
+                                WorkspaceFor(pickedWorkspace, need.Endpoint!),
                                 allowCreateNew: true, allowWorkspaceOnly: false, suggestion, cancellationToken);
                             if (selection is null)
                                 return 1; // listing failed — do not save a half-configured mirror
@@ -233,6 +240,7 @@ internal sealed class ConnectCommand : ICommandModule
                         {
                             var selection = await PickDatabaseAsync(
                                 ModelReference.Remote(need.Endpoint!),
+                                WorkspaceFor(pickedWorkspace, need.Endpoint!),
                                 allowCreateNew: false, allowWorkspaceOnly: true, null, cancellationToken);
                             if (selection is null)
                                 return 1; // listing failed — do not overwrite the active connection
@@ -568,6 +576,7 @@ internal sealed class ConnectCommand : ICommandModule
 
         var selection = await PickDatabaseAsync(
             ModelReference.Remote(workspace.XmlaEndpoint),
+            workspace,
             allowCreateNew: false, allowWorkspaceOnly: true, suggestedNewName: null, cancellationToken);
         if (selection is null)
             return null; // listing failed — do not fall through to "workspace only"
@@ -588,18 +597,29 @@ internal sealed class ConnectCommand : ICommandModule
         }
     }
 
+    /// <summary>
+    /// The picked workspace, but only when it is the one <paramref name="endpoint"/> refers to.
+    /// <c>PrimaryDatabase</c> can be reached with an endpoint the user typed, which must not
+    /// inherit the group id of a workspace picked earlier in the same run.
+    /// </summary>
+    internal static WorkspaceInfo? WorkspaceFor(WorkspaceInfo? picked, string endpoint)
+        => picked is not null && string.Equals(picked.XmlaEndpoint, endpoint, StringComparison.OrdinalIgnoreCase)
+            ? picked
+            : null;
+
     // Returns the model selection, or null on failure (listing error, expired auth, or no catalog).
     // A null here means "could not resolve" and must NOT be treated as an explicit workspace-only
     // choice — callers stop with exit 1 rather than saving a connection.
     private async Task<ConnectPrompts.DatabaseSelection?> PickDatabaseAsync(
         ModelReference endpoint,
+        WorkspaceInfo? workspace,
         bool allowCreateNew,
         bool allowWorkspaceOnly,
         string? suggestedNewName,
         CancellationToken cancellationToken)
     {
         var catalog = _providers.OfType<IServerCatalog>().FirstOrDefault(c => c.CanList(endpoint));
-        if (catalog is null)
+        if (catalog is null && workspace is null)
         {
             RenderInteractiveError(new InvalidOperationException(
                 $"No provider can list models on '{endpoint.Value}'."));
@@ -609,13 +629,47 @@ internal sealed class ConnectCommand : ICommandModule
         try
         {
             return await ConnectPrompts.PickDatabaseAsync(
-                ErrConsole(), catalog, endpoint, allowCreateNew, allowWorkspaceOnly, suggestedNewName, cancellationToken);
+                ErrConsole(), BuildModelLister(endpoint, workspace, catalog, _workspaceCatalog),
+                allowCreateNew, allowWorkspaceOnly, suggestedNewName, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             RenderInteractiveError(ex);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Chooses how to enumerate the models on <paramref name="endpoint"/>. A workspace picked from
+    /// the REST catalog carries a group id, so its models come from one REST call instead of an
+    /// XMLA handshake; anything else (a typed endpoint, Azure AS, Desktop) still goes over XMLA.
+    /// A REST failure — most often a token without <c>Dataset.Read.All</c> — degrades to the XMLA
+    /// listing rather than failing the picker.
+    /// </summary>
+    internal static Func<CancellationToken, Task<ConnectPrompts.ModelListing>> BuildModelLister(
+        ModelReference endpoint,
+        WorkspaceInfo? workspace,
+        IServerCatalog? catalog,
+        IWorkspaceCatalog workspaceCatalog)
+    {
+        if (workspace is null || string.IsNullOrWhiteSpace(workspace.Id))
+            return async ct => new ConnectPrompts.ModelListing(
+                await catalog!.ListDatabasesAsync(endpoint, ct), null);
+
+        return async ct =>
+        {
+            try
+            {
+                return new ConnectPrompts.ModelListing(
+                    await workspaceCatalog.ListDatasetsAsync(workspace.Id, ct), null);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && catalog is not null)
+            {
+                return new ConnectPrompts.ModelListing(
+                    await catalog.ListDatabasesAsync(endpoint, ct),
+                    $"Listed models over XMLA; the Power BI dataset API failed: {ex.Message}");
+            }
+        };
     }
 
     private static void RenderInteractiveError(Exception ex)

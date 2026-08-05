@@ -12,6 +12,11 @@ public class ConnectPromptsTests
 
     private static ModelReference Endpoint => ModelReference.Remote("powerbi://api.powerbi.com/v1.0/myorg/WS");
 
+    /// <summary>Adapts an <see cref="IServerCatalog"/> to the lister the picker now takes.</summary>
+    private static Func<CancellationToken, Task<ConnectPrompts.ModelListing>> Lister(
+        FakeServerCatalog catalog, string? note = null)
+        => async ct => new ConnectPrompts.ModelListing(await catalog.ListDatabasesAsync(Endpoint, ct), note);
+
     // Selecting the highlighted (first) workspace returns it.
     [Fact]
     public async Task PickWorkspace_SelectsHighlighted()
@@ -65,7 +70,7 @@ public class ConnectPromptsTests
         var catalog = new FakeServerCatalog("SalesModel");
 
         var result = await ConnectPrompts.PickDatabaseAsync(
-            console, catalog, Endpoint,
+            console, Lister(catalog),
             allowCreateNew: false, allowWorkspaceOnly: false, suggestedNewName: null, CancellationToken.None);
 
         Assert.False(result.IsWorkspaceOnly);
@@ -83,7 +88,7 @@ public class ConnectPromptsTests
         var catalog = new FakeServerCatalog();
 
         var result = await ConnectPrompts.PickDatabaseAsync(
-            console, catalog, Endpoint,
+            console, Lister(catalog),
             allowCreateNew: true, allowWorkspaceOnly: false, suggestedNewName: "sales-dev-bokg", CancellationToken.None);
 
         Assert.False(result.IsWorkspaceOnly);
@@ -100,7 +105,7 @@ public class ConnectPromptsTests
         var catalog = new FakeServerCatalog();
 
         var result = await ConnectPrompts.PickDatabaseAsync(
-            console, catalog, Endpoint,
+            console, Lister(catalog),
             allowCreateNew: true, allowWorkspaceOnly: false, suggestedNewName: "sales-dev-bokg", CancellationToken.None);
 
         Assert.Equal("custom-name", result.Name);
@@ -115,11 +120,29 @@ public class ConnectPromptsTests
         var catalog = new FakeServerCatalog();
 
         var result = await ConnectPrompts.PickDatabaseAsync(
-            console, catalog, Endpoint,
+            console, Lister(catalog),
             allowCreateNew: false, allowWorkspaceOnly: true, suggestedNewName: null, CancellationToken.None);
 
         Assert.True(result.IsWorkspaceOnly);
         Assert.Null(result.Name);
+    }
+
+    // A note from the lister (e.g. "the fast REST listing failed, fell back to XMLA") is shown to
+    // the user, and must survive the spinner rather than being swallowed by the live display.
+    [Fact]
+    public async Task PickDatabase_ListerNote_IsRendered()
+    {
+        var console = Interactive();
+        console.Input.PushKey(ConsoleKey.Enter);
+        var catalog = new FakeServerCatalog("SalesModel");
+
+        var result = await ConnectPrompts.PickDatabaseAsync(
+            console, Lister(catalog, "the dataset API said no [really]"),
+            allowCreateNew: false, allowWorkspaceOnly: false, suggestedNewName: null, CancellationToken.None);
+
+        Assert.Equal("SalesModel", result.Name);
+        // Escaped, so the bracketed fragment survives verbatim instead of being read as markup.
+        Assert.Contains("the dataset API said no [really]", console.Output);
     }
 
     // A listing failure (e.g. expired auth) surfaces as an exception — it must never be mistaken
@@ -131,7 +154,7 @@ public class ConnectPromptsTests
         var catalog = new FakeServerCatalog { Failure = new InvalidOperationException("XMLA denied") };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => ConnectPrompts.PickDatabaseAsync(
-            console, catalog, Endpoint,
+            console, Lister(catalog),
             allowCreateNew: false, allowWorkspaceOnly: true, suggestedNewName: null, CancellationToken.None));
     }
 }

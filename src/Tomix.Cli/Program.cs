@@ -296,6 +296,11 @@ internal static class Program
 
         public Task<IReadOnlyList<WorkspaceInfo>> ListWorkspacesAsync(CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<WorkspaceInfo>>([]);
+
+        public Task<IReadOnlyList<ServerDatabaseInfo>> ListDatasetsAsync(
+            string workspaceId,
+            CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<ServerDatabaseInfo>>([]);
     }
 
     /// <summary>Release source for contexts without network wiring (e.g. help-only test roots).</summary>

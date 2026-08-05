@@ -93,9 +93,16 @@ internal static class ConnectPrompts
     }
 
     /// <summary>
-    /// Prompts for a semantic model on <paramref name="endpoint"/>. When
-    /// <paramref name="allowCreateNew"/> is set, offers a "create new" entry that opens a text
-    /// prompt pre-filled with <paramref name="suggestedNewName"/>. When
+    /// The models a lister produced, plus an optional note to show once the spinner is gone
+    /// (for example: the fast REST listing failed and the slower XMLA one was used instead).
+    /// </summary>
+    internal readonly record struct ModelListing(IReadOnlyList<ServerDatabaseInfo> Models, string? Note);
+
+    /// <summary>
+    /// Prompts for a semantic model produced by <paramref name="list"/> — the caller decides
+    /// whether that is the REST dataset API or an XMLA catalog, so this prompt stays protocol
+    /// agnostic. When <paramref name="allowCreateNew"/> is set, offers a "create new" entry that
+    /// opens a text prompt pre-filled with <paramref name="suggestedNewName"/>. When
     /// <paramref name="allowWorkspaceOnly"/> is set, offers a "workspace only" entry.
     /// Returns a <see cref="DatabaseSelection"/> distinguishing a chosen/created model from an
     /// explicit "workspace only" choice. Throws (rather than returning a sentinel) if listing
@@ -103,22 +110,27 @@ internal static class ConnectPrompts
     /// </summary>
     public static async Task<DatabaseSelection> PickDatabaseAsync(
         IAnsiConsole console,
-        IServerCatalog catalog,
-        ModelReference endpoint,
+        Func<CancellationToken, Task<ModelListing>> list,
         bool allowCreateNew,
         bool allowWorkspaceOnly,
         string? suggestedNewName,
         CancellationToken cancellationToken)
     {
-        var databases = await console.Status()
+        var listing = await console.Status()
             .Spinner(Spectre.Console.Spinner.Known.Dots)
             .StartAsync(
                 "Listing models on the workspace...",
-                _ => catalog.ListDatabasesAsync(endpoint, cancellationToken))
+                _ => list(cancellationToken))
             .ConfigureAwait(false);
 
+        // Printed after the status display has torn down; writing inside the callback would
+        // fight the live region for the same lines. Styling.Muted escapes, which matters here:
+        // a note can carry a server error message, and those are free to contain brackets.
+        if (!string.IsNullOrWhiteSpace(listing.Note))
+            console.MarkupLine(Styling.Muted(listing.Note));
+
         var choices = new List<DatabaseChoice>();
-        foreach (var database in databases.OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var database in listing.Models.OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
             choices.Add(DatabaseChoice.Existing(database.Name));
         if (allowCreateNew)
             choices.Add(DatabaseChoice.CreateNew());

@@ -6,6 +6,15 @@ namespace Tomix.App.Connect;
 public interface IWorkspaceCatalog
 {
     Task<IReadOnlyList<WorkspaceInfo>> ListWorkspacesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists the semantic models in a workspace by its REST group id. This is the fast path for
+    /// the interactive model picker: one REST call, versus the XMLA handshake an
+    /// <see cref="IServerCatalog"/> pays to reach the same names.
+    /// </summary>
+    Task<IReadOnlyList<ServerDatabaseInfo>> ListDatasetsAsync(
+        string workspaceId,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>A Power BI workspace as reported by the REST API.</summary>
