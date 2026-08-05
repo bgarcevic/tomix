@@ -80,10 +80,5 @@ public sealed class TmdlModelSessionSaveRoundTripTests : IDisposable
         Assert.Equal(before, after);
     }
 
-    private string CopySample()
-    {
-        var destination = Path.Combine(_tempDir.Path, "basic-tmdl");
-        TestSupport.CopyDirectory(TestSupport.SampleTmdlFolder, destination);
-        return destination;
-    }
+    private string CopySample() => SampleModel.CopyTo(_tempDir, "basic-tmdl");
 }

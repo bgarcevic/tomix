@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Using Include="Tomix.App.Tests.Support" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Tomix.App\Tomix.App.csproj" />
     <ProjectReference Include="..\..\src\Tomix.Core\Tomix.Core.csproj" />
     <ProjectReference Include="..\..\src\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />

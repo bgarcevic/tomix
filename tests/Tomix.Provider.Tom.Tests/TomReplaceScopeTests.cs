@@ -66,21 +66,4 @@ public sealed class TomReplaceScopeTests
         Assert.Equal("old-value", sales.Annotations["Tag"].Value);
         Assert.DoesNotContain(result.Previews, p => p.Property.StartsWith("Annotation:"));
     }
-
-    private static ModelReplaceRequest Replace(string pattern, string replacement, string scope, bool apply = true)
-        => new(pattern, replacement, scope, Regex: false, CaseSensitive: false, Apply: apply);
-
-    private static Database WithSales()
-    {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
-        var sales = new Table { Name = "Sales" };
-        sales.Partitions.Add(new Partition
-        {
-            Name = "Sales",
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        db.Model.Tables.Add(sales);
-        return db;
-    }
 }

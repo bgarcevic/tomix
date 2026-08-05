@@ -21,7 +21,7 @@ public sealed class ProviderDisjointnessTests
     [Fact]
     public void TmdlFolder_IsClaimedOnlyByTmdlProvider()
     {
-        var provider = RealProviders().ResolveSingle(new ModelReference(LocateSample()));
+        var provider = RealProviders().ResolveSingle(new ModelReference(SampleModel.Locate()));
 
         Assert.IsType<TmdlModelProvider>(provider);
     }
@@ -59,17 +59,5 @@ public sealed class ProviderDisjointnessTests
         var reference = new ModelReference(Path.Combine(Path.GetTempPath(), $"tomix-missing-{Guid.NewGuid():N}"));
 
         Assert.Null(RealProviders().ResolveSingle(reference));
-    }
-
-    private static string LocateSample()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "samples", "basic-tmdl");
-            if (Directory.Exists(candidate))
-                return candidate;
-        }
-
-        throw new InvalidOperationException("samples/basic-tmdl not found above test base directory.");
     }
 }

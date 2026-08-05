@@ -71,19 +71,9 @@ public sealed class TestRunRendererTests
                 differences: [new TestDifference("cell", 1, "[Total]", "1", "2")], totalDifferences: 1),
             Case(TestOutcome.Missing, name: "c-miss", message: "No snapshot recorded."));
 
-        var stderr = new StringWriter();
-        var original = Console.Error;
-        Console.SetError(stderr);
-        try
-        {
-            TestRunRenderer.EmitCi("github", run);
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.Run(() => TestRunRenderer.EmitCi("github", run));
 
-        var lines = stderr.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = captured.Stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(2, lines.Length);
         Assert.All(lines, line => Assert.StartsWith("::error::", line));
         Assert.Contains("b-fail", lines[0]);
@@ -94,18 +84,9 @@ public sealed class TestRunRendererTests
     [Fact]
     public void EmitCi_NoAnnotations_WhenAllPass()
     {
-        var stderr = new StringWriter();
-        var original = Console.Error;
-        Console.SetError(stderr);
-        try
-        {
-            TestRunRenderer.EmitCi("vsts", Run(Case(TestOutcome.Passed)));
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.Run(
+            () => TestRunRenderer.EmitCi("vsts", Run(Case(TestOutcome.Passed))));
 
-        Assert.Equal("", stderr.ToString());
+        Assert.Equal("", captured.Stderr);
     }
 }

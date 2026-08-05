@@ -271,37 +271,29 @@ public sealed class DeployModelHandlerTests
     [Fact]
     public async Task HandleAsync_GeneratesScript_WhenXmlaOutputIsFile()
     {
-        var outputDir = Path.Combine(Path.GetTempPath(), $"tomix-deploy-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(outputDir);
-        try
-        {
-            var scriptPath = Path.Combine(outputDir, "script.json");
-            var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
-            var result = await handler.HandleAsync(
-                new DeployModelRequest(
-                    new ModelReference("samples/basic-tmdl"),
-                    Server: "my-workspace",
-                    Database: "my-model",
-                    Profile: null,
-                    CreateOnly: false,
-                    SkipBpa: true,
-                    FixBpa: false,
-                    BpaRules: null,
-                    XmlaOutput: scriptPath,
-                    Force: false,
-                    Ci: null),
-                CancellationToken.None);
+        using var outputDir = new TempDir();
+        var scriptPath = outputDir.Combine("script.json");
+        var handler = new DeployModelHandler([new StubDeployProvider()], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: scriptPath,
+                Force: false,
+                Ci: null),
+            CancellationToken.None);
 
-            Assert.True(result.Success);
-            Assert.Equal("script", result.Data!.Status);
-            Assert.True(File.Exists(result.Data.ScriptPath));
-            var content = await File.ReadAllTextAsync(result.Data.ScriptPath!);
-            Assert.Contains("my-model", content);
-        }
-        finally
-        {
-            Directory.Delete(outputDir, recursive: true);
-        }
+        Assert.True(result.Success);
+        Assert.Equal("script", result.Data!.Status);
+        Assert.True(File.Exists(result.Data.ScriptPath));
+        var content = await File.ReadAllTextAsync(result.Data.ScriptPath!);
+        Assert.Contains("my-model", content);
     }
 
     [Fact]

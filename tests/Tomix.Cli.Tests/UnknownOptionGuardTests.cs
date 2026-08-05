@@ -12,12 +12,9 @@ public sealed class UnknownOptionGuardTests
 {
     private static (ParseResult Result, string[] Args) Parse(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
         var services = TestServices.Create();
-        root.Subcommands.Add(new LsCommand(providers, services.State).Build());
+        var root = TestRoot.With(new LsCommand(providers, services.State).Build());
         root.Subcommands.Add(new GetCommand(providers, services.State).Build());
         root.Subcommands.Add(new FindCommand(providers, services.State).Build());
         return (root.Parse(args), args);

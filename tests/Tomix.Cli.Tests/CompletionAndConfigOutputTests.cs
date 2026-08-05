@@ -111,36 +111,6 @@ public sealed class CompletionAndConfigOutputTests
         }
     }
 
-    private static InvocationResult Invoke(Command command, params string[] args)
-    {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
-        root.Subcommands.Add(command);
-
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var originalAnsiConsole = AnsiConsole.Console;
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(stdout)
-        });
-        try
-        {
-            var parsed = root.Parse(args);
-            return new InvocationResult(parsed.Invoke(), stdout.ToString(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-            AnsiConsole.Console = originalAnsiConsole;
-        }
-    }
-
-    private sealed record InvocationResult(int ExitCode, string Stdout, string Stderr);
+    private static ConsoleCapture.Captured Invoke(Command command, params string[] args)
+        => ConsoleCapture.Invoke(TestRoot.With(command).Parse(args), captureAnsiConsole: true);
 }

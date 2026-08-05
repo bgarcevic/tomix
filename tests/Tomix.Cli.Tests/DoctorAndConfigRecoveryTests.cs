@@ -84,32 +84,8 @@ public sealed class DoctorAndConfigRecoveryTests : IDisposable
         Assert.Contains("\"code\": \"TOMIX_CONFIG_CORRUPT\"", invocation.Stderr);
     }
 
-    private static Invocation Invoke(params string[] args)
-    {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var originalAnsiConsole = AnsiConsole.Console;
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(stdout)
-        });
-        try
-        {
-            return new Invocation(Program.Run(args), stdout.ToString(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-            AnsiConsole.Console = originalAnsiConsole;
-        }
-    }
-
-    private sealed record Invocation(int ExitCode, string Stdout, string Stderr);
+    private static ConsoleCapture.Captured Invoke(params string[] args)
+        => ConsoleCapture.Run(() => Program.Run(args), captureAnsiConsole: true);
 }
 
 [Collection(ConsoleStateCollection.Name)]
@@ -152,30 +128,6 @@ public sealed class ConfigDefaultFormatIntegrationTests : IDisposable
         Assert.StartsWith("# tomix shell completion", result.Stdout);
     }
 
-    private static Invocation Invoke(params string[] args)
-    {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var originalAnsiConsole = AnsiConsole.Console;
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(stdout)
-        });
-        try
-        {
-            return new Invocation(Program.Run(args), stdout.ToString(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-            AnsiConsole.Console = originalAnsiConsole;
-        }
-    }
-
-    private sealed record Invocation(int ExitCode, string Stdout, string Stderr);
+    private static ConsoleCapture.Captured Invoke(params string[] args)
+        => ConsoleCapture.Run(() => Program.Run(args), captureAnsiConsole: true);
 }

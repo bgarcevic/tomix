@@ -56,7 +56,7 @@ public sealed class CommandSurfaceSnapshotTests
         var docsDir = Path.Combine(RepoRoot(), "docs", "commands");
         var haystack = string.Join('\n', Directory.GetFiles(docsDir, "*.md").Select(File.ReadAllText));
 
-        var missing = CommandPaths(BuildRoot(), "")
+        var missing = CommandPaths(TestRoot.Full(), "")
             .Select(entry => entry.Path.TrimStart(' '))
             .Where(path => !haystack.Contains(path, StringComparison.Ordinal))
             .ToList();
@@ -66,16 +66,10 @@ public sealed class CommandSurfaceSnapshotTests
             Environment.NewLine + string.Join(Environment.NewLine, missing));
     }
 
-    private static RootCommand BuildRoot()
-        => Program.BuildRootCommand(
-            providers: [],
-            new CompositeExpressionFormatterClient([]),
-            version: "0.0.0-test",
-            TestServices.Create());
 
     private static string RenderSurface()
     {
-        var root = BuildRoot();
+        var root = TestRoot.Full();
 
         var sb = new StringBuilder();
         WriteCommand(sb, root, "tx");
@@ -124,16 +118,10 @@ public sealed class CommandSurfaceSnapshotTests
         return joined;
     }
 
+    /// <summary>Visible commands only, each with its display path prefixed by <paramref name="prefix"/>.</summary>
     private static IEnumerable<(Command Command, string Path)> CommandPaths(Command command, string prefix)
-    {
-        foreach (var sub in command.Subcommands.Where(c => !c.Hidden))
-        {
-            var path = $"{prefix} {sub.Name}";
-            yield return (sub, path);
-            foreach (var nested in CommandPaths(sub, path))
-                yield return nested;
-        }
-    }
+        => TestRoot.Descendants(command, includeHidden: false)
+            .Select(entry => (entry.Command, Path: $"{prefix} {string.Join(' ', entry.Path)}"));
 
     private static string OneLine(string? text)
         => (text ?? "").Replace("\r", "").Replace("\n", "\\n");

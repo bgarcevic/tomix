@@ -24,10 +24,7 @@ public sealed class VertipaqCommandParseTests
 
     private static ParseResult Parse(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
-        root.Subcommands.Add(BuildCommand());
+        var root = TestRoot.With(BuildCommand());
         return root.Parse(args);
     }
 
@@ -36,17 +33,8 @@ public sealed class VertipaqCommandParseTests
         var result = Parse(args);
         Assert.Empty(result.Errors);
 
-        var original = Console.Error;
-        var stderr = new StringWriter();
-        Console.SetError(stderr);
-        try
-        {
-            return (result.Invoke(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.Invoke(result);
+        return (captured.ExitCode, captured.Stderr);
     }
 
     [Fact]

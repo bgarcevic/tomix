@@ -156,47 +156,33 @@ public sealed class UpdateCheckHandlerTests
     [Fact]
     public async Task SuccessfulCheck_RefreshesTheNoticeCache()
     {
-        var dir = Directory.CreateTempSubdirectory("tomix-update-handler-tests").FullName;
-        try
-        {
-            var store = new UpdateCheckStore(dir);
-            var source = new FakeReleaseSource { Releases = [Release("0.3.0")] };
-            var handler = new UpdateCheckHandler(source, store);
+        using var dir = new TempDir();
+        var store = new UpdateCheckStore(dir.Path);
+        var source = new FakeReleaseSource { Releases = [Release("0.3.0")] };
+        var handler = new UpdateCheckHandler(source, store);
 
-            var result = await handler.HandleAsync("0.1.0", InstallKind.Standalone, null, CancellationToken.None);
+        var result = await handler.HandleAsync("0.1.0", InstallKind.Standalone, null, CancellationToken.None);
 
-            Assert.NotNull(result.Data);
-            Assert.Equal("0.3.0", store.Load()?.LatestVersion);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        Assert.NotNull(result.Data);
+        Assert.Equal("0.3.0", store.Load()?.LatestVersion);
     }
 
     [Fact]
     public async Task PinnedCheck_CachesTheNewestStableRelease_NotThePin()
     {
-        var dir = Directory.CreateTempSubdirectory("tomix-update-handler-tests").FullName;
-        try
+        using var dir = new TempDir();
+        var store = new UpdateCheckStore(dir.Path);
+        var source = new FakeReleaseSource
         {
-            var store = new UpdateCheckStore(dir);
-            var source = new FakeReleaseSource
-            {
-                Releases = [Release("0.4.0-rc.1", prerelease: true), Release("0.3.0"), Release("0.2.0")]
-            };
-            var handler = new UpdateCheckHandler(source, store);
+            Releases = [Release("0.4.0-rc.1", prerelease: true), Release("0.3.0"), Release("0.2.0")]
+        };
+        var handler = new UpdateCheckHandler(source, store);
 
-            var result = await handler.HandleAsync("0.1.0", InstallKind.Standalone, "0.2.0", CancellationToken.None);
+        var result = await handler.HandleAsync("0.1.0", InstallKind.Standalone, "0.2.0", CancellationToken.None);
 
-            // The check resolves the pin, but the notice cache must keep tracking the
-            // newest stable release or the 0.3.0 notice would be suppressed for a day.
-            Assert.Equal("0.2.0", result.Data!.LatestVersion);
-            Assert.Equal("0.3.0", store.Load()?.LatestVersion);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        // The check resolves the pin, but the notice cache must keep tracking the
+        // newest stable release or the 0.3.0 notice would be suppressed for a day.
+        Assert.Equal("0.2.0", result.Data!.LatestVersion);
+        Assert.Equal("0.3.0", store.Load()?.LatestVersion);
     }
 }

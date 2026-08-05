@@ -1,5 +1,4 @@
 using Tomix.App.Script;
-using Tomix.App.Tests.Support;
 using Tomix.Core.Models;
 using Tomix.Provider.Tmdl;
 
@@ -14,13 +13,12 @@ namespace Tomix.App.Tests;
 public sealed class ScriptHandlerTests : IDisposable
 {
     private readonly TempConfigDir _config = new();
-    private readonly string _model = CopySample();
+    private readonly TempDir _model = SampleModel.CopyToTemp();
 
     public void Dispose()
     {
         _config.Dispose();
-        if (Directory.Exists(_model))
-            Directory.Delete(_model, recursive: true);
+        _model.Dispose();
     }
 
     // ---- Input resolution failures -------------------------------------------------------
@@ -336,7 +334,7 @@ public sealed class ScriptHandlerTests : IDisposable
         bool stage = false,
         bool revert = false)
         => new(
-            new ModelReference(model ?? _model),
+            new ModelReference(model ?? _model.Path),
             files ?? [],
             expressions ?? [],
             DryRun: dryRun,
@@ -368,32 +366,4 @@ public sealed class ScriptHandlerTests : IDisposable
 
     private static ModelObject Child(string name, ModelObjectKind kind)
         => new(name, kind, name, null, null, null, false, null, []);
-
-    private static string CopySample()
-    {
-        var dest = Path.Combine(Path.GetTempPath(), $"tomix-script-test-{Guid.NewGuid():N}");
-        CopyDirectory(LocateSample(), dest);
-        return dest;
-    }
-
-    private static string LocateSample()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "samples", "basic-tmdl");
-            if (Directory.Exists(candidate))
-                return candidate;
-        }
-
-        throw new InvalidOperationException("samples/basic-tmdl not found above test base directory.");
-    }
-
-    private static void CopyDirectory(string source, string dest)
-    {
-        Directory.CreateDirectory(dest);
-        foreach (var file in Directory.GetFiles(source))
-            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
-        foreach (var dir in Directory.GetDirectories(source))
-            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
-    }
 }

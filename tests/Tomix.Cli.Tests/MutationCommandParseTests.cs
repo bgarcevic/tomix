@@ -11,10 +11,7 @@ public sealed class MutationCommandParseTests
 {
     private static ParseResult Parse(Command command, params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
-        root.Subcommands.Add(command);
+        var root = TestRoot.With(command);
         return root.Parse(args);
     }
 

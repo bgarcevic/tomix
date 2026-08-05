@@ -15,30 +15,22 @@ public sealed class MsalAuthenticatorFastFailTests
     [Fact]
     public async Task GetTokenAsync_NoRecordedLogin_FailsFast()
     {
-        var directory = Path.Combine(Path.GetTempPath(), $"tomix-auth-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var authenticator = new MsalAuthenticator(
-                MsalAuthSettings.Default,
-                cacheDirectory: directory,
-                stateFile: Path.Combine(directory, "auth-state.json"),
-                credentialFile: Path.Combine(directory, "credentials.json"));
+        using var dir = new TempDir();
+        var authenticator = new MsalAuthenticator(
+            MsalAuthSettings.Default,
+            cacheDirectory: dir.Path,
+            stateFile: dir.Combine("auth-state.json"),
+            credentialFile: dir.Combine("credentials.json"));
 
-            var stopwatch = Stopwatch.StartNew();
-            var ex = await Assert.ThrowsAsync<AuthenticationRequiredException>(
-                () => authenticator.GetTokenAsync("powerbi://api.powerbi.com/v1.0/myorg/ws", CancellationToken.None));
-            stopwatch.Stop();
+        var stopwatch = Stopwatch.StartNew();
+        var ex = await Assert.ThrowsAsync<AuthenticationRequiredException>(
+            () => authenticator.GetTokenAsync("powerbi://api.powerbi.com/v1.0/myorg/ws", CancellationToken.None));
+        stopwatch.Stop();
 
-            Assert.Contains("tx auth login", ex.Message);
-            // The gate must not open the keystore-backed MSAL cache — that can block for minutes.
-            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5),
-                $"Expected an immediate failure, took {stopwatch.Elapsed}.");
-        }
-        finally
-        {
-            Directory.Delete(directory, true);
-        }
+        Assert.Contains("tx auth login", ex.Message);
+        // The gate must not open the keystore-backed MSAL cache — that can block for minutes.
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5),
+            $"Expected an immediate failure, took {stopwatch.Elapsed}.");
     }
 
     [Fact]

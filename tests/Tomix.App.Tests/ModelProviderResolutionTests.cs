@@ -19,22 +19,18 @@ public sealed class ModelProviderResolutionTests
         if (!CanDropUnixReadPermission())
             return;
 
-        var path = Path.Combine(Path.GetTempPath(), $"tomix-unreadable-{Guid.NewGuid():N}.pbip");
-        File.WriteAllText(path, "{}");
+        // Deleting the enclosing directory needs write permission on the directory, not on the
+        // file, so an unreadable file still cleans up with the rest of the TempDir.
+        using var dir = new TempDir();
+        var path = dir.WriteFile("Report.pbip", "{}");
         File.SetUnixFileMode(path, UnixFileMode.None);
-        try
-        {
-            var providers = new IModelProvider[] { new StubProvider(claims: false) };
 
-            var ex = Assert.Throws<ModelLoadException>(
-                () => providers.ResolveSingleProvider(new ModelReference(path)));
+        var providers = new IModelProvider[] { new StubProvider(claims: false) };
 
-            Assert.Contains(path, ex.Message);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        var ex = Assert.Throws<ModelLoadException>(
+            () => providers.ResolveSingleProvider(new ModelReference(path)));
+
+        Assert.Contains(path, ex.Message);
     }
 
     [Fact]
@@ -43,8 +39,8 @@ public sealed class ModelProviderResolutionTests
         if (!CanDropUnixReadPermission())
             return;
 
-        var path = Path.Combine(Path.GetTempPath(), $"tomix-unreadable-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(path);
+        using var dir = new TempDir();
+        var path = dir.CreateSubdirectory("Sales.SemanticModel");
         File.SetUnixFileMode(path, UnixFileMode.None);
         try
         {
@@ -57,9 +53,9 @@ public sealed class ModelProviderResolutionTests
         }
         finally
         {
-            File.SetUnixFileMode(
-                path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            Directory.Delete(path);
+            // A directory the process cannot traverse cannot be removed recursively either, so
+            // TempDir's dispose needs the mode restored first.
+            RestoreOwnerAccess(path);
         }
     }
 
@@ -71,10 +67,9 @@ public sealed class ModelProviderResolutionTests
 
         // File/Directory.Exists report false for a path the process cannot traverse to, so an
         // Exists-gated probe would silently skip it; the probe must open the path instead.
-        var parent = Path.Combine(Path.GetTempPath(), $"tomix-nontraversable-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(parent);
-        var path = Path.Combine(parent, "Report.pbip");
-        File.WriteAllText(path, "{}");
+        using var dir = new TempDir();
+        var path = dir.WriteFile(Path.Combine("locked", "Report.pbip"), "{}");
+        var parent = dir.Combine("locked");
         File.SetUnixFileMode(parent, UnixFileMode.None);
         try
         {
@@ -87,9 +82,7 @@ public sealed class ModelProviderResolutionTests
         }
         finally
         {
-            File.SetUnixFileMode(
-                parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            Directory.Delete(parent, recursive: true);
+            RestoreOwnerAccess(parent);
         }
     }
 
@@ -97,18 +90,12 @@ public sealed class ModelProviderResolutionTests
     public void ResolveSingleProvider_UnclaimedReadableFile_ReturnsNull()
     {
         // The unreadable-source probe must not misfire on sources that are merely unowned.
-        var path = Path.Combine(Path.GetTempPath(), $"tomix-readable-{Guid.NewGuid():N}.txt");
-        File.WriteAllText(path, "not a model");
-        try
-        {
-            var providers = new IModelProvider[] { new StubProvider(claims: false) };
+        using var dir = new TempDir();
+        var path = dir.WriteFile("notes.txt", "not a model");
 
-            Assert.Null(providers.ResolveSingleProvider(new ModelReference(path)));
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        var providers = new IModelProvider[] { new StubProvider(claims: false) };
+
+        Assert.Null(providers.ResolveSingleProvider(new ModelReference(path)));
     }
 
     [Fact]
@@ -116,7 +103,8 @@ public sealed class ModelProviderResolutionTests
     {
         // FileNotFound from the open probe is the callers' no-provider case, not an
         // unreadable source.
-        var path = Path.Combine(Path.GetTempPath(), $"tomix-missing-{Guid.NewGuid():N}.pbip");
+        using var dir = new TempDir();
+        var path = dir.Combine("absent.pbip");
         var providers = new IModelProvider[] { new StubProvider(claims: false) };
 
         Assert.Null(providers.ResolveSingleProvider(new ModelReference(path)));
@@ -139,20 +127,14 @@ public sealed class ModelProviderResolutionTests
 
         // A provider can claim a reference without reading it (e.g. by extension plus sibling
         // folders); a match must win over the unreadable-source probe.
-        var path = Path.Combine(Path.GetTempPath(), $"tomix-unreadable-{Guid.NewGuid():N}.pbip");
-        File.WriteAllText(path, "{}");
+        using var dir = new TempDir();
+        var path = dir.WriteFile("Report.pbip", "{}");
         File.SetUnixFileMode(path, UnixFileMode.None);
-        try
-        {
-            var expected = new StubProvider(claims: true);
-            var providers = new IModelProvider[] { expected };
 
-            Assert.Same(expected, providers.ResolveSingleProvider(new ModelReference(path)));
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        var expected = new StubProvider(claims: true);
+        var providers = new IModelProvider[] { expected };
+
+        Assert.Same(expected, providers.ResolveSingleProvider(new ModelReference(path)));
     }
 
     // Unix permission bits are the only way these tests can make a path unreadable; on Windows
@@ -161,6 +143,11 @@ public sealed class ModelProviderResolutionTests
     [UnsupportedOSPlatformGuard("windows")]
     private static bool CanDropUnixReadPermission()
         => !OperatingSystem.IsWindows() && !Environment.IsPrivilegedProcess;
+
+    [UnsupportedOSPlatform("windows")]
+    private static void RestoreOwnerAccess(string path)
+        => File.SetUnixFileMode(
+            path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 
     private sealed class StubProvider(bool claims) : IModelProvider
     {

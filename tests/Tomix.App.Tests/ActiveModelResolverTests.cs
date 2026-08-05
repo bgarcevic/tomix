@@ -56,30 +56,23 @@ public sealed class ActiveModelResolverTests
     {
         // An in-place save of the primary addressed through a link alias must keep syncing;
         // treating the alias as a different model would silently skip the mirror.
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        var modelPath = Path.Combine(dir, "ModelB.SemanticModel");
-        Directory.CreateDirectory(modelPath);
-        var linkPath = Path.Combine(dir, "alias");
+        using var dir = new TempDir();
+        var modelPath = dir.CreateSubdirectory("ModelB.SemanticModel");
+        var linkPath = dir.Combine("alias");
+
         try
         {
-            try
-            {
-                Directory.CreateSymbolicLink(linkPath, modelPath);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                return; // Symlinks unavailable on this platform (e.g. Windows without developer mode).
-            }
-
-            var result = ActiveModelResolver.ResolveSyncTarget(
-                LocalWorkspaceConnection(modelPath), new ModelReference(linkPath));
-
-            Assert.NotNull(result);
+            Directory.CreateSymbolicLink(linkPath, modelPath);
         }
-        finally
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Directory.Delete(dir, true);
+            return; // Symlinks unavailable on this platform (e.g. Windows without developer mode).
         }
+
+        var result = ActiveModelResolver.ResolveSyncTarget(
+            LocalWorkspaceConnection(modelPath), new ModelReference(linkPath));
+
+        Assert.NotNull(result);
     }
 
     [Fact]
@@ -143,8 +136,8 @@ public sealed class ActiveModelResolverTests
     [Fact]
     public void ResolveReference_ReturnsExplicitModel_WhenProvided()
     {
-        var store = new CliStateStore(Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}"));
-        var resolver = new ActiveModelResolver(store);
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
         var result = resolver.ResolveReference("./my-model.tmdl");
 
@@ -154,217 +147,148 @@ public sealed class ActiveModelResolverTests
     [Fact]
     public void ResolveReference_ReturnsWorkspacePath_WhenWorkspaceIsLocal()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",
-                Database: "MyModel",
-                Model: null,
-                Auth: null,
-                Local: false,
-                Profile: null,
-                Workspace: "./my-workspace",
-                WorkspaceFormat: "tmdl",
-                WorkspaceAuth: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            Database: "MyModel",
+            Model: null,
+            Auth: null,
+            Local: false,
+            Profile: null,
+            Workspace: "./my-workspace",
+            WorkspaceFormat: "tmdl",
+            WorkspaceAuth: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(null);
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveReference(null);
 
-            Assert.Equal("./my-workspace", result.Value);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Equal("./my-workspace", result.Value);
     }
 
     [Fact]
     public void ResolveReference_ReturnsRemoteEndpoint_WhenWorkspaceIsRemote()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",
-                Database: "MyModel",
-                Model: null,
-                Auth: null,
-                Local: false,
-                Profile: null,
-                Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws2",
-                WorkspaceFormat: null,
-                WorkspaceAuth: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            Database: "MyModel",
+            Model: null,
+            Auth: null,
+            Local: false,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws2",
+            WorkspaceFormat: null,
+            WorkspaceAuth: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(null, "MyModel");
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveReference(null, "MyModel");
 
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
-            Assert.Equal("MyModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
+        Assert.Equal("MyModel", result.Database);
     }
 
     [Fact]
     public void ResolveReference_ReturnsSessionModel_WhenNoWorkspace()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: null,
-                Model: "./my-model.tmdl",
-                Auth: null,
-                Local: false,
-                Profile: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: null,
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: false,
+            Profile: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(null);
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveReference(null);
 
-            Assert.Equal(Path.GetFullPath("./my-model.tmdl"), result.Value);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Equal(Path.GetFullPath("./my-model.tmdl"), result.Value);
     }
 
     [Fact]
     public void ResolveReference_ReturnsEmpty_WhenNoSession()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(null);
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
-            Assert.Equal("", result.Value);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        var result = resolver.ResolveReference(null);
+
+        Assert.Equal("", result.Value);
     }
 
     [Fact]
     public void ResolveReference_ReturnsServerEndpoint_WhenServerGivenAndNoSession()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(
-                explicitModel: null,
-                database: "MyModel",
-                server: "powerbi://api.powerbi.com/v1.0/myorg/ws");
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
-            Assert.Equal("MyModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        var result = resolver.ResolveReference(
+            explicitModel: null,
+            database: "MyModel",
+            server: "powerbi://api.powerbi.com/v1.0/myorg/ws");
+
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
+        Assert.Equal("MyModel", result.Database);
     }
 
     [Fact]
     public void ResolveReference_ServerOverridesSession()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: "powerbi://api.powerbi.com/v1.0/myorg/session-ws",
-                Database: "SessionModel",
-                Model: "./session.tmdl",
-                Auth: null,
-                Local: false,
-                Profile: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: "powerbi://api.powerbi.com/v1.0/myorg/session-ws",
+            Database: "SessionModel",
+            Model: "./session.tmdl",
+            Auth: null,
+            Local: false,
+            Profile: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(
-                explicitModel: null,
-                database: "ExplicitModel",
-                server: "powerbi://api.powerbi.com/v1.0/myorg/explicit-ws");
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveReference(
+            explicitModel: null,
+            database: "ExplicitModel",
+            server: "powerbi://api.powerbi.com/v1.0/myorg/explicit-ws");
 
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/explicit-ws", result.Value);
-            Assert.Equal("ExplicitModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/explicit-ws", result.Value);
+        Assert.Equal("ExplicitModel", result.Database);
     }
 
     [Fact]
     public void ResolveReference_ServerFallsBackToSessionDatabase_WhenDatabaseOmitted()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: "SessionModel",
-                Model: null,
-                Auth: null,
-                Local: false,
-                Profile: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: "SessionModel",
+            Model: null,
+            Auth: null,
+            Local: false,
+            Profile: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(
-                explicitModel: null,
-                database: null,
-                server: "powerbi://api.powerbi.com/v1.0/myorg/ws");
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveReference(
+            explicitModel: null,
+            database: null,
+            server: "powerbi://api.powerbi.com/v1.0/myorg/ws");
 
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
-            Assert.Equal("SessionModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
+        Assert.Equal("SessionModel", result.Database);
     }
 
     [Fact]
     public void ResolveReference_ExpandsBareWorkspaceName_ToXmlaEndpoint()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(
-                explicitModel: null,
-                database: "Contoso_core",
-                server: "MyWorkspace");
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/MyWorkspace", result.Value);
-            Assert.Equal("Contoso_core", result.Database);
-            Assert.True(result.IsRemote);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        var result = resolver.ResolveReference(
+            explicitModel: null,
+            database: "Contoso_core",
+            server: "MyWorkspace");
+
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/MyWorkspace", result.Value);
+        Assert.Equal("Contoso_core", result.Database);
+        Assert.True(result.IsRemote);
     }
 
     [Theory]
@@ -374,186 +298,126 @@ public sealed class ActiveModelResolverTests
     [InlineData("asazure://aspaaseastus2.asazure.windows.net/myserver")]
     public void ResolveReference_LeavesFormedEndpoints_Unchanged(string server)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(
-                explicitModel: null,
-                database: "MyModel",
-                server: server);
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
-            Assert.Equal(server, result.Value);
-            Assert.True(result.IsRemote);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        var result = resolver.ResolveReference(
+            explicitModel: null,
+            database: "MyModel",
+            server: server);
+
+        Assert.Equal(server, result.Value);
+        Assert.True(result.IsRemote);
     }
 
     [Fact]
     public void ResolveReference_ExplicitModelWinsOverServer()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveReference(
-                explicitModel: "powerbi://api.powerbi.com/v1.0/myorg/model-ws",
-                database: "ExplicitModel",
-                server: "powerbi://api.powerbi.com/v1.0/myorg/other-ws");
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/model-ws", result.Value);
-            Assert.Equal("ExplicitModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        var result = resolver.ResolveReference(
+            explicitModel: "powerbi://api.powerbi.com/v1.0/myorg/model-ws",
+            database: "ExplicitModel",
+            server: "powerbi://api.powerbi.com/v1.0/myorg/other-ws");
+
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/model-ws", result.Value);
+        Assert.Equal("ExplicitModel", result.Database);
     }
 
     [Fact]
     public void ResolveSyncTarget_ReturnsPrimaryRemote_WhenWorkspaceIsLocal()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",
-                Database: "MyModel",
-                Model: null,
-                Auth: null,
-                Local: false,
-                Profile: null,
-                Workspace: "./my-workspace",
-                WorkspaceFormat: "tmdl",
-                WorkspaceAuth: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            Database: "MyModel",
+            Model: null,
+            Auth: null,
+            Local: false,
+            Profile: null,
+            Workspace: "./my-workspace",
+            WorkspaceFormat: "tmdl",
+            WorkspaceAuth: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveSyncTarget();
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveSyncTarget();
 
-            Assert.NotNull(result);
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
-            Assert.Equal("MyModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.NotNull(result);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Value);
+        Assert.Equal("MyModel", result.Database);
     }
 
     [Fact]
     public void ResolveSyncTarget_ReturnsWorkspaceRemote_WhenWorkspaceIsRemote()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: "MyModel",
-                Model: "./my-model.tmdl",
-                Auth: null,
-                Local: true,
-                Profile: null,
-                Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws2",
-                WorkspaceFormat: null,
-                WorkspaceAuth: "auto"));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: "MyModel",
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws2",
+            WorkspaceFormat: null,
+            WorkspaceAuth: "auto"));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveSyncTarget();
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveSyncTarget();
 
-            Assert.NotNull(result);
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws2", result.Value);
-            Assert.Equal("MyModel", result.Database);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.NotNull(result);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws2", result.Value);
+        Assert.Equal("MyModel", result.Database);
     }
 
     [Fact]
     public void ResolveSyncTarget_ReturnsNull_WhenNoWorkspace()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: null,
-                Model: "./my-model.tmdl",
-                Auth: null,
-                Local: false,
-                Profile: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: null,
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: false,
+            Profile: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveSyncTarget();
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveSyncTarget();
 
-            Assert.Null(result);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Null(result);
     }
 
     [Fact]
     public void ResolveSyncTarget_ReturnsNull_WhenNoSession()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveSyncTarget();
+        using var config = new TempConfigDir();
+        var resolver = new ActiveModelResolver(config.State);
 
-            Assert.Null(result);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        var result = resolver.ResolveSyncTarget();
+
+        Assert.Null(result);
     }
 
     [Fact]
     public void ResolveSyncTarget_ReturnsNull_WhenWorkspaceIsLocalAndNoRemote()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: null,
-                Model: "./primary.tmdl",
-                Auth: null,
-                Local: true,
-                Profile: null,
-                Workspace: "./workspace",
-                WorkspaceFormat: "tmdl",
-                WorkspaceAuth: null));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: null,
+            Model: "./primary.tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "./workspace",
+            WorkspaceFormat: "tmdl",
+            WorkspaceAuth: null));
 
-            var resolver = new ActiveModelResolver(store);
-            var result = resolver.ResolveSyncTarget();
+        var resolver = new ActiveModelResolver(config.State);
+        var result = resolver.ResolveSyncTarget();
 
-            Assert.Null(result);
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        Assert.Null(result);
     }
 }

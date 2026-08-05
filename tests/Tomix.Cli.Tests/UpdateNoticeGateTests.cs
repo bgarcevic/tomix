@@ -68,11 +68,8 @@ public sealed class UpdateNoticeGateTests
 
     private static ParseResult ParseWithLocalFormatCommand(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new DoctorCommand(
+        var root = TestRoot.With(new DoctorCommand(
             "0.1.0", services.ConfigDirectory, services.ConfigStore, services.State,
             services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth", "auth-state.json"),
             ["FakeProvider"]).Build());
@@ -100,10 +97,7 @@ public sealed class UpdateNoticeGateTests
     [Fact]
     public void ResolveOutputFormat_FallsBackToTheGlobalOption_ForCommandsWithoutALocalOne()
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
-        root.Subcommands.Add(new Command("bare"));
+        var root = TestRoot.With(new Command("bare"));
 
         var parseResult = root.Parse(["bare", "--output-format", "json"]);
 

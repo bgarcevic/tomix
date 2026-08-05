@@ -101,43 +101,34 @@ public class ConnectWorkspaceHandlerTests
     [Fact]
     public async Task Initialize_ExistingTargetWithoutForce_Skips()
     {
-        var workspace = FreshPath();
-        Directory.CreateDirectory(workspace);
-        try
-        {
-            var session = new RecordingExportSession();
-            var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
+        using var workspace = new TempDir();
+        var session = new RecordingExportSession();
+        var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
 
-            var init = await handler.InitializeAsync(
-                new ConnectWorkspaceInitRequest(workspace, WorkspaceFormat: null, Force: false, Primary: new ModelReference("./model.bim")),
-                CancellationToken.None);
+        var init = await handler.InitializeAsync(
+            new ConnectWorkspaceInitRequest(workspace.Path, WorkspaceFormat: null, Force: false, Primary: new ModelReference("./model.bim")),
+            CancellationToken.None);
 
-            Assert.False(init.Initialized);
-            Assert.Null(session.LastRequest);
-            Assert.True(Directory.Exists(workspace));
-        }
-        finally
-        {
-            Directory.Delete(workspace, true);
-        }
+        Assert.False(init.Initialized);
+        Assert.Null(session.LastRequest);
+        Assert.True(Directory.Exists(workspace.Path));
     }
 
     [Fact]
     public async Task Initialize_ExistingTargetWithForce_DeletesThenExports()
     {
-        var workspace = FreshPath();
-        Directory.CreateDirectory(workspace);
-        File.WriteAllText(Path.Combine(workspace, "stale.txt"), "old");
+        using var workspace = new TempDir();
+        workspace.WriteFile("stale.txt", "old");
         var session = new RecordingExportSession();
         var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(workspace, WorkspaceFormat: null, Force: true, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(workspace.Path, WorkspaceFormat: null, Force: true, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.True(init.Initialized);
         Assert.NotNull(session.LastRequest);
-        Assert.False(Directory.Exists(workspace)); // stub export doesn't recreate it
+        Assert.False(Directory.Exists(workspace.Path)); // stub export doesn't recreate it
     }
 
     [Fact]

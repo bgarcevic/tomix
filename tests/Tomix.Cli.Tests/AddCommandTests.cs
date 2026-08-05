@@ -13,11 +13,8 @@ public sealed class AddCommandTests
 {
     private static Command BuildRoot()
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new AddCommand([], services.State, services.Mutations).Build());
+        var root = TestRoot.With(new AddCommand([], services.State, services.Mutations).Build());
         return root;
     }
 

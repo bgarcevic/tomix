@@ -110,7 +110,4 @@ public sealed class TomAnnotationMutationTests
         var annotation = db.Model.Relationships["SalesToCustomer"].Annotations["Vertipaq_RIViolationInvalidRows"];
         Assert.Equal("3", annotation.Value);
     }
-
-    private static Database NewDatabase()
-        => new() { Name = "M", Model = new Model { Name = "Model" } };
 }

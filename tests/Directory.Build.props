@@ -15,6 +15,16 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="Tomix.Tests.Support" />
+  </ItemGroup>
+
+  <!--
+    Support code every test project needs (throwaway directories, sample lookup). Compiled into
+    each test assembly rather than shipped as a project, so the helpers stay BCL-only and no test
+    project gains a dependency on another. See tests/Shared and tests/CONTEXT.md.
+  -->
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Shared\*.cs" LinkBase="Shared" />
   </ItemGroup>
 
 </Project>

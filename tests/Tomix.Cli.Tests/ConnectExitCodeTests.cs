@@ -59,26 +59,14 @@ public sealed class ConnectExitCodeTests
                 "powerbi://api.powerbi.com/v1.0/myorg/old", "Old", null, null,
                 Local: false, Profile: null));
 
-            var root = new RootCommand("test");
-            foreach (var option in GlobalOptions.All())
-                root.Options.Add(option);
-            root.Subcommands.Add(new ConnectCommand(
+            var root = TestRoot.With(new ConnectCommand(
                 [new ThrowingProvider()], FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
 
-            var stderr = new StringWriter();
-            var original = Console.Error;
-            Console.SetError(stderr);
-            try
-            {
-                var exitCode = Program.Invoke(root.Parse(["connect", "--profile", "local"]));
+            var captured = ConsoleCapture.InvokeThroughProgram(
+                root.Parse(["connect", "--profile", "local"]));
 
-                Assert.NotEqual(0, exitCode);
-                Assert.Equal("Old", services.State.LoadCurrentSession()!.Database);
-            }
-            finally
-            {
-                Console.SetError(original);
-            }
+            Assert.NotEqual(0, captured.ExitCode);
+            Assert.Equal("Old", services.State.LoadCurrentSession()!.Database);
         }
         finally
         {
@@ -88,11 +76,8 @@ public sealed class ConnectExitCodeTests
 
     private static (int ExitCode, string Stderr) Invoke(IReadOnlyList<IModelProvider> providers, params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
+        var root = TestRoot.With(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
 
         var parseResult = root.Parse(args);
         var original = Console.Error;

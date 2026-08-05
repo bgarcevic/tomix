@@ -76,12 +76,9 @@ public sealed class RecentConnectionsTests
 
     private static ParseResult Parse(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
         var services = TestServices.Create();
-        root.Subcommands.Add(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
+        var root = TestRoot.With(new ConnectCommand(providers, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
         root.Subcommands.Add(new LsCommand(providers, services.State).Build());
         return root.Parse(args);
     }

@@ -11,11 +11,8 @@ public sealed class MvCommandTests
 {
     private static Command BuildRoot()
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new MvCommand([], services.State, services.Mutations).Build());
+        var root = TestRoot.With(new MvCommand([], services.State, services.Mutations).Build());
         return root;
     }
 

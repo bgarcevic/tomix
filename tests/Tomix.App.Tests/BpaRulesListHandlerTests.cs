@@ -11,34 +11,26 @@ public sealed class BpaRulesListHandlerTests
     [Fact]
     public async Task List_WithModel_IncludesModelRuleSourcesAndDiagnostics()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "tomix-bpa-list-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
+        using var dir = new TempDir();
+        var session = new SnapshotSession(new Dictionary<string, string>
         {
-            var session = new SnapshotSession(new Dictionary<string, string>
-            {
-                [$"Annotation:{BpaModelRuleLoader.EmbeddedKey}"] = OneRuleJson,
-                [$"Annotation:{BpaModelRuleLoader.ExternalFilesKey}"] = "[\"missing-rules.json\"]"
-            });
-            var handler = new BpaRulesListHandler([new Provider(session)], new BpaUserRuleState(dir));
+            [$"Annotation:{BpaModelRuleLoader.EmbeddedKey}"] = OneRuleJson,
+            [$"Annotation:{BpaModelRuleLoader.ExternalFilesKey}"] = "[\"missing-rules.json\"]"
+        });
+        var handler = new BpaRulesListHandler([new Provider(session)], new BpaUserRuleState(dir.Path));
 
-            var result = await handler.HandleAsync(
-                new BpaRulesListRequest(Model: new ModelReference(dir), NoDefaults: true),
-                CancellationToken.None);
+        var result = await handler.HandleAsync(
+            new BpaRulesListRequest(Model: new ModelReference(dir.Path), NoDefaults: true),
+            CancellationToken.None);
 
-            Assert.True(result.Success);
-            var rule = Assert.Single(result.Data!.Rules);
-            Assert.Equal("MODEL_RULE", rule.Id);
-            Assert.Equal("model-embedded", rule.Source);
-            var diagnostic = Assert.Single(result.Data.Diagnostics!);
-            Assert.Contains("missing-rules.json", diagnostic);
-            // "rules list" has no --no-model-rules option; the hint must not suggest it.
-            Assert.DoesNotContain("--no-model-rules", diagnostic);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        Assert.True(result.Success);
+        var rule = Assert.Single(result.Data!.Rules);
+        Assert.Equal("MODEL_RULE", rule.Id);
+        Assert.Equal("model-embedded", rule.Source);
+        var diagnostic = Assert.Single(result.Data.Diagnostics!);
+        Assert.Contains("missing-rules.json", diagnostic);
+        // "rules list" has no --no-model-rules option; the hint must not suggest it.
+        Assert.DoesNotContain("--no-model-rules", diagnostic);
     }
 
     [Fact]
@@ -46,54 +38,37 @@ public sealed class BpaRulesListHandlerTests
     {
         // A .pbip/.pbism/project-root entry point opens the nested definition folder; relative
         // external-file entries are anchored there, not at the entry point the user typed.
-        var root = Path.Combine(Path.GetTempPath(), "tomix-bpa-list-" + Guid.NewGuid().ToString("N"));
-        var definition = Path.Combine(root, "Sales.SemanticModel", "definition");
-        Directory.CreateDirectory(definition);
-        try
-        {
-            await File.WriteAllTextAsync(
-                Path.Combine(root, "rules.json"),
-                OneRuleJson.Replace("MODEL_RULE", "EXTERNAL_RULE"));
-            var session = new SnapshotSession(new Dictionary<string, string>
-            {
-                [$"Annotation:{BpaModelRuleLoader.ExternalFilesKey}"] = "[\"..\\\\..\\\\rules.json\"]"
-            }, sourcePath: definition);
-            var handler = new BpaRulesListHandler([new Provider(session)], new BpaUserRuleState(root));
+        using var root = new TempDir();
+        var definition = root.CreateSubdirectory("Sales.SemanticModel", "definition");
+        root.WriteFile("rules.json", OneRuleJson.Replace("MODEL_RULE", "EXTERNAL_RULE"));
 
-            var result = await handler.HandleAsync(
-                new BpaRulesListRequest(Model: new ModelReference(root), NoDefaults: true),
-                CancellationToken.None);
-
-            Assert.True(result.Success);
-            var rule = Assert.Single(result.Data!.Rules);
-            Assert.Equal("EXTERNAL_RULE", rule.Id);
-            Assert.Null(result.Data.Diagnostics);
-        }
-        finally
+        var session = new SnapshotSession(new Dictionary<string, string>
         {
-            Directory.Delete(root, recursive: true);
-        }
+            [$"Annotation:{BpaModelRuleLoader.ExternalFilesKey}"] = "[\"..\\\\..\\\\rules.json\"]"
+        }, sourcePath: definition);
+        var handler = new BpaRulesListHandler([new Provider(session)], new BpaUserRuleState(root.Path));
+
+        var result = await handler.HandleAsync(
+            new BpaRulesListRequest(Model: new ModelReference(root.Path), NoDefaults: true),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var rule = Assert.Single(result.Data!.Rules);
+        Assert.Equal("EXTERNAL_RULE", rule.Id);
+        Assert.Null(result.Data.Diagnostics);
     }
 
     [Fact]
     public async Task List_WithoutModel_HasNoDiagnostics()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "tomix-bpa-list-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var handler = new BpaRulesListHandler([], new BpaUserRuleState(dir));
+        using var dir = new TempDir();
+        var handler = new BpaRulesListHandler([], new BpaUserRuleState(dir.Path));
 
-            var result = await handler.HandleAsync(new BpaRulesListRequest(), CancellationToken.None);
+        var result = await handler.HandleAsync(new BpaRulesListRequest(), CancellationToken.None);
 
-            Assert.True(result.Success);
-            Assert.NotEmpty(result.Data!.Rules);
-            Assert.Null(result.Data.Diagnostics);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        Assert.True(result.Success);
+        Assert.NotEmpty(result.Data!.Rules);
+        Assert.Null(result.Data.Diagnostics);
     }
 
     private sealed class Provider(IModelSession session) : IModelProvider

@@ -111,19 +111,4 @@ public sealed class TomAddNamespaceCollisionTests
             Value: "1",
             Properties: [],
             IfNotExists: ifNotExists));
-
-    private static Database NewDatabase()
-        => new() { Name = "M", Model = new Model { Name = "Model" } };
-
-    private static Table AddTable(Database db, string name)
-    {
-        var table = new Table { Name = name };
-        table.Partitions.Add(new Partition
-        {
-            Name = name,
-            Source = new MPartitionSource { Expression = "let x = 1 in x" }
-        });
-        db.Model.Tables.Add(table);
-        return table;
-    }
 }

@@ -205,25 +205,5 @@ public sealed class TomAddOptionTests
         Assert.Equal("tds", ds.ConnectionDetails.Protocol);
     }
 
-    private static ModelObjectAddRequest Add(string path, string type)
-        => new(path, type, Value: null, [], IfNotExists: false);
-
     private static Table Sales(Database db) => db.Model.Tables.Single(t => t.Name == "Sales");
-
-    private static Database NewDatabase()
-        => new() { Name = "M", Model = new Model { Name = "Model" } };
-
-    private static Database WithSales()
-    {
-        var db = NewDatabase();
-        var sales = new Table { Name = "Sales" };
-        sales.Partitions.Add(new Partition
-        {
-            Name = "Sales",
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        db.Model.Tables.Add(sales);
-        return db;
-    }
 }

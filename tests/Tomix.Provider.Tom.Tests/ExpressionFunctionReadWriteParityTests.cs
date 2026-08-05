@@ -21,7 +21,7 @@ public sealed class ExpressionFunctionReadWriteParityTests
     public void AddLsGetSetRm_RoundTripsThroughTheSnapshot(
         string addType, ModelObjectKind kind, string path, string value)
     {
-        var db = NewDatabase();
+        var db = NewFixture();
         var mutator = new TomModelMutator(db);
         var name = path.Split('/')[1];
 
@@ -60,7 +60,7 @@ public sealed class ExpressionFunctionReadWriteParityTests
     {
         // Rename fixup routes dependency-graph sites through RewriteExpressions, so a measure
         // rename that touches a UDF body must land on the function's expression.
-        var db = NewDatabase();
+        var db = NewFixture();
         db.Model.Functions.Add(new Function { Name = "F", Expression = "(x) => [Old] * x" });
         var mutator = new TomModelMutator(db);
 
@@ -81,10 +81,10 @@ public sealed class ExpressionFunctionReadWriteParityTests
         Assert.Equal(kind, parsed);
     }
 
-    private static Database NewDatabase()
+    private static Database NewFixture()
     {
         // 1702+ so the model can carry DAX user-defined functions.
-        var db = new Database { Name = "M", CompatibilityLevel = 1702, Model = new Model { Name = "Model" } };
+        var db = NewDatabase(compatibilityLevel: 1702);
         var table = new Table { Name = "T" };
         table.Partitions.Add(new Partition
         {

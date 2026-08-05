@@ -64,7 +64,7 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsRequired_WhenQueryBlank()
     {
-        var handler = new QueryModelHandler([new StubQueryProvider(new StubQuerySession())], RemoteState);
+        var handler = new QueryModelHandler([new QueryStubs.Provider(new QueryStubs.Session())], RemoteState);
         var result = await handler.HandleAsync(Request(query: "   "), null, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -78,7 +78,7 @@ public sealed class QueryModelHandlerTests
     [InlineData("/* unterminated block")]
     public async Task HandleAsync_ReturnsInvalid_WhenQueryDoesNotStartWithStatement(string query)
     {
-        var handler = new QueryModelHandler([new StubQueryProvider(new StubQuerySession())], RemoteState);
+        var handler = new QueryModelHandler([new QueryStubs.Provider(new QueryStubs.Session())], RemoteState);
         var result = await handler.HandleAsync(Request(query: query), null, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -96,8 +96,8 @@ public sealed class QueryModelHandlerTests
     [InlineData("/* block */ EVALUATE 'Sales'")]
     public async Task HandleAsync_AcceptsValidLeadingKeywords(string query)
     {
-        var session = new StubQuerySession();
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session();
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
         var result = await handler.HandleAsync(Request(query: query), null, CancellationToken.None);
 
         Assert.True(result.Success);
@@ -107,8 +107,8 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_SkipsValidation_WithNoValidate()
     {
-        var session = new StubQuerySession();
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session();
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
         var result = await handler.HandleAsync(
             Request(query: "SUMMARIZE(Sales)", noValidate: true),
             null,
@@ -121,7 +121,7 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsNoRemoteTarget_WhenConnectionIsLocal()
     {
-        var handler = new QueryModelHandler([new StubQueryProvider(new StubQuerySession())], LocalState);
+        var handler = new QueryModelHandler([new QueryStubs.Provider(new QueryStubs.Session())], LocalState);
         var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -132,7 +132,7 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsUnsupported_WhenSessionIsNotQueryCapable()
     {
-        var handler = new QueryModelHandler([new StubNonQueryProvider()], RemoteState);
+        var handler = new QueryModelHandler([new QueryStubs.NonQueryProvider()], RemoteState);
         var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -144,7 +144,7 @@ public sealed class QueryModelHandlerTests
     public async Task HandleAsync_ReturnsAuthRequired_WhenProviderThrowsAuthException()
     {
         var handler = new QueryModelHandler(
-            [new ThrowingProvider(new AuthenticationRequiredException("login"))], RemoteState);
+            [new QueryStubs.ThrowingProvider(new AuthenticationRequiredException("login"))], RemoteState);
         var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -155,8 +155,8 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_ReturnsQueryFailed_WhenExecutionThrows()
     {
-        var session = new StubQuerySession { Throw = new InvalidOperationException("syntax error near BAD") };
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session { Throw = new InvalidOperationException("syntax error near BAD") };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
         var result = await handler.HandleAsync(Request(query: "EVALUATE BAD("), null, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -168,8 +168,8 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_MapsRowsetAndForwardsLimitAndParameters()
     {
-        var session = new StubQuerySession();
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session();
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
         var result = await handler.HandleAsync(
             Request(
                 query: "EVALUATE 'Sales'",
@@ -194,8 +194,8 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_ForwardsPerfOptionsAndTraceWriter()
     {
-        var session = new StubQuerySession();
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session();
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
         var writer = new StringWriter();
 
         var result = await handler.HandleAsync(
@@ -214,8 +214,8 @@ public sealed class QueryModelHandlerTests
     [Fact]
     public async Task HandleAsync_ClampsRunsBelowOneToOne()
     {
-        var session = new StubQuerySession();
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session();
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
 
         await handler.HandleAsync(Request(query: "EVALUATE 'Sales'", runs: 0), null, CancellationToken.None);
 
@@ -231,8 +231,8 @@ public sealed class QueryModelHandlerTests
             new(2, Cold: true, ClientMs: 80, Timings: new QueryTimings(70, 100, 20, 50, 70, 2, 0))
         };
         var plans = new List<QueryPlan> { new("logical", "AddColumns: ..."), new("physical", "Spool: ...") };
-        var session = new StubQuerySession { Runs = runs, Plans = plans };
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session { Runs = runs, Plans = plans };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
 
         var result = await handler.HandleAsync(
             Request(query: "EVALUATE 'Sales'", trace: true, plan: true, runs: 2),
@@ -254,8 +254,8 @@ public sealed class QueryModelHandlerTests
     public async Task HandleAsync_DegradesGracefully_WhenNoTimingsCaptured()
     {
         // Trace requested but the provider returned no runs (e.g. non-admin, tracing unavailable).
-        var session = new StubQuerySession { Runs = null };
-        var handler = new QueryModelHandler([new StubQueryProvider(session)], RemoteState);
+        var session = new QueryStubs.Session { Runs = null };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
 
         var result = await handler.HandleAsync(
             Request(query: "EVALUATE 'Sales'", trace: true),
@@ -300,74 +300,4 @@ public sealed class QueryModelHandlerTests
             Plan: plan,
             Cold: cold,
             Runs: runs);
-
-    private sealed class StubQueryProvider : IModelProvider
-    {
-        private readonly StubQuerySession _session;
-        public StubQueryProvider(StubQuerySession session) => _session = session;
-        public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(_session);
-    }
-
-    private sealed class StubQuerySession : IModelSession, IModelQuerySession
-    {
-        public ModelQueryRequest? LastRequest { get; private set; }
-        public TextWriter? LastTraceWriter { get; private set; }
-        public Exception? Throw { get; init; }
-        public IReadOnlyList<QueryRun>? Runs { get; init; }
-        public IReadOnlyList<QueryPlan>? Plans { get; init; }
-        public string SourcePath => "";
-        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
-            => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
-        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
-            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-        public Task<ModelQueryResult> ExecuteQueryAsync(
-            ModelQueryRequest request,
-            TextWriter? traceWriter,
-            CancellationToken cancellationToken)
-        {
-            LastRequest = request;
-            LastTraceWriter = traceWriter;
-            if (Throw is not null)
-                throw Throw;
-            return Task.FromResult(new ModelQueryResult(
-                "stub-server",
-                "stub-db",
-                [new QueryColumn("Sales[Amount]", "decimal")],
-                [[100.5m], [(object?)null]],
-                Truncated: true,
-                DurationMs: 7,
-                Runs: Runs,
-                Plans: Plans));
-        }
-    }
-
-    private sealed class StubNonQueryProvider : IModelProvider
-    {
-        public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new StubNonQuerySession());
-    }
-
-    private sealed class StubNonQuerySession : IModelSession
-    {
-        public string SourcePath => "";
-        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
-            => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
-        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
-            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
-
-    private sealed class ThrowingProvider : IModelProvider
-    {
-        private readonly Exception _exception;
-        public ThrowingProvider(Exception exception) => _exception = exception;
-        public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => throw _exception;
-    }
 }

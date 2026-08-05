@@ -1,4 +1,5 @@
 using Tomix.App.IncrementalRefresh;
+using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
@@ -6,13 +7,16 @@ using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
 
-public sealed class IncrementalRefreshHandlerTests
+public sealed class IncrementalRefreshHandlerTests : IDisposable
 {
+    // Every staged mutation below writes through these stores; a get-only property building a
+    // fresh StagingStore per access leaked a temp directory on each write.
+    private readonly TempConfigDir _config = new();
 
-    private static Tomix.App.Mutations.MutationStores TestStores => new(
-        new Tomix.App.State.StagingStore(
-            Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
-        () => null);
+    public void Dispose() => _config.Dispose();
+
+    private MutationStores TestStores => _config.Stores;
+
     private const string ValidSourceExpression =
         "let Source = Src, Filtered = Table.SelectRows(Source, each [Date] >= RangeStart and [Date] < RangeEnd) in Filtered";
 
@@ -208,141 +212,106 @@ public sealed class IncrementalRefreshHandlerTests
     [Fact]
     public async Task Set_Show_Rm_RoundTripThroughRealProvider()
     {
-        var model = CopySample();
-        try
-        {
-            var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var reference = new ModelReference(model);
+        using var model = SampleModel.CopyToTemp();
+        var providers = new IModelProvider[] { new TmdlModelProvider() };
+        var reference = new ModelReference(model.Path);
 
-            var setResult = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
-                NewSetRequest(reference,
-                    rollingWindowPeriods: 10, rollingWindowGranularity: "year",
-                    incrementalPeriods: 3, incrementalGranularity: "day",
-                    sourceExpression: ValidSourceExpression, save: true),
-                CancellationToken.None);
+        var setResult = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
+            NewSetRequest(reference,
+                rollingWindowPeriods: 10, rollingWindowGranularity: "year",
+                incrementalPeriods: 3, incrementalGranularity: "day",
+                sourceExpression: ValidSourceExpression, save: true),
+            CancellationToken.None);
 
-            Assert.True(setResult.Success, string.Join("; ", setResult.Diagnostics.Select(d => d.Message)));
-            Assert.True(setResult.Data!.Created);
-            Assert.Equal(["RangeStart", "RangeEnd"], setResult.Data.CreatedExpressions);
+        Assert.True(setResult.Success, string.Join("; ", setResult.Diagnostics.Select(d => d.Message)));
+        Assert.True(setResult.Data!.Created);
+        Assert.Equal(["RangeStart", "RangeEnd"], setResult.Data.CreatedExpressions);
 
-            // Reopen from disk and confirm the policy persisted.
-            var showResult = await new ShowRefreshPolicyHandler(providers).HandleAsync(
-                new ShowRefreshPolicyRequest(reference, "Sales"), CancellationToken.None);
-            Assert.True(showResult.Success);
-            Assert.Equal(10, showResult.Data!.RollingWindowPeriods);
-            Assert.Equal("Year", showResult.Data.RollingWindowGranularity);
+        // Reopen from disk and confirm the policy persisted.
+        var showResult = await new ShowRefreshPolicyHandler(providers).HandleAsync(
+            new ShowRefreshPolicyRequest(reference, "Sales"), CancellationToken.None);
+        Assert.True(showResult.Success);
+        Assert.Equal(10, showResult.Data!.RollingWindowPeriods);
+        Assert.Equal("Year", showResult.Data.RollingWindowGranularity);
 
-            var rmResult = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
-                new RemoveRefreshPolicyRequest(reference, "Sales", IfExists: false,
-                    Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
-                CancellationToken.None);
-            Assert.True(rmResult.Success);
-            Assert.Equal("Sales", rmResult.Data!.Removed);
+        var rmResult = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
+            new RemoveRefreshPolicyRequest(reference, "Sales", IfExists: false,
+                Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
+            CancellationToken.None);
+        Assert.True(rmResult.Success);
+        Assert.Equal("Sales", rmResult.Data!.Removed);
 
-            var afterRm = await new ShowRefreshPolicyHandler(providers).HandleAsync(
-                new ShowRefreshPolicyRequest(reference, "Sales"), CancellationToken.None);
-            Assert.False(afterRm.Success);
-            Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", afterRm.Diagnostics[0].Code);
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        var afterRm = await new ShowRefreshPolicyHandler(providers).HandleAsync(
+            new ShowRefreshPolicyRequest(reference, "Sales"), CancellationToken.None);
+        Assert.False(afterRm.Success);
+        Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", afterRm.Diagnostics[0].Code);
     }
 
     [Fact]
     public async Task Set_InvalidWithoutForce_ReturnsPolicyInvalid()
     {
-        var model = CopySample();
-        try
-        {
-            var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
-                NewSetRequest(new ModelReference(model),
-                    rollingWindowPeriods: 10, rollingWindowGranularity: "year",
-                    incrementalPeriods: 3, incrementalGranularity: "day",
-                    sourceExpression: "let Source = Src in Source", save: true),
-                CancellationToken.None);
+        using var model = SampleModel.CopyToTemp();
+        var providers = new IModelProvider[] { new TmdlModelProvider() };
+        var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
+            NewSetRequest(new ModelReference(model.Path),
+                rollingWindowPeriods: 10, rollingWindowGranularity: "year",
+                incrementalPeriods: 3, incrementalGranularity: "day",
+                sourceExpression: "let Source = Src in Source", save: true),
+            CancellationToken.None);
 
-            Assert.False(result.Success);
-            Assert.Equal("TOMIX_REFRESH_POLICY_INVALID", result.Diagnostics[0].Code);
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_REFRESH_POLICY_INVALID", result.Diagnostics[0].Code);
     }
 
     [Fact]
     public async Task Set_UnknownTable_ReturnsObjectNotFound()
     {
-        var model = CopySample();
-        try
-        {
-            var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
-                NewSetRequest(new ModelReference(model),
-                    rollingWindowPeriods: 10, rollingWindowGranularity: "year",
-                    incrementalPeriods: 3, incrementalGranularity: "day",
-                    sourceExpression: ValidSourceExpression, save: true, table: "Bogus"),
-                CancellationToken.None);
+        using var model = SampleModel.CopyToTemp();
+        var providers = new IModelProvider[] { new TmdlModelProvider() };
+        var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
+            NewSetRequest(new ModelReference(model.Path),
+                rollingWindowPeriods: 10, rollingWindowGranularity: "year",
+                incrementalPeriods: 3, incrementalGranularity: "day",
+                sourceExpression: ValidSourceExpression, save: true, table: "Bogus"),
+            CancellationToken.None);
 
-            Assert.False(result.Success);
-            Assert.Equal("TOMIX_OBJECT_NOT_FOUND", result.Diagnostics[0].Code);
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_OBJECT_NOT_FOUND", result.Diagnostics[0].Code);
     }
 
     [Fact]
     public async Task Set_ForcedInvalid_KeepsErrorsInResult()
     {
-        var model = CopySample();
-        try
-        {
-            var providers = new IModelProvider[] { new TmdlModelProvider() };
-            var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
-                NewSetRequest(new ModelReference(model),
-                    rollingWindowPeriods: 10, rollingWindowGranularity: "year",
-                    incrementalPeriods: 3, incrementalGranularity: "day",
-                    sourceExpression: "let Source = Src in Source", save: true, force: true),
-                CancellationToken.None);
+        using var model = SampleModel.CopyToTemp();
+        var providers = new IModelProvider[] { new TmdlModelProvider() };
+        var result = await new SetRefreshPolicyHandler(providers, TestStores).HandleAsync(
+            NewSetRequest(new ModelReference(model.Path),
+                rollingWindowPeriods: 10, rollingWindowGranularity: "year",
+                incrementalPeriods: 3, incrementalGranularity: "day",
+                sourceExpression: "let Source = Src in Source", save: true, force: true),
+            CancellationToken.None);
 
-            // --force overrode the blocking error; the save succeeds but the error must remain
-            // visible in the result rather than being silently dropped.
-            Assert.True(result.Success);
-            Assert.NotNull(result.Data!.Issues);
-            Assert.Contains(result.Data.Issues!, i => i.IsError && i.Code == "source_expression_range_refs");
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        // --force overrode the blocking error; the save succeeds but the error must remain
+        // visible in the result rather than being silently dropped.
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data!.Issues);
+        Assert.Contains(result.Data.Issues!, i => i.IsError && i.Code == "source_expression_range_refs");
     }
 
     [Fact]
     public async Task Rm_NoPolicyWithoutIfExists_ReturnsPolicyNotFound()
     {
-        var model = CopySample();
-        try
-        {
-            var providers = new IModelProvider[] { new TmdlModelProvider() };
-            // The sample's Sales table has no policy; rm without --if-exists must emit the
-            // documented code, not the generic TOMIX_MUTATION_FAILED.
-            var result = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
-                new RemoveRefreshPolicyRequest(new ModelReference(model), "Sales", IfExists: false,
-                    Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
-                CancellationToken.None);
+        using var model = SampleModel.CopyToTemp();
+        var providers = new IModelProvider[] { new TmdlModelProvider() };
+        // The sample's Sales table has no policy; rm without --if-exists must emit the
+        // documented code, not the generic TOMIX_MUTATION_FAILED.
+        var result = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
+            new RemoveRefreshPolicyRequest(new ModelReference(model.Path), "Sales", IfExists: false,
+                Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
+            CancellationToken.None);
 
-            Assert.False(result.Success);
-            Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", result.Diagnostics[0].Code);
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", result.Diagnostics[0].Code);
     }
 
     private static SetRefreshPolicyRequest NewSetRequest(
@@ -377,34 +346,6 @@ public sealed class IncrementalRefreshHandlerTests
 
     private static RefreshPolicyInfo SamplePolicy() => new(
         "Sales", "Import", "Year", 10, "Day", 3, 0, "", ValidSourceExpression, [], []);
-
-    private static string CopySample()
-    {
-        var dest = Path.Combine(Path.GetTempPath(), $"tomix-ir-test-{Guid.NewGuid():N}");
-        CopyDirectory(LocateSample(), dest);
-        return dest;
-    }
-
-    private static string LocateSample()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "samples", "basic-tmdl");
-            if (Directory.Exists(candidate))
-                return candidate;
-        }
-
-        throw new InvalidOperationException("samples/basic-tmdl not found above test base directory.");
-    }
-
-    private static void CopyDirectory(string source, string dest)
-    {
-        Directory.CreateDirectory(dest);
-        foreach (var file in Directory.GetFiles(source))
-            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
-        foreach (var dir in Directory.GetDirectories(source))
-            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
-    }
 
     private static CliConnectionState RemoteSession() =>
         new(Server: "powerbi://api.powerbi.com/v1.0/myorg/ws",

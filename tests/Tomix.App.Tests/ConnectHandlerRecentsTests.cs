@@ -10,17 +10,8 @@ public sealed class ConnectHandlerRecentsTests
 
     private static void WithStore(Action<CliStateStore, ConnectHandler> test)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            test(store, new ConnectHandler(store));
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        using var config = new TempConfigDir();
+        test(config.State, new ConnectHandler(config.State));
     }
 
     [Fact]

@@ -15,7 +15,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveRelationship_ByEndpointsPath()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var mutator = new TomModelMutator(db);
 
         var result = mutator.RemoveObject(Remove("Sales[CustomerId] -> Customer[Id]"));
@@ -27,7 +27,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveRelationship_RemovesVariationsBoundToIt()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var relationship = (SingleColumnRelationship)db.Model.Relationships[0];
         var customer = db.Model.Tables["Customer"];
         db.Model.Tables["Sales"].Columns["CustomerId"].Variations.Add(new Variation
@@ -47,7 +47,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveLevel_KeepsHierarchyWithRemainingLevels()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         AddHierarchy(db, "Calendar", "MonthNo", "MonthName");
         var mutator = new TomModelMutator(db);
 
@@ -61,7 +61,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveLevel_LastLevel_RemovesHierarchy()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         AddHierarchy(db, "Calendar", "MonthNo");
         var mutator = new TomModelMutator(db);
 
@@ -74,7 +74,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveCalculationItem()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var calcGroup = new Table { Name = "Time Intelligence", CalculationGroup = new CalculationGroup() };
         calcGroup.Partitions.Add(new Partition
         {
@@ -99,7 +99,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveRoleMember()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var role = new ModelRole { Name = "Readers" };
         role.Members.Add(new ExternalModelRoleMember { MemberName = "user@contoso.com", IdentityProvider = "AzureAD" });
         db.Model.Roles.Add(role);
@@ -115,7 +115,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemovePerspective()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         db.Model.Perspectives.Add(new Perspective { Name = "Reporting" });
         var mutator = new TomModelMutator(db);
 
@@ -128,7 +128,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveCulture()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         db.Model.Cultures.Add(new Culture { Name = "da-DK" });
         var mutator = new TomModelMutator(db);
 
@@ -141,7 +141,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveExpression()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         db.Model.Expressions.Add(new NamedExpression
         {
             Name = "Environment",
@@ -159,7 +159,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveFunction()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         db.CompatibilityLevel = 1702; // DAX user-defined functions require CL 1702+
         db.Model.Functions.Add(new Function { Name = "AddOne", Expression = "(x) => x + 1" });
         var mutator = new TomModelMutator(db);
@@ -173,7 +173,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveDataSource_Unreferenced()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         db.Model.DataSources.Add(new ProviderDataSource { Name = "Warehouse", ConnectionString = "Data Source=sql;" });
         var mutator = new TomModelMutator(db);
 
@@ -186,7 +186,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveDataSource_ReferencedByQueryPartition_Throws()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var source = new ProviderDataSource { Name = "Warehouse", ConnectionString = "Data Source=sql;" };
         db.Model.DataSources.Add(source);
         var sales = db.Model.Tables["Sales"];
@@ -207,7 +207,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveKpi_ByTypeOption_KeepsMeasure()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         sales.Measures.Add(new Measure
         {
@@ -227,7 +227,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveKpi_ViaKpiPathSegment()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         sales.Measures.Add(new Measure
         {
@@ -248,7 +248,7 @@ public sealed class TomRemoveObjectKindsTests
     {
         // The KPI shares its measure's path; without an explicit kind the measure must win
         // outright — a KPI candidate here would make every KPI-bearing measure ambiguous.
-        var db = BaseModel();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         sales.Measures.Add(new Measure
         {
@@ -267,7 +267,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveTablePermission_KeepsRoleAndTable()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         var role = new ModelRole { Name = "Readers" };
         role.TablePermissions.Add(new TablePermission
         {
@@ -289,7 +289,7 @@ public sealed class TomRemoveObjectKindsTests
     [Fact]
     public void RemoveCalendar()
     {
-        var db = BaseModel();
+        var db = WithRelationship();
         db.CompatibilityLevel = 1701; // calendars require CL 1701+
         var sales = db.Model.Tables["Sales"];
         sales.Calendars.Add(new Calendar { Name = "Fiscal" });
@@ -308,43 +308,5 @@ public sealed class TomRemoveObjectKindsTests
         for (var i = 0; i < levelColumns.Length; i++)
             hierarchy.Levels.Add(new Level { Name = levelColumns[i], Column = sales.Columns[levelColumns[i]], Ordinal = i });
         sales.Hierarchies.Add(hierarchy);
-    }
-
-    private static ModelObjectRemoveRequest Remove(string path)
-        => new(path, Type: null, IfExists: false);
-
-    private static Database BaseModel()
-    {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
-
-        var sales = NewTable("Sales", "CustomerId", "Amount", "MonthName", "MonthNo");
-        var customer = NewTable("Customer", "Id");
-        db.Model.Tables.Add(sales);
-        db.Model.Tables.Add(customer);
-
-        db.Model.Relationships.Add(new SingleColumnRelationship
-        {
-            Name = "SalesToCustomer",
-            FromColumn = sales.Columns["CustomerId"],
-            ToColumn = customer.Columns["Id"],
-            FromCardinality = RelationshipEndCardinality.Many,
-            ToCardinality = RelationshipEndCardinality.One
-        });
-
-        return db;
-    }
-
-    private static Table NewTable(string name, params string[] columns)
-    {
-        var table = new Table { Name = name };
-        foreach (var column in columns)
-            table.Columns.Add(new DataColumn { Name = column, DataType = DataType.Int64, SourceColumn = column });
-        table.Partitions.Add(new Partition
-        {
-            Name = name,
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        return table;
     }
 }

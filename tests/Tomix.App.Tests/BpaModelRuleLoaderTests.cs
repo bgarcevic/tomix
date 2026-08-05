@@ -60,24 +60,16 @@ public sealed class BpaModelRuleLoaderTests
     [Fact]
     public async Task LoadAsync_ExternalLocalFile_ResolvedRelativeToBaseDirectory()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "tomix-bpa-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            await File.WriteAllTextAsync(Path.Combine(dir, "rules.json"), OneRuleJson);
-            var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"rules.json\"]"));
+        using var dir = new TempDir();
+        await File.WriteAllTextAsync(Path.Combine(dir.Path, "rules.json"), OneRuleJson);
+        var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"rules.json\"]"));
 
-            var outcome = await BpaModelRuleLoader.LoadAsync(props, dir, allowExternal: false, CancellationToken.None);
+        var outcome = await BpaModelRuleLoader.LoadAsync(props, dir.Path, allowExternal: false, CancellationToken.None);
 
-            var collection = Assert.Single(outcome.Collections);
-            Assert.Equal(BpaRuleSourceKind.External, collection.Kind);
-            Assert.Equal("R1", Assert.Single(collection.Rules).Id);
-            Assert.Empty(outcome.Diagnostics);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        var collection = Assert.Single(outcome.Collections);
+        Assert.Equal(BpaRuleSourceKind.External, collection.Kind);
+        Assert.Equal("R1", Assert.Single(collection.Rules).Id);
+        Assert.Empty(outcome.Diagnostics);
     }
 
     [Fact]
@@ -85,27 +77,18 @@ public sealed class BpaModelRuleLoaderTests
     {
         // Community tooling writes external-file paths with Windows separators
         // (e.g. "..\\.devops\\bpa-rules.json"); they must resolve on Unix too.
-        var root = Path.Combine(Path.GetTempPath(), "tomix-bpa-" + Guid.NewGuid().ToString("N"));
-        var modelDir = Path.Combine(root, "model");
-        Directory.CreateDirectory(modelDir);
-        Directory.CreateDirectory(Path.Combine(root, ".devops"));
-        try
-        {
-            await File.WriteAllTextAsync(Path.Combine(root, ".devops", "bpa-rules.json"), OneRuleJson);
-            var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"..\\\\.devops\\\\bpa-rules.json\"]"));
+        using var root = new TempDir();
+        var modelDir = root.CreateSubdirectory("model");
+        root.WriteFile(Path.Combine(".devops", "bpa-rules.json"), OneRuleJson);
+        var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"..\\\\.devops\\\\bpa-rules.json\"]"));
 
-            var outcome = await BpaModelRuleLoader.LoadAsync(props, modelDir, allowExternal: false, CancellationToken.None);
+        var outcome = await BpaModelRuleLoader.LoadAsync(props, modelDir, allowExternal: false, CancellationToken.None);
 
-            var collection = Assert.Single(outcome.Collections);
-            Assert.Equal(BpaRuleSourceKind.External, collection.Kind);
-            // The display name stays as-written so precedence identity and diagnostics match the annotation.
-            Assert.Equal("..\\.devops\\bpa-rules.json", collection.DisplayName);
-            Assert.Empty(outcome.Diagnostics);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        var collection = Assert.Single(outcome.Collections);
+        Assert.Equal(BpaRuleSourceKind.External, collection.Kind);
+        // The display name stays as-written so precedence identity and diagnostics match the annotation.
+        Assert.Equal("..\\.devops\\bpa-rules.json", collection.DisplayName);
+        Assert.Empty(outcome.Diagnostics);
     }
 
     [Fact]
@@ -138,58 +121,35 @@ public sealed class BpaModelRuleLoaderTests
     {
         // The entry point may be a project root or .pbip; the session opens the nested
         // definition folder, and that is what relative rule paths are anchored to.
-        var root = Path.Combine(Path.GetTempPath(), "tomix-bpa-" + Guid.NewGuid().ToString("N"));
-        var definition = Path.Combine(root, "Sales.SemanticModel", "definition");
-        Directory.CreateDirectory(definition);
-        try
-        {
-            var resolved = BpaModelRuleLoader.ResolveBaseDirectory(
-                new StubSession(definition), new ModelReference(root));
+        using var root = new TempDir();
+        var definition = root.CreateSubdirectory("Sales.SemanticModel", "definition");
 
-            Assert.Equal(definition, resolved);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        var resolved = BpaModelRuleLoader.ResolveBaseDirectory(
+            new StubSession(definition), new ModelReference(root.Path));
+
+        Assert.Equal(definition, resolved);
     }
 
     [Fact]
     public void ResolveBaseDirectory_SessionFile_UsesContainingFolder()
     {
         // A .bim session reports the file itself as its source path.
-        var dir = Path.Combine(Path.GetTempPath(), "tomix-bpa-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var bim = Path.Combine(dir, "model.bim");
-            File.WriteAllText(bim, "{}");
+        using var dir = new TempDir();
+        var bim = Path.Combine(dir.Path, "model.bim");
+        File.WriteAllText(bim, "{}");
 
-            var resolved = BpaModelRuleLoader.ResolveBaseDirectory(
-                new StubSession(bim), new ModelReference(bim));
+        var resolved = BpaModelRuleLoader.ResolveBaseDirectory(
+            new StubSession(bim), new ModelReference(bim));
 
-            Assert.Equal(dir, resolved);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        Assert.Equal(dir.Path, resolved);
     }
 
     [Fact]
     public void ResolveBaseDirectory_NullSession_FallsBackToLocalReference()
     {
         // A staged run passes no session so the original model's folder is used, not the working copy.
-        var dir = Path.Combine(Path.GetTempPath(), "tomix-bpa-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            Assert.Equal(dir, BpaModelRuleLoader.ResolveBaseDirectory(session: null, new ModelReference(dir)));
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        using var dir = new TempDir();
+        Assert.Equal(dir.Path, BpaModelRuleLoader.ResolveBaseDirectory(session: null, new ModelReference(dir.Path)));
     }
 
     [Fact]

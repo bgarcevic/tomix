@@ -22,14 +22,14 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_RenameReferencedMeasure_RewritesReferences()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Null(result.Data!.BrokenReferences);
         Assert.Equal(["Sales/Derived"], result.Data.FixedReferences);
-        var edit = Assert.Single(session.RewrittenEdits!);
+        var edit = Assert.Single(session.LastRewrites!);
         Assert.Equal("Sales/Derived", edit.Path);
         Assert.Equal("Expression", edit.Property);
         Assert.Equal("[NewName] * 2", edit.Value);
@@ -42,7 +42,7 @@ public sealed class RenameReferenceFixupTests
         // Edits are planned against pre-rename paths, so they must be applied while those
         // paths still resolve.
         var session = NewSession();
-        await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -53,7 +53,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_RenameReferencedMeasure_DaxFormPath_RewritesReferences()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("'Sales'[Base]", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -65,7 +65,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_StrictRefs_PassesWhenEverythingIsFixable()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")], strictRefs: true),
             CancellationToken.None);
 
@@ -77,14 +77,14 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_NoFixRefs_WarnsWithoutRewriting()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "NewName")], fixRefs: false),
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(["Sales/Derived"], result.Data!.BrokenReferences);
         Assert.Null(result.Data.FixedReferences);
-        Assert.Null(session.RewrittenEdits);
+        Assert.Null(session.LastRewrites);
         Assert.True(session.SetPropertyCalled);
     }
 
@@ -92,7 +92,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_NoFixRefs_StrictRefs_FailsBeforeMutating()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest(
                 "Sales/Base", [new ModelPropertyAssignment("name", "NewName")],
                 strictRefs: true, fixRefs: false),
@@ -101,7 +101,7 @@ public sealed class RenameReferenceFixupTests
         Assert.False(result.Success);
         Assert.Equal("TOMIX_RENAME_BREAKS_REFS", result.Diagnostics[0].Code);
         Assert.False(session.SetPropertyCalled);
-        Assert.Null(session.RewrittenEdits);
+        Assert.Null(session.LastRewrites);
     }
 
     [Fact]
@@ -110,20 +110,20 @@ public sealed class RenameReferenceFixupTests
         // Role RLS filters are synthesized per-table in the snapshot and cannot be written
         // back as one property, so they stay a warning.
         var session = SessionWithRlsReference();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(["Analyst"], result.Data!.BrokenReferences);
-        Assert.Null(session.RewrittenEdits);
+        Assert.Null(session.LastRewrites);
     }
 
     [Fact]
     public async Task Set_RlsReference_StrictRefs_FailsBeforeMutating()
     {
         var session = SessionWithRlsReference();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")], strictRefs: true),
             CancellationToken.None);
 
@@ -136,7 +136,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_RenameUnreferencedMeasure_ReportsNothing()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Derived", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -149,7 +149,7 @@ public sealed class RenameReferenceFixupTests
     public async Task Set_NonNameProperty_SkipsReferenceCheck()
     {
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("description", "x")]),
             CancellationToken.None);
 
@@ -163,26 +163,26 @@ public sealed class RenameReferenceFixupTests
     {
         // DAX resolves names case-insensitively; rewriting would only churn casing.
         var session = NewSession();
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "BASE")]),
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Null(result.Data!.FixedReferences);
-        Assert.Null(session.RewrittenEdits);
+        Assert.Null(session.LastRewrites);
     }
 
     [Fact]
     public async Task Mv_RenameReferencedMeasure_RewritesReferences()
     {
         var session = NewSession();
-        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             MvRequest("Sales/Base", "Sales/NewName"),
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(["Sales/Derived"], result.Data!.FixedReferences);
-        var edit = Assert.Single(session.RewrittenEdits!);
+        var edit = Assert.Single(session.LastRewrites!);
         Assert.Equal("[NewName] * 2", edit.Value);
     }
 
@@ -190,20 +190,20 @@ public sealed class RenameReferenceFixupTests
     public async Task Mv_NoFixRefs_WarnsWithoutRewriting()
     {
         var session = NewSession();
-        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             MvRequest("Sales/Base", "Sales/NewName", fixRefs: false),
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(["Sales/Derived"], result.Data!.BrokenReferences);
-        Assert.Null(session.RewrittenEdits);
+        Assert.Null(session.LastRewrites);
     }
 
     [Fact]
     public async Task Mv_NoFixRefs_StrictRefs_FailsBeforeMutating()
     {
         var session = NewSession();
-        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             MvRequest("Sales/Base", "Sales/NewName", strictRefs: true, fixRefs: false),
             CancellationToken.None);
 
@@ -218,7 +218,7 @@ public sealed class RenameReferenceFixupTests
         // Desktop names a table's default partition after the table, so a measure named like its
         // table shares its snapshot path with a partition. The check must not treat that as
         // ambiguous — only DAX-named kinds count.
-        var session = new StubSnapshotSession(new ModelSnapshot("M", 1601,
+        var session = new MutationStubs.SnapshotSession(new ModelSnapshot("M", 1601,
         [
             new ModelObject("Sales", ModelObjectKind.Table, "Sales",
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
@@ -230,7 +230,7 @@ public sealed class RenameReferenceFixupTests
                 Detail: null, Expression: "[Sales] * 2", Description: null, Hidden: false, SourceColumn: null, Children: [])
         ]));
 
-        var result = await new SetModelPropertyHandler([new StubProvider(session)], TestStores).HandleAsync(
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             SetRequest("'Sales'[Sales]", [new ModelPropertyAssignment("name", "NewName")]),
             CancellationToken.None);
 
@@ -270,19 +270,11 @@ public sealed class RenameReferenceFixupTests
             FixRefs: fixRefs);
 
     /// <summary>Two measures on table Sales: Derived's DAX references Base via [Base].</summary>
-    private static StubSnapshotSession NewSession()
-        => new(new ModelSnapshot("M", 1601,
-        [
-            new ModelObject("Sales", ModelObjectKind.Table, "Sales",
-                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
-            new ModelObject("Base", ModelObjectKind.Measure, "Sales/Base",
-                Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null, Children: []),
-            new ModelObject("Derived", ModelObjectKind.Measure, "Sales/Derived",
-                Detail: null, Expression: "[Base] * 2", Description: null, Hidden: false, SourceColumn: null, Children: [])
-        ]));
+    private static MutationStubs.SnapshotSession NewSession()
+        => new(MutationStubs.BaseAndDerived());
 
     /// <summary>A column referenced only by a role's RLS filter — the unfixable case.</summary>
-    private static StubSnapshotSession SessionWithRlsReference()
+    private static MutationStubs.SnapshotSession SessionWithRlsReference()
         => new(new ModelSnapshot("M", 1601,
         [
             new ModelObject("Sales", ModelObjectKind.Table, "Sales",
@@ -293,69 +285,4 @@ public sealed class RenameReferenceFixupTests
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: [],
                 Properties: new Dictionary<string, string> { ["RlsExpression"] = "'Sales'[Amount] > 0" })
         ]));
-
-    private sealed class StubProvider : IModelProvider
-    {
-        private readonly StubSnapshotSession _session;
-
-        public StubProvider(StubSnapshotSession session) => _session = session;
-
-        public bool CanOpen(ModelReference _) => true;
-
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(_session);
-    }
-
-    private sealed class StubSnapshotSession : IModelSession, IModelMutationSession, IExpressionRewriteSession
-    {
-        private readonly ModelSnapshot _snapshot;
-
-        public StubSnapshotSession(ModelSnapshot snapshot) => _snapshot = snapshot;
-
-        public bool SetPropertyCalled { get; private set; }
-
-        public bool SnapshotRequested { get; private set; }
-
-        public IReadOnlyList<ModelExpressionEdit>? RewrittenEdits { get; private set; }
-
-        public bool RewriteCameBeforeSetProperty { get; private set; }
-
-        public string SourcePath => "";
-
-        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
-            => Task.FromResult(new ModelSummary("stub", 1601, 1, 2, 0, 0, 0));
-
-        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
-        {
-            SnapshotRequested = true;
-            return Task.FromResult(_snapshot);
-        }
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-        public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
-            => new(request.Path, Changed: true);
-
-        public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request)
-        {
-            SetPropertyCalled = true;
-            return new ModelObjectMutationResult(request.Path, Changed: true, Property: request.Properties[^1].Property, Value: request.Properties[^1].Value);
-        }
-
-        public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
-            => new(request.Path, Changed: true);
-
-        public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
-            => new(0, []);
-
-        public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
-        {
-            RewrittenEdits = edits;
-            RewriteCameBeforeSetProperty = !SetPropertyCalled;
-            return new ModelExpressionRewriteResult(edits.Count);
-        }
-
-        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
-            => Task.FromResult(new ModelExportResult(outputPath ?? "/local/model", serialization));
-    }
 }

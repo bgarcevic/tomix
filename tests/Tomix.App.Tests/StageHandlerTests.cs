@@ -11,174 +11,127 @@ public sealed class StageHandlerTests
     [Fact]
     public async Task EmptyReference_FailsWithNoModel_InsteadOfCrashing()
     {
-        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(configDir);
-        try
-        {
-            var handler = new StageHandler(new StagingStore(configDir, "test-session"));
-            var empty = new ModelReference("");
+        using var config = new TempConfigDir();
+        var handler = new StageHandler(config.Staging);
+        var empty = new ModelReference("");
 
-            var status = handler.Status(empty);
-            var discard = handler.Discard(empty, all: false);
-            var commit = await handler.CommitAsync(empty, [], force: false, CancellationToken.None);
+        var status = handler.Status(empty);
+        var discard = handler.Discard(empty, all: false);
+        var commit = await handler.CommitAsync(empty, [], force: false, CancellationToken.None);
 
-            foreach (var (success, diagnostics, exitCode) in new[]
-            {
-                (status.Success, status.Diagnostics, status.ExitCode),
-                (discard.Success, discard.Diagnostics, discard.ExitCode),
-                (commit.Success, commit.Diagnostics, commit.ExitCode),
-            })
-            {
-                Assert.False(success);
-                Assert.Equal("TOMIX_NO_MODEL", diagnostics[0].Code);
-                Assert.Equal(2, exitCode);
-            }
-        }
-        finally
+        foreach (var (success, diagnostics, exitCode) in new[]
         {
-            Directory.Delete(configDir, true);
+            (status.Success, status.Diagnostics, status.ExitCode),
+            (discard.Success, discard.Diagnostics, discard.ExitCode),
+            (commit.Success, commit.Diagnostics, commit.ExitCode),
+        })
+        {
+            Assert.False(success);
+            Assert.Equal("TOMIX_NO_MODEL", diagnostics[0].Code);
+            Assert.Equal(2, exitCode);
         }
     }
 
     [Fact]
     public void Discard_All_SucceedsWithoutAModel()
     {
-        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(configDir);
-        try
-        {
-            var handler = new StageHandler(new StagingStore(configDir, "test-session"));
+        using var config = new TempConfigDir();
+        var handler = new StageHandler(config.Staging);
 
-            var result = handler.Discard(new ModelReference(""), all: true);
+        var result = handler.Discard(new ModelReference(""), all: true);
 
-            Assert.True(result.Success);
-            Assert.Equal(0, result.Data!.Discarded);
-        }
-        finally
-        {
-            Directory.Delete(configDir, true);
-        }
+        Assert.True(result.Success);
+        Assert.Equal(0, result.Data!.Discarded);
     }
 
     [Fact]
     public async Task CommitAsync_ReturnsFail_WhenNothingStaged()
     {
-        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(configDir);
-        try
-        {
-            var staging = new StagingStore(configDir, "test-session");
-            var handler = new StageHandler(staging);
-            var result = await handler.CommitAsync(
-                new ModelReference("./nonexistent.tmdl"),
-                [new StubLocalProvider()],
-                force: false,
-                CancellationToken.None);
+        using var config = new TempConfigDir();
+        var handler = new StageHandler(config.Staging);
 
-            Assert.False(result.Success);
-            Assert.Equal("TOMIX_STAGE_NOTHING_TO_COMMIT", result.Diagnostics[0].Code);
-        }
-        finally
-        {
-            Directory.Delete(configDir, true);
-        }
+        var result = await handler.CommitAsync(
+            new ModelReference("./nonexistent.tmdl"),
+            [new StubLocalProvider()],
+            force: false,
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_STAGE_NOTHING_TO_COMMIT", result.Diagnostics[0].Code);
     }
 
     [Fact]
     public async Task CommitAsync_DeploysToRemote_WhenSourceKindIsRemote()
     {
-        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(configDir);
-        try
-        {
-            var staging = new StagingStore(configDir, "test-session");
-            var source = new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel");
-            var workingDir = Path.Combine(configDir, "working");
-            Directory.CreateDirectory(workingDir);
+        using var config = new TempConfigDir();
+        var source = new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel");
+        var workingDir = config.CreateSubdirectory("working");
 
-            var manifest = new StagingManifest(
-                SessionId: "test-session",
-                Source: $"powerbi://api.powerbi.com/v1.0/myorg/ws|MyModel",
-                SourceKind: "remote",
-                SourceEndpoint: "powerbi://api.powerbi.com/v1.0/myorg/ws",
-                SourceDatabase: "MyModel",
-                Workspace: null,
-                Serialization: "tmdl",
-                WorkingCopy: workingDir,
-                CreatedUtc: DateTimeOffset.UtcNow,
-                UpdatedUtc: DateTimeOffset.UtcNow,
-                SourceFingerprint: null,
-                Ops: [new StagedOp(1, DateTimeOffset.UtcNow, "add table", "Added table X")]);
+        var manifest = new StagingManifest(
+            SessionId: TempConfigDir.SessionId,
+            Source: $"powerbi://api.powerbi.com/v1.0/myorg/ws|MyModel",
+            SourceKind: "remote",
+            SourceEndpoint: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            SourceDatabase: "MyModel",
+            Workspace: null,
+            Serialization: "tmdl",
+            WorkingCopy: workingDir,
+            CreatedUtc: DateTimeOffset.UtcNow,
+            UpdatedUtc: DateTimeOffset.UtcNow,
+            SourceFingerprint: null,
+            Ops: [new StagedOp(1, DateTimeOffset.UtcNow, "add table", "Added table X")]);
 
-            staging.WriteManifest(source, manifest);
+        config.Staging.WriteManifest(source, manifest);
 
-            var handler = new StageHandler(staging);
-            var result = await handler.CommitAsync(
-                source,
-                [new StubDeployProvider(workingDir)],
-                force: false,
-                CancellationToken.None);
+        var handler = new StageHandler(config.Staging);
+        var result = await handler.CommitAsync(
+            source,
+            [new StubDeployProvider(workingDir)],
+            force: false,
+            CancellationToken.None);
 
-            Assert.True(result.Success);
-            Assert.True(result.Data!.RemoteDeployed);
-            Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Data.Server);
-            Assert.Equal("MyModel", result.Data.Database);
-            Assert.NotNull(result.Data.DeployDurationMs);
-            Assert.Equal(1, result.Data.OpsCommitted);
-        }
-        finally
-        {
-            Directory.Delete(configDir, true);
-        }
+        Assert.True(result.Success);
+        Assert.True(result.Data!.RemoteDeployed);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", result.Data.Server);
+        Assert.Equal("MyModel", result.Data.Database);
+        Assert.NotNull(result.Data.DeployDurationMs);
+        Assert.Equal(1, result.Data.OpsCommitted);
     }
 
     [Fact]
     public async Task CommitAsync_ExportsLocally_WhenSourceKindIsLocal()
     {
-        var configDir = Path.Combine(Path.GetTempPath(), $"tomix-stage-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(configDir);
-        try
-        {
-            var staging = new StagingStore(configDir, "test-session");
+        using var config = new TempConfigDir();
+        var sourcePath = config.CreateSubdirectory("source-model");
+        var workingDir = config.CreateSubdirectory("working");
 
-            var sourcePath = Path.Combine(configDir, "source-model");
-            Directory.CreateDirectory(sourcePath);
+        var source = new ModelReference(sourcePath);
+        var manifest = new StagingManifest(
+            SessionId: TempConfigDir.SessionId,
+            Source: sourcePath,
+            SourceKind: "local",
+            SourceEndpoint: null,
+            SourceDatabase: null,
+            Workspace: null,
+            Serialization: "tmdl",
+            WorkingCopy: workingDir,
+            CreatedUtc: DateTimeOffset.UtcNow,
+            UpdatedUtc: DateTimeOffset.UtcNow,
+            SourceFingerprint: null,
+            Ops: [new StagedOp(1, DateTimeOffset.UtcNow, "add measure", "Added measure X")]);
 
-            var workingDir = Path.Combine(configDir, "working");
-            Directory.CreateDirectory(workingDir);
+        config.Staging.WriteManifest(source, manifest);
 
-            var source = new ModelReference(sourcePath);
-            var manifest = new StagingManifest(
-                SessionId: "test-session",
-                Source: sourcePath,
-                SourceKind: "local",
-                SourceEndpoint: null,
-                SourceDatabase: null,
-                Workspace: null,
-                Serialization: "tmdl",
-                WorkingCopy: workingDir,
-                CreatedUtc: DateTimeOffset.UtcNow,
-                UpdatedUtc: DateTimeOffset.UtcNow,
-                SourceFingerprint: null,
-                Ops: [new StagedOp(1, DateTimeOffset.UtcNow, "add measure", "Added measure X")]);
+        var handler = new StageHandler(config.Staging);
+        var result = await handler.CommitAsync(
+            source,
+            [new StubExportProvider(workingDir, sourcePath)],
+            force: false,
+            CancellationToken.None);
 
-            staging.WriteManifest(source, manifest);
-
-            var handler = new StageHandler(staging);
-            var result = await handler.CommitAsync(
-                source,
-                [new StubExportProvider(workingDir, sourcePath)],
-                force: false,
-                CancellationToken.None);
-
-            Assert.True(result.Success);
-            Assert.False(result.Data!.RemoteDeployed);
-            Assert.Equal(1, result.Data.OpsCommitted);
-        }
-        finally
-        {
-            Directory.Delete(configDir, true);
-        }
+        Assert.True(result.Success);
+        Assert.False(result.Data!.RemoteDeployed);
+        Assert.Equal(1, result.Data.OpsCommitted);
     }
 
     private sealed class StubDeployProvider : IModelProvider

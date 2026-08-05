@@ -13,6 +13,10 @@ Automated tests for Tomix.
 
 ## Cross-folder dependencies
 
+- `/tests/Shared` holds BCL-only support code compiled into every test assembly by
+  `tests/Directory.Build.props`. It is not a project, so no test project depends on another; keep it
+  free of `Tomix.*` references so it stays usable from all six. Helpers that need a production type
+  belong in the owning project's `Support/` folder instead.
 - `/tests/Tomix.Core.Tests` tests Core types and production project-dependency boundaries.
 - `/tests/Tomix.App.Tests` tests App handlers, shared platform primitives, authentication, and
   cross-provider application flows.
@@ -63,19 +67,45 @@ failure mode — that distinction is the documentation.
 
 ### Reuse the shared helpers
 
-Check for an existing helper before writing setup:
+Check for an existing helper before writing setup. Never hand-roll
+`Path.GetTempPath()` + `Directory.CreateDirectory` + `try`/`finally` + `Directory.Delete`, a
+`Console.SetOut`/`SetError` redirect, a root command, or a `..`-relative path to `samples/`.
 
-- `Tomix.App.Tests/Support/TempConfigDir` — throwaway config dir + `MutationStores`/`Staging`;
-  disposes and deletes. Use `using var config = new TempConfigDir();` instead of hand-rolled
-  `Path.GetTempPath()` + `try`/`finally` + `Directory.Delete`.
+Available to every test project (`tests/Shared`, compiled in via `tests/Directory.Build.props`;
+namespace `Tomix.Tests.Support` is a global using):
+
+- `TempDir` — a throwaway directory that exists on construction and is deleted on dispose, plus
+  `Combine`/`CreateSubdirectory`/`WriteFile`. `using var dir = new TempDir();`
+- `SampleModel` — `Locate()` for `samples/basic-tmdl`, `Locate(name)` for any other sample,
+  `CopyToTemp()`/`CopyTo(...)` for a writable copy, `CopyDirectory(...)`. Never open a sample in
+  place in a test that saves.
+- `RepoPaths` — `Root` (upward search anchored on `Tomix.slnx`), `Samples`, `Combine(...)`.
+
+Per project:
+
+- `Tomix.App.Tests/Support/TempConfigDir` — throwaway config dir with cached
+  `State`/`Staging`/`Stores`. `using var config = new TempConfigDir();`
+- `Tomix.App.Tests/Support/QueryStubs` — query-capable session/provider stubs (`Session` with
+  `OnQuery`/`Result`/`Throw`, `Provider`, `NonQueryProvider`, `ThrowingProvider`).
+- `Tomix.App.Tests/Support/MutationStubs` — `SnapshotSession` (records set/rewrite calls and their
+  order), `MoveCapableSnapshotSession`, `Provider`, and the `BaseAndDerived()` snapshot.
+- `Tomix.Cli.Tests/ConsoleCapture` — `Run(Func<int>) -> (ExitCode, Stdout, Stderr)`, restoring the
+  writers in a `finally`; pass `captureAnsiConsole: true` for Spectre-rendered output. Put the class
+  in `ConsoleStateCollection`.
+- `Tomix.Cli.Tests/TestRoot` — `With(...)` for a root carrying the global options plus the
+  subcommands under test, `Full()` for the production tree, `Descendants(...)` to walk it.
 - `Tomix.Cli.Tests/TestServices` — `AppServices` rooted in a throwaway temp dir, so command tests
   never touch the developer's real `~/.tomix`.
-- `Tomix.Provider.Tmdl.Tests/TestSupport` — sample lookup (searches upward; do not hardcode
-  `..`-relative depths) and `CopyDirectory`.
+- `Tomix.Provider.Tom.Tests/TestModels` — in-memory TOM fixtures (`NewDatabase`, `NewTable`,
+  `AddTable`, `WithSales`, `WithRelationship`) and the `Add`/`Remove`/`Move`/`Set`/`Replace` request
+  factories. Imported as a static using, so call them unqualified.
 - `Tomix.Provider.Vpax.Tests/TestDaxModelBuilder` — DAX model fixtures.
 
 If you need the same fixture or stub twice, extract it rather than copying — duplicated fixtures
 drift apart silently. Anything that creates files must clean up after itself.
+
+A class-scoped `Directory.CreateTempSubdirectory(...)` field deleted in `Dispose` is also fine when
+every test in the class shares one directory; reach for `TempDir` when the directory is per-test.
 
 ### Contract, snapshot, and drift-guard tests
 

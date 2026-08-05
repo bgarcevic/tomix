@@ -209,7 +209,7 @@ public sealed class MoveModelObjectHandlerTests
             Save: false, SaveTo: null, Serialization: "", Force: false,
             Revert: true);
 
-        var result = await new MoveModelObjectHandler([new StubProvider(session)], TestStores)
+        var result = await new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores)
             .HandleAsync(request, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -357,8 +357,8 @@ public sealed class MoveModelObjectHandlerTests
     }
 
     private static Task<Core.Results.TomixResult<MoveModelObjectResult>> Handle(
-        StubSnapshotSession session, string source, string destination, ModelObjectKind? type = null)
-        => new MoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
+        MutationStubs.SnapshotSession session, string source, string destination, ModelObjectKind? type = null)
+        => new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
             new MoveModelObjectRequest(
                 new ModelReference("model.bim"),
                 source, destination, Type: type,
@@ -367,7 +367,7 @@ public sealed class MoveModelObjectHandlerTests
 
     /// <summary>Move-capable session over Sales with an extra measure whose DAX references
     /// Base fully qualified — the one reference shape a cross-table move breaks.</summary>
-    private static MoveCapableStubSession NewMoveSession()
+    private static MutationStubs.MoveCapableSnapshotSession NewMoveSession()
         => new(new ModelSnapshot("M", 1601,
         [
             new ModelObject("Sales", ModelObjectKind.Table, "Sales",
@@ -383,21 +383,13 @@ public sealed class MoveModelObjectHandlerTests
         ]));
 
     /// <summary>Two measures on table Sales: Derived's DAX references Base via [Base].</summary>
-    private static StubSnapshotSession NewSession()
-        => new(new ModelSnapshot("M", 1601,
-        [
-            new ModelObject("Sales", ModelObjectKind.Table, "Sales",
-                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
-            new ModelObject("Base", ModelObjectKind.Measure, "Sales/Base",
-                Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null, Children: []),
-            new ModelObject("Derived", ModelObjectKind.Measure, "Sales/Derived",
-                Detail: null, Expression: "[Base] * 2", Description: null, Hidden: false, SourceColumn: null, Children: [])
-        ]));
+    private static MutationStubs.SnapshotSession NewSession()
+        => new(MutationStubs.BaseAndDerived());
 
     /// <summary>Display-folder scenarios: Base sits in folder 'Finance', Plain in no folder,
     /// hierarchy Calendar has level Year, measure and hierarchy share the name 'Date', and
     /// role Admin covers kinds without folders.</summary>
-    private static StubSnapshotSession NewFolderSession()
+    private static MutationStubs.SnapshotSession NewFolderSession()
         => new(new ModelSnapshot("M", 1601,
         [
             new ModelObject("Sales", ModelObjectKind.Table, "Sales",
@@ -422,88 +414,4 @@ public sealed class MoveModelObjectHandlerTests
             new ModelObject("Admin", ModelObjectKind.Role, "Roles/Admin",
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: [])
         ]));
-
-    private sealed class StubProvider : IModelProvider
-    {
-        private readonly StubSnapshotSession _session;
-
-        public StubProvider(StubSnapshotSession session) => _session = session;
-
-        public bool CanOpen(ModelReference _) => true;
-
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(_session);
-    }
-
-    private sealed class MoveCapableStubSession : StubSnapshotSession, IObjectMoveSession
-    {
-        public MoveCapableStubSession(ModelSnapshot snapshot)
-            : base(snapshot)
-        {
-        }
-
-        public ModelObjectMoveRequest? LastMove { get; private set; }
-
-        public ModelObjectMutationResult MoveObject(ModelObjectMoveRequest request)
-        {
-            LastMove = request;
-            return new ModelObjectMutationResult($"{request.NewParent}/{request.NewName}", Changed: true);
-        }
-    }
-
-    private class StubSnapshotSession : IModelSession, IModelMutationSession, IExpressionRewriteSession
-    {
-        private readonly ModelSnapshot _snapshot;
-
-        public StubSnapshotSession(ModelSnapshot snapshot) => _snapshot = snapshot;
-
-        public bool SetPropertyCalled { get; private set; }
-
-        public string? LastSetValue { get; private set; }
-
-        public IReadOnlyList<ModelPropertyAssignment>? LastSetProperties { get; private set; }
-
-        public bool SnapshotRequested { get; private set; }
-
-        public string SourcePath => "";
-
-        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
-            => Task.FromResult(new ModelSummary("stub", 1601, 1, 2, 0, 0, 0));
-
-        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
-        {
-            SnapshotRequested = true;
-            return Task.FromResult(_snapshot);
-        }
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-        public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
-            => new(request.Path, Changed: true);
-
-        public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request)
-        {
-            SetPropertyCalled = true;
-            LastSetValue = request.Properties[^1].Value;
-            LastSetProperties = request.Properties;
-            return new ModelObjectMutationResult(request.Path, Changed: true, Property: request.Properties[^1].Property, Value: request.Properties[^1].Value);
-        }
-
-        public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
-            => new(request.Path, Changed: true);
-
-        public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
-            => new(0, []);
-
-        public IReadOnlyList<ModelExpressionEdit>? LastRewrites { get; private set; }
-
-        public ModelExpressionRewriteResult RewriteExpressions(IReadOnlyList<ModelExpressionEdit> edits)
-        {
-            LastRewrites = edits;
-            return new(edits.Count);
-        }
-
-        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
-            => Task.FromResult(new ModelExportResult(outputPath ?? "/local/model", serialization));
-    }
 }

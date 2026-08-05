@@ -12,12 +12,9 @@ public sealed class TestCommandParseTests
 {
     private static ParseResult Parse(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         IReadOnlyList<IModelProvider> providers = [];
         var services = TestServices.Create();
-        root.Subcommands.Add(new TestCommand(providers, services.LoadCurrentSession).Build());
+        var root = TestRoot.With(new TestCommand(providers, services.LoadCurrentSession).Build());
         return root.Parse(args);
     }
 

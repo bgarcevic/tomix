@@ -13,17 +13,11 @@ namespace Tomix.Cli.Tests;
 /// </summary>
 public sealed class HelpExampleParityTests
 {
-    private static RootCommand BuildRoot()
-        => Program.BuildRootCommand(
-            providers: [],
-            new CompositeExpressionFormatterClient([]),
-            version: "0.0.0-test",
-            TestServices.Create());
 
     [Fact]
     public void EveryExampleKey_ResolvesToARegisteredCommand()
     {
-        var root = BuildRoot();
+        var root = TestRoot.Full();
         var stale = SpectreHelpAction.CommandExamples.Keys
             .Where(key => ResolveCommand(root, key) is null)
             .ToList();
@@ -35,7 +29,7 @@ public sealed class HelpExampleParityTests
     [Fact]
     public void EveryExample_ParsesWithoutErrors()
     {
-        var root = BuildRoot();
+        var root = TestRoot.Full();
         var failures = new List<string>();
 
         foreach (var example in SpectreHelpAction.CommandExamples.Values.SelectMany(e => e))

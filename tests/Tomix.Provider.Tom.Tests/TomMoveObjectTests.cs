@@ -149,12 +149,9 @@ public sealed class TomMoveObjectTests
         Assert.Single(db.Model.Tables["Sales"].Measures);
     }
 
-    private static ModelObjectMoveRequest Move(string path, string newParent, string? newName = null)
-        => new(path, Type: null, newParent, newName);
-
     private static Database BaseModel()
     {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
+        var db = NewDatabase();
 
         var sales = NewTable("Sales", "Amount");
         sales.Measures.Add(new Measure { Name = "Revenue", Expression = "SUM('Sales'[Amount])" });
@@ -162,19 +159,5 @@ public sealed class TomMoveObjectTests
         db.Model.Tables.Add(NewTable("Metrics", "Dummy"));
 
         return db;
-    }
-
-    private static Table NewTable(string name, params string[] columns)
-    {
-        var table = new Table { Name = name };
-        foreach (var column in columns)
-            table.Columns.Add(new DataColumn { Name = column, DataType = DataType.Int64, SourceColumn = column });
-        table.Partitions.Add(new Partition
-        {
-            Name = name,
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        return table;
     }
 }

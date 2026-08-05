@@ -56,23 +56,10 @@ public sealed class DeployFlagRejectionTests
 
     private static (int ExitCode, string Stderr) Invoke(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new DeployCommand([], services.State).Build());
+        var root = TestRoot.With(new DeployCommand([], services.State).Build());
 
-        var parseResult = root.Parse(args);
-        var original = Console.Error;
-        var stderr = new StringWriter();
-        Console.SetError(stderr);
-        try
-        {
-            return (Program.Invoke(parseResult), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.InvokeThroughProgram(root.Parse(args));
+        return (captured.ExitCode, captured.Stderr);
     }
 }

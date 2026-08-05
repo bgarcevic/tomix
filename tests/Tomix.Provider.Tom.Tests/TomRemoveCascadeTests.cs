@@ -14,7 +14,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveColumn_RemovesRelationshipsTouchingIt()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var mutator = new TomModelMutator(db);
 
         var result = mutator.RemoveObject(Remove("Sales/CustomerId"));
@@ -27,7 +27,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveTable_RemovesRelationshipsTouchingIt()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var mutator = new TomModelMutator(db);
 
         var result = mutator.RemoveObject(Remove("Customer"));
@@ -40,7 +40,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveColumn_ClearsSortByPointingAtIt()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         sales.Columns["MonthName"].SortByColumn = sales.Columns["MonthNo"];
         var mutator = new TomModelMutator(db);
@@ -54,7 +54,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveColumn_RemovesItsHierarchyLevel_KeepsHierarchyWithRemainingLevels()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         var hierarchy = new Hierarchy { Name = "Calendar" };
         hierarchy.Levels.Add(new Level { Name = "No", Column = sales.Columns["MonthNo"], Ordinal = 0 });
@@ -72,7 +72,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveColumn_RemovesHierarchyLeftWithoutLevels()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         var hierarchy = new Hierarchy { Name = "Calendar" };
         hierarchy.Levels.Add(new Level { Name = "No", Column = sales.Columns["MonthNo"], Ordinal = 0 });
@@ -88,7 +88,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveTable_RemovesPerspectiveEntryRolePermissionAndTranslations()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
 
         var perspective = new Perspective { Name = "Reporting" };
@@ -129,7 +129,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveMeasure_RemovesPerspectiveEntryAndTranslation()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         var measure = new Measure { Name = "Total", Expression = "1" };
         sales.Measures.Add(measure);
@@ -159,7 +159,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveColumn_RemovesColumnPermission()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         var role = new ModelRole { Name = "Analyst" };
         var permission = new TablePermission { Table = sales };
@@ -180,7 +180,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveLastPartition_Fails_InsteadOfCorruptingTheTable()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var mutator = new TomModelMutator(db);
 
         var ex = Assert.Throws<InvalidOperationException>(() => mutator.RemoveObject(
@@ -193,7 +193,7 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemovePartition_WithSiblingsRemaining_Removes()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         var sales = db.Model.Tables["Sales"];
         sales.Partitions.Add(new Partition
         {
@@ -214,54 +214,12 @@ public sealed class TomRemoveCascadeTests
     [Fact]
     public void RemoveUnentangledMeasure_ReportsNoCascade()
     {
-        var db = ModelWithRelationship();
+        var db = WithRelationship();
         db.Model.Tables["Sales"].Measures.Add(new Measure { Name = "Total", Expression = "1" });
 
         var result = new TomModelMutator(db).RemoveObject(Remove("Sales/Total"));
 
         Assert.True(result.Changed);
         Assert.Null(result.CascadeRemoved);
-    }
-
-    private static ModelObjectRemoveRequest Remove(string path)
-        => new(path, Type: null, IfExists: false);
-
-    /// <summary>
-    /// Sales (CustomerId, Amount, MonthName, MonthNo) many-to-one Customer (Id), one import
-    /// partition per table named after the table (the Desktop default).
-    /// </summary>
-    private static Database ModelWithRelationship()
-    {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
-
-        var sales = NewTable("Sales", "CustomerId", "Amount", "MonthName", "MonthNo");
-        var customer = NewTable("Customer", "Id");
-        db.Model.Tables.Add(sales);
-        db.Model.Tables.Add(customer);
-
-        db.Model.Relationships.Add(new SingleColumnRelationship
-        {
-            Name = "SalesToCustomer",
-            FromColumn = sales.Columns["CustomerId"],
-            ToColumn = customer.Columns["Id"],
-            FromCardinality = RelationshipEndCardinality.Many,
-            ToCardinality = RelationshipEndCardinality.One
-        });
-
-        return db;
-    }
-
-    private static Table NewTable(string name, params string[] columns)
-    {
-        var table = new Table { Name = name };
-        foreach (var column in columns)
-            table.Columns.Add(new DataColumn { Name = column, DataType = DataType.Int64, SourceColumn = column });
-        table.Partitions.Add(new Partition
-        {
-            Name = name,
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        return table;
     }
 }

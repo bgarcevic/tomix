@@ -122,7 +122,7 @@ public sealed class TomExporterSourceIndentTests
     [Fact]
     public async Task ExportTmdl_WritesSourceBlocksAtDesktopDepth_AndRoundTrips()
     {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
+        var db = NewDatabase();
         var table = new Table { Name = "Sales" };
         const string expression = "let\n\tSource = #table({}, {})\nin\n\tSource";
         table.Partitions.Add(new Partition
@@ -132,23 +132,38 @@ public sealed class TomExporterSourceIndentTests
         });
         db.Model.Tables.Add(table);
 
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-indent-test-{Guid.NewGuid():N}");
-        try
-        {
-            await TomModelExporter.ExportAsync(
-                db, new ModelExportRequest(dir, "tmdl", Force: true, SupportingFiles: false), CancellationToken.None);
+        using var dir = new TempDir();
+        await TomModelExporter.ExportAsync(
+            db, new ModelExportRequest(dir.Path, "tmdl", Force: true, SupportingFiles: false), CancellationToken.None);
 
-            var text = await File.ReadAllTextAsync(Path.Combine(dir, "tables", "Sales.tmdl"));
-            Assert.Contains("\t\tsource =\n\t\t\tlet\n", text.ReplaceLineEndings("\n"));
+        var text = await File.ReadAllTextAsync(dir.Combine("tables", "Sales.tmdl"));
+        Assert.Contains("\t\tsource =\n\t\t\tlet\n", text.ReplaceLineEndings("\n"));
 
-            var roundTripped = TmdlSerializer.DeserializeDatabaseFromFolder(dir);
-            var source = (MPartitionSource)roundTripped.Model.Tables["Sales"].Partitions["Sales"].Source;
-            Assert.Equal(expression.ReplaceLineEndings("\n"), source.Expression.ReplaceLineEndings("\n"));
-        }
-        finally
-        {
-            if (Directory.Exists(dir))
-                Directory.Delete(dir, recursive: true);
-        }
+        var roundTripped = TmdlSerializer.DeserializeDatabaseFromFolder(dir.Path);
+        var source = (MPartitionSource)roundTripped.Model.Tables["Sales"].Partitions["Sales"].Source;
+        Assert.Equal(expression.ReplaceLineEndings("\n"), source.Expression.ReplaceLineEndings("\n"));
+    }
+
+    // Moved from SaveAsyncForceTests, where it was named
+    // TmdlModelSession_SaveAsync_InPlaceClearsStaleFiles despite never constructing a
+    // TmdlModelSession — it drives TomModelExporter directly, which is what it pins.
+    [Fact]
+    public async Task ExportTmdl_WithForce_ClearsStaleNonTmdlFilesInTarget()
+    {
+        using var dir = new TempDir();
+        var targetPath = dir.CreateSubdirectory("out");
+
+        // Seed the directory with a non-TMDL junk file that the serializer would NOT overwrite
+        // on its own. A proper in-place save must clear it so stale artifacts don't survive.
+        var junkPath = Path.Combine(targetPath, "stale-artifact.txt");
+        File.WriteAllText(junkPath, "old content");
+
+        var db = NewDatabase();
+        await TomModelExporter.ExportAsync(
+            db,
+            new ModelExportRequest(targetPath, "tmdl", Force: true, SupportingFiles: false),
+            CancellationToken.None);
+
+        Assert.False(File.Exists(junkPath), "stale file should be cleared when force=true");
     }
 }

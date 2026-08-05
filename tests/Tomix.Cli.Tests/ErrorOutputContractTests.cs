@@ -47,18 +47,8 @@ public sealed class ErrorOutputContractTests
 
     private static JsonDocument CaptureJson(params TomixDiagnostic[] diagnostics)
     {
-        var original = Console.Error;
-        var stderr = new StringWriter();
-        Console.SetError(stderr);
-        try
-        {
-            ErrorOutput.Write(diagnostics, "json");
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.Run(() => ErrorOutput.Write(diagnostics, "json"));
 
-        return JsonDocument.Parse(stderr.ToString());
+        return JsonDocument.Parse(captured.Stderr);
     }
 }

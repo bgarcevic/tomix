@@ -16,12 +16,9 @@ public sealed class DestructiveConfirmationTests
 {
     private static RootCommand BuildRoot(IReadOnlyList<IModelProvider>? providers = null)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
         var noProviders = providers ?? Array.Empty<IModelProvider>();
-        root.Subcommands.Add(new SessionCommand(services.State).Build());
+        var root = TestRoot.With(new SessionCommand(services.State).Build());
         root.Subcommands.Add(new StageCommand(noProviders, services.State, services.Staging).Build());
         root.Subcommands.Add(new RmCommand(noProviders, services.State, services.Mutations).Build());
         root.Subcommands.Add(new ReplaceCommand(noProviders, services.State, services.Mutations).Build());
@@ -40,21 +37,8 @@ public sealed class DestructiveConfirmationTests
         var result = root.Parse(args);
         Assert.Empty(result.Errors);
 
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        try
-        {
-            return (result.Invoke(), stdout.ToString(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-        }
+        var captured = ConsoleCapture.Invoke(result);
+        return (captured.ExitCode, captured.Stdout, captured.Stderr);
     }
 
     [Theory]

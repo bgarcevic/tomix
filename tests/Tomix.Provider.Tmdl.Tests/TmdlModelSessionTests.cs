@@ -13,7 +13,7 @@ public sealed class TmdlModelSessionTests
     [Fact]
     public async Task GetSummaryAsync_BasicTmdlSample_ReportsKnownCounts()
     {
-        await using var session = new TmdlModelSession(TestSupport.SampleTmdlFolder);
+        await using var session = new TmdlModelSession(SampleModel.Locate());
 
         var summary = await session.GetSummaryAsync(CancellationToken.None);
 
@@ -28,7 +28,7 @@ public sealed class TmdlModelSessionTests
     [Fact]
     public async Task GetSnapshotAsync_BasicTmdlSample_ContainsSampleTables()
     {
-        await using var session = new TmdlModelSession(TestSupport.SampleTmdlFolder);
+        await using var session = new TmdlModelSession(SampleModel.Locate());
 
         var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
 
@@ -43,7 +43,7 @@ public sealed class TmdlModelSessionTests
     [Fact]
     public async Task GetSnapshotAsync_BasicTmdlSample_SalesTableHasFourMeasures()
     {
-        await using var session = new TmdlModelSession(TestSupport.SampleTmdlFolder);
+        await using var session = new TmdlModelSession(SampleModel.Locate());
 
         var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
 

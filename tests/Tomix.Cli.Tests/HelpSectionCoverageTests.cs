@@ -11,12 +11,6 @@ namespace Tomix.Cli.Tests;
 /// </summary>
 public sealed class HelpSectionCoverageTests
 {
-    private static RootCommand BuildRoot()
-        => Program.BuildRootCommand(
-            providers: [],
-            new CompositeExpressionFormatterClient([]),
-            version: "0.0.0-test",
-            TestServices.Create());
 
     private static HashSet<string> ListedNames()
         => SpectreHelpAction.RootSections.SelectMany(section => section.Commands)
@@ -26,7 +20,7 @@ public sealed class HelpSectionCoverageTests
     public void EveryRegisteredCommand_AppearsInAHelpSection()
     {
         var listed = ListedNames();
-        var missing = BuildRoot().Subcommands
+        var missing = TestRoot.Full().Subcommands
             .Select(sc => sc.Name)
             .Where(name => !listed.Contains(name))
             .ToList();
@@ -38,7 +32,7 @@ public sealed class HelpSectionCoverageTests
     [Fact]
     public void EverySectionedCommand_IsActuallyRegistered()
     {
-        var registered = BuildRoot().Subcommands
+        var registered = TestRoot.Full().Subcommands
             .Select(sc => sc.Name)
             .ToHashSet(StringComparer.Ordinal);
         var stale = ListedNames().Where(name => !registered.Contains(name)).ToList();

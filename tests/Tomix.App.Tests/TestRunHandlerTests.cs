@@ -39,16 +39,15 @@ public sealed class TestRunHandlerTests : IDisposable
         return path;
     }
 
-    private static ModelQueryResult Rowset(params object?[] values) => new(
-        "stub-server",
-        "stub-db",
-        [new QueryColumn("[Value]", "int64")],
-        values.Select(v => (IReadOnlyList<object?>)[v]).ToList(),
-        Truncated: false,
-        DurationMs: 3);
+    private static ModelQueryResult Rowset(params object?[] values) => QueryStubs.Rowset(values);
 
-    private static TestRunHandler Handler(StubQuerySession session, Func<CliConnectionState?>? state = null)
-        => new([new StubQueryProvider(session)], state ?? RemoteState);
+    /// <summary>A session answering with a single-row rowset unless the test overrides it.</summary>
+    private static QueryStubs.Session NewSession(
+        Func<ModelQueryRequest, ModelQueryResult>? onQuery = null)
+        => new() { OnQuery = onQuery ?? (_ => Rowset(1L)) };
+
+    private static TestRunHandler Handler(QueryStubs.Session session, Func<CliConnectionState?>? state = null)
+        => new([new QueryStubs.Provider(session)], state ?? RemoteState);
 
     private TestRunRequest Request(bool update = false, string? filter = null,
         IReadOnlyDictionary<string, string>? parameters = null, int maxRows = 10000, string? path = null)
@@ -60,7 +59,7 @@ public sealed class TestRunHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_ReturnsPathNotFound_WhenPathMissing()
     {
-        var result = await Handler(new StubQuerySession()).HandleAsync(
+        var result = await Handler(NewSession()).HandleAsync(
             Request(path: Path.Combine(_dir, "nope")), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -71,7 +70,7 @@ public sealed class TestRunHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_ReturnsNoneFound_WhenDirectoryHasNoDaxFiles()
     {
-        var result = await Handler(new StubQuerySession()).HandleAsync(Request(), CancellationToken.None);
+        var result = await Handler(NewSession()).HandleAsync(Request(), CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_TEST_NONE_FOUND", result.Diagnostics[0].Code);
@@ -82,7 +81,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ReturnsNoneFound_WhenFilterMatchesNothing()
     {
         WriteDax("sales");
-        var result = await Handler(new StubQuerySession()).HandleAsync(
+        var result = await Handler(NewSession()).HandleAsync(
             Request(filter: "other-*"), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -94,7 +93,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ReturnsNoRemoteTarget_WhenConnectionIsLocal()
     {
         WriteDax("sales");
-        var result = await Handler(new StubQuerySession(), LocalState).HandleAsync(Request(), CancellationToken.None);
+        var result = await Handler(NewSession(), LocalState).HandleAsync(Request(), CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_TEST_NO_REMOTE_TARGET", result.Diagnostics[0].Code);
@@ -105,7 +104,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ReturnsUnsupported_WhenSessionIsNotQueryCapable()
     {
         WriteDax("sales");
-        var handler = new TestRunHandler([new StubNonQueryProvider()], RemoteState);
+        var handler = new TestRunHandler([new QueryStubs.NonQueryProvider()], RemoteState);
         var result = await handler.HandleAsync(Request(), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -118,7 +117,7 @@ public sealed class TestRunHandlerTests : IDisposable
     {
         WriteDax("sales");
         var handler = new TestRunHandler(
-            [new ThrowingProvider(new AuthenticationRequiredException("login"))], RemoteState);
+            [new QueryStubs.ThrowingProvider(new AuthenticationRequiredException("login"))], RemoteState);
         var result = await handler.HandleAsync(Request(), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -132,7 +131,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_Update_WritesSnapshotAndExitsZero()
     {
         var daxPath = WriteDax("sales");
-        var result = await Handler(new StubQuerySession()).HandleAsync(Request(update: true), CancellationToken.None);
+        var result = await Handler(NewSession()).HandleAsync(Request(update: true), CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal(0, result.ExitCode);
@@ -150,7 +149,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_Update_ReportsUnchanged_WhenResultIsIdentical()
     {
         WriteDax("sales");
-        var handler = Handler(new StubQuerySession());
+        var handler = Handler(NewSession());
 
         await handler.HandleAsync(Request(update: true), CancellationToken.None);
         var second = await handler.HandleAsync(Request(update: true), CancellationToken.None);
@@ -165,7 +164,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_PassesAndExitsZero_WhenResultMatchesSnapshot()
     {
         WriteDax("sales");
-        var handler = Handler(new StubQuerySession());
+        var handler = Handler(NewSession());
         await handler.HandleAsync(Request(update: true), CancellationToken.None);
 
         var result = await handler.HandleAsync(Request(), CancellationToken.None);
@@ -182,10 +181,10 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_FailsWithDifferences_WhenResultDrifts()
     {
         WriteDax("sales");
-        var handler = Handler(new StubQuerySession());
+        var handler = Handler(NewSession());
         await handler.HandleAsync(Request(update: true), CancellationToken.None);
 
-        var drifted = Handler(new StubQuerySession { OnQuery = _ => Rowset(2L) });
+        var drifted = Handler(NewSession(_ => Rowset(2L)));
         var result = await drifted.HandleAsync(Request(), CancellationToken.None);
 
         Assert.True(result.Success);                    // report renders; exit code carries the failure
@@ -203,7 +202,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ReportsMissing_WhenSnapshotAbsent()
     {
         WriteDax("sales");
-        var result = await Handler(new StubQuerySession()).HandleAsync(Request(), CancellationToken.None);
+        var result = await Handler(NewSession()).HandleAsync(Request(), CancellationToken.None);
 
         Assert.Equal(1, result.ExitCode);
         var test = Assert.Single(result.Data!.Tests);
@@ -216,12 +215,12 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_MentionsQueryChange_WhenFailingWithStaleHash()
     {
         var daxPath = WriteDax("sales");
-        var handler = Handler(new StubQuerySession());
+        var handler = Handler(NewSession());
         await handler.HandleAsync(Request(update: true), CancellationToken.None);
 
         // Query text changes (new hash) and its result drifts from the stale snapshot.
         File.WriteAllText(daxPath, "EVALUATE ROW(\"Value\", 2)");
-        var drifted = Handler(new StubQuerySession { OnQuery = _ => Rowset(2L) });
+        var drifted = Handler(NewSession(_ => Rowset(2L)));
         var result = await drifted.HandleAsync(Request(), CancellationToken.None);
 
         var test = Assert.Single(result.Data!.Tests);
@@ -235,7 +234,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ReportsError_WhenResultTruncated()
     {
         WriteDax("sales");
-        var session = new StubQuerySession { OnQuery = _ => Rowset(1L) with { Truncated = true } };
+        var session = NewSession(_ => Rowset(1L) with { Truncated = true });
         var result = await Handler(session).HandleAsync(Request(maxRows: 5), CancellationToken.None);
 
         Assert.Equal(1, result.ExitCode);
@@ -255,7 +254,7 @@ public sealed class TestRunHandlerTests : IDisposable
               "rows": [[]] }
             """);
 
-        var result = await Handler(new StubQuerySession()).HandleAsync(Request(), CancellationToken.None);
+        var result = await Handler(NewSession()).HandleAsync(Request(), CancellationToken.None);
 
         Assert.Equal(1, result.ExitCode);
         var test = Assert.Single(result.Data!.Tests);
@@ -267,7 +266,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ReportsError_ForNonQueryStatement()
     {
         WriteDax("bad", "SUMMARIZE(Sales)");
-        var result = await Handler(new StubQuerySession()).HandleAsync(Request(), CancellationToken.None);
+        var result = await Handler(NewSession()).HandleAsync(Request(), CancellationToken.None);
 
         Assert.Equal(1, result.ExitCode);
         var test = Assert.Single(result.Data!.Tests);
@@ -280,12 +279,9 @@ public sealed class TestRunHandlerTests : IDisposable
     {
         WriteDax("a-boom", "EVALUATE BOOM()");
         WriteDax("b-good");
-        var session = new StubQuerySession
-        {
-            OnQuery = request => request.Query.Contains("BOOM")
-                ? throw new InvalidOperationException("syntax error near BOOM")
-                : Rowset(1L)
-        };
+        var session = NewSession(request => request.Query.Contains("BOOM")
+            ? throw new InvalidOperationException("syntax error near BOOM")
+            : Rowset(1L));
         var result = await Handler(session).HandleAsync(Request(update: true), CancellationToken.None);
 
         Assert.Equal(2, result.Data!.Tests.Count);
@@ -301,7 +297,7 @@ public sealed class TestRunHandlerTests : IDisposable
     public async Task HandleAsync_ForwardsParametersAndMaxRows()
     {
         WriteDax("sales");
-        var session = new StubQuerySession();
+        var session = NewSession();
         await Handler(session).HandleAsync(
             Request(update: true, parameters: new Dictionary<string, string> { ["color"] = "Red" }, maxRows: 42),
             CancellationToken.None);
@@ -315,67 +311,9 @@ public sealed class TestRunHandlerTests : IDisposable
     {
         WriteDax("totals/sales");
         WriteDax("other/costs");
-        var result = await Handler(new StubQuerySession()).HandleAsync(
+        var result = await Handler(NewSession()).HandleAsync(
             Request(update: true, filter: "totals/*"), CancellationToken.None);
 
         Assert.Equal("totals/sales", Assert.Single(result.Data!.Tests).Name);
-    }
-
-    // ── Stubs (mirroring QueryModelHandlerTests) ────────────────────────────
-
-    private sealed class StubQueryProvider : IModelProvider
-    {
-        private readonly StubQuerySession _session;
-        public StubQueryProvider(StubQuerySession session) => _session = session;
-        public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(_session);
-    }
-
-    private sealed class StubQuerySession : IModelSession, IModelQuerySession
-    {
-        public Func<ModelQueryRequest, ModelQueryResult>? OnQuery { get; init; }
-        public ModelQueryRequest? LastRequest { get; private set; }
-        public string SourcePath => "";
-        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
-            => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
-        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
-            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-        public Task<ModelQueryResult> ExecuteQueryAsync(
-            ModelQueryRequest request,
-            TextWriter? traceWriter,
-            CancellationToken cancellationToken)
-        {
-            LastRequest = request;
-            return Task.FromResult(OnQuery is not null ? OnQuery(request) : Rowset(1L));
-        }
-    }
-
-    private sealed class StubNonQueryProvider : IModelProvider
-    {
-        public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new StubNonQuerySession());
-    }
-
-    private sealed class StubNonQuerySession : IModelSession
-    {
-        public string SourcePath => "";
-        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
-            => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
-        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
-            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
-
-    private sealed class ThrowingProvider : IModelProvider
-    {
-        private readonly Exception _exception;
-        public ThrowingProvider(Exception exception) => _exception = exception;
-        public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => throw _exception;
     }
 }

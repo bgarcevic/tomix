@@ -54,51 +54,41 @@ public sealed class RefreshModelHandlerTests
     [Fact]
     public async Task ResolveTarget_PicksPrimary_WhenPrimaryIsRemote()
     {
-        var dir = NewTempDir();
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(RemoteSession("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel"));
-            var resolver = new ActiveModelResolver(store);
-            var request = Request(server: null, database: null);
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(RemoteSession("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel"));
+        var resolver = new ActiveModelResolver(config.State);
+        var request = Request(server: null, database: null);
 
-            var target = RefreshModelHandler.ResolveTarget(request, resolver);
+        var target = RefreshModelHandler.ResolveTarget(request, resolver);
 
-            Assert.NotNull(target);
-            Assert.True(target!.IsRemote);
-            Assert.Equal("MyModel", target.Database);
-        }
-        finally { Directory.Delete(dir, true); }
+        Assert.NotNull(target);
+        Assert.True(target!.IsRemote);
+        Assert.Equal("MyModel", target.Database);
     }
 
     [Fact]
     public void ResolveTarget_PicksSecondary_WhenPrimaryIsLocalAndSecondaryIsRemote()
     {
-        var dir = NewTempDir();
-        try
-        {
-            var store = new CliStateStore(dir);
-            // Primary local (Model path set), Workspace holds a remote endpoint => the secondary.
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: "MyModel",
-                Model: "./my-model.tmdl",
-                Auth: null,
-                Local: true,
-                Profile: null,
-                Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws",
-                WorkspaceFormat: null,
-                WorkspaceAuth: null));
-            var resolver = new ActiveModelResolver(store);
-            var request = Request(server: null, database: null);
+        using var config = new TempConfigDir();
+        // Primary local (Model path set), Workspace holds a remote endpoint => the secondary.
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: "MyModel",
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            WorkspaceFormat: null,
+            WorkspaceAuth: null));
+        var resolver = new ActiveModelResolver(config.State);
+        var request = Request(server: null, database: null);
 
-            var target = RefreshModelHandler.ResolveTarget(request, resolver);
+        var target = RefreshModelHandler.ResolveTarget(request, resolver);
 
-            Assert.NotNull(target);
-            Assert.True(target!.IsRemote);
-            Assert.Equal("MyModel", target.Database);
-        }
-        finally { Directory.Delete(dir, true); }
+        Assert.NotNull(target);
+        Assert.True(target!.IsRemote);
+        Assert.Equal("MyModel", target.Database);
     }
 
     [Fact]
@@ -106,73 +96,58 @@ public sealed class RefreshModelHandlerTests
     {
         // An explicit unrelated local source must not fall back to refreshing the
         // session's workspace mirror (#134).
-        var dir = NewTempDir();
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: "MyModel",
-                Model: "./my-model.tmdl",
-                Auth: null,
-                Local: true,
-                Profile: null,
-                Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws",
-                WorkspaceFormat: null,
-                WorkspaceAuth: null));
-            var resolver = new ActiveModelResolver(store);
-            var request = Request(model: Path.Combine(Path.GetTempPath(), "unrelated.tmdl"));
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: "MyModel",
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            WorkspaceFormat: null,
+            WorkspaceAuth: null));
+        var resolver = new ActiveModelResolver(config.State);
+        var request = Request(model: Path.Combine(Path.GetTempPath(), "unrelated.tmdl"));
 
-            var target = RefreshModelHandler.ResolveTarget(request, resolver);
+        var target = RefreshModelHandler.ResolveTarget(request, resolver);
 
-            Assert.Null(target);
-        }
-        finally { Directory.Delete(dir, true); }
+        Assert.Null(target);
     }
 
     [Fact]
     public void ResolveTarget_ReturnsNull_WhenPrimaryLocalAndNoSecondary()
     {
-        var dir = NewTempDir();
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(LocalSession());
-            var resolver = new ActiveModelResolver(store);
-            var request = Request();
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(LocalSession());
+        var resolver = new ActiveModelResolver(config.State);
+        var request = Request();
 
-            var target = RefreshModelHandler.ResolveTarget(request, resolver);
+        var target = RefreshModelHandler.ResolveTarget(request, resolver);
 
-            Assert.Null(target);
-        }
-        finally { Directory.Delete(dir, true); }
+        Assert.Null(target);
     }
 
     [Fact]
     public void ResolveTarget_ReturnsNull_WhenSecondaryIsAlsoLocal()
     {
-        var dir = NewTempDir();
-        try
-        {
-            var store = new CliStateStore(dir);
-            store.SaveCurrentSession(new CliConnectionState(
-                Server: null,
-                Database: "MyModel",
-                Model: "./my-model.tmdl",
-                Auth: null,
-                Local: true,
-                Profile: null,
-                Workspace: "./mirror", // local path, not remote
-                WorkspaceFormat: "tmdl",
-                WorkspaceAuth: null));
-            var resolver = new ActiveModelResolver(store);
-            var request = Request();
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            Server: null,
+            Database: "MyModel",
+            Model: "./my-model.tmdl",
+            Auth: null,
+            Local: true,
+            Profile: null,
+            Workspace: "./mirror", // local path, not remote
+            WorkspaceFormat: "tmdl",
+            WorkspaceAuth: null));
+        var resolver = new ActiveModelResolver(config.State);
+        var request = Request();
 
-            var target = RefreshModelHandler.ResolveTarget(request, resolver);
+        var target = RefreshModelHandler.ResolveTarget(request, resolver);
 
-            Assert.Null(target);
-        }
-        finally { Directory.Delete(dir, true); }
+        Assert.Null(target);
     }
 
     [Fact]
@@ -233,8 +208,6 @@ public sealed class RefreshModelHandlerTests
             DryRun: dryRun,
             NoProgress: false,
             TracePath: null);
-
-    private static string NewTempDir() => Path.Combine(Path.GetTempPath(), $"tomix-refresh-test-{Guid.NewGuid():N}");
 
     private static CliConnectionState RemoteSession(string endpoint, string database) =>
         new(Server: endpoint,

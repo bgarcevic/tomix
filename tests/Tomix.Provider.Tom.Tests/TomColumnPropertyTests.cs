@@ -192,7 +192,7 @@ public sealed class TomColumnPropertyTests
 
     private static (TomModelMutator Mutator, Table Table) NewModel()
     {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
+        var db = NewDatabase();
         var table = new Table { Name = "T" };
         table.Partitions.Add(new Partition
         {

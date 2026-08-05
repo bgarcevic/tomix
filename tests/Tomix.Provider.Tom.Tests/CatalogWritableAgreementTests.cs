@@ -60,13 +60,21 @@ public sealed class CatalogWritableAgreementTests
 
         foreach (var token in tokens)
         {
+            // A new writable token needs a sample value here, or this guard cannot exercise it.
+            // Fail naming the token rather than letting the indexer throw a bare
+            // KeyNotFoundException, which says nothing about what drifted.
+            Assert.True(
+                ValidValues.TryGetValue(token, out var value),
+                $"The catalog marks '{token}' writable on {kind}, but {nameof(ValidValues)} has no "
+                    + $"sample value for it. Add a '{token}' row so this guard can set it.");
+
             // Fresh model per property so a 'name' assignment cannot invalidate later paths.
-            var db = NewDatabase();
+            var db = NewFixture();
             var mutator = new TomModelMutator(db);
             var (path, type) = TargetFor(kind);
 
             var exception = Record.Exception(() => mutator.SetProperty(new ModelObjectSetRequest(
-                path, [new ModelPropertyAssignment(token, ValidValues[token])], type)));
+                path, [new ModelPropertyAssignment(token, value)], type)));
 
             Assert.True(exception is null,
                 $"Catalog marks '{token}' writable on {kind}, but the mutator rejected it: {exception?.Message}");
@@ -78,7 +86,7 @@ public sealed class CatalogWritableAgreementTests
     {
         foreach (var scope in ModelPropertyCatalog.SearchScopes)
         {
-            var mutator = new TomModelMutator(NewDatabase());
+            var mutator = new TomModelMutator(NewFixture());
 
             // An unknown scope throws ArgumentException before any operation is built.
             var exception = Record.Exception(() => mutator.ReplaceText(new ModelReplaceRequest(
@@ -99,7 +107,7 @@ public sealed class CatalogWritableAgreementTests
     {
         // 'expression' is only settable on M-source partitions, so the hint must not
         // advertise it for calculated/entity/policy-range partitions.
-        var db = NewDatabase();
+        var db = NewFixture();
         db.Model.Tables["T"].Partitions["T"].Source = new CalculatedPartitionSource { Expression = "T2" };
         var mutator = new TomModelMutator(db);
 
@@ -113,7 +121,7 @@ public sealed class CatalogWritableAgreementTests
     [Fact]
     public void UnsupportedPartitionPropertyHint_IncludesExpression_ForMSources()
     {
-        var mutator = new TomModelMutator(NewDatabase());
+        var mutator = new TomModelMutator(NewFixture());
 
         var exception = Assert.Throws<NotSupportedException>(() => mutator.SetProperty(new ModelObjectSetRequest(
             "T/T", [new ModelPropertyAssignment("bogus", "x")], ModelObjectKind.Partition)));
@@ -133,10 +141,10 @@ public sealed class CatalogWritableAgreementTests
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
-    private static Database NewDatabase()
+    private static Database NewFixture()
     {
         // 1702+ so the fixture can carry DAX user-defined functions.
-        var db = new Database { Name = "M", CompatibilityLevel = 1702, Model = new Model { Name = "Model" } };
+        var db = NewDatabase(compatibilityLevel: 1702);
         var table = new Table { Name = "T" };
         table.Partitions.Add(new Partition
         {

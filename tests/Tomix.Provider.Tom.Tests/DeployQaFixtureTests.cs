@@ -83,9 +83,7 @@ public sealed class DeployQaFixtureTests
 
     private static JsonObject LoadFixtureModel()
     {
-        var folder = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples", "deploy-qa"));
-        Assert.True(Directory.Exists(folder), $"fixture not found: {folder}");
+        var folder = SampleModel.Locate("deploy-qa");
 
         var database = TmdlSerializer.DeserializeDatabaseFromFolder(folder);
         var json = TabularJsonSerializer.SerializeDatabase(database, new SerializeOptions());

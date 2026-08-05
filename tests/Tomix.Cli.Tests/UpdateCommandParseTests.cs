@@ -9,11 +9,8 @@ public sealed class UpdateCommandParseTests
 {
     private static RootCommand BuildRoot(FakeReleaseSource? source = null, string version = "0.1.0")
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new UpdateCommand(version, source ?? FakeReleaseSource.Empty, services.UpdateCheck).Build());
+        var root = TestRoot.With(new UpdateCommand(version, source ?? FakeReleaseSource.Empty, services.UpdateCheck).Build());
         return root;
     }
 
@@ -22,21 +19,8 @@ public sealed class UpdateCommandParseTests
         var result = root.Parse(args);
         Assert.Empty(result.Errors);
 
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        try
-        {
-            return (result.Invoke(), stdout.ToString(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-        }
+        var captured = ConsoleCapture.Invoke(result);
+        return (captured.ExitCode, captured.Stdout, captured.Stderr);
     }
 
     [Theory]

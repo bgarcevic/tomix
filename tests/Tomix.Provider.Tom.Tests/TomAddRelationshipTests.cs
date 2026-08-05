@@ -134,12 +134,9 @@ public sealed class TomAddRelationshipTests
         Assert.Equal(CrossFilteringBehavior.BothDirections, relationship.CrossFilteringBehavior);
     }
 
-    private static ModelObjectAddRequest Add(string path, string? type)
-        => new(path, type, Value: null, [], IfNotExists: false);
-
     private static Database TwoTables()
     {
-        var db = new Database { Name = "M", Model = new Model { Name = "Model" } };
+        var db = NewDatabase();
         foreach (var name in new[] { "Sales", "Product" })
         {
             var table = new Table { Name = name };

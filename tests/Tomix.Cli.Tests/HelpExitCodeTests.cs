@@ -15,20 +15,14 @@ namespace Tomix.Cli.Tests;
 [Collection(ConsoleStateCollection.Name)]
 public sealed class HelpExitCodeTests
 {
-    private static RootCommand BuildRoot()
-        => Program.BuildRootCommand(
-            providers: [],
-            new CompositeExpressionFormatterClient([]),
-            version: "0.0.0-test",
-            TestServices.Create());
 
     [Fact]
     public void EveryCommand_Help_ParsesCleanAndExitsZero()
     {
-        var root = BuildRoot();
+        var root = TestRoot.Full();
         var failures = new List<string>();
 
-        foreach (var path in CommandPaths(root))
+        foreach (var (_, path) in TestRoot.Descendants(root, includeHidden: true))
         {
             var result = root.Parse([.. path, "--help"]);
             // Mirrors Program.Main: any parse error is a usage error and exits 2.
@@ -45,7 +39,7 @@ public sealed class HelpExitCodeTests
     [Fact]
     public void RootHelp_ExitsZero()
     {
-        var result = BuildRoot().Parse(["--help"]);
+        var result = TestRoot.Full().Parse(["--help"]);
 
         Assert.Empty(result.Errors);
         Assert.Equal(0, result.Invoke());
@@ -54,19 +48,9 @@ public sealed class HelpExitCodeTests
     [Fact]
     public void MissingRequiredArgument_WithoutHelp_StillFailsParse()
     {
-        var result = BuildRoot().Parse(["mv"]);
+        var result = TestRoot.Full().Parse(["mv"]);
 
         Assert.NotEmpty(result.Errors);
     }
 
-    private static IEnumerable<string[]> CommandPaths(Command command, string[]? prefix = null)
-    {
-        foreach (var sub in command.Subcommands)
-        {
-            string[] path = prefix is null ? [sub.Name] : [.. prefix, sub.Name];
-            yield return path;
-            foreach (var nested in CommandPaths(sub, path))
-                yield return nested;
-        }
-    }
 }

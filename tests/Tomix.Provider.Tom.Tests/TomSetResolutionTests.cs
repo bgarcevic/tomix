@@ -369,21 +369,6 @@ public sealed class TomSetResolutionTests
         Assert.Contains("partitions", ex.Message);
     }
 
-    private static Database NewDatabase()
-        => new() { Name = "M", Model = new Model { Name = "Model" } };
-
-    private static Table AddTable(Database db, string name)
-    {
-        var table = new Table { Name = name };
-        table.Partitions.Add(new Partition
-        {
-            Name = name,
-            Source = new MPartitionSource { Expression = "let x = 1 in x" }
-        });
-        db.Model.Tables.Add(table);
-        return table;
-    }
-
     private static SingleColumnRelationship AddRelationship(Database db)
     {
         var sales = AddTable(db, "Sales");

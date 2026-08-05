@@ -6,75 +6,47 @@ namespace Tomix.App.Tests;
 
 public sealed class BpaRulesDisableTests
 {
-    private static string TempDir()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), "tomix-bpa-disable-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        return dir;
-    }
-
     [Fact]
     public void Disable_PersistsAndIsIdempotent()
     {
-        var dir = TempDir();
-        try
-        {
-            var state = new BpaUserRuleState(dir);
+        using var dir = new TempDir();
+        var state = new BpaUserRuleState(dir.Path);
 
-            Assert.True(state.Disable("RULE_A"));
-            Assert.False(state.Disable("RULE_A"));            // already disabled
-            Assert.Contains("RULE_A", state.GetDisabled());
+        Assert.True(state.Disable("RULE_A"));
+        Assert.False(state.Disable("RULE_A"));            // already disabled
+        Assert.Contains("RULE_A", state.GetDisabled());
 
-            // A fresh instance reads the persisted file.
-            Assert.Contains("RULE_A", new BpaUserRuleState(dir).GetDisabled());
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        // A fresh instance reads the persisted file.
+        Assert.Contains("RULE_A", new BpaUserRuleState(dir.Path).GetDisabled());
     }
 
     [Fact]
     public void Disable_IsCaseInsensitive_AndEnableReverts()
     {
-        var dir = TempDir();
-        try
-        {
-            var state = new BpaUserRuleState(dir);
-            state.Disable("rule_a");
+        using var dir = new TempDir();
+        var state = new BpaUserRuleState(dir.Path);
+        state.Disable("rule_a");
 
-            Assert.Contains("RULE_A", state.GetDisabled());   // case-insensitive membership
-            Assert.True(state.Enable("RULE_A"));
-            Assert.Empty(state.GetDisabled());
-            Assert.False(state.Enable("RULE_A"));             // already enabled
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        Assert.Contains("RULE_A", state.GetDisabled());   // case-insensitive membership
+        Assert.True(state.Enable("RULE_A"));
+        Assert.Empty(state.GetDisabled());
+        Assert.False(state.Enable("RULE_A"));             // already enabled
     }
 
     [Fact]
     public void Handler_DisableThenEnable_ReportsChange()
     {
-        var dir = TempDir();
-        try
-        {
-            var handler = new BpaRulesDisableHandler(new BpaUserRuleState(dir));
+        using var dir = new TempDir();
+        var handler = new BpaRulesDisableHandler(new BpaUserRuleState(dir.Path));
 
-            var disabled = handler.Handle(new BpaRulesDisableRequest("RULE_A", Disable: true));
-            Assert.True(disabled.Success);
-            Assert.True(disabled.Data!.Changed);
-            Assert.Contains("RULE_A", disabled.Data.DisabledRuleIds);
+        var disabled = handler.Handle(new BpaRulesDisableRequest("RULE_A", Disable: true));
+        Assert.True(disabled.Success);
+        Assert.True(disabled.Data!.Changed);
+        Assert.Contains("RULE_A", disabled.Data.DisabledRuleIds);
 
-            var enabled = handler.Handle(new BpaRulesDisableRequest("RULE_A", Disable: false));
-            Assert.True(enabled.Data!.Changed);
-            Assert.Empty(enabled.Data.DisabledRuleIds);
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
+        var enabled = handler.Handle(new BpaRulesDisableRequest("RULE_A", Disable: false));
+        Assert.True(enabled.Data!.Changed);
+        Assert.Empty(enabled.Data.DisabledRuleIds);
     }
 
     [Fact]

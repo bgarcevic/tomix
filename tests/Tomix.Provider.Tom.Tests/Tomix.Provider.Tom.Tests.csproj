@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- TestModels supplies every in-memory TOM fixture and request factory in this project. -->
+  <ItemGroup>
+    <Using Include="Tomix.Provider.Tom.Tests.TestModels" Static="true" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
     <ProjectReference Include="..\..\src\Tomix.Provider.Tmdl\Tomix.Provider.Tmdl.csproj" />

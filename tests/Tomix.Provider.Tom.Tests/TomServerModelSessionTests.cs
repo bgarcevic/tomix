@@ -74,23 +74,6 @@ public sealed class TomServerModelSessionTests
         Assert.True(result.ChangeCount > 0);
     }
 
-    private static Database NewDatabase()
-        => new() { Name = "Test", Model = new Model { Name = "Model" } };
-
-    private static Database WithSales()
-    {
-        var db = NewDatabase();
-        var sales = new Table { Name = "Sales" };
-        sales.Partitions.Add(new Partition
-        {
-            Name = "Sales",
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        db.Model.Tables.Add(sales);
-        return db;
-    }
-
     private static Database WithSalesMeasure()
     {
         var db = WithSales();

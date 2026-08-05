@@ -118,7 +118,4 @@ public sealed class TomReplaceCoverageTests
         var preview = Assert.Single(result.Previews);
         Assert.Equal("driftSales/driftPartition", preview.ObjectPath);
     }
-
-    private static ModelReplaceRequest Replace(string pattern, string replacement, string scope, bool apply = true)
-        => new(pattern, replacement, scope, Regex: false, CaseSensitive: false, Apply: apply);
 }

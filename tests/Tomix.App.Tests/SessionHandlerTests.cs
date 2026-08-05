@@ -7,17 +7,8 @@ public sealed class SessionHandlerTests
 {
     private static void WithStore(Action<CliStateStore, SessionHandler> test)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"tomix-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var store = new CliStateStore(dir);
-            test(store, new SessionHandler(store));
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        using var config = new TempConfigDir();
+        test(config.State, new SessionHandler(config.State));
     }
 
     private static CliConnectionState LocalModel(string model)

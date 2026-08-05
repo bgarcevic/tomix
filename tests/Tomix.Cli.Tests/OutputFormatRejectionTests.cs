@@ -61,23 +61,11 @@ public sealed class OutputFormatRejectionTests
 
     private static (int ExitCode, string Stderr, ParseResult Result) Invoke(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
-        root.Subcommands.Add(BuildModule(args[0]));
+        var root = TestRoot.With(BuildModule(args[0]));
 
         var result = root.Parse(args);
-        var original = Console.Error;
-        var stderr = new StringWriter();
-        Console.SetError(stderr);
-        try
-        {
-            return (result.Invoke(), stderr.ToString(), result);
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.Invoke(result);
+        return (captured.ExitCode, captured.Stderr, result);
     }
 
     // Every command that renders text/json only, probed with csv (the silent-fallback repro),

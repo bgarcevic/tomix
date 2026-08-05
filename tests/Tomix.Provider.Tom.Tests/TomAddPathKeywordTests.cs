@@ -13,7 +13,7 @@ public sealed class TomAddPathKeywordTests
     [Fact]
     public void MeasureKeyword_InfersTypeAndStripsKeywords()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var result = mutator.AddObject(Add("tables/Sales/measures/Revenue", Type: null));
@@ -64,7 +64,7 @@ public sealed class TomAddPathKeywordTests
     [Fact]
     public void ExplicitType_OverridesKeywordButStillStripsKeywords()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         // Explicit -t Measure wins; keywords are still stripped so the path shape is correct.
@@ -77,7 +77,7 @@ public sealed class TomAddPathKeywordTests
     [Fact]
     public void PlainPath_WithoutKeywordOrType_ThrowsActionableError()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var ex = Assert.Throws<ArgumentException>(() => mutator.AddObject(Add("Sales/Revenue", Type: null)));
@@ -88,7 +88,7 @@ public sealed class TomAddPathKeywordTests
     [Fact]
     public void MeasureKeywordWithoutTable_ThrowsActionableError()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
@@ -137,7 +137,7 @@ public sealed class TomAddPathKeywordTests
     [Fact]
     public void KpiKeyword_InfersType()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
         Sales(db).Measures.Add(new Measure { Name = "Rev", Expression = "1" });
 
@@ -164,7 +164,7 @@ public sealed class TomAddPathKeywordTests
     [Fact]
     public void LongFormCalculatedColumnAlias_ResolvesToCalcColumn()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var result = mutator.AddObject(Add("Sales/CC", "calculatedcolumn", "Sales[Amount]"));
@@ -203,27 +203,9 @@ public sealed class TomAddPathKeywordTests
 
     private static Table Sales(Database db) => db.Model.Tables.Single(t => t.Name == "Sales");
 
-    private static Database NewDatabase()
-        => new() { Name = "M", Model = new Model { Name = "Model" } };
-
-    private static Database WithSales()
-    {
-        var db = NewDatabase();
-        var sales = new Table { Name = "Sales" };
-        sales.Partitions.Add(new Partition
-        {
-            Name = "Sales",
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        sales.Columns.Add(new DataColumn { Name = "Amount", DataType = DataType.Int64, SourceColumn = "Amount" });
-        db.Model.Tables.Add(sales);
-        return db;
-    }
-
     private static Database WithSalesAndHierarchy()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var sales = Sales(db);
         var hierarchy = new Hierarchy { Name = "H" };
         hierarchy.Levels.Add(new Level { Name = "L1", Ordinal = 0, Column = sales.Columns["Amount"] });

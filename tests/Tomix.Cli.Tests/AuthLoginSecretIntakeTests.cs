@@ -142,27 +142,14 @@ public sealed class AuthLoginSecretIntakeTests
 
     private static ParseResult Parse(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(new AuthCommand(services.ConfigStore, services.State).Build());
+        var root = TestRoot.With(new AuthCommand(services.ConfigStore, services.State).Build());
         return root.Parse(args);
     }
 
     private static (int ExitCode, string Stderr) Invoke(params string[] args)
     {
-        var result = Parse(args);
-        var original = Console.Error;
-        var stderr = new StringWriter();
-        Console.SetError(stderr);
-        try
-        {
-            return (result.Invoke(), stderr.ToString());
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
+        var captured = ConsoleCapture.Invoke(Parse(args));
+        return (captured.ExitCode, captured.Stderr);
     }
 }

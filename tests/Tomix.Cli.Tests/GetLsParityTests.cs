@@ -31,8 +31,8 @@ public sealed class GetLsParityTests
     [MemberData(nameof(ObjectPaths))]
     public void LsRow_EqualsGetProperties(string getPath, string lsFilter)
     {
-        var get = JsonNode.Parse(Invoke("get", getPath, SampleModel, "--output-format", "json"))!;
-        var lsRows = JsonNode.Parse(Invoke("ls", lsFilter, SampleModel, "--output-format", "json"))!.AsArray();
+        var get = JsonNode.Parse(Invoke("get", getPath, SampleTmdl, "--output-format", "json"))!;
+        var lsRows = JsonNode.Parse(Invoke("ls", lsFilter, SampleTmdl, "--output-format", "json"))!.AsArray();
 
         var row = Assert.Single(lsRows)!.AsObject();
         Assert.Equal(get["path"]!.GetValue<string>(), row["path"]!.GetValue<string>());
@@ -48,11 +48,11 @@ public sealed class GetLsParityTests
     [Fact]
     public void LsRow_EqualsGetProperties_ForPartitions()
     {
-        var partitions = JsonNode.Parse(Invoke("ls", "Sales/Partitions", SampleModel, "--output-format", "json"))!.AsArray();
+        var partitions = JsonNode.Parse(Invoke("ls", "Sales/Partitions", SampleTmdl, "--output-format", "json"))!.AsArray();
         var row = Assert.Single(partitions)!.AsObject();
         var path = row["path"]!.GetValue<string>();
 
-        var get = JsonNode.Parse(Invoke("get", path, SampleModel, "--type", "partition", "--output-format", "json"))!;
+        var get = JsonNode.Parse(Invoke("get", path, SampleTmdl, "--type", "partition", "--output-format", "json"))!;
 
         row.Remove("path");
         row.Remove("type");
@@ -67,8 +67,8 @@ public sealed class GetLsParityTests
     [InlineData("Sales/Amount", "Sales/Columns")]
     public void CsvHeaders_Match_ModuloLeadingPath(string getPath, string lsFilter)
     {
-        var getHeader = FirstLine(Invoke("get", getPath, SampleModel, "--output-format", "csv"));
-        var lsHeader = FirstLine(Invoke("ls", lsFilter, SampleModel, "--output-format", "csv"));
+        var getHeader = FirstLine(Invoke("get", getPath, SampleTmdl, "--output-format", "csv"));
+        var lsHeader = FirstLine(Invoke("ls", lsFilter, SampleTmdl, "--output-format", "csv"));
 
         Assert.Equal("Path," + getHeader, lsHeader);
     }
@@ -79,7 +79,7 @@ public sealed class GetLsParityTests
         // `ls Sales` lists a table's children — a mixed column/measure/partition set. The rows'
         // Projected dictionaries are keyed per-kind ("dataType", not "detail"), so the generic
         // CSV columns must come from the LsObject fields, not the projections.
-        var csv = Invoke("ls", "Sales", SampleModel, "--output-format", "csv");
+        var csv = Invoke("ls", "Sales", SampleTmdl, "--output-format", "csv");
         var lines = csv.TrimEnd().Split('\n').Select(l => l.TrimEnd('\r')).ToList();
 
         Assert.Equal("Path,Name,Description,Hidden,Detail,Expression", lines[0]);
@@ -97,8 +97,8 @@ public sealed class GetLsParityTests
         // `ls <model> [path-filter]` order stays accepted via the can-open heuristic.
         // (JSON output on purpose: AnsiConsole-backed text output caches the console
         // writer from the first invoke, so captured text is unreliable across invokes.)
-        var canonical = Invoke("ls", "Sales/Measures", SampleModel, "--output-format", "json");
-        var legacy = Invoke("ls", SampleModel, "Sales/Measures", "--output-format", "json");
+        var canonical = Invoke("ls", "Sales/Measures", SampleTmdl, "--output-format", "json");
+        var legacy = Invoke("ls", SampleTmdl, "Sales/Measures", "--output-format", "json");
 
         Assert.Equal(canonical, legacy);
         Assert.Contains("Sales/Total Sales", canonical);
@@ -107,8 +107,8 @@ public sealed class GetLsParityTests
     [Fact]
     public void DataType_IsIdenticalAcrossCommands_AndNeverGuessed()
     {
-        var get = JsonNode.Parse(Invoke("get", "Sales/Total Sales", SampleModel, "--output-format", "json"))!;
-        var row = JsonNode.Parse(Invoke("ls", "Sales/'Total Sales'", SampleModel, "--output-format", "json"))!
+        var get = JsonNode.Parse(Invoke("get", "Sales/Total Sales", SampleTmdl, "--output-format", "json"))!;
+        var row = JsonNode.Parse(Invoke("ls", "Sales/'Total Sales'", SampleTmdl, "--output-format", "json"))!
             .AsArray().Single()!.AsObject();
 
         // Regression pin: ls used to fabricate "Decimal" from the DAX text while get said "Unknown",
@@ -123,47 +123,20 @@ public sealed class GetLsParityTests
 
     private static string Invoke(params string[] args)
     {
-        var root = new RootCommand("test");
-        foreach (var option in GlobalOptions.All())
-            root.Options.Add(option);
         var services = TestServices.Create();
-        root.Subcommands.Add(args[0] == "get"
+        var root = TestRoot.With(args[0] == "get"
             ? new GetCommand(Providers, services.State).Build()
             : new LsCommand(Providers, services.State).Build());
 
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        try
-        {
-            var exitCode = root.Parse(args).Invoke();
-            Assert.True(exitCode == 0, $"'{string.Join(' ', args)}' exited {exitCode}: {stderr}");
-            return stdout.ToString();
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-        }
+        var captured = ConsoleCapture.Invoke(root.Parse(args));
+        Assert.True(captured.ExitCode == 0,
+            $"'{string.Join(' ', args)}' exited {captured.ExitCode}: {captured.Stderr}");
+        return captured.Stdout;
     }
+
+    private static readonly string SampleTmdl = SampleModel.Locate();
 
     private static string FirstLine(string output)
         => output.Split('\n')[0].TrimEnd('\r');
 
-    private static string SampleModel { get; } = FindSampleModel();
-
-    private static string FindSampleModel()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "samples", "basic-tmdl");
-            if (Directory.Exists(candidate))
-                return candidate;
-        }
-
-        throw new InvalidOperationException("samples/basic-tmdl not found above test base directory.");
-    }
 }

@@ -1,5 +1,4 @@
 using Tomix.App.Mutations;
-using Tomix.App.Tests.Support;
 using Tomix.Core.Models;
 using Tomix.Provider.Tmdl;
 
@@ -22,45 +21,32 @@ public sealed class MutationRunnerTests
     public async Task RunAsync_Stage_WritesToInjectedStagingStore()
     {
         using var config = new TempConfigDir();
-        var model = CopySample();
-        try
-        {
-            var staging = config.Staging;
-            var result = await RunAsync(new ModelReference(model), StageOptions, new MutationStores(staging, () => null));
+        using var model = SampleModel.CopyToTemp();
 
-            Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
-            Assert.NotNull(staging.TryLoad(new ModelReference(model)));
-            Assert.True(Directory.Exists(Path.Combine(config.Path, "staging", "test-session")));
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        var staging = config.Staging;
+        var result = await RunAsync(new ModelReference(model.Path), StageOptions, config.Stores);
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.NotNull(staging.TryLoad(new ModelReference(model.Path)));
+        Assert.True(Directory.Exists(config.Combine("staging", TempConfigDir.SessionId)));
     }
 
     [Fact]
     public async Task RunAsync_Revert_DiscardsFromInjectedStagingStore()
     {
         using var config = new TempConfigDir();
-        var model = CopySample();
-        try
-        {
-            var staging = config.Staging;
-            var stores = new MutationStores(staging, () => null);
-            var reference = new ModelReference(model);
+        using var model = SampleModel.CopyToTemp();
 
-            await RunAsync(reference, StageOptions, stores);
-            Assert.NotNull(staging.TryLoad(reference));
+        var staging = config.Staging;
+        var reference = new ModelReference(model.Path);
 
-            var revert = await RunAsync(reference, RevertOptions, stores);
+        await RunAsync(reference, StageOptions, config.Stores);
+        Assert.NotNull(staging.TryLoad(reference));
 
-            Assert.True(revert.Success);
-            Assert.Null(staging.TryLoad(reference));
-        }
-        finally
-        {
-            Directory.Delete(model, recursive: true);
-        }
+        var revert = await RunAsync(reference, RevertOptions, config.Stores);
+
+        Assert.True(revert.Success);
+        Assert.Null(staging.TryLoad(reference));
     }
 
     private static Task<Tomix.Core.Results.TomixResult<string>> RunAsync(
@@ -71,32 +57,4 @@ public sealed class MutationRunnerTests
                 (true, "test mutation", _ => "mutated")),
             revertResult: "reverted",
             CancellationToken.None);
-
-    private static string CopySample()
-    {
-        var dest = Path.Combine(Path.GetTempPath(), $"tomix-runner-test-{Guid.NewGuid():N}");
-        CopyDirectory(LocateSample(), dest);
-        return dest;
-    }
-
-    private static string LocateSample()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "samples", "basic-tmdl");
-            if (Directory.Exists(candidate))
-                return candidate;
-        }
-
-        throw new InvalidOperationException("samples/basic-tmdl not found above test base directory.");
-    }
-
-    private static void CopyDirectory(string source, string dest)
-    {
-        Directory.CreateDirectory(dest);
-        foreach (var file in Directory.GetFiles(source))
-            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
-        foreach (var dir in Directory.GetDirectories(source))
-            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
-    }
 }

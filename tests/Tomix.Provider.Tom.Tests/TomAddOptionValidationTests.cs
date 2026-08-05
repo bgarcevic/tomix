@@ -29,7 +29,7 @@ public sealed class TomAddOptionValidationTests
     [InlineData("PolicyRangePartition")]
     public void PartitionExpression_OnNonMPartition_Throws(string type)
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var ex = Assert.Throws<UnsupportedAddOptionException>(() => mutator.AddObject(
@@ -62,7 +62,7 @@ public sealed class TomAddOptionValidationTests
     [Fact]
     public void SourceDatabase_OnEntityPartition_ThrowsWithSchemaHint()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var ex = Assert.Throws<UnsupportedAddOptionException>(() => mutator.AddObject(
@@ -85,7 +85,7 @@ public sealed class TomAddOptionValidationTests
     [Fact]
     public void RangeStart_OnMeasure_Throws()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         var ex = Assert.Throws<UnsupportedAddOptionException>(() => mutator.AddObject(
@@ -96,7 +96,7 @@ public sealed class TomAddOptionValidationTests
     [Fact]
     public void Mode_OnRelationship_Throws()
     {
-        var db = WithSales();
+        var db = WithSales(withAmountColumn: true);
         var mutator = new TomModelMutator(db);
 
         Assert.Throws<UnsupportedAddOptionException>(() => mutator.AddObject(
@@ -123,26 +123,5 @@ public sealed class TomAddOptionValidationTests
 
         var result = mutator.AddObject(Add("CT", "CalcTable") with { PartitionExpression = "{1}" });
         Assert.True(result.Changed);
-    }
-
-    private static ModelObjectAddRequest Add(string path, string type)
-        => new(path, type, Value: null, [], IfNotExists: false);
-
-    private static Database NewDatabase()
-        => new() { Name = "M", Model = new Model { Name = "Model" } };
-
-    private static Database WithSales()
-    {
-        var db = NewDatabase();
-        var sales = new Table { Name = "Sales" };
-        sales.Columns.Add(new DataColumn { Name = "Amount", DataType = DataType.Double, SourceColumn = "Amount" });
-        sales.Partitions.Add(new Partition
-        {
-            Name = "Sales",
-            Mode = ModeType.Import,
-            Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
-        });
-        db.Model.Tables.Add(sales);
-        return db;
     }
 }
