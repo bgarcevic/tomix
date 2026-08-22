@@ -19,7 +19,7 @@ internal static class CommandOutput
     /// arguments). Honors the command's <c>--error-format</c> value.
     /// </summary>
     public static bool TryValidateFormat(ParseResult parseResult, string format, string commandName, params string[] supported)
-        => ValidateFormat(format, parseResult.GetValue(GlobalOptions.ErrorFormat), commandName, supported);
+        => ValidateFormat(format, GlobalOptions.ErrorFormatValue(parseResult, format), commandName, supported);
 
     private static bool ValidateFormatValue(string format, string? errorFormat)
     {
@@ -57,8 +57,32 @@ internal static class CommandOutput
     /// Branches on <c>Data</c> rather than <c>Success</c> so commands like <c>doctor</c> can still
     /// render their report while signalling a non-zero exit code.
     /// </summary>
-    public static int Render<T>(TomixResult<T> result, string format, Action<T> renderHuman)
-        => Render(result, format, renderHuman, data => data);
+    /// <remarks>
+    /// These take the <see cref="ParseResult"/> rather than letting the stderr format default:
+    /// the overloads that allowed <c>errorFormat</c> to be omitted left nine commands
+    /// (<c>bpa</c>, <c>config</c>, <c>doctor</c>, <c>init</c>, <c>profile</c>, <c>replace</c>,
+    /// <c>session</c>, <c>stage</c>, <c>validate</c>) silently ignoring <c>--error-format json</c>.
+    /// Deriving it here rather than at each call site is what keeps that from coming back — a new
+    /// command cannot forget an argument it never had to pass. The <c>string? errorFormat</c>
+    /// overloads below remain for the few commands that resolve the format earlier for their own
+    /// error paths.
+    /// </remarks>
+    public static int Render<T>(
+        ParseResult parseResult,
+        TomixResult<T> result,
+        string format,
+        Action<T> renderHuman)
+        => Render(result, format, renderHuman, data => data, renderCsv: null,
+            GlobalOptions.ErrorFormatValue(parseResult, format));
+
+    public static int Render<T>(
+        ParseResult parseResult,
+        TomixResult<T> result,
+        string format,
+        Action<T> renderHuman,
+        Action<T> renderCsv)
+        => Render(result, format, renderHuman, data => data, renderCsv,
+            GlobalOptions.ErrorFormatValue(parseResult, format));
 
     public static int Render<T>(
         TomixResult<T> result,
@@ -70,25 +94,28 @@ internal static class CommandOutput
     public static int Render<T>(
         TomixResult<T> result,
         string format,
-        Action<T> renderHuman,
-        Action<T> renderCsv)
-        => Render(result, format, renderHuman, data => data, renderCsv);
-
-    public static int Render<T>(
-        TomixResult<T> result,
-        string format,
         string? errorFormat,
         Action<T> renderHuman,
         Action<T> renderCsv)
         => Render(result, format, renderHuman, data => data, renderCsv, errorFormat);
 
     public static int Render<T, TJson>(
+        ParseResult parseResult,
         TomixResult<T> result,
         string format,
         Action<T> renderHuman,
         Func<T, TJson> projectJson,
-        Action<T>? renderCsv = null,
-        string? errorFormat = null)
+        Action<T>? renderCsv = null)
+        => Render(result, format, renderHuman, projectJson, renderCsv,
+            GlobalOptions.ErrorFormatValue(parseResult, format));
+
+    public static int Render<T, TJson>(
+        TomixResult<T> result,
+        string format,
+        Action<T> renderHuman,
+        Func<T, TJson> projectJson,
+        Action<T>? renderCsv,
+        string? errorFormat)
     {
         if (result.Data is null)
         {
@@ -97,7 +124,7 @@ internal static class CommandOutput
         }
 
         if (OutputFormats.IsJson(format))
-            JsonOutput.Write(projectJson(result.Data));
+            JsonOutput.Write(new CommandEnvelope<TJson>(projectJson(result.Data), result.Diagnostics));
         else if (OutputFormats.IsCsv(format) && renderCsv is not null)
             renderCsv(result.Data);
         else

@@ -2,7 +2,8 @@
 
 Read-only commands for exploring a model. All of them work against the
 [active connection](../guides/connections.md) or an explicit model argument,
-and all print JSON/CSV with `--output-format`.
+and all print JSON with `--output-format json`. `ls`, `get`, and `query` also
+print CSV; `get` additionally emits `tmdl`, `bim`, and `tmsl`.
 
 ## `ls` — list model objects
 

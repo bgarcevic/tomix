@@ -104,7 +104,7 @@ internal sealed class RmCommand : ICommandModule
             {
                 if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
                 {
-                    return TypeValidation.WriteInvalidTypeError();
+                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 }
 
                 type = parsed;
@@ -149,7 +149,7 @@ internal sealed class RmCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), Render);
+            return CommandOutput.Render(parseResult, result, formatValue, Render);
         });
 
         return command;

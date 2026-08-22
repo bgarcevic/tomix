@@ -53,7 +53,7 @@ public sealed class CommandSurfaceSnapshotTests
     [Fact]
     public void EveryCommand_IsMentionedInCommandDocs()
     {
-        var docsDir = Path.Combine(RepoRoot(), "docs", "commands");
+        var docsDir = RepoPaths.Combine("docs", "commands");
         var haystack = string.Join('\n', Directory.GetFiles(docsDir, "*.md").Select(File.ReadAllText));
 
         var missing = CommandPaths(TestRoot.Full(), "")
@@ -63,6 +63,28 @@ public sealed class CommandSurfaceSnapshotTests
 
         Assert.True(missing.Count == 0,
             "Commands not mentioned anywhere in docs/commands/*.md — document them on the appropriate page:" +
+            Environment.NewLine + string.Join(Environment.NewLine, missing));
+    }
+
+    /// <summary>
+    /// The gate above reads only docs/commands/, so the README's own command summary drifted
+    /// undetected: <c>test</c> shipped, got a reference page, and stayed missing from the README
+    /// list. Every top-level command must appear there as `name`. Subcommands are deliberately
+    /// not required — the README is a summary and docs/commands/ is the reference.
+    /// </summary>
+    [Fact]
+    public void EveryTopLevelCommand_IsMentionedInTheReadme()
+    {
+        var readme = File.ReadAllText(RepoPaths.Combine("README.md"));
+
+        var missing = TestRoot.Descendants(TestRoot.Full(), includeHidden: false)
+            .Where(entry => entry.Path.Length == 1)
+            .Select(entry => entry.Path[0])
+            .Where(name => !readme.Contains($"`{name}`", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "Top-level commands missing from the README command summary — add them to the matching group:" +
             Environment.NewLine + string.Join(Environment.NewLine, missing));
     }
 
@@ -148,7 +170,4 @@ public sealed class CommandSurfaceSnapshotTests
 
     private static string SnapshotPath([CallerFilePath] string sourcePath = "")
         => Path.Combine(Path.GetDirectoryName(sourcePath)!, "CommandSurface.approved.txt");
-
-    private static string RepoRoot([CallerFilePath] string sourcePath = "")
-        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath)!, "..", ".."));
 }

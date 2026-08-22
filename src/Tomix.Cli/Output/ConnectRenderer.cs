@@ -2,6 +2,7 @@ using Spectre.Console;
 using Tomix.App.Connect;
 using Tomix.App.Info;
 using Tomix.App.State;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Output;
@@ -12,16 +13,25 @@ namespace Tomix.Cli.Output;
 /// </summary>
 internal static class ConnectRenderer
 {
+    /// <remarks>
+    /// <paramref name="diagnostics"/> is threaded in rather than defaulted to empty because this
+    /// renderer only receives the payload, not the enclosing <c>TomixResult</c>. Defaulting would
+    /// make connect the one command that silently drops the envelope's diagnostics half — invisibly,
+    /// since the key would still be present and still an empty array.
+    /// </remarks>
     public static void RenderConnectedModel(
         InfoModelResult result,
         string format,
         string? model,
         string? remoteServer,
         string? database,
-        string? workspace)
+        string? workspace,
+        IReadOnlyList<TomixDiagnostic> diagnostics)
     {
         if (OutputFormats.IsJson(format))
-            JsonOutput.Write(ProjectConnectedModelJson(result, model, remoteServer, database, workspace));
+            JsonOutput.Write(new CommandEnvelope<object>(
+                ProjectConnectedModelJson(result, model, remoteServer, database, workspace),
+                diagnostics));
         else
             RenderConnectedModelText(result, model, remoteServer, database, workspace);
     }

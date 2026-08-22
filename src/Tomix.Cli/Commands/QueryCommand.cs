@@ -107,7 +107,7 @@ internal sealed class QueryCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             if (!CommandOutput.TryValidateFormat(parseResult, format, "query", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;

@@ -275,6 +275,16 @@ offline DAX reference scan; `TOMIX_*` codes come from structural integrity check
 | `TOMIX_COMPLETION_SHELL_REQUIRED` | 2 | `completion` called without its required shell argument. |
 | `TOMIX_PROFILE_TARGET_REQUIRED` | 2 | A new profile has no usable remote, local-model, Desktop, or active-session target. |
 | `TOMIX_INVALID_OUTPUT_FORMAT` | 2 | `--output-format` value is not one of: auto, text, json, csv, tmsl, bim, tmdl. |
+| `TOMIX_INVALID_TYPE` | 2 | `--type` value is not a known object kind; the hint lists the valid types. |
+| `TOMIX_ADD_VALUE_REQUIRED` | 2 | `tx add -q <property>` has no matching `-i <value>`. Pair each `-q` with a following `-i`. |
+| `TOMIX_CONFIRMATION_REQUIRED` | 1 | A destructive action needed confirmation but prompting was unavailable (`--non-interactive`, `--quiet`, json/csv output, or redirected stdin/stderr). Pass `--yes`. |
+| `TOMIX_OPTION_CONFLICT` | 2 | Mutually-exclusive options were combined (e.g. `--recent` with a model path, `--profile` with an explicit server/database). The message names the pair; which options conflict is command-specific, so branch on the code rather than the wording. |
+| `TOMIX_RECENT_INVALID` | 2 | `--recent` was given a value that is not a positive index (`1` = most recently used). |
+| `TOMIX_RECENT_NONE` | 1 | `--recent` was used but no connection has been made yet. Connect once with `tx connect <server> <database>`. |
+| `TOMIX_RECENT_OUT_OF_RANGE` | 1 | `--recent <n>` is higher than the number of stored connections; the message states how many exist. |
+| `TOMIX_RECENT_INDEX_REQUIRED` | 2 | A valueless `--recent` needs its interactive picker, but prompting was unavailable (`--non-interactive`, `--quiet`, json/csv output, or redirected stdin/stderr). Pass `--recent <n>`. |
+| `TOMIX_WORKSPACE_PRIMARY_REQUIRED` | 2 | `connect -w` was given without enough of a primary connection to mirror from (needs `<server> <database>`, or a local path). A missing value, not a conflict — see `TOMIX_OPTION_CONFLICT` for that. |
+| `TOMIX_WORKSPACE_UNREACHABLE` | 1 | `connect -w` reached the primary model but could not reach the workspace mirror's server. The connection is left unchanged. |
 | `TOMIX_OUTPUT_FORMAT_UNSUPPORTED` | 2 | The command cannot render the requested `--output-format`; the message lists the formats it supports. |
 | `TOMIX_CONFIG_CORRUPT` | 2 | `~/.tomix/config.json` exists but does not parse. Repair it manually or reset it with `tx config init --force`; help, version, doctor, and config recovery paths remain available. |
 | `TOMIX_UNEXPECTED` | 1 | An unexpected exception reached the top-level handler. The stack trace is only printed under `--debug`; with `--error-format json` it is embedded as a `detail` field in the envelope so stderr stays valid JSON. |

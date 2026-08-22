@@ -100,6 +100,7 @@ internal sealed class ValidateCommand : ICommandModule
             }
 
             return CommandOutput.Render(
+                parseResult,
                 result,
                 format,
                 data => ValidateRenderer.Render(data, errorsOnly, parseResult.GetValue(noMultilineOption), includeBanner: !OutputFormats.IsCsv(format)));

@@ -141,7 +141,7 @@ against the published `checksums.txt`, and swaps the binary in place.
 
 | Option | Description |
 |--------|-------------|
-| `--check` | Preview only: latest version plus release notes for every version between installed and latest, with `[breaking]` flags. Exits 0 whether or not an update exists — scripts should read `updateAvailable` from `--output-format json`. |
+| `--check` | Preview only: latest version plus release notes for every version between installed and latest, with `[breaking]` flags. Exits 0 whether or not an update exists; a failed check (no network, no published releases) exits 1 with a `TOMIX_UPDATE_CHECK_FAILED` diagnostic. Scripts should read `.data.updateAvailable` from `--output-format json`. |
 | `--version <v>` | Update (or downgrade, with `--yes`) to a specific released version. |
 
 The binary swap always asks for confirmation; pass `--yes` to skip (required

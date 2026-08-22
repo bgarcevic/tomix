@@ -23,7 +23,7 @@ tx find "CALCULATE" --in expressions --paths-only | xargs -I{} tx format -p "{}"
 
 # Count columns per table
 tx ls --type column --output-format json |
-  jq 'group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
+  jq '.data | group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
 ```
 
 ## Querying live models

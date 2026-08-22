@@ -4,6 +4,7 @@ using Tomix.App.Add;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Cli.Output;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Commands;
@@ -189,9 +190,16 @@ internal sealed class AddCommand : ICommandModule
             var parsed = ParseInterleavedQi(parseResult);
             if (parsed.DanglingProperty is not null)
             {
-                AnsiConsole.MarkupLine(Styling.Error(Styling.MarkupEscape(
-                    $"Option -q '{parsed.DanglingProperty}' has no matching -i value.")));
-                AnsiConsole.MarkupLine(Styling.Guidance("Pair each -q <property> with a following -i <value>."));
+                // Was AnsiConsole.MarkupLine, which writes to stdout — so `tx add ... | jq` got
+                // markup on the data stream instead of an empty one. Errors belong on stderr
+                // (docs/cli-ux-guidelines.md), with a code and --error-format support.
+                ErrorOutput.Write(
+                    [new TomixDiagnostic(
+                        "TOMIX_ADD_VALUE_REQUIRED",
+                        DiagnosticSeverity.Error,
+                        $"Option -q '{parsed.DanglingProperty}' has no matching -i value.",
+                        "Pair each -q <property> with a following -i <value>.")],
+                    GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 return 2;
             }
 
@@ -244,7 +252,7 @@ internal sealed class AddCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), Render);
+            return CommandOutput.Render(parseResult, result, formatValue, Render);
         });
 
         return command;

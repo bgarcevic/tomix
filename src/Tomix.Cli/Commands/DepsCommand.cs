@@ -83,7 +83,7 @@ internal sealed class DepsCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
             var typeValue = parseResult.GetValue(typeOption);
             var upstreamRequested = parseResult.GetValue(upstreamOption);
             var downstreamRequested = parseResult.GetValue(downstreamOption);
@@ -99,7 +99,7 @@ internal sealed class DepsCommand : ICommandModule
             {
                 if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
                 {
-                    return TypeValidation.WriteInvalidTypeError();
+                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 }
 
                 type = parsed;
@@ -141,6 +141,7 @@ internal sealed class DepsCommand : ICommandModule
                 formatValue,
                 data => DepsRenderer.Render(data, showUpstream: !downstreamOnly, showDownstream: !upstreamOnly, deep: deep, quiet: quiet),
                 data => DepsRenderer.ToReferenceJson(data, includeUpstream: !downstreamOnly, includeDownstream: !upstreamOnly),
+                renderCsv: null,
                 errorFormat: errorFormat);
         });
 

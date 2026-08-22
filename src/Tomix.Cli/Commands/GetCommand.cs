@@ -55,7 +55,7 @@ internal sealed class GetCommand : ICommandModule
         {
             var path = parseResult.GetValue(pathArgument) ?? "";
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
             var query = parseResult.GetValue(queryOption);
             var typeValue = parseResult.GetValue(typeOption);
 
@@ -67,7 +67,7 @@ internal sealed class GetCommand : ICommandModule
             {
                 if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
                 {
-                    return TypeValidation.WriteInvalidTypeError();
+                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 }
 
                 type = parsed;

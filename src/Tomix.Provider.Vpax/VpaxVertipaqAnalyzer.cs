@@ -168,9 +168,7 @@ public sealed class VpaxVertipaqAnalyzer : IVertipaqAnalyzer
     private async Task<(string ConnectionString, AsAccessToken? AccessToken, Func<AsAccessToken, AsAccessToken>? OnTokenExpired)>
         BuildConnectionAsync(ModelReference model, CancellationToken cancellationToken)
     {
-        var connectionString = $"Data Source={ModelReference.NormalizeEndpoint(model.Value)}";
-        if (!string.IsNullOrWhiteSpace(model.Database))
-            connectionString += $";Initial Catalog={model.Database}";
+        var connectionString = XmlaConnectionString.Build(model);
 
         if (model.IsLocalInstance)
             return (connectionString, null, null);

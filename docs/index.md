@@ -37,8 +37,10 @@ $ tx deploy --server MyWorkspace --database basic-tmdl
 OK Deployed basic-tmdl to MyWorkspace (4.1s)
 ```
 
-Everything that prints a table also prints JSON or CSV (`--output-format json`),
-so the output of any command can become the input of your next script.
+Every command prints JSON with `--output-format json`, so the output of any
+command can become the input of your next script. `ls`, `get`, `query`,
+`refresh`, `save`, `script`, and `vertipaq` also print CSV, and `get` can emit
+the model formats too (`tmdl`, `bim`, `tmsl`).
 
 ## Where to start
 

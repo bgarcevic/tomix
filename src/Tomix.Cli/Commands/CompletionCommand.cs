@@ -31,11 +31,7 @@ internal sealed class CompletionCommand : ICommandModule
 
             var shell = parseResult.GetValue(shellArgument) ?? "";
             var result = new CompletionHandler().Generate(shell);
-            return CommandOutput.Render(
-                result,
-                format,
-                parseResult.GetValue(GlobalOptions.ErrorFormat),
-                data => Console.WriteLine(data.Script));
+            return CommandOutput.Render(parseResult, result, format, data => Console.WriteLine(data.Script));
         });
 
         return command;

@@ -28,7 +28,7 @@ internal static class UnknownOptionGuard
                 DiagnosticSeverity.Error,
                 $"Unrecognized option: {offending}",
                 Hint(offending, parseResult.CommandResult.Command))],
-            parseResult.GetValue(GlobalOptions.ErrorFormat));
+            GlobalOptions.ErrorFormatValue(parseResult));
         return true;
     }
 

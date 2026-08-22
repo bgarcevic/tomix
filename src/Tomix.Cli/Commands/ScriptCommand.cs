@@ -105,7 +105,7 @@ internal sealed class ScriptCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
 
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "script", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;

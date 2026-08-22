@@ -117,7 +117,7 @@ internal sealed class RefreshCommand : ICommandModule
                             $"Invalid --partition value '{badPartition}'. Expected TableName.PartitionName.",
                             Hint: "Example: --partition Sales.Internet")
                     },
-                    parseResult.GetValue(GlobalOptions.ErrorFormat));
+                    GlobalOptions.ErrorFormatValue(parseResult, format));
                 return 2;
             }
 
@@ -177,13 +177,13 @@ internal sealed class RefreshCommand : ICommandModule
                     if (dryResult.Success && dryResult.Data?.Script is not null)
                     {
                         if (OutputFormats.IsJson(format))
-                            JsonOutput.Write(dryResult.Data);
+                            JsonOutput.Write(new CommandEnvelope<object>(dryResult.Data, dryResult.Diagnostics));
                         else
                             RefreshRenderer.WriteTmsl(dryResult.Data.Script);
                     }
                     else
                     {
-                        ErrorOutput.Write(dryResult.Diagnostics, parseResult.GetValue(GlobalOptions.ErrorFormat));
+                        ErrorOutput.Write(dryResult.Diagnostics, GlobalOptions.ErrorFormatValue(parseResult, format));
                     }
                     return dryResult.ExitCode == 0 && dryResult.Success ? 0 : dryResult.ExitCode;
                 }
@@ -210,7 +210,7 @@ internal sealed class RefreshCommand : ICommandModule
                     RefreshRenderer.Render,
                     data => data,
                     RefreshRenderer.RenderCsv,
-                    errorFormat: parseResult.GetValue(GlobalOptions.ErrorFormat));
+                    errorFormat: GlobalOptions.ErrorFormatValue(parseResult, format));
             }
             finally
             {

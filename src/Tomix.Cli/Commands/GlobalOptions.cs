@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using Tomix.Cli.Output;
 
 namespace Tomix.Cli.Commands;
@@ -112,6 +113,58 @@ internal static class GlobalOptions
             return parseResult.GetValue(OutputFormat) ?? OutputFormats.Text;
 
         return parseResult.GetValue(localOption) ?? OutputFormats.Text;
+    }
+
+    /// <summary>
+    /// The effective stderr format for a command's diagnostics: an explicit <c>--error-format</c>
+    /// wins, otherwise JSON stdout implies JSON errors. Without the second half, a script that asks
+    /// for <c>--output-format json</c> still has to parse a colored text error off stderr — which is
+    /// what docs/error-codes.md has always promised it would not have to do. Every command resolves
+    /// its error format through here so the rule holds uniformly.
+    /// </summary>
+    public static string? ErrorFormatValue(ParseResult parseResult, string outputFormat)
+        => parseResult.GetValue(ErrorFormat)
+           ?? (OutputFormats.IsJson(outputFormat) ? OutputFormats.Json : null);
+
+    /// <summary>
+    /// <see cref="ErrorFormatValue(ParseResult, string)"/> for paths that run before a command has
+    /// resolved its own output format — the top-level crash handler, the unknown-option guard, and
+    /// shared helpers like <see cref="RecentConnections"/> that fail before the command body runs.
+    /// </summary>
+    public static string? ErrorFormatValue(ParseResult parseResult)
+        => ErrorFormatValue(parseResult, EffectiveOutputFormat(parseResult));
+
+    /// <summary>
+    /// The <c>--output-format</c> value as actually parsed, whichever option carried it.
+    /// </summary>
+    /// <remarks>
+    /// <c>doctor</c>, <c>update</c> and <c>completion</c> declare their own local
+    /// <c>--output-format</c> alongside the recursive global one — which is why
+    /// <see cref="OutputFormatValue(ParseResult, Option{string})"/> exists at all. Reading
+    /// <see cref="OutputFormat"/> alone reports its *default* for exactly those commands, so a
+    /// caller that passed <c>--output-format json</c> to one of them would still get a text error
+    /// off stderr. Walking outward from the parsed command finds whichever option was bound,
+    /// innermost first, matching that helper's local-then-global precedence.
+    /// </remarks>
+    private static string EffectiveOutputFormat(ParseResult parseResult)
+    {
+        for (SymbolResult? symbol = parseResult.CommandResult; symbol is not null; symbol = symbol.Parent)
+        {
+            if (symbol is not CommandResult command)
+                continue;
+
+            foreach (var option in command.Command.Options)
+            {
+                if (option is not Option<string> formatOption
+                    || !string.Equals(formatOption.Name, OutputFormat.Name, StringComparison.Ordinal))
+                    continue;
+
+                if (parseResult.GetResult(formatOption) is { Implicit: false })
+                    return parseResult.GetValue(formatOption) ?? OutputFormats.Text;
+            }
+        }
+
+        return OutputFormatValue(parseResult);
     }
 
     public static void ConfigureDefaultOutputFormat(string? format)

@@ -271,6 +271,7 @@ internal sealed class BpaCommand : ICommandModule
                 Info: parseResult.GetValue(infoOption));
 
             return CommandOutput.Render(
+                parseResult,
                 result,
                 format,
                 data => BpaRunRenderer.Render(data, view),
@@ -367,6 +368,7 @@ internal sealed class BpaCommand : ICommandModule
                 cancellationToken);
 
             return CommandOutput.Render(
+                parseResult,
                 result,
                 format,
                 BpaRulesRenderer.RenderList,
@@ -396,7 +398,7 @@ internal sealed class BpaCommand : ICommandModule
             var result = new BpaRulesDisableHandler(_bpaRules).Handle(
                 new BpaRulesDisableRequest(parseResult.GetValue(ruleIdArgument)!, Disable: disable));
 
-            return CommandOutput.Render(result, format, BpaRulesRenderer.RenderDisable, BpaRulesRenderer.ToDisableJson);
+            return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderDisable, BpaRulesRenderer.ToDisableJson);
         });
 
         return command;
@@ -471,7 +473,7 @@ internal sealed class BpaCommand : ICommandModule
                     NoSync: parseResult.GetValue(noSyncOption)),
                 cancellationToken);
 
-            return CommandOutput.Render(result, format, BpaRulesRenderer.RenderIgnore, BpaRulesRenderer.ToIgnoreJson);
+            return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderIgnore, BpaRulesRenderer.ToIgnoreJson);
         });
 
         return command;

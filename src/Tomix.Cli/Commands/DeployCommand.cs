@@ -125,7 +125,7 @@ internal sealed class DeployCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             if (!CommandOutput.TryValidateFormat(parseResult, format, "deploy", OutputFormats.Text, OutputFormats.Json))
                 return 2;
@@ -137,8 +137,9 @@ internal sealed class DeployCommand : ICommandModule
                 // --recent picks the deploy *source*; --server/--database keep addressing the target.
                 if (!string.IsNullOrWhiteSpace(explicitModel))
                 {
-                    var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
-                    err.MarkupLine(Styling.Error("--recent cannot be combined with a model path."));
+                    RecentConnections.WriteOptionConflict(
+                        "--recent cannot be combined with a model path.",
+                        GlobalOptions.ErrorFormatValue(parseResult, format));
                     return 2;
                 }
 
@@ -220,8 +221,9 @@ internal sealed class DeployCommand : ICommandModule
             if (result.Data is not null && result.Data.ScriptPath == "-" && result.Data.Script is not null)
             {
                 if (OutputFormats.IsJson(format))
-                    JsonOutput.Write(result.Data);
+                    JsonOutput.Write(new CommandEnvelope<object>(result.Data, result.Diagnostics));
                 else
+                    // Raw TMSL: --xmla output is a script for the engine, never an envelope.
                     Console.WriteLine(result.Data.Script);
                 return result.ExitCode;
             }

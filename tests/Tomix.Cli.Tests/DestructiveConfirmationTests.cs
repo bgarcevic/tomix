@@ -102,7 +102,12 @@ public sealed class DestructiveConfirmationTests
                 ["connect", model, "SalesDataset", "-w", "AnalyticsWorkspace", .. contextArgs]);
 
             Assert.Equal(1, exitCode);
-            Assert.Contains("Pass --yes to confirm Overwrite workspace target", stderr);
+            // The message names what needs confirming; the hint is the remediation. Asserted
+            // separately so a future edit cannot quietly turn the hint back into a restatement
+            // of the action, which is what it was.
+            Assert.Contains("Overwrite workspace target", stderr);
+            Assert.Contains("needs confirmation", stderr);
+            Assert.Contains("Pass --yes to confirm", stderr);
         }
         finally
         {

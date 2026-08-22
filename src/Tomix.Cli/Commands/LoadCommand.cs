@@ -43,7 +43,7 @@ internal sealed class LoadCommand : ICommandModule
                     out var recentExit))
                 return recentExit;
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
 
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "load", OutputFormats.Text, OutputFormats.Json))
                 return 2;
@@ -57,7 +57,7 @@ internal sealed class LoadCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, Render, ToReferenceJson, errorFormat: errorFormat);
+            return CommandOutput.Render(result, formatValue, Render, ToReferenceJson, renderCsv: null, errorFormat: errorFormat);
         });
 
         return command;

@@ -69,14 +69,6 @@ internal sealed class LsCommand : ICommandModule
         {
             var firstValue = parseResult.GetValue(pathArgument);
             var secondValue = parseResult.GetValue(modelArgument);
-            if (!RecentConnections.TryResolveModel(
-                    parseResult,
-                    GlobalOptions.ModelValue(parseResult),
-                    _state,
-                    out var activeReference,
-                    out var recentExit))
-                return recentExit;
-            var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
 
             // Canonical order is `ls [path-filter] [model]`, matching `get <path> [model]`.
             // The legacy `ls <model> [path-filter]` order stays accepted: a first positional
@@ -84,17 +76,41 @@ internal sealed class LsCommand : ICommandModule
             var firstIsModel = !string.IsNullOrWhiteSpace(firstValue)
                 && _providers.Any(p => p.CanOpen(new ModelReference(firstValue)));
 
+            // Resolved before --recent is applied, and passed to it: TryResolveModel rejects
+            // --recent combined with an explicit model, and handing it only --model would let
+            // the positional form slip past that guard -- `ls --recent 1 ./model` then exited 0
+            // having silently ignored the --recent selection, while `-m ./model` was rejected.
+            var positionalModel = firstIsModel ? firstValue : secondValue;
+            // Blank-checked rather than ?? : the guard downstream tests IsNullOrWhiteSpace, so a
+            // present-but-empty --model would otherwise win the coalesce and hide the positional.
+            var explicitModel = GlobalOptions.ModelValue(parseResult) is { } m && !string.IsNullOrWhiteSpace(m)
+                ? m
+                : positionalModel;
+
+            if (!RecentConnections.TryResolveModel(
+                    parseResult,
+                    explicitModel,
+                    _state,
+                    out var activeReference,
+                    out var recentExit))
+                return recentExit;
+            var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
+
             ModelReference reference;
             string? pathFilter;
 
+            // --database rides along: a positional endpoint rebuilt without it would open the
+            // server and then fail to resolve a catalog, or silently pick the only one there.
+            var database = parseResult.GetValue(GlobalOptions.Database);
+
             if (firstIsModel)
             {
-                reference = new ModelReference(firstValue!);
+                reference = new ModelReference(firstValue!, database);
                 pathFilter = secondValue;
             }
             else if (!string.IsNullOrWhiteSpace(secondValue))
             {
-                reference = new ModelReference(secondValue);
+                reference = new ModelReference(secondValue, database);
                 pathFilter = firstValue;
             }
             else if (hasContextModel)
@@ -111,7 +127,7 @@ internal sealed class LsCommand : ICommandModule
             var pathsOnly = parseResult.GetValue(pathsOnlyOption);
             var noMultiline = parseResult.GetValue(noMultilineOption);
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
 
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "ls", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
@@ -121,7 +137,7 @@ internal sealed class LsCommand : ICommandModule
             {
                 if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
                 {
-                    return TypeValidation.WriteInvalidTypeError();
+                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 }
 
                 type = parsed;

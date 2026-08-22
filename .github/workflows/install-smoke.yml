@@ -35,7 +35,10 @@ jobs:
         include:
           - { os: ubuntu-latest, rid: linux-x64 }
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }
-          - { os: macos-13, rid: osx-x64 }
+          # macos-15-intel, not macos-13: the macOS 13 image was retired in
+          # December 2025 and its label now terminates the job with an error.
+          # macos-14 is deprecated too; this is the last Intel image.
+          - { os: macos-15-intel, rid: osx-x64 }
           - { os: macos-latest, rid: osx-arm64 }
           - { os: windows-latest, rid: win-x64 }
           - { os: windows-11-arm, rid: win-arm64 }
@@ -65,7 +68,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          actual="$(tx --version)"
+          # tr strips the CR that .NET writes on Windows: this step runs under
+          # bash on every platform, and $() removes a trailing LF but never a CR,
+          # so without it both Windows legs fail on two identical-looking strings.
+          actual="$(tx --version | tr -d '\r')"
           echo "installed: ${actual}"
           if [ -n "${TOMIX_VERSION:-}" ]; then
             expected="${TOMIX_VERSION#v}"

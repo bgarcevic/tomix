@@ -145,7 +145,7 @@ internal sealed class ReplaceCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, Render);
+            return CommandOutput.Render(parseResult, result, formatValue, Render);
         });
 
         return command;

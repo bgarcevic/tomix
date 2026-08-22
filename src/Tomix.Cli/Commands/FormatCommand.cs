@@ -121,7 +121,7 @@ internal sealed class FormatCommand : ICommandModule
             {
                 if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
                 {
-                    return TypeValidation.WriteInvalidTypeError();
+                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 }
 
                 type = parsed;
@@ -165,7 +165,7 @@ internal sealed class FormatCommand : ICommandModule
                 Render,
                 data => (object)data,
                 renderCsv: null,
-                parseResult.GetValue(GlobalOptions.ErrorFormat));
+                GlobalOptions.ErrorFormatValue(parseResult, formatValue));
         });
 
         return command;

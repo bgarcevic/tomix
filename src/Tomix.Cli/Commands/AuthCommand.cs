@@ -73,7 +73,7 @@ internal sealed class AuthCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "auth login", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
             var username = parseResult.GetValue(usernameOption);
             var tenant = parseResult.GetValue(tenantOption);
             var certificate = parseResult.GetValue(certificateOption);
@@ -145,7 +145,7 @@ internal sealed class AuthCommand : ICommandModule
                 "Authenticating...",
                 () => handler.LoginAsync(options, cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format));
-            return CommandOutput.Render(result, format, RenderLogin, data => data.Identity);
+            return CommandOutput.Render(parseResult, result, format, RenderLogin, data => data.Identity);
         });
 
         return command;
@@ -162,7 +162,7 @@ internal sealed class AuthCommand : ICommandModule
 
             var handler = new AuthHandler(CreateAuthenticator(clientIdOverride: null, tenant: null));
             var result = await handler.StatusAsync(cancellationToken);
-            return CommandOutput.Render(result, format, RenderStatus, data => FlatAuthStatus.FromResult(data));
+            return CommandOutput.Render(parseResult, result, format, RenderStatus, data => FlatAuthStatus.FromResult(data));
         });
         return command;
     }
@@ -179,6 +179,7 @@ internal sealed class AuthCommand : ICommandModule
             var handler = new AuthHandler(CreateAuthenticator(clientIdOverride: null, tenant: null));
             var result = await handler.LogoutAsync(cancellationToken);
             return CommandOutput.Render(
+                parseResult,
                 result,
                 format,
                 data => AnsiConsole.MarkupLine(data.Existed ? Styling.Success("Logged out -- cached credentials cleared.") : Styling.Muted("Not logged in.")));

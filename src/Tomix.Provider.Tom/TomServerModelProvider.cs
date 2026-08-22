@@ -100,12 +100,7 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
     }
 
     internal static string BuildConnectionString(ModelReference reference)
-    {
-        var connectionString = $"Data Source={TomModelDeployer.ResolveEndpoint(reference.Value)}";
-        return string.IsNullOrWhiteSpace(reference.Database)
-            ? connectionString
-            : $"{connectionString};Initial Catalog={reference.Database}";
-    }
+        => XmlaConnectionString.Build(reference);
 
     private static TabularDatabase ResolveDatabase(TabularServer server, string? database)
     {

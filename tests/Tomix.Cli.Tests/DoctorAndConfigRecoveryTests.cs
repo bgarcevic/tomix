@@ -28,7 +28,7 @@ public sealed class DoctorAndConfigRecoveryTests : IDisposable
         var invocation = Invoke("doctor", "--output-format", "json");
 
         Assert.Equal(1, invocation.ExitCode);
-        using var json = JsonDocument.Parse(invocation.Stdout);
+        using var json = CommandJson.DataDocument(invocation.Stdout);
         Assert.True(json.RootElement.TryGetProperty("terminal", out _));
         Assert.Contains(json.RootElement.GetProperty("checks").EnumerateArray(), check =>
             check.GetProperty("name").GetString() == "configuration" &&
@@ -41,7 +41,7 @@ public sealed class DoctorAndConfigRecoveryTests : IDisposable
         var invocation = Invoke("config", "paths", "--output-format", "json");
 
         Assert.Equal(0, invocation.ExitCode);
-        using var json = JsonDocument.Parse(invocation.Stdout);
+        using var json = CommandJson.DataDocument(invocation.Stdout);
         Assert.Equal(_directory, json.RootElement.GetProperty("configDir").GetString());
     }
 
@@ -111,7 +111,7 @@ public sealed class ConfigDefaultFormatIntegrationTests : IDisposable
     public void ConfiguredDefaultAppliesAndExplicitOutputFormatWins()
     {
         var implicitResult = Invoke("config", "paths");
-        using var json = JsonDocument.Parse(implicitResult.Stdout);
+        using var json = CommandJson.DataDocument(implicitResult.Stdout);
         Assert.Equal(_directory, json.RootElement.GetProperty("configDir").GetString());
 
         var explicitResult = Invoke("config", "paths", "--output-format", "text");

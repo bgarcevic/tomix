@@ -40,8 +40,10 @@ $ tx deploy --server MyWorkspace --database basic-tmdl
 OK Deployed basic-tmdl to MyWorkspace (4.1s)
 ```
 
-Everything that prints a table also prints JSON or CSV (`--output-format
-json`), so the output of any command can become the input of your next script.
+Every command prints JSON with `--output-format json`, so the output of any
+command can become the input of your next script. `ls`, `get`, `query`,
+`refresh`, `save`, `script`, and `vertipaq` also print CSV, and `get` can emit
+the model formats too (`tmdl`, `bim`, `tmsl`).
 The [samples](samples/) folder also contains a full PBIP model if you want
 something more realistic than `basic-tmdl` to explore.
 
@@ -73,8 +75,9 @@ tx update           # update in place (standalone binary or dotnet global tool)
 
 `tx update` detects how tx was installed: a standalone binary is replaced
 in place after checksum verification against the release's `checksums.txt`;
-a dotnet global tool runs `dotnet tool update -g Tomix.Cli`. `--check` always
-exits 0 — scripts should read `updateAvailable` from
+a dotnet global tool runs `dotnet tool update -g Tomix.Cli`. `--check` exits 0
+whether or not an update exists (a failed check — no network, no releases —
+exits 1); scripts should read `.data.updateAvailable` from
 `tx update --check --output-format json`.
 
 tx also checks for new releases in the background at most once per 24 hours
@@ -92,8 +95,9 @@ formatter APIs), `script` (run C# scripts against a model),
 Connect: `connect` (interactive workspace/model pickers with `--remote`,
 reconnect to a previous target with `--recent`), `deploy`, `refresh`,
 `load`, `save`, `auth`, `session`
-Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`,
-`vertipaq` (storage statistics, `.vpax` export/import), `diff`, `doctor`
+Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `test`
+(DAX regression tests against a live model), `vertipaq` (storage statistics,
+`.vpax` export/import), `diff`, `doctor`
 Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
 staged, then committed or discarded), `update` (self-update with
 release-notes preview)
@@ -118,7 +122,7 @@ tx find "CALCULATE" --in expressions --paths-only | xargs -I{} tx format -p "{}"
 
 # Count columns per table
 tx ls --type column --output-format json |
-  jq 'group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
+  jq '.data | group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
 ```
 
 `query` runs DAX or DMV against a live model, with DAX Studio-style performance

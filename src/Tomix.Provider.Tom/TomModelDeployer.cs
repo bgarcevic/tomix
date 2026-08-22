@@ -182,7 +182,7 @@ public static class TomModelDeployer
             };
         }
 
-        server.Connect($"Data Source={ResolveEndpoint(endpoint)}");
+        server.Connect(XmlaConnectionString.Build(endpoint));
     }
 
     public static string ResolveEndpoint(string server)

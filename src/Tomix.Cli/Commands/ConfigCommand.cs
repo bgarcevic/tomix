@@ -47,7 +47,7 @@ internal sealed class ConfigCommand : ICommandModule
                 return 2;
 
             var result = new ConfigHandler(_configStore).Init(parseResult.GetValue(forceOption));
-            return CommandOutput.Render(result, formatValue, RenderInit);
+            return CommandOutput.Render(parseResult, result, formatValue, RenderInit);
         });
 
         return command;
@@ -74,7 +74,7 @@ internal sealed class ConfigCommand : ICommandModule
             var key = parseResult.GetValue(keyArgument) ?? "";
             var value = parseResult.GetValue(valueArgument) ?? "";
             var result = new ConfigHandler(_configStore).Set(key, value);
-            return CommandOutput.Render(result, formatValue, RenderSet);
+            return CommandOutput.Render(parseResult, result, formatValue, RenderSet);
         });
 
         return command;
@@ -91,6 +91,7 @@ internal sealed class ConfigCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
+                parseResult,
                 Tomix.Core.Results.TomixResult<ConfigPathsResult>.Ok(new ConfigPathsResult(_configDirectory, _configFilePath)),
                 formatValue,
                 result =>
@@ -115,7 +116,7 @@ internal sealed class ConfigCommand : ICommandModule
                 return 2;
 
             var result = new ConfigHandler(_configStore).List();
-            return CommandOutput.Render(result, formatValue, RenderList);
+            return CommandOutput.Render(parseResult, result, formatValue, RenderList);
         });
 
         return command;

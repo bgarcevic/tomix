@@ -99,9 +99,7 @@ internal sealed class VertipaqCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            // Effective stderr format: explicit --error-format wins, else JSON output implies JSON errors.
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat)
-                ?? (OutputFormats.IsJson(formatValue) ? OutputFormats.Json : null);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
 
             if (!CommandOutput.TryValidateFormat(parseResult,

@@ -118,8 +118,42 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # RuntimeIdentifiers is cleared for the pack only. The SDK drops the tool's
+      # implementation whenever that property is set (Microsoft.NET.PackTool.targets
+      # decides on RuntimeIdentifiers, not on CreateRidSpecificToolPackages), and
+      # emits a payload-less Tomix.Cli that redirects to six Tomix.Cli.<rid>
+      # packages instead. Those extra IDs are outside the nuget.org Trusted
+      # Publishing policy, so they would 403 while the redirect had already gone
+      # live — permanently, since nuget.org versions are immutable. The six
+      # self-contained archives are unaffected: the publish job passes --runtime
+      # explicitly and never reads this property.
       - name: Pack
-        run: dotnet pack src/Tomix.Cli/Tomix.Cli.csproj --configuration Release --output artifacts/packages
+        run: >
+          dotnet pack src/Tomix.Cli/Tomix.Cli.csproj
+          --configuration Release
+          --output artifacts/packages
+          -p:RuntimeIdentifiers=
+          -p:ToolPackageRuntimeIdentifiers=
+
+      - name: Verify the tool package is runnable
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(ls -1 artifacts/packages/*.nupkg | wc -l)
+          if [[ "${count}" -ne 1 ]]; then
+            echo "::error::expected exactly 1 tool package, found ${count}"
+            ls -1 artifacts/packages/*.nupkg
+            exit 1
+          fi
+          # The RID-redirect wrapper carries no assemblies at all, so the presence
+          # of the entry assembly is what separates a usable tool from a manifest
+          # pointing at packages this workflow never pushes.
+          # grep without -q on purpose: -q exits at the first match, unzip then
+          # dies of SIGPIPE, and pipefail reports the whole pipeline as failed.
+          if ! unzip -l artifacts/packages/*.nupkg | grep 'tools/net10.0/any/Tomix.Cli.dll' >/dev/null; then
+            echo "::error::tool package contains no implementation - it is a RID redirect"
+            exit 1
+          fi
 
       - name: Upload
         uses: actions/upload-artifact@v7
@@ -133,12 +167,25 @@ jobs:
     needs: [publish, pack]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    # Required by the nuget.org Trusted Publishing policy, which is registered
+    # with Environment: prod. The environment name is a claim in the OIDC token,
+    # so a job that omits this key gets a token nuget.org refuses — and it fails
+    # at NuGet/login, after the GitHub Release has already been created.
+    environment: prod
     permissions:
       contents: write
       id-token: write # OIDC token for NuGet Trusted Publishing
     env:
       NUGET_USER: ${{ secrets.NUGET_USER }}
     steps:
+      # Checkout precedes the artifact download on purpose: actions/checkout
+      # cleans the workspace, so running it second would delete the archives.
+      - name: Checkout changelog
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
@@ -150,6 +197,29 @@ jobs:
         working-directory: artifacts/packages
         run: sha256sum tx-*.zip tx-*.tar.gz > checksums.txt
 
+      # Without this the release body is GitHub's generated commit log, which for
+      # a first release compares against the start of history and lists every PR
+      # ever merged. The curated section leads; generated notes still follow it.
+      - name: Extract release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          # The newest section runs to end-of-file, so the trailing link-reference
+          # definitions come with it; they define compare URLs and are never
+          # referenced from the body, so dropping them loses nothing. grep's
+          # no-match exit is swallowed so that a missing section reaches the
+          # explicit check below instead of tripping pipefail here.
+          awk -v v="${version}" '
+            $0 == "## [" v "]" || index($0, "## [" v "] ") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md | { grep -v '^\[[^]]*\]: http' || true; } > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "::error::CHANGELOG.md has no '## [${version}]' section to release from"
+            exit 1
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
@@ -157,6 +227,7 @@ jobs:
             artifacts/packages/tx-*.zip
             artifacts/packages/tx-*.tar.gz
             artifacts/packages/checksums.txt
+          body_path: release-notes.md
           generate_release_notes: true
           draft: false
           # Hyphenated tags (v0.1.0-rc.1) are prereleases: excluded from
@@ -169,7 +240,29 @@ jobs:
       # for a 1-hour key, authorized by the policy configured on nuget.org
       # (owner bgarcevic, repo tomix-cli, workflow file release.yml). All steps
       # no-op when the NUGET_USER secret (nuget.org profile name) is unset
-      # (forks); --skip-duplicate keeps tag re-runs idempotent.
+      # (forks, and the canonical repo until the nuget.org policy exists);
+      # --skip-duplicate keeps tag re-runs idempotent.
+      #
+      # The skip is announced rather than silent: skipped steps render grey and
+      # the job still concludes green, so without this the release looks entirely
+      # successful while the package channel published nothing. Announcing beats
+      # failing here — the binary channel is already live by this point, and a
+      # hard failure would strand an otherwise complete release.
+      - name: Report skipped NuGet publish
+        if: env.NUGET_USER == ''
+        run: |
+          echo "::warning::NUGET_USER is unset - nothing was pushed to nuget.org, so 'dotnet tool install -g Tomix.Cli' will not work for this release."
+          {
+            echo "### NuGet publish skipped"
+            echo
+            echo "\`NUGET_USER\` is unset, so no package reached nuget.org."
+            echo "The GitHub Release and its archives are unaffected."
+            echo
+            echo "To publish this version later: configure the nuget.org Trusted"
+            echo "Publishing policy, add the \`NUGET_USER\` secret, then re-run this"
+            echo "workflow against the tag. \`--skip-duplicate\` makes it idempotent."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Setup .NET
         if: env.NUGET_USER != ''
         uses: actions/setup-dotnet@v6

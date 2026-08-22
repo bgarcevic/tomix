@@ -64,7 +64,7 @@ public sealed class CompletionAndConfigOutputTests
             "config", "paths", "--output-format", "json");
 
         Assert.Equal(0, result.ExitCode);
-        using var json = JsonDocument.Parse(result.Stdout);
+        using var json = CommandJson.DataDocument(result.Stdout);
         Assert.Equal(services.ConfigDirectory, json.RootElement.GetProperty("configDir").GetString());
         Assert.Equal(services.ConfigFilePath, json.RootElement.GetProperty("configFile").GetString());
     }
@@ -97,7 +97,7 @@ public sealed class CompletionAndConfigOutputTests
         {
             var implicitResult = Invoke(command, "config", "paths");
             Assert.Equal(0, implicitResult.ExitCode);
-            using var json = JsonDocument.Parse(implicitResult.Stdout);
+            using var json = CommandJson.DataDocument(implicitResult.Stdout);
             Assert.Equal(services.ConfigDirectory, json.RootElement.GetProperty("configDir").GetString());
 
             var explicitResult = Invoke(

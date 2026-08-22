@@ -31,8 +31,8 @@ public sealed class GetLsParityTests
     [MemberData(nameof(ObjectPaths))]
     public void LsRow_EqualsGetProperties(string getPath, string lsFilter)
     {
-        var get = JsonNode.Parse(Invoke("get", getPath, SampleTmdl, "--output-format", "json"))!;
-        var lsRows = JsonNode.Parse(Invoke("ls", lsFilter, SampleTmdl, "--output-format", "json"))!.AsArray();
+        var get = CommandJson.Data(Invoke("get", getPath, SampleTmdl, "--output-format", "json"));
+        var lsRows = CommandJson.DataArray(Invoke("ls", lsFilter, SampleTmdl, "--output-format", "json"));
 
         var row = Assert.Single(lsRows)!.AsObject();
         Assert.Equal(get["path"]!.GetValue<string>(), row["path"]!.GetValue<string>());
@@ -48,11 +48,11 @@ public sealed class GetLsParityTests
     [Fact]
     public void LsRow_EqualsGetProperties_ForPartitions()
     {
-        var partitions = JsonNode.Parse(Invoke("ls", "Sales/Partitions", SampleTmdl, "--output-format", "json"))!.AsArray();
+        var partitions = CommandJson.DataArray(Invoke("ls", "Sales/Partitions", SampleTmdl, "--output-format", "json"));
         var row = Assert.Single(partitions)!.AsObject();
         var path = row["path"]!.GetValue<string>();
 
-        var get = JsonNode.Parse(Invoke("get", path, SampleTmdl, "--type", "partition", "--output-format", "json"))!;
+        var get = CommandJson.Data(Invoke("get", path, SampleTmdl, "--type", "partition", "--output-format", "json"));
 
         row.Remove("path");
         row.Remove("type");
@@ -107,9 +107,9 @@ public sealed class GetLsParityTests
     [Fact]
     public void DataType_IsIdenticalAcrossCommands_AndNeverGuessed()
     {
-        var get = JsonNode.Parse(Invoke("get", "Sales/Total Sales", SampleTmdl, "--output-format", "json"))!;
-        var row = JsonNode.Parse(Invoke("ls", "Sales/'Total Sales'", SampleTmdl, "--output-format", "json"))!
-            .AsArray().Single()!.AsObject();
+        var get = CommandJson.Data(Invoke("get", "Sales/Total Sales", SampleTmdl, "--output-format", "json"));
+        var row = CommandJson.DataArray(Invoke("ls", "Sales/'Total Sales'", SampleTmdl, "--output-format", "json"))
+            .Single()!.AsObject();
 
         // Regression pin: ls used to fabricate "Decimal" from the DAX text while get said "Unknown",
         // and emitted null for detailRowsExpression/kpi where get emitted "".

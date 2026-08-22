@@ -105,7 +105,7 @@ internal sealed class MvCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "mv", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
 
             var typeValue = parseResult.GetValue(typeOption);
             ModelObjectKind? type = null;
@@ -113,7 +113,7 @@ internal sealed class MvCommand : ICommandModule
             {
                 if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
                 {
-                    return TypeValidation.WriteInvalidTypeError();
+                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
                 }
 
                 type = parsed;

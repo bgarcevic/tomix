@@ -70,7 +70,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), IncrementalRefreshRenderer.RenderShow);
+            return CommandOutput.Render(parseResult, result, formatValue, IncrementalRefreshRenderer.RenderShow);
         });
 
         return show;
@@ -224,7 +224,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), IncrementalRefreshRenderer.RenderSet);
+            return CommandOutput.Render(parseResult, result, formatValue, IncrementalRefreshRenderer.RenderSet);
         });
 
         return set;
@@ -326,7 +326,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), IncrementalRefreshRenderer.RenderRm);
+            return CommandOutput.Render(parseResult, result, formatValue, IncrementalRefreshRenderer.RenderRm);
         });
 
         return rm;
@@ -378,7 +378,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(result, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), IncrementalRefreshRenderer.RenderApply);
+            return CommandOutput.Render(parseResult, result, formatValue, IncrementalRefreshRenderer.RenderApply);
         });
 
         return apply;

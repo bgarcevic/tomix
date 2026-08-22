@@ -62,7 +62,7 @@ internal sealed class StageCommand : ICommandModule
                 () => new StageHandler(_staging).CommitAsync(
                     reference, _providers, parseResult.GetValue(forceOption), cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
-            return CommandOutput.Render(result, format, RenderCommit);
+            return CommandOutput.Render(parseResult, result, format, RenderCommit);
         });
         return command;
     }
@@ -83,7 +83,7 @@ internal sealed class StageCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "stage list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new StageHandler(_staging).List(), format, RenderList);
+            return CommandOutput.Render(parseResult, new StageHandler(_staging).List(), format, RenderList);
         });
         return command;
     }
@@ -116,6 +116,7 @@ internal sealed class StageCommand : ICommandModule
             if (!TryResolveModel(parseResult, out var reference, out var recentExit))
                 return recentExit;
             return CommandOutput.Render(
+                parseResult,
                 new StageHandler(_staging).Discard(reference, all),
                 format,
                 result => AnsiConsole.MarkupLine(Styling.Success($"Discarded {result.Discarded} staged change set(s).")));
@@ -131,7 +132,7 @@ internal sealed class StageCommand : ICommandModule
 
         if (!TryResolveModel(parseResult, out var reference, out var recentExit))
             return recentExit;
-        return CommandOutput.Render(new StageHandler(_staging).Status(reference), format, RenderStatusResult);
+        return CommandOutput.Render(parseResult, new StageHandler(_staging).Status(reference), format, RenderStatusResult);
     }
 
     private static void RenderStatusResult(StageStatusResult result)

@@ -3,6 +3,7 @@ using System.Globalization;
 using Spectre.Console;
 using Tomix.App.State;
 using Tomix.Cli.Output;
+using Tomix.Core.Diagnostics;
 
 namespace Tomix.Cli.Commands;
 
@@ -53,7 +54,9 @@ internal static class RecentConnections
 
         if (!string.IsNullOrWhiteSpace(explicitModel) || !string.IsNullOrWhiteSpace(server))
         {
-            WriteError("--recent cannot be combined with a model path or --server.");
+            WriteOptionConflict(
+                "--recent cannot be combined with a model path or --server.",
+                GlobalOptions.ErrorFormatValue(parseResult));
             source = default;
             exitCode = 2;
             return false;
@@ -128,10 +131,16 @@ internal static class RecentConnections
         entry = null;
         exitCode = 0;
 
+        var errorFormat = GlobalOptions.ErrorFormatValue(parseResult);
+
         var raw = GlobalOptions.RecentValue(parseResult);
         if (!TryParseRecentIndex(raw, out var index))
         {
-            WriteError($"Invalid --recent value '{raw}'. Expected a number: 1 = most recent.");
+            WriteRecentError(
+                "TOMIX_RECENT_INVALID",
+                $"Invalid --recent value '{raw}'. Expected a number: 1 = most recent.",
+                "Use --recent <n>, where 1 is the most recently used connection.",
+                errorFormat);
             exitCode = 2;
             return false;
         }
@@ -139,8 +148,11 @@ internal static class RecentConnections
         var recents = store.LoadRecentConnections();
         if (recents.Count == 0)
         {
-            WriteError("No recent connections yet.");
-            WriteGuidance("Connect once: tx connect <server> <database>");
+            WriteRecentError(
+                "TOMIX_RECENT_NONE",
+                "No recent connections yet.",
+                "Connect once: tx connect <server> <database>",
+                errorFormat);
             exitCode = 1;
             return false;
         }
@@ -150,7 +162,11 @@ internal static class RecentConnections
             if (index > recents.Count)
             {
                 var noun = recents.Count == 1 ? "connection" : "connections";
-                WriteError($"--recent {index} is out of range ({recents.Count} recent {noun}). Run: tx connect --recent");
+                WriteRecentError(
+                    "TOMIX_RECENT_OUT_OF_RANGE",
+                    $"--recent {index} is out of range ({recents.Count} recent {noun}).",
+                    "List the recents with: tx connect --recent",
+                    errorFormat);
                 exitCode = 1;
                 return false;
             }
@@ -161,8 +177,11 @@ internal static class RecentConnections
 
         if (!InteractionGate.CanPrompt(parseResult, GlobalOptions.OutputFormatValue(parseResult)))
         {
-            WriteError("--recent needs an index when prompts are unavailable.");
-            WriteGuidance("Use --recent <n>; list with: tx connect --recent");
+            WriteRecentError(
+                "TOMIX_RECENT_INDEX_REQUIRED",
+                "--recent needs an index when prompts are unavailable.",
+                "Use --recent <n>; list with: tx connect --recent",
+                errorFormat);
             exitCode = 2;
             return false;
         }
@@ -244,11 +263,27 @@ internal static class RecentConnections
         return $"{(int)age.TotalDays}d ago";
     }
 
-    private static void WriteError(string message)
-        => StdErr().MarkupLine(Styling.Error(message));
+    /// <summary>
+    /// Mutually-exclusive options, reported with a code so a scripted caller can branch on the
+    /// conflict instead of matching prose. The wording differs per command on purpose —
+    /// <c>deploy --recent --server</c> is legal (the server addresses the deploy target) while
+    /// the same pair is a conflict here — so the code, not the message, is the stable part.
+    /// </summary>
+    internal static void WriteOptionConflict(string message, string? errorFormat)
+        => ErrorOutput.Write(
+            [new TomixDiagnostic("TOMIX_OPTION_CONFLICT", DiagnosticSeverity.Error, message)],
+            errorFormat);
 
-    private static void WriteGuidance(string message)
-        => StdErr().MarkupLine(Styling.Guidance(message));
+    /// <summary>
+    /// A <c>--recent</c> selection failure, coded like every other error. These used to write raw
+    /// markup, which left one failure in this helper emitting JSON while its four siblings emitted
+    /// colored text under the same <c>--output-format json</c> — so a script parsing stderr
+    /// succeeded or threw depending on which way the selection failed.
+    /// </summary>
+    private static void WriteRecentError(string code, string message, string hint, string? errorFormat)
+        => ErrorOutput.Write(
+            [new TomixDiagnostic(code, DiagnosticSeverity.Error, message, hint)],
+            errorFormat);
 
     private static IAnsiConsole StdErr()
         => AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });

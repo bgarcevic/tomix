@@ -31,7 +31,7 @@ internal sealed class ProfileCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "profile list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new ProfileHandler(_state).List(), format, RenderList);
+            return CommandOutput.Render(parseResult, new ProfileHandler(_state).List(), format, RenderList);
         });
         return command;
     }
@@ -51,6 +51,7 @@ internal sealed class ProfileCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
+                parseResult,
                 new ProfileHandler(_state).Show(parseResult.GetValue(nameArgument) ?? ""),
                 format,
                 result => RenderProfile(result.Profile));
@@ -73,6 +74,7 @@ internal sealed class ProfileCommand : ICommandModule
                 return 2;
 
             return CommandOutput.Render(
+                parseResult,
                 new ProfileHandler(_state).Remove(parseResult.GetValue(nameArgument) ?? ""),
                 format,
                 result => AnsiConsole.MarkupLine(result.Removed ? Styling.Success($"Removed: {result.Name}") : Styling.Warning($"Not found: {result.Name}")));
@@ -111,6 +113,7 @@ internal sealed class ProfileCommand : ICommandModule
                 parseResult.GetValue(fromActiveOption)));
 
             return CommandOutput.Render(
+                parseResult,
                 result,
                 format,
                 data => AnsiConsole.MarkupLine(Styling.Success($"Saved profile: {data.Profile.Name}")));

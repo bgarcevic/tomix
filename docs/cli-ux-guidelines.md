@@ -139,6 +139,57 @@ the bottom for where each concern lives.
   renaming; changing human-oriented text is fine.
 - Don't repurpose a flag to mean something different — add a new one.
 
+### The two JSON shapes
+
+The streams answer different questions, so they have different shapes. Don't merge them.
+
+**stdout — the command envelope.** `--output-format json` wraps every command's payload:
+
+```json
+{ "data": <the command's own shape>, "diagnostics": [] }
+```
+
+`diagnostics` is always present and currently always empty — no handler emits a non-fatal
+diagnostic yet, and a command with no data writes nothing to stdout. It is part of the
+contract so that a command which succeeds *with something to say* has somewhere to say it
+without a breaking change. Rendered by `CommandEnvelope<T>`; scripts read `.data`.
+
+**stderr — the error object.** A single failure, shaped for the one thing a caller wants
+to branch on (see [error-codes.md](error-codes.md)):
+
+```json
+{ "error": "...", "code": "TOMIX_...", "severity": "Error", "hint": "..." }
+```
+
+Emitted under `--error-format json`, and implied by `--output-format json` so a JSON
+caller never has to parse text off stderr. `GlobalOptions.ErrorFormatValue` resolves that
+rule for every command. No `CommandOutput.Render` overload lets a command skip the
+decision: each either takes the `ParseResult` and derives the format, or requires it as a
+non-optional argument — enforced by `ErrorOutputContractTests`.
+
+**Outside the envelope**, because they are not command results:
+
+| Output | Shape | Pinned by |
+|---|---|---|
+| `--output-format csv` | tabular rows | `CommandEnvelopeContractTests` |
+| `get --output-format tmdl\|bim\|tmsl` | a model fragment a consumer feeds back to a serializer | `CommandEnvelopeContractTests` |
+| `deploy --xmla -` in **text** mode | the raw TMSL script, for the engine | `CommandEnvelopeContractTests` |
+| `query --output-file <path>` | a data file for jq/pandas — written to the file, never stdout | `QueryOutputFileContractTests` |
+
+`deploy --xmla --output-format json` is **not** an exception: JSON mode is a command
+result like any other, enveloped as usual. Only the text-mode stdout is raw, and only
+for `--xmla -` — with `--xmla <file>` the script goes to the file and text mode prints
+a human summary instead.
+
+**`diagnostics` appears at two levels, and they are different things.** The envelope's
+`.diagnostics` holds CLI diagnostics (`code`/`severity`/`message`/`hint`) and is empty
+today. A command's own payload may also have a field called `diagnostics` — `bpa run`'s
+`.data.diagnostics` is its non-violation rule outcomes, and `bpa rules list`'s is its
+rule-load problems. Enveloping moved those from `.diagnostics` to `.data.diagnostics`
+like every other payload field; the name collision just makes the mistake quiet rather
+than a missing-key error. **Scripts wanting a command's own diagnostics must read
+`.data.diagnostics`.**
+
 ## Versioning policy
 
 - Versions are derived from git tags by [MinVer](https://github.com/adamralph/minver).

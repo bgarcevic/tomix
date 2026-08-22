@@ -116,7 +116,7 @@ internal static class Program
                     DiagnosticSeverity.Error,
                     configLoadError.Message,
                     "Run 'tx config init --force' to reset the file, or repair it manually.")],
-                parseResult.GetValue(GlobalOptions.ErrorFormat));
+                GlobalOptions.ErrorFormatValue(parseResult));
             return 2;
         }
 
@@ -148,7 +148,7 @@ internal static class Program
                     DiagnosticSeverity.Error,
                     ex.Message,
                     "Fix the model source and retry; the message lists what could not be loaded.")],
-                parseResult.GetValue(GlobalOptions.ErrorFormat));
+                GlobalOptions.ErrorFormatValue(parseResult));
             return 2;
         }
         catch (AmbiguousModelProviderException ex)
@@ -159,7 +159,7 @@ internal static class Program
                     DiagnosticSeverity.Error,
                     ex.Message,
                     "Report this at https://github.com/bgarcevic/tomix-cli/issues.")],
-                parseResult.GetValue(GlobalOptions.ErrorFormat));
+                GlobalOptions.ErrorFormatValue(parseResult));
             return 1;
         }
         catch (Exception ex)
@@ -173,7 +173,7 @@ internal static class Program
                     DiagnosticSeverity.Error,
                     $"Unexpected error: {ex.Message}",
                     "Re-run with --debug for the full stack trace; if this persists, report it at https://github.com/bgarcevic/tomix-cli/issues.")],
-                parseResult.GetValue(GlobalOptions.ErrorFormat),
+                GlobalOptions.ErrorFormatValue(parseResult),
                 detail: parseResult.GetValue(GlobalOptions.Debug) ? ex.ToString() : null);
 
             return 1;

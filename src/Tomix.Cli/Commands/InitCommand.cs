@@ -70,7 +70,7 @@ internal sealed class InitCommand : ICommandModule
                 parseResult.GetValue(compatibilityLevelOption),
                 parseResult.GetValue(forceOption)));
 
-            return CommandOutput.Render(result, formatValue, Render);
+            return CommandOutput.Render(parseResult, result, formatValue, Render);
         });
 
         return command;

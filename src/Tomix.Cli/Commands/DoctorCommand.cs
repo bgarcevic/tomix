@@ -47,7 +47,7 @@ internal sealed class DoctorCommand : ICommandModule
             var result = _handler.Handle(
                 _version,
                 new DoctorTerminalCapabilities(caps.Interactive, caps.Ansi, caps.ColorSystem.ToString()));
-            return CommandOutput.Render(result, formatValue, Render);
+            return CommandOutput.Render(parseResult, result, formatValue, Render);
         });
 
         return command;

@@ -84,7 +84,7 @@ internal sealed class TestCommand : ICommandModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             if (!CommandOutput.TryValidateFormat(parseResult, format, "test", OutputFormats.Text, OutputFormats.Json))
                 return 2;

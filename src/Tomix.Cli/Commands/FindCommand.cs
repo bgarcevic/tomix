@@ -71,7 +71,7 @@ internal sealed class FindCommand : ICommandModule
         {
             var pattern = parseResult.GetValue(patternArgument) ?? "";
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = parseResult.GetValue(GlobalOptions.ErrorFormat);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
 
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "find", OutputFormats.Text, OutputFormats.Json))
@@ -104,6 +104,7 @@ internal sealed class FindCommand : ICommandModule
                 formatValue,
                 data => Render(data, pathsOnly, noMultiline, caseSensitive),
                 ToReferenceJson,
+                renderCsv: null,
                 errorFormat: errorFormat);
         });
 

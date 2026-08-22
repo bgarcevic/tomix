@@ -39,7 +39,7 @@ internal sealed class SessionCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "session list", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            return CommandOutput.Render(new SessionHandler(_state).List(), format, RenderList);
+            return CommandOutput.Render(parseResult, new SessionHandler(_state).List(), format, RenderList);
         });
         return command;
     }
@@ -60,6 +60,7 @@ internal sealed class SessionCommand : ICommandModule
                 return 1;
 
             return CommandOutput.Render(
+                parseResult,
                 new SessionHandler(_state).Clear(),
                 format,
                 result => AnsiConsole.MarkupLine(result.Cleared ? Styling.Success("Cleared current session.") : Styling.Muted("No active session.")));
@@ -99,6 +100,7 @@ internal sealed class SessionCommand : ICommandModule
                 return 1;
 
             return CommandOutput.Render(
+                parseResult,
                 new SessionHandler(_state).Prune(all, dryRun),
                 format,
                 result => AnsiConsole.MarkupLine(result.DryRun
@@ -114,7 +116,7 @@ internal sealed class SessionCommand : ICommandModule
         if (!CommandOutput.TryValidateFormat(parseResult, format, "session", OutputFormats.Text, OutputFormats.Json))
             return 2;
 
-        return CommandOutput.Render(new SessionHandler(_state).Show(), format, RenderShowResult);
+        return CommandOutput.Render(parseResult, new SessionHandler(_state).Show(), format, RenderShowResult);
     }
 
     private static void RenderShowResult(SessionShowResult result)

@@ -53,8 +53,7 @@ internal sealed class UpdateCommand : ICommandModule
 
             if (parseResult.GetValue(check) || checkResult.Data is null)
             {
-                return CommandOutput.Render(
-                    checkResult, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), UpdateRenderer.RenderCheck);
+                return CommandOutput.Render(parseResult, checkResult, formatValue, UpdateRenderer.RenderCheck);
             }
 
             return await ApplyAsync(parseResult, formatValue, checkResult.Data, target, installKind, cancellationToken);
@@ -86,7 +85,7 @@ internal sealed class UpdateCommand : ICommandModule
                 NewVersion: _version,
                 InstallKind: installKind,
                 Method: "none"));
-            return CommandOutput.Render(upToDate, formatValue, _ =>
+            return CommandOutput.Render(parseResult, upToDate, formatValue, _ =>
                 AnsiConsole.MarkupLine(Styling.Success($"tx is up to date ({_version}).")));
         }
 
@@ -97,8 +96,7 @@ internal sealed class UpdateCommand : ICommandModule
                 message: $"This tx was not installed in an updatable way (detected: {installKind}).",
                 exitCode: 2,
                 hint: "Reinstall via install.sh/install.ps1 or 'dotnet tool install -g Tomix.Cli'; the dev wrapper always runs current source.");
-            return CommandOutput.Render(
-                unsupported, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), _ => { });
+            return CommandOutput.Render(parseResult, unsupported, formatValue, _ => { });
         }
 
         var action = isDowngrade ? "Downgrade" : "Update";
@@ -121,7 +119,6 @@ internal sealed class UpdateCommand : ICommandModule
                 RuntimeIdentifier: RuntimeInformation.RuntimeIdentifier),
             cancellationToken);
 
-        return CommandOutput.Render(
-            applyResult, formatValue, parseResult.GetValue(GlobalOptions.ErrorFormat), UpdateRenderer.RenderApply);
+        return CommandOutput.Render(parseResult, applyResult, formatValue, UpdateRenderer.RenderApply);
     }
 }
