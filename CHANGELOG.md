@@ -10,7 +10,7 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-08-16
+## [0.1.0] - 2026-08-22
 
 First public release. Since nothing shipped before it, the sections below describe the
 surface as released, together with the changes and fixes made during pre-release
