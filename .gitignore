@@ -150,3 +150,5 @@ site/
 # samples/deploy-qa fixture, which is the input to that harness rather than its output.
 /deploy-qa/
 *.xmla
+
+.pi
