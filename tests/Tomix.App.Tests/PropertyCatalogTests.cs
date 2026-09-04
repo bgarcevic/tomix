@@ -183,26 +183,46 @@ public sealed class PropertyCatalogTests
     }
 
     [Fact]
-    public void WritableTokens_CoverTheCatalogedKindsOnly()
+    public void WritableTokens_MirrorTheCatalogedWritableDescriptors_ForEveryKind()
     {
-        Assert.Equal(["name", "description", "isHidden", "dataCategory"],
-            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Table));
-        Assert.Equal(["name", "description", "isHidden", "expression", "formatString", "displayFolder"],
-            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Measure));
-        Assert.Equal(["name", "description", "sourceColumn", "dataType", "isHidden", "formatString",
-                "displayFolder", "sortByColumn", "summarizeBy", "lineageTag", "sourceLineageTag",
-                "dataCategory", "isKey", "isNullable", "isUnique", "isAvailableInMDX", "keepUniqueRows",
-                "encodingHint", "alignment", "tableDetailPosition", "isDefaultLabel", "isDefaultImage",
-                "displayOrdinal", "sourceProviderType", "isDataTypeInferred"],
-            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Column));
-        Assert.Equal(["name", "expression"],
-            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Partition));
-        Assert.Equal(["name", "description", "expression", "kind", "remoteParameterName",
-                "lineageTag", "sourceLineageTag"],
-            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Expression));
-        Assert.Equal(["name", "description", "isHidden", "expression", "lineageTag", "sourceLineageTag"],
-            ModelPropertyCatalog.WritableTokens(ModelObjectKind.Function));
+        foreach (var kind in AllKinds)
+            Assert.Equal(
+                ModelPropertyCatalog.For(kind).Where(d => d.Writable).Select(d => d.JsonKey),
+                ModelPropertyCatalog.WritableTokens(kind));
+    }
+
+    [Theory]
+    [InlineData(ModelObjectKind.Table,
+        "name,description,isHidden,dataCategory")]
+    [InlineData(ModelObjectKind.Measure,
+        "name,description,isHidden,expression,formatString,displayFolder")]
+    [InlineData(ModelObjectKind.Column,
+        "name,description,sourceColumn,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag,sourceLineageTag,dataCategory,isKey,isNullable,isUnique,isAvailableInMDX,keepUniqueRows,encodingHint,alignment,tableDetailPosition,isDefaultLabel,isDefaultImage,displayOrdinal,sourceProviderType,isDataTypeInferred")]
+    [InlineData(ModelObjectKind.Hierarchy,
+        "name,description,isHidden,displayFolder")]
+    [InlineData(ModelObjectKind.Partition,
+        "name,expression")]
+    [InlineData(ModelObjectKind.Expression,
+        "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.Function,
+        "name,description,isHidden,expression,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.Kpi,
+        "description,targetExpression,statusExpression,trendExpression,targetFormatString")]
+    [InlineData(ModelObjectKind.TablePermission,
+        "filterExpression")]
+    public void WritableTokens_PinTheHintVocabularyPerKind(ModelObjectKind kind, string expectedTokens)
+    {
+        Assert.Equal(expectedTokens.Split(','), ModelPropertyCatalog.WritableTokens(kind));
+    }
+
+    [Fact]
+    public void WritableTokens_KindsWithoutWritableDescriptors_AreEmpty()
+    {
+        // A consequence of the mirror invariant, not an override: Role and Relationship model
+        // no writable descriptors yet, so they advertise nothing. Adding descriptors (issues
+        // #118/#119) makes the tokens — and the set hint — appear here for free.
         Assert.Empty(ModelPropertyCatalog.WritableTokens(ModelObjectKind.Role));
+        Assert.Empty(ModelPropertyCatalog.WritableTokens(ModelObjectKind.Relationship));
     }
 
     private static ModelObject Leaf(ModelObjectKind kind)

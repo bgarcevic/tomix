@@ -10,6 +10,18 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Fixed
+
+- `set` error hints now list the writable properties for every kind the catalog models, not
+  just tables, measures, columns, and partitions: KPIs (`targetExpression`, `statusExpression`,
+  `trendExpression`, `targetFormatString`, `description`), table permissions (`filterExpression`),
+  hierarchies, expressions, and functions previously rejected an unknown property with no
+  "Writable properties:" hint. A typo like `tx set "Sales/Total/KPI" statusGraphic=Foo` now
+  suggests what is actually settable (#144).
+- The catalog no longer advertises `name` as writable on table permissions: TOM derives the
+  name from the referenced table and rejects the assignment, so `tx set` now reports it as
+  unsupported (with the valid tokens) instead of surfacing the underlying TOM error (#144).
+
 ## [0.1.0] - 2026-08-22
 
 First public release. Since nothing shipped before it, the sections below describe the

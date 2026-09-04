@@ -152,9 +152,9 @@ public static class ModelPropertyCatalog
 
     private static readonly IReadOnlyList<PropertyDescriptor> TablePermission =
     [
-        // Not searchable: TOM derives the permission's name from the referenced table, so the
-        // site is find/replace-addressable only via the table itself.
-        new("name", "Name", o => o.Name, Writable: true),
+        // Not searchable and not writable: TOM derives the permission's name from the referenced
+        // table, so the site is find/replace-addressable only via the table, and renaming throws.
+        new("name", "Name", o => o.Name),
         // MetadataPermission is the permission's Detail, which diff already compares — not diffable here.
         new("metadataPermission", "MetadataPermission", o => o.Detail ?? ""),
         // The RLS filter is diffed via the parent role's rlsExpression — not diffable here.
@@ -240,17 +240,12 @@ public static class ModelPropertyCatalog
         [NamesScope, ExpressionsScope, DescriptionsScope, FormatStringsScope, DisplayFoldersScope];
 
     /// <summary>
-    /// JSON keys of the properties the mutator can set on this kind, for error hints. Empty for
-    /// kinds whose writable set the catalog does not model (the mutator stays the authority).
+    /// JSON keys of the properties the mutator can set on this kind, for error hints: exactly the
+    /// catalog's writable descriptors, so kinds that model none (relationship, role, the generic
+    /// fallback) yield an empty list — the mutator stays the authority for what is settable.
     /// </summary>
-    public static IReadOnlyList<string> WritableTokens(ModelObjectKind kind) => kind switch
-    {
-        ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
-            or ModelObjectKind.Hierarchy or ModelObjectKind.Partition
-            or ModelObjectKind.Expression or ModelObjectKind.Function
-            => For(kind).Where(d => d.Writable).Select(d => d.JsonKey).ToList(),
-        _ => []
-    };
+    public static IReadOnlyList<string> WritableTokens(ModelObjectKind kind)
+        => For(kind).Where(d => d.Writable).Select(d => d.JsonKey).ToList();
 
     /// <summary>Canonicalizes a data-type name; <c>Unknown</c> and empty mean "absent" and map to <c>""</c>.</summary>
     public static string NormalizeDataType(string? raw)

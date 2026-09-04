@@ -423,7 +423,7 @@ internal static class TomPropertyApplier
                 role.Description = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for roles.");
+                throw UnsupportedProperty(displayName, "roles", ModelObjectKind.Role);
         }
     }
 
@@ -459,7 +459,7 @@ internal static class TomPropertyApplier
                 hierarchy.IsHidden = ParseBool(value, displayName);
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for hierarchies.");
+                throw UnsupportedProperty(displayName, "hierarchies", ModelObjectKind.Hierarchy);
         }
     }
 
@@ -477,7 +477,7 @@ internal static class TomPropertyApplier
                 level.Ordinal = ParseInt(value, displayName);
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for levels.");
+                throw UnsupportedProperty(displayName, "levels", ModelObjectKind.Level);
         }
     }
 
@@ -507,7 +507,7 @@ internal static class TomPropertyApplier
                 expression.SourceLineageTag = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for expressions.");
+                throw UnsupportedProperty(displayName, "expressions", ModelObjectKind.Expression);
         }
     }
 
@@ -534,7 +534,7 @@ internal static class TomPropertyApplier
                 function.SourceLineageTag = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for functions.");
+                throw UnsupportedProperty(displayName, "functions", ModelObjectKind.Function);
         }
     }
 
@@ -555,7 +555,7 @@ internal static class TomPropertyApplier
                 item.Ordinal = ParseInt(value, displayName);
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for calculation items.");
+                throw UnsupportedProperty(displayName, "calculation items", ModelObjectKind.CalculationItem);
         }
     }
 
@@ -576,7 +576,7 @@ internal static class TomPropertyApplier
                 provider.Provider = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for data sources.");
+                throw UnsupportedProperty(displayName, "data sources", ModelObjectKind.DataSource);
         }
     }
 
@@ -600,7 +600,7 @@ internal static class TomPropertyApplier
                 kpi.TrendExpression = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for KPIs.");
+                throw UnsupportedProperty(displayName, "KPIs", ModelObjectKind.Kpi);
         }
     }
 
@@ -608,14 +608,13 @@ internal static class TomPropertyApplier
     {
         switch (property)
         {
-            case "name":
-                permission.Name = value;
-                break;
+            // No 'name' case: TOM derives the permission's name from its table and rejects the
+            // assignment, so the catalog does not advertise it and the hint falls through here.
             case "filterexpression":
                 permission.FilterExpression = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for table permissions.");
+                throw UnsupportedProperty(displayName, "table permissions", ModelObjectKind.TablePermission);
         }
     }
 
@@ -631,7 +630,7 @@ internal static class TomPropertyApplier
                 member.MemberID = value;
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for role members.");
+                throw UnsupportedProperty(displayName, "role members", ModelObjectKind.RoleMember);
         }
     }
 
@@ -691,7 +690,7 @@ internal static class TomPropertyApplier
                 relationship.ToCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
                 break;
             default:
-                throw new NotSupportedException($"Setting '{displayName}' is not supported for relationships.");
+                throw UnsupportedProperty(displayName, "relationships", ModelObjectKind.Relationship);
         }
     }
 

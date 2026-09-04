@@ -43,13 +43,19 @@ public sealed class CatalogWritableAgreementTests
             ["sourceProviderType"] = "int",
             ["isDataTypeInferred"] = "false",
             ["kind"] = "M",
-            ["remoteParameterName"] = "RemoteParam"
+            ["remoteParameterName"] = "RemoteParam",
+            ["targetExpression"] = "100",
+            ["statusExpression"] = "1",
+            ["trendExpression"] = "2",
+            ["targetFormatString"] = "#,0",
+            ["filterExpression"] = "TRUE()"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
         => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column,
             ModelObjectKind.Hierarchy, ModelObjectKind.Partition,
-            ModelObjectKind.Expression, ModelObjectKind.Function);
+            ModelObjectKind.Expression, ModelObjectKind.Function,
+            ModelObjectKind.Kpi, ModelObjectKind.TablePermission);
 
     [Theory]
     [MemberData(nameof(CatalogedKinds))]
@@ -79,6 +85,23 @@ public sealed class CatalogWritableAgreementTests
             Assert.True(exception is null,
                 $"Catalog marks '{token}' writable on {kind}, but the mutator rejected it: {exception?.Message}");
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(CatalogedKinds))]
+    public void UnsupportedPropertyError_ListsTheWritableTokensAsHint(ModelObjectKind kind)
+    {
+        var db = NewFixture();
+        var mutator = new TomModelMutator(db);
+        var (path, type) = TargetFor(kind);
+
+        var exception = Assert.Throws<NotSupportedException>(() => mutator.SetProperty(new ModelObjectSetRequest(
+            path, [new ModelPropertyAssignment("statusGraphic", "x")], type)));
+
+        // The hint is the only user-visible payload of WritableTokens: every kind with tokens
+        // must surface them when a property is rejected, not just the kinds that remember to.
+        Assert.Contains("Writable properties:", exception.Message);
+        Assert.Contains(ModelPropertyCatalog.WritableTokens(kind)[0], exception.Message);
     }
 
     [Fact]
@@ -138,6 +161,8 @@ public sealed class CatalogWritableAgreementTests
         ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
         ModelObjectKind.Expression => ("Expressions/E", null),
         ModelObjectKind.Function => ("Functions/F", null),
+        ModelObjectKind.Kpi => ("T/M", ModelObjectKind.Kpi),
+        ModelObjectKind.TablePermission => ("Readers/T", null),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -158,6 +183,12 @@ public sealed class CatalogWritableAgreementTests
         hierarchy.Levels.Add(new Level { Name = "L", Column = table.Columns["C"] });
         table.Hierarchies.Add(hierarchy);
         db.Model.Tables.Add(table);
+        // KPI on the measure so Kpi-kind set paths resolve; role + permission so
+        // TablePermission set paths resolve.
+        table.Measures["M"].KPI = new KPI { TargetExpression = "0", StatusExpression = "0" };
+        var role = new ModelRole { Name = "Readers" };
+        role.TablePermissions.Add(new TablePermission { Name = "T", Table = table, FilterExpression = "TRUE()" });
+        db.Model.Roles.Add(role);
         db.Model.Expressions.Add(new NamedExpression
         {
             Name = "E",
