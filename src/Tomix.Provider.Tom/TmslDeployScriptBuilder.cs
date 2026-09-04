@@ -30,6 +30,36 @@ internal static class TmslDeployScriptBuilder
         ModelDeployOptions options,
         bool stripRoleMemberIds)
     {
+        var database = BuildDatabaseNode(
+            sourceDatabaseJson, targetDatabaseJson, deployName, targetId, options, stripRoleMemberIds);
+
+        var script = new JsonObject
+        {
+            ["createOrReplace"] = new JsonObject
+            {
+                // TMSL addresses the existing database by NAME, not ID.
+                ["object"] = new JsonObject { ["database"] = deployName },
+                ["database"] = database
+            }
+        };
+
+        return script.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>
+    /// Builds the merged <c>database</c> node — the exact model a deploy would leave on the
+    /// target — without the <c>createOrReplace</c> envelope. <see cref="Build"/> wraps it for
+    /// execution; the dry-run plan deserializes it to snapshot what the deploy will produce, so
+    /// both paths are guaranteed to describe the same model.
+    /// </summary>
+    internal static JsonObject BuildDatabaseNode(
+        string sourceDatabaseJson,
+        string? targetDatabaseJson,
+        string deployName,
+        string? targetId,
+        ModelDeployOptions options,
+        bool stripRoleMemberIds)
+    {
         var database = JsonNode.Parse(sourceDatabaseJson) as JsonObject
             ?? throw new InvalidOperationException("Source database did not serialize to a JSON object.");
 
@@ -51,17 +81,7 @@ internal static class TmslDeployScriptBuilder
             AddPlaceholderPartitionsToPolicyTables(model);
         }
 
-        var script = new JsonObject
-        {
-            ["createOrReplace"] = new JsonObject
-            {
-                // TMSL addresses the existing database by NAME, not ID.
-                ["object"] = new JsonObject { ["database"] = deployName },
-                ["database"] = database
-            }
-        };
-
-        return script.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        return database;
     }
 
     private static void MergePreservedObjects(
@@ -192,6 +212,9 @@ internal static class TmslDeployScriptBuilder
     /// A refresh-policy table with no partitions fails deployment; the engine expects at least
     /// one. Injects a placeholder import partition built from the policy's source expression —
     /// the service replaces it with policy-generated partitions on the next refresh.
+    /// The name is deterministic rather than a fresh GUID so scripts are reproducible and the
+    /// dry-run plan does not report a spurious change on every run; it is only ever injected
+    /// into a table that has no partitions at all, so it cannot collide.
     /// </summary>
     internal static void AddPlaceholderPartitionsToPolicyTables(JsonObject model)
     {
@@ -208,7 +231,7 @@ internal static class TmslDeployScriptBuilder
             var sourceExpression = ((JsonObject)table["refreshPolicy"]!)["sourceExpression"]!.DeepClone();
             table["partitions"] = new JsonArray(new JsonObject
             {
-                ["name"] = $"{Name(table)}-{Guid.NewGuid():N}",
+                ["name"] = $"{Name(table)}-policy-placeholder",
                 ["mode"] = "import",
                 ["source"] = new JsonObject
                 {

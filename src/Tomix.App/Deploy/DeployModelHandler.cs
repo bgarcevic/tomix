@@ -95,31 +95,43 @@ public sealed class DeployModelHandler
         {
             DiffModelResult? diff = null;
             string? diffError = null;
+            bool? createsDatabase = null;
 
             if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(database))
             {
-                // Normalize so a bare workspace name (-s MyWorkspace) becomes a real endpoint,
-                // matching what the deployer does internally. The reference has to read as
-                // remote for the diff to treat the target as a processed database.
-                var remoteRef = ModelReference.Remote(
-                    ModelReference.NormalizeEndpoint(server), database);
-                var diffHandler = new DiffModelHandler(_providers);
-                // Target first: the dry run answers "what will this deploy change on the
-                // target", so added/removed/old→new must read in the deploy's direction.
-                var diffResult = await diffHandler.HandleAsync(
-                    new DiffModelRequest(remoteRef, request.Model),
-                    cancellationToken);
+                try
+                {
+                    // The plan reads the target once and returns both the target's current model
+                    // and the model this deploy would leave behind under the same options a real
+                    // deploy uses, so preserved objects never surface as changes.
+                    var plan = await deployer.GeneratePlanAsync(deployRequest, cancellationToken);
 
-                if (diffResult.Success)
-                    diff = diffResult.Data;
-                else
-                    // Keep the reason: "target unreachable" and "diff failed" are different
-                    // situations and the dry-run output should not conflate them.
-                    diffError = diffResult.Diagnostics.Count > 0 ? diffResult.Diagnostics[0].Message : null;
+                    if (!plan.TargetExists)
+                        // Nothing to compare against: the deploy creates the database and ships
+                        // the full source model.
+                        createsDatabase = true;
+                    else
+                        // Target first: the dry run answers "what will this deploy change on the
+                        // target", so added/removed/old→new read in the deploy's direction. The
+                        // target is a processed database, so engine-computed state is ignored.
+                        diff = DiffModelHandler.Diff(
+                            plan.Target!, plan.Planned, ignoreEngineComputedState: true);
+                }
+                // Keep the reason: "not authenticated" and "target unreachable" are different
+                // situations and the dry-run output should not conflate them.
+                catch (AuthenticationRequiredException ex)
+                {
+                    diffError = ex.Message;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException and not ModelLoadException)
+                {
+                    diffError = $"Cannot read target '{server}': {ex.InnerException?.Message ?? ex.Message}";
+                }
             }
 
             return TomixResult<DeployModelResult>.Ok(new DeployModelResult(
-                server, database ?? request.Model.Value, "dry-run", null, null, null, diff, diffError));
+                server, database ?? request.Model.Value, "dry-run", null, null, null, diff, diffError,
+                createsDatabase));
         }
 
         if (!string.IsNullOrWhiteSpace(request.XmlaOutput))

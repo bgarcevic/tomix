@@ -97,6 +97,91 @@ public static class TomModelDeployer
         }
     }
 
+    /// <summary>
+    /// Reads the target once and returns the two sides a dry run compares: the target's current
+    /// model and the model this deploy would leave behind under the request's options. Unlike
+    /// <see cref="GenerateScriptAsync"/> this always connects — even for a full deploy — because
+    /// the target snapshot is one half of the answer.
+    /// </summary>
+    public static async Task<ModelDeployPlan> GeneratePlanAsync(
+        Database sourceDatabase,
+        ModelDeployRequest request,
+        IAccessTokenProvider? tokenProvider,
+        CancellationToken cancellationToken)
+    {
+        var targetName = string.IsNullOrWhiteSpace(request.Database)
+            ? sourceDatabase.Name ?? sourceDatabase.ID
+            : request.Database;
+
+        var server = new TabularServer();
+        try
+        {
+            await ConnectAsync(server, request.Server, tokenProvider, cancellationToken).ConfigureAwait(false);
+            var existing = server.Databases.FindByName(targetName);
+            return BuildPlan(sourceDatabase, existing, targetName, request);
+        }
+        finally
+        {
+            if (server.Connected)
+                server.Disconnect();
+            server.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Pure plan construction, mirroring <c>BuildScript(forExecution: false)</c>: the same merge
+    /// produces the deployed model, so what the dry run reports and what the deploy sends cannot
+    /// drift. Restricted information stays out on both sides — the plan feeds a diff, not a
+    /// server — and the merged node is round-tripped back through TOM so the planned model is
+    /// summarized by exactly the same projection as the target.
+    /// </summary>
+    internal static ModelDeployPlan BuildPlan(
+        Database sourceDatabase,
+        TabularDatabase? existing,
+        string targetName,
+        ModelDeployRequest request)
+    {
+        var options = request.EffectiveOptions;
+        var deployName = existing?.Name ?? targetName;
+
+        var clone = sourceDatabase.Clone();
+        clone.Name = deployName;
+
+        var serializeOptions = new SerializeOptions
+        {
+            SplitMultilineStrings = true,
+            IncludeRestrictedInformation = false
+        };
+
+        var sourceJson = TabularJsonSerializer.SerializeDatabase(clone, serializeOptions);
+
+        string? targetJson = null;
+        ModelSnapshot? targetSnapshot = null;
+        if (existing is not null)
+        {
+            // The Databases collection is shallow until refreshed; read the full model once and
+            // use it for both the merge and the target snapshot. A detached database (an
+            // in-memory fixture) has nothing to refresh from and is already complete.
+            if (existing.Server is not null)
+                existing.Refresh(true);
+            targetJson = TabularJsonSerializer.SerializeDatabase(existing, serializeOptions);
+            targetSnapshot = TomModelSummarizer.Snapshot(existing, deployName);
+        }
+
+        var merged = TmslDeployScriptBuilder.BuildDatabaseNode(
+            sourceJson,
+            targetJson,
+            deployName,
+            existing?.ID,
+            options,
+            stripRoleMemberIds: IsCloudEndpoint(request.Server));
+
+        var planned = TabularJsonSerializer.DeserializeDatabase(merged.ToJsonString());
+        var plannedSnapshot = TomModelSummarizer.Snapshot(planned, deployName);
+
+        return new ModelDeployPlan(existing is not null, targetSnapshot, plannedSnapshot);
+    }
+
     /// <param name="forExecution">True when the script goes straight to the server, false when
     /// it is written to a file or stdout. Only executed scripts include the target's restricted
     /// information: preserved connection strings must survive a real deploy, but credentials

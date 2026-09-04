@@ -72,7 +72,10 @@ public sealed class SaveModelHandler
                 cancellationToken);
 
             var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
-                session, request.SyncTarget, request.Force, cancellationToken);
+                session, request.SyncTarget, request.Force,
+                // 'save' never edits a refresh policy, so the mirror's policy partitions (and their
+                // processed data) are preserved — see WorkspaceSync.SyncOptionsFor.
+                WorkspaceSync.SyncOptionsFor("save"), cancellationToken);
 
             // A failed workspace sync leaves the mirror behind the source; render the saved
             // result but exit non-zero so CI catches the drift.

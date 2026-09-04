@@ -152,7 +152,8 @@ public static class MutationLifecycle
             case MutationMode.Save:
                 var export = await mutator.SaveAsync(context.SaveTarget, context.Serialization, context.Force, cancellationToken);
                 var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
-                    mutator, context.SyncTarget, context.Force, cancellationToken);
+                    mutator, context.SyncTarget, context.Force,
+                    WorkspaceSync.SyncOptionsFor(command), cancellationToken);
                 return new MutationOutcome(export.SavedPath, null, synced, syncTarget, syncWarning);
 
             case MutationMode.Stage:

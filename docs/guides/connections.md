@@ -140,6 +140,19 @@ tx connect MyWorkspace Sales -w ./model.tmdl   # remote primary, local mirror
 tx connect ./model.tmdl -w                     # pick the target interactively
 ```
 
+A sync overwrites the mirror with the primary model, because the primary is the
+edited copy and preserving target objects would silently revert the edit. The
+one exception is incremental-refresh policy partitions: they are generated and
+processed on the service, so the mirror keeps them — and their processed data —
+even though the local model has none. `tx incremental-refresh` is exempt from
+the exception: when it edits a refresh policy, the sync replaces the policy and
+its partitions in full, so the change actually lands. To force a complete
+overwrite of everything, deploy explicitly:
+
+```sh
+tx deploy -s MyWorkspace -d Sales --deploy-full
+```
+
 Individual commands can skip the mirror with `--no-sync`. The mirror only
 applies to the session's primary model: a command addressed at an explicit
 source (a model path or `-s`/`-d`) that resolves to something other than the

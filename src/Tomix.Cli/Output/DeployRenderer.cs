@@ -20,7 +20,12 @@ internal static class DeployRenderer
             var name = string.IsNullOrWhiteSpace(result.Database) ? source : result.Database;
             AnsiConsole.MarkupLine(Styling.Value($"Dry run: {name} to {result.Server} / {result.Database}"));
 
-            if (result.Diff is not null)
+            if (result.CreatesDatabase == true)
+            {
+                AnsiConsole.MarkupLine(Styling.Success(
+                    "Target database does not exist — this deploy creates it with the full source model."));
+            }
+            else if (result.Diff is not null)
             {
                 if (!result.Diff.HasChanges)
                 {

@@ -151,33 +151,101 @@ public sealed class DeployModelHandlerTests
     [Fact]
     public async Task HandleAsync_DryRun_DiffsInDeployDirection()
     {
-        var source = SnapshotWithMeasure(includeMeasure: true);
+        var planned = SnapshotWithMeasure(includeMeasure: true);
         var target = SnapshotWithMeasure(includeMeasure: false);
         var provider = new DirectionalDeployProvider(
-            reference => reference.Value == "local-model" ? source : target);
+            reference => reference.Value == "local-model" ? planned : target,
+            () => new ModelDeployPlan(TargetExists: true, target, planned));
 
         var handler = new DeployModelHandler([provider], TestState);
-        var result = await handler.HandleAsync(
-            new DeployModelRequest(
-                new ModelReference("local-model"),
-                Server: "my-workspace",
-                Database: "my-model",
-                Profile: null,
-                CreateOnly: false,
-                SkipBpa: true,
-                FixBpa: false,
-                BpaRules: null,
-                XmlaOutput: null,
-                Force: false,
-                Ci: null,
-                DryRun: true),
-            CancellationToken.None);
+        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
 
         Assert.True(result.Success);
         var change = Assert.Single(result.Data!.Diff!.Changes);
         Assert.Equal("added", change.Action);
         Assert.Equal("Sales/Total Sales", change.Path);
     }
+
+    /// <summary>
+    /// The proof of the #128 fix at the handler level: the dry run diffs the deploy plan, not
+    /// the raw source. Here the source carries a measure the deploy will not send (the plan
+    /// preserves the target's state), so the honest answer is "no changes" — diffing the raw
+    /// source would report an addition the deploy never makes.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_DryRun_DiffsThePlan_NotTheRawSource()
+    {
+        var rawSource = SnapshotWithMeasure(includeMeasure: true);
+        var target = SnapshotWithMeasure(includeMeasure: false);
+        var provider = new DirectionalDeployProvider(
+            reference => reference.Value == "local-model" ? rawSource : target,
+            () => new ModelDeployPlan(TargetExists: true, target, Planned: target));
+
+        var handler = new DeployModelHandler([provider], TestState);
+        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.False(result.Data!.Diff!.HasChanges);
+        Assert.Empty(result.Data.Diff.Changes);
+    }
+
+    /// <summary>
+    /// A target database that does not exist yet has nothing to diff against: the deploy creates
+    /// it with the full source model, and the dry run must say so rather than report every object
+    /// in the model as an addition or fail as "target unreachable".
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_DryRun_TargetMissing_ReportsCreatesDatabase()
+    {
+        var source = SnapshotWithMeasure(includeMeasure: true);
+        var provider = new DirectionalDeployProvider(
+            _ => source,
+            () => new ModelDeployPlan(TargetExists: false, Target: null, Planned: source));
+
+        var handler = new DeployModelHandler([provider], TestState);
+        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(result.Data!.CreatesDatabase);
+        Assert.Null(result.Data.Diff);
+        Assert.Null(result.Data.DiffError);
+    }
+
+    /// <summary>
+    /// An unreadable target degrades the preview instead of failing the command: the dry run
+    /// still succeeds, reporting why the diff is missing.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_DryRun_PlanFailure_SetsDiffError_AndStillSucceeds()
+    {
+        var source = SnapshotWithMeasure(includeMeasure: true);
+        var provider = new DirectionalDeployProvider(
+            _ => source,
+            () => throw new InvalidOperationException("workspace is unreachable"));
+
+        var handler = new DeployModelHandler([provider], TestState);
+        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("dry-run", result.Data!.Status);
+        Assert.Null(result.Data.Diff);
+        Assert.Contains("workspace is unreachable", result.Data.DiffError);
+    }
+
+    private static DeployModelRequest DryRunRequest()
+        => new(
+            new ModelReference("local-model"),
+            Server: "my-workspace",
+            Database: "my-model",
+            Profile: null,
+            CreateOnly: false,
+            SkipBpa: true,
+            FixBpa: false,
+            BpaRules: null,
+            XmlaOutput: null,
+            Force: false,
+            Ci: null,
+            DryRun: true);
 
     private static ModelSnapshot SnapshotWithMeasure(bool includeMeasure)
     {
@@ -375,23 +443,31 @@ public sealed class DeployModelHandlerTests
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
             => throw Load();
 
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken ct)
+            => throw Load();
+
         private static ModelLoadException Load()
             => new("Cannot load model from 'broken.bim': unparsable.", new InvalidOperationException("inner"));
     }
 
     /// <summary>
-    /// Serves a different snapshot per reference so the dry-run diff sees distinct source and
-    /// target models; deploy-capable because the handler requires it of the source session.
+    /// Serves a different snapshot per reference — the raw source for the local model, the live
+    /// model for the remote target — plus the deploy plan the dry run is supposed to diff. The
+    /// two are configured independently so a handler that went back to diffing the raw source
+    /// instead of the plan produces a visibly different answer.
     /// </summary>
-    private sealed class DirectionalDeployProvider(Func<ModelReference, ModelSnapshot> snapshots) : IModelProvider
+    private sealed class DirectionalDeployProvider(
+        Func<ModelReference, ModelSnapshot> snapshots,
+        Func<ModelDeployPlan>? plan = null) : IModelProvider
     {
         public bool CanOpen(ModelReference _) => true;
 
         public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new DirectionalDeploySession(snapshots(reference)));
+            => Task.FromResult<IModelSession>(new DirectionalDeploySession(snapshots(reference), plan));
     }
 
-    private sealed class DirectionalDeploySession(ModelSnapshot snapshot) : IModelSession, IModelDeploySession
+    private sealed class DirectionalDeploySession(ModelSnapshot snapshot, Func<ModelDeployPlan>? plan)
+        : IModelSession, IModelDeploySession
     {
         public string SourcePath => "";
 
@@ -408,6 +484,11 @@ public sealed class DeployModelHandlerTests
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
             => Task.FromResult("{}");
+
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken ct)
+            => plan is null
+                ? throw new InvalidOperationException("This session has no configured deploy plan.")
+                : Task.FromResult(plan());
     }
 
     private sealed class StubDeployProvider : IModelProvider
@@ -435,6 +516,12 @@ public sealed class DeployModelHandlerTests
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
             => Task.FromResult($"{{\"createOrReplace\":{{\"object\":{{\"database\":\"{request.Database ?? "stub"}\"}},\"database\":{{\"name\":\"{request.Database ?? "stub"}\",\"compatibilityLevel\":1601}}}}}}");
+
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken ct)
+            => Task.FromResult(new ModelDeployPlan(
+                TargetExists: true,
+                new ModelSnapshot("stub", 1601, []),
+                new ModelSnapshot("stub", 1601, [])));
     }
 
     private sealed class StubDeployOnlyProvider : IModelProvider
@@ -476,6 +563,12 @@ public sealed class DeployModelHandlerTests
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
             => Task.FromResult($"{{\"createOrReplace\":{{\"object\":{{\"database\":\"{request.Database ?? "stub"}\"}},\"database\":{{\"name\":\"{request.Database ?? "stub"}\",\"compatibilityLevel\":1601}}}}}}");
+
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken ct)
+            => Task.FromResult(new ModelDeployPlan(
+                TargetExists: true,
+                new ModelSnapshot("stub", 1601, []),
+                new ModelSnapshot("stub", 1601, [])));
 
         private static ModelObject EmptyRole()
             => new("Empty", ModelObjectKind.Role, "Roles/Empty",

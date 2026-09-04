@@ -14,7 +14,27 @@ public interface IModelDeploySession
     Task<string> GenerateScriptAsync(
         ModelDeployRequest request,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the target once and returns both sides of the deploy as snapshots: the target's
+    /// current state and the exact model <see cref="DeployAsync"/> would leave behind under the
+    /// request's <see cref="ModelDeployRequest.Options"/>. Comparing the two is what makes a dry
+    /// run honest about preservation — it reports only the changes the deploy actually makes.
+    /// </summary>
+    Task<ModelDeployPlan> GeneratePlanAsync(
+        ModelDeployRequest request,
+        CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// The two sides of a planned deploy, produced from a single read of the target.
+/// <paramref name="Target"/> is null exactly when <paramref name="TargetExists"/> is false — the
+/// deploy creates the database and ships the full source model, so there is nothing to diff.
+/// </summary>
+public sealed record ModelDeployPlan(
+    bool TargetExists,
+    ModelSnapshot? Target,
+    ModelSnapshot Planned);
 
 /// <summary>
 /// Controls which aspects of an existing target database are overwritten by a deploy.

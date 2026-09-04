@@ -44,16 +44,28 @@ public sealed class DiffModelHandler
                 // on one side and absent on the other is an authored difference, not processing
                 // state, and hiding it would report two unequal models as identical.
                 var liveTargetInvolved = request.Left.IsRemote || request.Right.IsRemote;
-                var changes = Compare(leftSnapshot, rightSnapshot, liveTargetInvolved);
-                var summary = new DiffSummary(
-                    Added: changes.Count(c => c.Action == "added"),
-                    Removed: changes.Count(c => c.Action == "removed"),
-                    Modified: changes.Count(c => c.Action == "modified"));
-                var result = new DiffModelResult(changes.Count > 0, summary, changes);
+                var result = Diff(leftSnapshot, rightSnapshot, liveTargetInvolved);
 
                 return TomixResult<DiffModelResult>.Ok(result, result.HasChanges ? 1 : 0);
             });
         });
+    }
+
+    /// <summary>
+    /// Compares two already-loaded snapshots. Exposed so callers that produce their own snapshots
+    /// — notably the deploy dry run, which diffs the target against the model the deploy would
+    /// leave behind — share one definition of "what changed" with <c>tx diff</c>.
+    /// </summary>
+    public static DiffModelResult Diff(
+        ModelSnapshot left, ModelSnapshot right, bool ignoreEngineComputedState)
+    {
+        var changes = Compare(left, right, ignoreEngineComputedState);
+        var summary = new DiffSummary(
+            Added: changes.Count(c => c.Action == "added"),
+            Removed: changes.Count(c => c.Action == "removed"),
+            Modified: changes.Count(c => c.Action == "modified"));
+
+        return new DiffModelResult(changes.Count > 0, summary, changes);
     }
 
     private static TomixResult<DiffModelResult> NoProvider(ModelReference model)

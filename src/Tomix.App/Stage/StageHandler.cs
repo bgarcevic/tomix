@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Tomix.App.Models;
+using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -131,14 +132,16 @@ public sealed class StageHandler
             {
                 var sw = Stopwatch.StartNew();
                 var deployResult = await deployer.DeployAsync(
-                    // Full overwrite: the staged model was pulled from this same workspace, so
-                    // preserving target objects would silently revert staged changes to them.
+                    // Overwrite the remote: the staged model was pulled from this same workspace, so
+                    // preserving target objects would silently revert staged changes to them. The
+                    // exception is incremental-refresh policy partitions, which live only on the
+                    // service — see WorkspaceSync.SyncOptionsFor for the exemption and its limits.
                     new ModelDeployRequest(
                         manifest.SourceEndpoint,
                         manifest.SourceDatabase,
                         CreateOnly: false,
                         Force: force,
-                        Options: ModelDeployOptions.Full),
+                        Options: WorkspaceSync.SyncOptionsFor(manifest.Ops.Select(op => op.Command))),
                     cancellationToken);
                 sw.Stop();
 

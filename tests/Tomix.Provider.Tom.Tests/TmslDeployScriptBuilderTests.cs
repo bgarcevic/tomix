@@ -319,6 +319,26 @@ public sealed class TmslDeployScriptBuilderTests
         Assert.Equal("let Source = Sql in Source", partition["source"]!["expression"]!.GetValue<string>());
     }
 
+    /// <summary>
+    /// The placeholder name is derived from the table, not generated: a random name would make
+    /// every script byte-different and make the dry-run plan report a changed partition on every
+    /// run even when nothing changed.
+    /// </summary>
+    [Fact]
+    public void PolicyTablePlaceholder_NameIsDeterministic()
+    {
+        var source = SourceDb(tables: new JsonArray(WithPolicy(QueryTable("Fact"))));
+        var options = new ModelDeployOptions(DeployPartitions: true, DeployPolicyPartitions: true);
+
+        var first = Model(Build(source, target: null, targetId: null, options));
+        var second = Model(Build(
+            SourceDb(tables: new JsonArray(WithPolicy(QueryTable("Fact")))),
+            target: null, targetId: null, options));
+
+        Assert.Equal(["Fact-policy-placeholder"], PartitionNames(first, "Fact"));
+        Assert.Equal(PartitionNames(first, "Fact"), PartitionNames(second, "Fact"));
+    }
+
     [Fact]
     public void PolicyTableWithPartitions_NoPlaceholderAdded()
     {

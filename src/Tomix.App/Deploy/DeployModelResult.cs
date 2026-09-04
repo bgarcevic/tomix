@@ -18,4 +18,9 @@ public sealed record DeployModelResult(
     string? Script,
     DiffModelResult? Diff = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? DiffError = null);
+    string? DiffError = null,
+    /// <summary>True on a dry run whose target database does not exist yet: the deploy creates
+    /// it with the full source model, so there is no diff to show. Null everywhere else, and
+    /// omitted from JSON so existing output is unchanged.</summary>
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    bool? CreatesDatabase = null);

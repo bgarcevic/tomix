@@ -23,25 +23,76 @@ public sealed class MutationLifecycleSyncTests
     }
 
     /// <summary>
-    /// Drift guard for the one deploy in the product that is deliberately NOT preserve-by-default.
-    /// The mutation the user just made may be to a partition, a data source, or a role member, and
-    /// preserving those on the mirror would silently discard the edit they asked for. Granular
-    /// deployment made <c>Preserve</c> the default everywhere else, so this line is one careless
+    /// Drift guard for the one deploy in the product that is deliberately NOT preserve-by-default,
+    /// now pinned in both directions (issue #129, fixed).
+    ///
+    /// Outbound: the mutation the user just made may be to a partition, a data source, or a role
+    /// member, and preserving those on the mirror would silently discard the edit they asked for.
+    /// Granular deployment made <c>Preserve</c> the default everywhere else, so this is one careless
     /// "make it consistent" away from breaking, and nothing else would notice.
     ///
-    /// Note the cost this accepts: a mirror carrying incremental-refresh partitions loses their
-    /// processed data on every synced mutation. See issue #129.
+    /// Inbound: incremental-refresh policy partitions are the exemption — they are generated and
+    /// processed on the service, so deploying them would discard processed data on every synced
+    /// mutation, even a measure rename. The <c>incremental-refresh</c> command itself opts back into
+    /// <see cref="ModelDeployOptions.Full"/>, because the preserve path clones the target's
+    /// refreshPolicy back and would otherwise revert the policy edit.
     /// </summary>
-    [Fact]
-    public async Task CompleteAsync_SyncsAsFullDeploy_NotPreserving()
+    [Theory]
+    [InlineData("set", false)]
+    [InlineData("add", false)]
+    [InlineData("rm", false)]
+    [InlineData("incremental-refresh", true)]
+    public async Task CompleteAsync_SyncOptions_PreservePolicyPartitionsExceptForRefreshPolicyCommand(
+        string command, bool deploysPolicyPartitions)
     {
         var session = new StubMutationSession(deploySucceeds: true);
 
         await MutationLifecycle.CompleteAsync(
-            session, NewSaveContext(SyncTarget), "set", "set X", CancellationToken.None);
+            session, NewSaveContext(SyncTarget), command, $"{command} X", CancellationToken.None);
 
-        Assert.Equal(ModelDeployOptions.Full, session.LastDeployRequest?.EffectiveOptions);
+        var expected = deploysPolicyPartitions
+            ? ModelDeployOptions.Full
+            : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
+        Assert.Equal(expected, session.LastDeployRequest?.EffectiveOptions);
     }
+
+    [Theory]
+    [InlineData("set", false)]
+    [InlineData("add", false)]
+    [InlineData("rm", false)]
+    [InlineData("replace", false)]
+    [InlineData("incremental-refresh", true)]
+    public void SyncOptionsFor_Command_DeploysPolicyPartitions_OnlyForRefreshPolicyCommand(
+        string command, bool deploysPolicyPartitions)
+    {
+        var options = WorkspaceSync.SyncOptionsFor(command);
+
+        // Record equality also pins that every other aspect stays a full overwrite.
+        var expected = deploysPolicyPartitions
+            ? ModelDeployOptions.Full
+            : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
+        Assert.Equal(expected, options);
+    }
+
+    [Theory]
+    [InlineData(new[] { "add" }, false)]
+    [InlineData(new[] { "add", "set" }, false)]
+    [InlineData(new[] { "incremental-refresh" }, true)]
+    [InlineData(new[] { "add", "incremental-refresh", "set" }, true)]
+    public void SyncOptionsFor_Commands_DeploysPolicyPartitions_WhenAnyOpEditsTheRefreshPolicy(
+        string[] commands, bool deploysPolicyPartitions)
+    {
+        var options = WorkspaceSync.SyncOptionsFor(commands);
+
+        var expected = deploysPolicyPartitions
+            ? ModelDeployOptions.Full
+            : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
+        Assert.Equal(expected, options);
+    }
+
+    [Fact]
+    public void SyncOptionsFor_EmptyCommands_PreservesPolicyPartitions()
+        => Assert.False(WorkspaceSync.SyncOptionsFor(Array.Empty<string>()).DeployPolicyPartitions);
 
     [Fact]
     public async Task CompleteAsync_SetsWarning_WhenDeployFails()
@@ -108,7 +159,7 @@ public sealed class MutationLifecycleSyncTests
 
         var (synced, target, warning) = await WorkspaceSync.SyncAsync(
             new StubMutationSession(deploySucceeds: false),
-            SyncTarget, force: false, CancellationToken.None);
+            SyncTarget, force: false, ModelDeployOptions.Full, CancellationToken.None);
 
         Assert.False(synced);
         Assert.Contains(messages, m => m.StartsWith("Syncing to powerbi://", StringComparison.Ordinal));
@@ -122,7 +173,8 @@ public sealed class MutationLifecycleSyncTests
         // downgraded to a "sync failed" warning.
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => WorkspaceSync.SyncAsync(
-                new CancellingDeploySession(), SyncTarget, force: false, CancellationToken.None));
+                new CancellingDeploySession(), SyncTarget, force: false,
+                ModelDeployOptions.Full, CancellationToken.None));
     }
 
     [Fact]
@@ -207,6 +259,9 @@ public sealed class MutationLifecycleSyncTests
         }
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
+
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken cancellationToken)
+            => throw new NotSupportedException("This stub never plans a deploy.");
     }
 
     private sealed class CancellingDeploySession : IModelDeploySession
@@ -215,6 +270,9 @@ public sealed class MutationLifecycleSyncTests
             => throw new OperationCanceledException();
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
+
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken cancellationToken)
+            => throw new NotSupportedException("This stub never plans a deploy.");
     }
 
     private sealed class StubNonDeployMutationSession : IModelMutationSession

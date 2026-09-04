@@ -98,6 +98,52 @@ public sealed class StageHandlerTests
         Assert.Equal(1, result.Data.OpsCommitted);
     }
 
+    /// <summary>
+    /// A staged commit pushes the whole working copy to the remote, so it carries the same
+    /// data-loss risk as a synced save (issue #129): deploying incremental-refresh policy
+    /// partitions discards their processed data on the service. Pinned in both directions — the
+    /// exemption drops only <c>DeployPolicyPartitions</c>, and a staged <c>incremental-refresh</c>
+    /// op restores the full deploy so the policy edit actually lands.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { "add" }, false)]
+    [InlineData(new[] { "add", "set" }, false)]
+    [InlineData(new[] { "incremental-refresh" }, true)]
+    [InlineData(new[] { "add", "incremental-refresh" }, true)]
+    public async Task CommitAsync_RemoteSync_PreservesPolicyPartitions_UnlessRefreshPolicyStaged(
+        string[] commands, bool deploysPolicyPartitions)
+    {
+        using var config = new TempConfigDir();
+        var source = new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel");
+        var workingDir = config.CreateSubdirectory("working");
+
+        var manifest = new StagingManifest(
+            SessionId: TempConfigDir.SessionId,
+            Source: "powerbi://api.powerbi.com/v1.0/myorg/ws|MyModel",
+            SourceKind: "remote",
+            SourceEndpoint: "powerbi://api.powerbi.com/v1.0/myorg/ws",
+            SourceDatabase: "MyModel",
+            Workspace: null,
+            Serialization: "tmdl",
+            WorkingCopy: workingDir,
+            CreatedUtc: DateTimeOffset.UtcNow,
+            UpdatedUtc: DateTimeOffset.UtcNow,
+            SourceFingerprint: null,
+            Ops: [.. commands.Select((c, i) => new StagedOp(i + 1, DateTimeOffset.UtcNow, c, $"{c} X"))]);
+
+        config.Staging.WriteManifest(source, manifest);
+
+        var provider = new StubDeployProvider(workingDir);
+        var handler = new StageHandler(config.Staging);
+        var result = await handler.CommitAsync(source, [provider], force: false, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var expected = deploysPolicyPartitions
+            ? ModelDeployOptions.Full
+            : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
+        Assert.Equal(expected, provider.Session.LastDeployRequest?.EffectiveOptions);
+    }
+
     [Fact]
     public async Task CommitAsync_ExportsLocally_WhenSourceKindIsLocal()
     {
@@ -140,15 +186,19 @@ public sealed class StageHandlerTests
 
         public StubDeployProvider(string expectedPath) => _expectedPath = expectedPath;
 
+        public StubDeploySession Session { get; } = new();
+
         public bool CanOpen(ModelReference reference)
             => reference.Value == _expectedPath || Directory.Exists(_expectedPath);
 
         public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new StubDeploySession());
+            => Task.FromResult<IModelSession>(Session);
     }
 
     private sealed class StubDeploySession : IModelSession, IModelDeploySession
     {
+        public ModelDeployRequest? LastDeployRequest { get; private set; }
+
         public string SourcePath => "";
 
         public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
@@ -160,9 +210,15 @@ public sealed class StageHandlerTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
-            => Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "updated", 42));
+        {
+            LastDeployRequest = request;
+            return Task.FromResult(new ModelDeployResult(request.Server, request.Database ?? "stub", "updated", 42));
+        }
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken) => Task.FromResult("");
+
+        public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken cancellationToken)
+            => throw new NotSupportedException("This stub never plans a deploy.");
     }
 
     private sealed class StubExportProvider : IModelProvider

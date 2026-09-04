@@ -143,6 +143,9 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
     public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken cancellationToken)
         => TomModelDeployer.GenerateScriptAsync(GetDatabase(), request, _tokenProvider, cancellationToken);
 
+    public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken cancellationToken)
+        => TomModelDeployer.GeneratePlanAsync(GetDatabase(), request, _tokenProvider, cancellationToken);
+
     private TabularDatabase GetDatabase()
     {
         if (_database is not null)
