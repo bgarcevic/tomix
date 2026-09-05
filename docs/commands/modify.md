@@ -71,6 +71,8 @@ tx set "Sales[Amount]" -q summarizeBy -i Sum
 tx set "Dates[Month]" -q sortByColumn -i MonthNo                  # empty value clears it
 tx set "Sales[OrderId]" -q isKey -i true
 tx set "Sales[Total Sales]" -t kpi -q statusGraphic -i "Cylinder"
+tx set "Sales Territory/'Sales Territories'" -q hideMembers -i HideBlankMembers
+tx set "Sales Territory/'Sales Territories'/Region" -q ordinal -i 2
 ```
 
 Columns accept every writable scalar property (`sourceColumn`, `dataType`,
@@ -92,6 +94,12 @@ accept `description`, `targetExpression`, `statusExpression`,
 `trendExpression`, `targetFormatString`, `statusGraphic`, `trendGraphic`,
 `statusDescription`, `targetDescription`, and `trendDescription` —
 address them with `-t kpi` or a `/KPI` path suffix.
+
+Hierarchies accept every writable scalar property (`hideMembers` —
+`Default` or `HideBlankMembers` — `lineageTag`, `sourceLineageTag`) —
+everything `tx get` shows for the hierarchy. Levels accept `ordinal`,
+`lineageTag`, and `sourceLineageTag`; address a level with its full
+`Table/Hierarchy/Level` path.
 
 ## `mv` — move or rename
 

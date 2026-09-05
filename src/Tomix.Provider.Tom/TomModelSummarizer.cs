@@ -305,17 +305,31 @@ public static class TomModelSummarizer
         var path = $"{tablePath}/{Segment(hierarchy.Name)}";
         var props = new Dictionary<string, string>
         {
-            [PropDisplayFolder] = hierarchy.DisplayFolder ?? ""
+            [PropDisplayFolder] = hierarchy.DisplayFolder ?? "",
+            [PropertyBagKeys.HideMembers] = hierarchy.HideMembers.ToString(),
+            [PropLineageTag] = hierarchy.LineageTag ?? "",
+            [PropertyBagKeys.SourceLineageTag] = hierarchy.SourceLineageTag ?? ""
         };
         AddAnnotations(props, hierarchy.Annotations);
         var levels = hierarchy.Levels
             .OrderBy(l => l.Ordinal)
-            .Select(l => Leaf(
+            .Select(l => new ModelObject(
                 l.Name,
                 ModelObjectKind.Level,
                 $"{path}/{Segment(l.Name)}",
-                detail: l.Column?.Name,
-                description: Desc(l.Description)))
+                Detail: l.Column?.Name,
+                Expression: null,
+                Description: Desc(l.Description),
+                Hidden: false,
+                SourceColumn: null,
+                Children: [],
+                Properties: new Dictionary<string, string>
+                {
+                    [PropertyBagKeys.Ordinal] = l.Ordinal.ToString(),
+                    [PropLineageTag] = l.LineageTag ?? "",
+                    [PropertyBagKeys.SourceLineageTag] = l.SourceLineageTag ?? "",
+                    [PropObjectType] = "Level"
+                }))
             .ToList();
 
         return new ModelObject(

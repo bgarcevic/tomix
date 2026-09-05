@@ -72,7 +72,9 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Role,
         "name,description,modelPermission,rlsExpression,members")]
     [InlineData(ModelObjectKind.Hierarchy,
-        "name,description,isHidden,detail,expression,displayFolder")]
+        "name,description,isHidden,detail,expression,displayFolder,hideMembers,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.Level,
+        "name,description,isHidden,detail,expression,ordinal,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Expression,
         "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Function,
@@ -201,7 +203,9 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Column,
         "name,description,sourceColumn,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag,sourceLineageTag,dataCategory,isKey,isNullable,isUnique,isAvailableInMDX,keepUniqueRows,encodingHint,alignment,tableDetailPosition,isDefaultLabel,isDefaultImage,displayOrdinal,sourceProviderType,isDataTypeInferred")]
     [InlineData(ModelObjectKind.Hierarchy,
-        "name,description,isHidden,displayFolder")]
+        "name,description,isHidden,displayFolder,hideMembers,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.Level,
+        "name,description,ordinal,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Partition,
         "name,expression")]
     [InlineData(ModelObjectKind.Expression,

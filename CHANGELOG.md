@@ -24,6 +24,11 @@ and the API surface that major versions protect.
   `statusGraphic`, `trendGraphic`, `statusDescription`, `targetDescription`, and
   `trendDescription`. `get`/`ls`/`find` JSON, CSV, and text output gain the matching read-side
   keys (additive), and `diff` reports changes to them (#115).
+- `set` on hierarchies and levels now covers the rest of their writable scalar surface:
+  hierarchies gain `hideMembers`, `lineageTag`, and `sourceLineageTag`; levels gain `ordinal`
+  (in addition to the existing `name`/`description`) plus the lineage tags, and `get`/`ls`/`find`
+  now model levels with their own property set instead of the generic fallback — the matching
+  read-side keys are additive, and `diff` reports changes to `hideMembers` and `ordinal` (#116).
 
 ### Changed
 

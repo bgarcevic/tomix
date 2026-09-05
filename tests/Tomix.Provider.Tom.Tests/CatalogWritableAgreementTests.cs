@@ -61,12 +61,14 @@ public sealed class CatalogWritableAgreementTests
             ["trendGraphic"] = "Standard Arrow",
             ["statusDescription"] = "status",
             ["targetDescription"] = "target",
-            ["trendDescription"] = "trend"
+            ["trendDescription"] = "trend",
+            ["hideMembers"] = "HideBlankMembers",
+            ["ordinal"] = "1"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
         => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column,
-            ModelObjectKind.Hierarchy, ModelObjectKind.Partition,
+            ModelObjectKind.Hierarchy, ModelObjectKind.Level, ModelObjectKind.Partition,
             ModelObjectKind.Expression, ModelObjectKind.Function,
             ModelObjectKind.Kpi, ModelObjectKind.TablePermission);
 
@@ -173,6 +175,7 @@ public sealed class CatalogWritableAgreementTests
         ModelObjectKind.Measure => ("T/M", ModelObjectKind.Measure),
         ModelObjectKind.Column => ("T/C", ModelObjectKind.Column),
         ModelObjectKind.Hierarchy => ("T/H", ModelObjectKind.Hierarchy),
+        ModelObjectKind.Level => ("T/H/L", ModelObjectKind.Level),
         ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
         ModelObjectKind.Expression => ("Expressions/E", null),
         ModelObjectKind.Function => ("Functions/F", null),

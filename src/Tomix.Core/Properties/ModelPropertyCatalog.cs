@@ -112,7 +112,26 @@ public static class ModelPropertyCatalog
         IsHidden(writable: true),
         new("detail", "Detail", o => o.Detail ?? ""),
         Expression(writable: false),
-        DisplayFolder()
+        DisplayFolder(),
+        new("hideMembers", "HideMembers", o => Bag(o, PropertyBagKeys.HideMembers), Writable: true, Diffable: true),
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
+    ];
+
+    // The generic keys levels answered before the catalog modeled them (including the
+    // always-empty expression and isHidden — TOM has no such Level properties) stay in
+    // place so existing JSON/CSV consumers keep their schema; detail remains the level's
+    // column name and the writable scalars are appended, not substituted.
+    private static readonly IReadOnlyList<PropertyDescriptor> Level =
+    [
+        Name(writable: true),
+        Description(writable: true),
+        IsHidden(writable: false),
+        new("detail", "Detail", o => o.Detail ?? ""),
+        Expression(writable: false),
+        new("ordinal", "Ordinal", o => IntBag(o, PropertyBagKeys.Ordinal), Writable: true, Diffable: true),
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Partition =
@@ -223,6 +242,7 @@ public static class ModelPropertyCatalog
         ModelObjectKind.Measure => Measure,
         ModelObjectKind.Column => Column,
         ModelObjectKind.Hierarchy => Hierarchy,
+        ModelObjectKind.Level => Level,
         ModelObjectKind.Partition => Partition,
         ModelObjectKind.Relationship => Relationship,
         ModelObjectKind.Role => Role,

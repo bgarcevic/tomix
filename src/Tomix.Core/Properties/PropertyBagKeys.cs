@@ -24,6 +24,7 @@ public static class PropertyBagKeys
     public const string EncodingHint = "EncodingHint";
     public const string Alignment = "Alignment";
     public const string TableDetailPosition = "TableDetailPosition";
+    public const string Ordinal = "Ordinal";
     public const string IsDefaultLabel = "IsDefaultLabel";
     public const string IsDefaultImage = "IsDefaultImage";
     public const string DisplayOrdinal = "DisplayOrdinal";
@@ -64,6 +65,7 @@ public static class PropertyBagKeys
     public const string ShowAsVariationsOnly = "ShowAsVariationsOnly";
     public const string SystemManaged = "SystemManaged";
     public const string DirectLakeIndexingBehavior = "DirectLakeIndexingBehavior";
+    public const string HideMembers = "HideMembers";
     public const string ExpressionKind = "ExpressionKind";
     public const string RemoteParameterName = "RemoteParameterName";
     public const string AnnotationPrefix = "Annotation:";

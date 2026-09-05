@@ -497,6 +497,15 @@ internal static class TomPropertyApplier
             case "ishidden":
                 hierarchy.IsHidden = ParseBool(value, displayName);
                 break;
+            case "hidemembers":
+                hierarchy.HideMembers = ParseEnum<HierarchyHideMembersType>(value, displayName);
+                break;
+            case "lineagetag":
+                hierarchy.LineageTag = value;
+                break;
+            case "sourcelineagetag":
+                hierarchy.SourceLineageTag = value;
+                break;
             default:
                 throw UnsupportedProperty(displayName, "hierarchies", ModelObjectKind.Hierarchy);
         }
@@ -514,6 +523,12 @@ internal static class TomPropertyApplier
                 break;
             case "ordinal":
                 level.Ordinal = ParseInt(value, displayName);
+                break;
+            case "lineagetag":
+                level.LineageTag = value;
+                break;
+            case "sourcelineagetag":
+                level.SourceLineageTag = value;
                 break;
             default:
                 throw UnsupportedProperty(displayName, "levels", ModelObjectKind.Level);
