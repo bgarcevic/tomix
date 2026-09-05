@@ -51,6 +51,13 @@ public static class PropertyBagKeys
     public const string RefreshPolicyPollingExpression = "RefreshPolicyPollingExpression";
     public const string NoSelectionExpression = "NoSelectionExpression";
     public const string MultipleOrEmptySelectionExpression = "MultipleOrEmptySelectionExpression";
+    public const string IsPrivate = "IsPrivate";
+    public const string ExcludeFromModelRefresh = "ExcludeFromModelRefresh";
+    public const string ExcludeFromAutomaticAggregations = "ExcludeFromAutomaticAggregations";
+    public const string AlternateSourcePrecedence = "AlternateSourcePrecedence";
+    public const string ShowAsVariationsOnly = "ShowAsVariationsOnly";
+    public const string SystemManaged = "SystemManaged";
+    public const string DirectLakeIndexingBehavior = "DirectLakeIndexingBehavior";
     public const string ExpressionKind = "ExpressionKind";
     public const string RemoteParameterName = "RemoteParameterName";
     public const string AnnotationPrefix = "Annotation:";

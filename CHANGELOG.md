@@ -10,6 +10,16 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `set` on tables now accepts every writable scalar property TOM exposes, in addition to the
+  existing `name`, `description`, `isHidden`, and `dataCategory`: `isPrivate`,
+  `excludeFromModelRefresh`, `excludeFromAutomaticAggregations`, `alternateSourcePrecedence`,
+  `showAsVariationsOnly`, `systemManaged`, `directLakeIndexingBehavior`, `lineageTag`, and
+  `sourceLineageTag`. `get`/`ls`/`find` JSON, CSV, and text output gain the matching read-side
+  keys (additive — existing keys and their order are unchanged), and `diff` reports changes to
+  the refresh/aggregation/DirectLake behavior properties (#114).
+
 ### Changed
 
 - Destructive commands now ask for confirmation before running: `stage commit` (it overwrites

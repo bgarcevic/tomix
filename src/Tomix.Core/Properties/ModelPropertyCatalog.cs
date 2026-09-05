@@ -23,7 +23,7 @@ public static class ModelPropertyCatalog
         Description(writable: true),
         IsHidden(writable: true),
         new("dataCategory", "DataCategory", o => Bag(o, PropertyBagKeys.DataCategory), Writable: true, Diffable: true),
-        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag)),
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
         new("columns", "Columns", o => Count(o, ModelObjectKind.Column)),
         new("measures", "Measures", o => Count(o, ModelObjectKind.Measure)),
         new("hierarchies", "Hierarchies", o => Count(o, ModelObjectKind.Hierarchy)),
@@ -34,7 +34,18 @@ public static class ModelPropertyCatalog
         // Calculation-group selection expressions; empty for regular tables.
         new("noSelectionExpression", "NoSelectionExpression", o => Bag(o, PropertyBagKeys.NoSelectionExpression), Searchable: true, SearchScope: ExpressionsScope),
         new("multipleOrEmptySelectionExpression", "MultipleOrEmptySelectionExpression", o => Bag(o, PropertyBagKeys.MultipleOrEmptySelectionExpression), Searchable: true, SearchScope: ExpressionsScope),
-        new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", o => Bag(o, PropertyBagKeys.DefaultDetailRowsExpression), Searchable: true, SearchScope: ExpressionsScope, Diffable: true)
+        new("defaultDetailRowsExpression", "DefaultDetailRowsExpression", o => Bag(o, PropertyBagKeys.DefaultDetailRowsExpression), Searchable: true, SearchScope: ExpressionsScope, Diffable: true),
+        // Refresh/aggregation/DirectLake behavior, source precedence, and the source lineage tag
+        // carry model semantics; the visibility/system flags below are writable for parity but
+        // not diffable: they carry no model semantics diff should report on.
+        new("isPrivate", "IsPrivate", o => BoolBag(o, PropertyBagKeys.IsPrivate), Writable: true),
+        new("excludeFromModelRefresh", "ExcludeFromModelRefresh", o => BoolBag(o, PropertyBagKeys.ExcludeFromModelRefresh), Writable: true, Diffable: true),
+        new("excludeFromAutomaticAggregations", "ExcludeFromAutomaticAggregations", o => BoolBag(o, PropertyBagKeys.ExcludeFromAutomaticAggregations), Writable: true, Diffable: true),
+        new("alternateSourcePrecedence", "AlternateSourcePrecedence", o => IntBag(o, PropertyBagKeys.AlternateSourcePrecedence), Writable: true, Diffable: true),
+        new("showAsVariationsOnly", "ShowAsVariationsOnly", o => BoolBag(o, PropertyBagKeys.ShowAsVariationsOnly), Writable: true),
+        new("systemManaged", "SystemManaged", o => BoolBag(o, PropertyBagKeys.SystemManaged), Writable: true),
+        new("directLakeIndexingBehavior", "DirectLakeIndexingBehavior", o => Bag(o, PropertyBagKeys.DirectLakeIndexingBehavior), Writable: true, Diffable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Measure =

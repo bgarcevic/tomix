@@ -48,7 +48,14 @@ public sealed class CatalogWritableAgreementTests
             ["statusExpression"] = "1",
             ["trendExpression"] = "2",
             ["targetFormatString"] = "#,0",
-            ["filterExpression"] = "TRUE()"
+            ["filterExpression"] = "TRUE()",
+            ["isPrivate"] = "true",
+            ["excludeFromModelRefresh"] = "true",
+            ["excludeFromAutomaticAggregations"] = "true",
+            ["alternateSourcePrecedence"] = "1",
+            ["showAsVariationsOnly"] = "true",
+            ["systemManaged"] = "true",
+            ["directLakeIndexingBehavior"] = "Default"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds

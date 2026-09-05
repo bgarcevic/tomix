@@ -220,6 +220,33 @@ internal static class TomPropertyApplier
             case "datacategory":
                 table.DataCategory = value;
                 break;
+            case "lineagetag":
+                table.LineageTag = value;
+                break;
+            case "sourcelineagetag":
+                table.SourceLineageTag = value;
+                break;
+            case "isprivate":
+                table.IsPrivate = ParseBool(value, displayName);
+                break;
+            case "excludefrommodelrefresh":
+                table.ExcludeFromModelRefresh = ParseBool(value, displayName);
+                break;
+            case "excludefromautomaticaggregations":
+                table.ExcludeFromAutomaticAggregations = ParseBool(value, displayName);
+                break;
+            case "alternatesourceprecedence":
+                table.AlternateSourcePrecedence = ParseInt(value, displayName);
+                break;
+            case "showasvariationsonly":
+                table.ShowAsVariationsOnly = ParseBool(value, displayName);
+                break;
+            case "systemmanaged":
+                table.SystemManaged = ParseBool(value, displayName);
+                break;
+            case "directlakeindexingbehavior":
+                table.DirectLakeIndexingBehavior = ParseEnum<DirectLakeIndexingBehavior>(value, displayName);
+                break;
             default:
                 throw UnsupportedProperty(displayName, "tables", ModelObjectKind.Table);
         }

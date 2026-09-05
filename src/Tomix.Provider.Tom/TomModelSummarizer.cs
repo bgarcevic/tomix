@@ -124,6 +124,14 @@ public static class TomModelSummarizer
             [PropertyBagKeys.NoSelectionExpression] = table.CalculationGroup?.NoSelectionExpression?.Expression ?? "",
             [PropertyBagKeys.MultipleOrEmptySelectionExpression] = table.CalculationGroup?.MultipleOrEmptySelectionExpression?.Expression ?? "",
             [PropertyBagKeys.DefaultDetailRowsExpression] = table.DefaultDetailRowsDefinition?.Expression ?? "",
+            [PropertyBagKeys.IsPrivate] = table.IsPrivate.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.ExcludeFromModelRefresh] = table.ExcludeFromModelRefresh.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.ExcludeFromAutomaticAggregations] = table.ExcludeFromAutomaticAggregations.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.AlternateSourcePrecedence] = table.AlternateSourcePrecedence.ToString(),
+            [PropertyBagKeys.ShowAsVariationsOnly] = table.ShowAsVariationsOnly.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.SystemManaged] = table.SystemManaged.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.DirectLakeIndexingBehavior] = table.DirectLakeIndexingBehavior.ToString(),
+            [PropertyBagKeys.SourceLineageTag] = table.SourceLineageTag ?? "",
             [PropObjectType] = "Table"
         };
         AddAnnotations(tableProps, table.Annotations);
