@@ -55,7 +55,13 @@ public sealed class CatalogWritableAgreementTests
             ["alternateSourcePrecedence"] = "1",
             ["showAsVariationsOnly"] = "true",
             ["systemManaged"] = "true",
-            ["directLakeIndexingBehavior"] = "Default"
+            ["directLakeIndexingBehavior"] = "Default",
+            ["isSimpleMeasure"] = "true",
+            ["statusGraphic"] = "Cylinder",
+            ["trendGraphic"] = "Standard Arrow",
+            ["statusDescription"] = "status",
+            ["targetDescription"] = "target",
+            ["trendDescription"] = "trend"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
@@ -102,8 +108,10 @@ public sealed class CatalogWritableAgreementTests
         var mutator = new TomModelMutator(db);
         var (path, type) = TargetFor(kind);
 
+        // Not a real token on any kind: statusGraphic used to play this role but became a
+        // writable KPI property, so the bogus name has to stay ahead of the catalog.
         var exception = Assert.Throws<NotSupportedException>(() => mutator.SetProperty(new ModelObjectSetRequest(
-            path, [new ModelPropertyAssignment("statusGraphic", "x")], type)));
+            path, [new ModelPropertyAssignment("bogusGraphic", "x")], type)));
 
         // The hint is the only user-visible payload of WritableTokens: every kind with tokens
         // must surface them when a property is rejected, not just the kinds that remember to.

@@ -274,6 +274,18 @@ internal static class TomPropertyApplier
             case "ishidden":
                 measure.IsHidden = ParseBool(value, displayName);
                 break;
+            case "datacategory":
+                measure.DataCategory = value;
+                break;
+            case "lineagetag":
+                measure.LineageTag = value;
+                break;
+            case "sourcelineagetag":
+                measure.SourceLineageTag = value;
+                break;
+            case "issimplemeasure":
+                measure.IsSimpleMeasure = ParseBool(value, displayName);
+                break;
             default:
                 throw UnsupportedProperty(displayName, "measures", ModelObjectKind.Measure);
         }
@@ -625,6 +637,21 @@ internal static class TomPropertyApplier
                 break;
             case "trendexpression":
                 kpi.TrendExpression = value;
+                break;
+            case "statusgraphic":
+                kpi.StatusGraphic = value;
+                break;
+            case "trendgraphic":
+                kpi.TrendGraphic = value;
+                break;
+            case "statusdescription":
+                kpi.StatusDescription = value;
+                break;
+            case "targetdescription":
+                kpi.TargetDescription = value;
+                break;
+            case "trenddescription":
+                kpi.TrendDescription = value;
                 break;
             default:
                 throw UnsupportedProperty(displayName, "KPIs", ModelObjectKind.Kpi);

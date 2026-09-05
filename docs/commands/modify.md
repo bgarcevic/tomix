@@ -70,6 +70,7 @@ tx set tables/Sales -q excludeFromModelRefresh -i true
 tx set "Sales[Amount]" -q summarizeBy -i Sum
 tx set "Dates[Month]" -q sortByColumn -i MonthNo                  # empty value clears it
 tx set "Sales[OrderId]" -q isKey -i true
+tx set "Sales[Total Sales]" -t kpi -q statusGraphic -i "Cylinder"
 ```
 
 Columns accept every writable scalar property (`sourceColumn`, `dataType`,
@@ -84,6 +85,13 @@ Tables accept every writable scalar property too (`isPrivate`,
 `alternateSourcePrecedence`, `showAsVariationsOnly`, `systemManaged`,
 `directLakeIndexingBehavior`, `lineageTag`, `sourceLineageTag`) —
 everything `tx get` shows for the table.
+
+Measures accept every writable scalar property (`dataCategory`,
+`isSimpleMeasure`, `lineageTag`, `sourceLineageTag`, and more). KPIs
+accept `description`, `targetExpression`, `statusExpression`,
+`trendExpression`, `targetFormatString`, `statusGraphic`, `trendGraphic`,
+`statusDescription`, `targetDescription`, and `trendDescription` —
+address them with `-t kpi` or a `/KPI` path suffix.
 
 ## `mv` — move or rename
 

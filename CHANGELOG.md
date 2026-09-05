@@ -19,6 +19,11 @@ and the API surface that major versions protect.
   `sourceLineageTag`. `get`/`ls`/`find` JSON, CSV, and text output gain the matching read-side
   keys (additive — existing keys and their order are unchanged), and `diff` reports changes to
   the refresh/aggregation/DirectLake behavior properties (#114).
+- `set` on measures and KPIs now covers the rest of their writable scalar surface: measures gain
+  `dataCategory`, `isSimpleMeasure`, `sourceLineageTag`, and a writable `lineageTag`; KPIs gain
+  `statusGraphic`, `trendGraphic`, `statusDescription`, `targetDescription`, and
+  `trendDescription`. `get`/`ls`/`find` JSON, CSV, and text output gain the matching read-side
+  keys (additive), and `diff` reports changes to them (#115).
 
 ### Changed
 

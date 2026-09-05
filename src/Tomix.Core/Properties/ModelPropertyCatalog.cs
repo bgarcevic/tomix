@@ -63,7 +63,10 @@ public static class ModelPropertyCatalog
         new("kpiTargetExpression", "KpiTargetExpression", o => Bag(o, PropertyBagKeys.KpiTargetExpression), Diffable: true),
         new("kpiStatusExpression", "KpiStatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Diffable: true),
         new("kpiTrendExpression", "KpiTrendExpression", o => Bag(o, PropertyBagKeys.KpiTrendExpression), Diffable: true),
-        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag))
+        new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
+        new("dataCategory", "DataCategory", o => Bag(o, PropertyBagKeys.DataCategory), Writable: true, Diffable: true),
+        new("isSimpleMeasure", "IsSimpleMeasure", o => BoolBag(o, PropertyBagKeys.IsSimpleMeasure), Writable: true, Diffable: true),
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Column =
@@ -158,7 +161,14 @@ public static class ModelPropertyCatalog
         new("statusExpression", "StatusExpression", o => Bag(o, PropertyBagKeys.KpiStatusExpression), Writable: true, Searchable: true, SearchScope: ExpressionsScope),
         new("trendExpression", "TrendExpression", o => Bag(o, PropertyBagKeys.KpiTrendExpression), Writable: true, Searchable: true, SearchScope: ExpressionsScope),
         // Only surfaced here (the measure's kpi* properties omit it), so it is diffable.
-        new("targetFormatString", "TargetFormatString", o => Bag(o, PropertyBagKeys.KpiTargetFormatString), Writable: true, Searchable: true, SearchScope: FormatStringsScope, Diffable: true)
+        new("targetFormatString", "TargetFormatString", o => Bag(o, PropertyBagKeys.KpiTargetFormatString), Writable: true, Searchable: true, SearchScope: FormatStringsScope, Diffable: true),
+        // Presentation strings below are only surfaced here (the measure's kpi* properties omit
+        // them), so — like targetFormatString — they are diffable.
+        new("statusGraphic", "StatusGraphic", o => Bag(o, PropertyBagKeys.StatusGraphic), Writable: true, Diffable: true),
+        new("trendGraphic", "TrendGraphic", o => Bag(o, PropertyBagKeys.TrendGraphic), Writable: true, Diffable: true),
+        new("statusDescription", "StatusDescription", o => Bag(o, PropertyBagKeys.StatusDescription), Writable: true, Diffable: true),
+        new("targetDescription", "TargetDescription", o => Bag(o, PropertyBagKeys.TargetDescription), Writable: true, Diffable: true),
+        new("trendDescription", "TrendDescription", o => Bag(o, PropertyBagKeys.TrendDescription), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> TablePermission =

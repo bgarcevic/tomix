@@ -29,6 +29,7 @@ public static class PropertyBagKeys
     public const string DisplayOrdinal = "DisplayOrdinal";
     public const string SourceProviderType = "SourceProviderType";
     public const string IsDataTypeInferred = "IsDataTypeInferred";
+    public const string IsSimpleMeasure = "IsSimpleMeasure";
     public const string DetailRowsExpression = "DetailRowsExpression";
     public const string DefaultDetailRowsExpression = "DefaultDetailRowsExpression";
     public const string FormatStringExpression = "FormatStringExpression";
@@ -37,6 +38,11 @@ public static class PropertyBagKeys
     public const string KpiStatusExpression = "KpiStatusExpression";
     public const string KpiTrendExpression = "KpiTrendExpression";
     public const string KpiTargetFormatString = "KpiTargetFormatString";
+    public const string StatusGraphic = "StatusGraphic";
+    public const string TrendGraphic = "TrendGraphic";
+    public const string StatusDescription = "StatusDescription";
+    public const string TargetDescription = "TargetDescription";
+    public const string TrendDescription = "TrendDescription";
     public const string FromColumn = "FromColumn";
     public const string ToColumn = "ToColumn";
     public const string FromCardinality = "FromCardinality";

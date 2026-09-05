@@ -255,6 +255,9 @@ public static class TomModelSummarizer
             [PropKpiStatusExpression] = measure.KPI?.StatusExpression ?? "",
             [PropKpiTrendExpression] = measure.KPI?.TrendExpression ?? "",
             [PropLineageTag] = measure.LineageTag ?? "",
+            [PropertyBagKeys.DataCategory] = measure.DataCategory ?? "",
+            [PropertyBagKeys.IsSimpleMeasure] = measure.IsSimpleMeasure.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.SourceLineageTag] = measure.SourceLineageTag ?? "",
             [PropObjectType] = "Measure"
         };
         AddAnnotations(props, measure.Annotations);
@@ -289,6 +292,11 @@ public static class TomModelSummarizer
                 [PropKpiStatusExpression] = kpi.StatusExpression ?? "",
                 [PropKpiTrendExpression] = kpi.TrendExpression ?? "",
                 [PropKpiTargetFormatString] = kpi.TargetFormatString ?? "",
+                [PropertyBagKeys.StatusGraphic] = kpi.StatusGraphic ?? "",
+                [PropertyBagKeys.TrendGraphic] = kpi.TrendGraphic ?? "",
+                [PropertyBagKeys.StatusDescription] = kpi.StatusDescription ?? "",
+                [PropertyBagKeys.TargetDescription] = kpi.TargetDescription ?? "",
+                [PropertyBagKeys.TrendDescription] = kpi.TrendDescription ?? "",
                 [PropObjectType] = "KPI"
             });
 

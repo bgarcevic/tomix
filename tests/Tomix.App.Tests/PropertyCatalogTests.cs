@@ -60,7 +60,9 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Table,
         "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,refreshPolicySourceExpression,refreshPolicyPollingExpression,noSelectionExpression,multipleOrEmptySelectionExpression,defaultDetailRowsExpression,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag")]
     [InlineData(ModelObjectKind.Measure,
-        "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,kpiTargetExpression,kpiStatusExpression,kpiTrendExpression,lineageTag")]
+        "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,kpiTargetExpression,kpiStatusExpression,kpiTrendExpression,lineageTag,dataCategory,isSimpleMeasure,sourceLineageTag")]
+    [InlineData(ModelObjectKind.Kpi,
+        "name,description,targetExpression,statusExpression,trendExpression,targetFormatString,statusGraphic,trendGraphic,statusDescription,targetDescription,trendDescription")]
     [InlineData(ModelObjectKind.Column,
         "name,description,sourceColumn,expression,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag,sourceLineageTag,dataCategory,isKey,isNullable,isUnique,isAvailableInMDX,keepUniqueRows,encodingHint,alignment,tableDetailPosition,isDefaultLabel,isDefaultImage,displayOrdinal,sourceProviderType,isDataTypeInferred")]
     [InlineData(ModelObjectKind.Partition,
@@ -195,7 +197,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Table,
         "name,description,isHidden,dataCategory,lineageTag,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag")]
     [InlineData(ModelObjectKind.Measure,
-        "name,description,isHidden,expression,formatString,displayFolder")]
+        "name,description,isHidden,expression,formatString,displayFolder,lineageTag,dataCategory,isSimpleMeasure,sourceLineageTag")]
     [InlineData(ModelObjectKind.Column,
         "name,description,sourceColumn,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag,sourceLineageTag,dataCategory,isKey,isNullable,isUnique,isAvailableInMDX,keepUniqueRows,encodingHint,alignment,tableDetailPosition,isDefaultLabel,isDefaultImage,displayOrdinal,sourceProviderType,isDataTypeInferred")]
     [InlineData(ModelObjectKind.Hierarchy,
@@ -207,7 +209,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Function,
         "name,description,isHidden,expression,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Kpi,
-        "description,targetExpression,statusExpression,trendExpression,targetFormatString")]
+        "description,targetExpression,statusExpression,trendExpression,targetFormatString,statusGraphic,trendGraphic,statusDescription,targetDescription,trendDescription")]
     [InlineData(ModelObjectKind.TablePermission,
         "filterExpression")]
     public void WritableTokens_PinTheHintVocabularyPerKind(ModelObjectKind kind, string expectedTokens)
