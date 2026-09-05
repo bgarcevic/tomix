@@ -162,6 +162,27 @@ internal sealed class RefreshCommand : ICommandModule
                 ? new RefreshModelHandler(_providers, _loadCurrentSession)
                 : new RefreshModelHandler(_providers, recentSession);
 
+            // Partition-risky variants confirm before executing: clearvalues wipes partition
+            // data, and bypassing or overriding the incremental-refresh policy can rebuild or
+            // drop historical partitions. Routine policy refreshes stay unprompted, and
+            // --dry-run never executes. Resolved with the handler's own logic so the prompt
+            // names the exact target and never fires when there is nothing remote to refresh.
+            var partitionRisky =
+                string.Equals(type, "clearvalues", StringComparison.OrdinalIgnoreCase)
+                || !applyPolicy
+                || effectiveDate is not null;
+            if (!dryRun && partitionRisky)
+            {
+                var target = RefreshModelHandler.ResolveTarget(
+                    request, new ActiveModelResolver(recentSession ?? _loadCurrentSession));
+                if (target is not null && !ConfirmationHelper.ConfirmOrAbort(
+                        "Refresh",
+                        $"{target.Database ?? "model"} on {target.Value} ({type})",
+                        parseResult,
+                        format))
+                    return 1;
+            }
+
             // Progress + trace sinks: live spinner display via AnsiConsole.Status, plus optional --trace file/stderr.
             var suppressProgress = noProgress || quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || CliSpinner.ShouldSuppress();
             using var traceWriter = TraceWriter.Open(tracePath, quiet);

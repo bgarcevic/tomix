@@ -176,8 +176,9 @@ public sealed class RefreshModelHandler
     /// <summary>
     /// Pure target resolution: primary reference if remote, otherwise the workspace-mode
     /// secondary when it is remote, otherwise null. Honors explicit --server/--database.
+    /// Public so the CLI confirmation gate resolves the exact target this handler would use.
     /// </summary>
-    internal static ModelReference? ResolveTarget(
+    public static ModelReference? ResolveTarget(
         RefreshModelRequest request,
         ActiveModelResolver resolver)
     {

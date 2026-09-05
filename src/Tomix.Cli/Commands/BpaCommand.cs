@@ -220,6 +220,20 @@ internal sealed class BpaCommand : ICommandModule
                     out var recentExit))
                 return recentExit;
 
+            // --allow-delete opts into Delete() fixes that remove model objects, and --revert
+            // drops staged work; both confirm before running. Plain --fix applies property
+            // fixes only and asks nothing unless it persists (--save/--stage paths gate there).
+            if (parseResult.GetValue(revertOption))
+            {
+                if (!ConfirmationHelper.ConfirmOrAbort(
+                        "Revert staged changes", $"for {model.Value}", parseResult, format))
+                    return 1;
+            }
+            else if (parseResult.GetValue(fixOption) && parseResult.GetValue(allowDeleteOption)
+                && !ConfirmationHelper.ConfirmOrAbort(
+                    "Apply destructive BPA fixes", $"on {model.Value}", parseResult, format))
+                return 1;
+
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
                 () => new BpaRunHandler(

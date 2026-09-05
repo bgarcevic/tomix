@@ -57,6 +57,16 @@ internal sealed class StageCommand : ICommandModule
             if (!TryResolveModel(parseResult, out var reference, out var recentExit))
                 return recentExit;
 
+            // Commit overwrites the source (and, for remote sources, deploys over the endpoint),
+            // so it confirms like discard does — the more destructive sibling must not be the
+            // ungated one.
+            if (!ConfirmationHelper.ConfirmOrAbort(
+                "Commit staged changes",
+                $"for {reference.Value}",
+                parseResult,
+                format))
+                return 1;
+
             var result = await CliSpinner.RunAsync(
                 "Committing staged changes...",
                 () => new StageHandler(_staging).CommitAsync(

@@ -140,6 +140,12 @@ tx refresh --type full
 tx refresh --table Sales --table Customers
 ```
 
+Routine refreshes run without prompting. The partition-risky variants —
+`--type clearvalues` (wipes partition data), `--skip-refresh-policy` /
+`--apply-refresh-policy false` (refreshes all historical partitions), and
+`--effective-date` (shifts policy window boundaries) — ask for confirmation
+first; `--dry-run` never does. Pass `--yes` to skip the prompt in scripts.
+
 ## `load` — load and summarize
 
 ```

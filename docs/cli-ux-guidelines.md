@@ -108,9 +108,10 @@ the bottom for where each concern lives.
 - Never *require* interactivity; every prompt has a flag equivalent. Honor
   `--no-input` to forbid all prompting. [tomix: gap — add to `GlobalOptions`.]
 - Confirm before anything destructive or remote-mutating (`rm`, `replace`,
-  `deploy`): mild = y/n, severe = type the object/workspace name, catastrophic =
-  require an explicit flag. Give `deploy` a `--dry-run` that prints the diff it
-  would push. [tomix: gap.]
+  `deploy`, `stage commit`/`discard`, `script --save`/`--revert`,
+  `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and the
+  partition-risky `refresh` variants): mild = y/n, severe = type the
+  object/workspace name, catastrophic = require an explicit flag.
 - Mask password input; let the user escape (Ctrl-C must always work in prompts).
 
 ## Subcommands
@@ -237,7 +238,7 @@ than a missing-key error. **Scripts wanting a command's own diagnostics must rea
 
 - [x] Grouped sections + Examples blocks in help
 - [x] `NO_COLOR` / `TERM=dumb` handling verified or added
-- [x] Confirmations with `--yes` on `rm`, `replace`, `deploy`; `--dry-run` on `deploy`
+- [x] Confirmations with `--yes` on `rm`, `replace`, `deploy`, `stage commit`, `script --save`/`--revert`, `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and partition-risky `refresh`; `--dry-run` on `deploy`
 - [x] `-q/--quiet` global flag (suppresses spinners, progress, non-essential output)
 - [x] Empty-state messages with next-step hints on `ls`/`find`
 - [x] "Did you mean?" suggestions for unknown subcommands

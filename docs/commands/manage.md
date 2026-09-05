@@ -119,8 +119,9 @@ Inspect and manage staged (uncommitted) model mutations — see
 `stage commit --force` commits even if the source changed since staging began
 (overwrites it); without it, source drift blocks the commit so you can
 re-stage. `stage discard --all` discards staged mutations for every model in
-the session, not just the active one. `stage discard` asks for confirmation
-before dropping anything; pass `--yes` to skip the prompt in scripts.
+the session, not just the active one. Both `stage commit` (it overwrites the
+source, and the workspace mirror for remote sources) and `stage discard` ask
+for confirmation; pass `--yes` to skip the prompt in scripts.
 
 ```sh
 tx stage             # staged mutations for the active model

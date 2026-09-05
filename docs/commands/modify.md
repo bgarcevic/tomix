@@ -116,6 +116,12 @@ tx mv "Sales/Finance/Revenue" "Sales/Margins/" --save    # between folders, keep
 tx rename "Sales/Date" "Sales/CalendarDate" -t Hierarchy --save
 ```
 
+`mv --save` overwrites the source (and syncs the workspace mirror), so it
+asks for confirmation; pass `--yes` to skip the prompt in scripts.
+`--revert` (drops staged work) asks too. Plain `mv` stays in memory,
+`--save-to` writes a copy, and `--stage` defers the prompt to
+`tx stage commit`.
+
 ## `rm` — remove an object
 
 ```
@@ -221,6 +227,12 @@ anything the built-in commands don't cover.
 tx script -e "Model.Tables.Count"
 tx script transform.csx --save
 ```
+
+`script --save` runs arbitrary C# and then overwrites the source (and syncs
+the workspace mirror), so it asks for confirmation; pass `--yes` to skip the
+prompt in scripts. `--revert` (drops staged work) asks too. Plain `script`
+stays in memory, `--save-to` writes a copy, and `--stage` defers the prompt
+to `tx stage commit`.
 
 ## `incremental-refresh` — refresh policies
 

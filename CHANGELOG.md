@@ -10,6 +10,18 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed
+
+- Destructive commands now ask for confirmation before running: `stage commit` (it overwrites
+  the source and, for remote sources, deploys over the endpoint), `script --save` and `mv --save`
+  (they overwrite the source and sync the workspace mirror), `bpa run --fix --allow-delete`
+  (it deletes model objects), the `--revert` forms of `script`/`mv`/`bpa run` (they discard
+  staged work), and the partition-risky `refresh` variants (`--type clearvalues`,
+  `--skip-refresh-policy`/`--apply-refresh-policy false`, `--effective-date`). Routine refreshes,
+  `--dry-run`, `--save-to` copies, and `--stage` (which defers to the `stage commit` gate)
+  stay unprompted. In non-interactive contexts these commands fail fast with
+  `TOMIX_CONFIRMATION_REQUIRED`; pass `--yes` to skip the prompt (#145).
+
 ### Fixed
 
 - `set` error hints now list the writable properties for every kind the catalog models, not

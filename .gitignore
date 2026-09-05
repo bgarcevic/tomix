@@ -152,3 +152,4 @@ site/
 *.xmla
 
 .pi
+.zcode

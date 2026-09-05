@@ -63,6 +63,10 @@ tx bpa run --errors
 tx bpa run --fix --save
 ```
 
+`bpa run --fix --allow-delete` deletes model objects, so it asks for
+confirmation; `--revert` (drops staged work) asks too. Pass `--yes` to skip
+the prompt in scripts.
+
 `bpa rules` manages rule collections:
 
 | Subcommand | Description |

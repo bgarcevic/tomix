@@ -126,6 +126,26 @@ internal sealed class MvCommand : ICommandModule
                     out var reference,
                     out var recentExit))
                 return recentExit;
+
+            // Only the persisting and discarding forms ask: --save overwrites the source (and
+            // syncs the mirror) and --revert drops staged work; --save-to writes a copy and
+            // --stage defers the gate to 'stage commit'.
+            if (parseResult.GetValue(revertOption))
+            {
+                if (!ConfirmationHelper.ConfirmOrAbort(
+                        "Revert staged changes", $"for {reference.Value}", parseResult, formatValue))
+                    return 1;
+            }
+            else if (parseResult.GetValue(saveOption)
+                && !ConfirmationHelper.ConfirmOrAbort(
+                    "Move and save",
+                    $"{parseResult.GetValue(sourceArgument)} -> {parseResult.GetValue(destinationArgument)}",
+                    parseResult,
+                    formatValue))
+            {
+                return 1;
+            }
+
             var label = MutationSpinnerLabel.For(
                 parseResult.GetValue(saveOption),
                 parseResult.GetValue(saveToOption),

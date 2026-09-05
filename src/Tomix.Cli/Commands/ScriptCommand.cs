@@ -128,6 +128,23 @@ internal sealed class ScriptCommand : ICommandModule
                     out var model,
                     out var recentExit))
                 return recentExit;
+
+            // Only the persisting and discarding forms ask: --save overwrites the source (and
+            // syncs the mirror) and --revert drops staged work; --save-to writes a copy and
+            // --stage defers the gate to 'stage commit'.
+            if (parseResult.GetValue(revertOption))
+            {
+                if (!ConfirmationHelper.ConfirmOrAbort(
+                        "Revert staged changes", $"for {model.Value}", parseResult, formatValue))
+                    return 1;
+            }
+            else if (parseResult.GetValue(saveOption) && !parseResult.GetValue(dryRunOption)
+                && !ConfirmationHelper.ConfirmOrAbort(
+                    "Save script changes", $"to {model.Value}", parseResult, formatValue))
+            {
+                return 1;
+            }
+
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Running script...",
