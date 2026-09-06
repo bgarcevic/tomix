@@ -354,6 +354,8 @@ public static class TomModelSummarizer
             [PropPartitionMode] = partition.Mode.ToString(),
             [PropPartitionDataView] = partition.DataView.ToString(),
             [PropPartitionQueryGroup] = partition.QueryGroup?.Name ?? "",
+            [PropertyBagKeys.RetainDataTillForceCalculate] =
+                partition.Source is CalculatedPartitionSource { RetainDataTillForceCalculate: true } ? "true" : "false",
             [PropDataSourceName] = dataSourceName,
             [PropDataSourceType] = dataSourceType,
             [PropObjectType] = "Partition"

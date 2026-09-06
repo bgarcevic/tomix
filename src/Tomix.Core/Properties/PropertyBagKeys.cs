@@ -53,6 +53,7 @@ public static class PropertyBagKeys
     public const string RlsExpression = "RlsExpression";
     public const string DataView = "DataView";
     public const string QueryGroup = "QueryGroup";
+    public const string RetainDataTillForceCalculate = "RetainDataTillForceCalculate";
     public const string RefreshPolicy = "RefreshPolicy";
     public const string RefreshPolicySourceExpression = "RefreshPolicySourceExpression";
     public const string RefreshPolicyPollingExpression = "RefreshPolicyPollingExpression";

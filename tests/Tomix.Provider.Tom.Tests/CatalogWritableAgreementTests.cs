@@ -63,7 +63,11 @@ public sealed class CatalogWritableAgreementTests
             ["targetDescription"] = "target",
             ["trendDescription"] = "trend",
             ["hideMembers"] = "HideBlankMembers",
-            ["ordinal"] = "1"
+            ["ordinal"] = "1",
+            ["mode"] = "Dual",
+            ["dataView"] = "Full",
+            ["retainDataTillForceCalculate"] = "true",
+            ["queryGroup"] = "QG"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
@@ -92,7 +96,7 @@ public sealed class CatalogWritableAgreementTests
             // Fresh model per property so a 'name' assignment cannot invalidate later paths.
             var db = NewFixture();
             var mutator = new TomModelMutator(db);
-            var (path, type) = TargetFor(kind);
+            var (path, type) = TargetFor(kind, token);
 
             var exception = Record.Exception(() => mutator.SetProperty(new ModelObjectSetRequest(
                 path, [new ModelPropertyAssignment(token, value)], type)));
@@ -169,20 +173,28 @@ public sealed class CatalogWritableAgreementTests
         Assert.Contains("expression", exception.Message);
     }
 
-    private static (string Path, ModelObjectKind? Type) TargetFor(ModelObjectKind kind) => kind switch
+    private static (string Path, ModelObjectKind? Type) TargetFor(ModelObjectKind kind, string? token = null)
     {
-        ModelObjectKind.Table => ("tables/T", null),
-        ModelObjectKind.Measure => ("T/M", ModelObjectKind.Measure),
-        ModelObjectKind.Column => ("T/C", ModelObjectKind.Column),
-        ModelObjectKind.Hierarchy => ("T/H", ModelObjectKind.Hierarchy),
-        ModelObjectKind.Level => ("T/H/L", ModelObjectKind.Level),
-        ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
-        ModelObjectKind.Expression => ("Expressions/E", null),
-        ModelObjectKind.Function => ("Functions/F", null),
-        ModelObjectKind.Kpi => ("T/M", ModelObjectKind.Kpi),
-        ModelObjectKind.TablePermission => ("Readers/T", null),
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    };
+        // Source-bound partition properties live on different partitions: 'expression' is
+        // exercised on the M-source partition, 'retainDataTillForceCalculate' on the calculated one.
+        if (kind == ModelObjectKind.Partition && token == "retainDataTillForceCalculate")
+            return ("T/Calc", ModelObjectKind.Partition);
+
+        return kind switch
+        {
+            ModelObjectKind.Table => ("tables/T", null),
+            ModelObjectKind.Measure => ("T/M", ModelObjectKind.Measure),
+            ModelObjectKind.Column => ("T/C", ModelObjectKind.Column),
+            ModelObjectKind.Hierarchy => ("T/H", ModelObjectKind.Hierarchy),
+            ModelObjectKind.Level => ("T/H/L", ModelObjectKind.Level),
+            ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
+            ModelObjectKind.Expression => ("Expressions/E", null),
+            ModelObjectKind.Function => ("Functions/F", null),
+            ModelObjectKind.Kpi => ("T/M", ModelObjectKind.Kpi),
+            ModelObjectKind.TablePermission => ("Readers/T", null),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+    }
 
     private static Database NewFixture()
     {
@@ -193,6 +205,11 @@ public sealed class CatalogWritableAgreementTests
         {
             Name = "T",
             Source = new MPartitionSource { Expression = "let x = 1 in x" }
+        });
+        table.Partitions.Add(new Partition
+        {
+            Name = "Calc",
+            Source = new CalculatedPartitionSource { Expression = "T2" }
         });
         table.Columns.Add(new DataColumn { Name = "C", DataType = DataType.Int64 });
         table.Columns.Add(new DataColumn { Name = "C2", DataType = DataType.String });
@@ -214,6 +231,9 @@ public sealed class CatalogWritableAgreementTests
             Expression = "\"v\" meta [IsParameterQuery=true]"
         });
         db.Model.Functions.Add(new Function { Name = "F", Expression = "(x) => x" });
+        // A query group so Partition set paths can resolve 'queryGroup' by name. The name is
+        // derived from the folder path — TOM refuses to set Name directly.
+        db.Model.QueryGroups.Add(new QueryGroup { Folder = "QG" });
         return db;
     }
 }

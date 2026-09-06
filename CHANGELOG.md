@@ -29,6 +29,11 @@ and the API surface that major versions protect.
   (in addition to the existing `name`/`description`) plus the lineage tags, and `get`/`ls`/`find`
   now model levels with their own property set instead of the generic fallback — the matching
   read-side keys are additive, and `diff` reports changes to `hideMembers` and `ordinal` (#116).
+- `set` on partitions now covers the rest of their writable scalar surface: `description`,
+  `mode`, `dataView`, `retainDataTillForceCalculate` (calculated sources only, just as
+  `expression` remains M-source-only), and `queryGroup`, which must name an existing query
+  group and clears on an empty value. `diff` reports changes to them, and the unsupported-
+  property hint omits source-bound tokens the targeted partition cannot take (#117).
 
 ### Changed
 

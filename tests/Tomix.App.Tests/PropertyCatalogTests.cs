@@ -66,7 +66,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Column,
         "name,description,sourceColumn,expression,dataType,isHidden,formatString,displayFolder,sortByColumn,summarizeBy,lineageTag,sourceLineageTag,dataCategory,isKey,isNullable,isUnique,isAvailableInMDX,keepUniqueRows,encodingHint,alignment,tableDetailPosition,isDefaultLabel,isDefaultImage,displayOrdinal,sourceProviderType,isDataTypeInferred")]
     [InlineData(ModelObjectKind.Partition,
-        "name,description,expression,mode,dataView,queryGroup")]
+        "name,description,expression,mode,dataView,queryGroup,retainDataTillForceCalculate")]
     [InlineData(ModelObjectKind.Relationship,
         "name,fromColumn,toColumn,fromCardinality,toCardinality,crossFilteringBehavior,isActive")]
     [InlineData(ModelObjectKind.Role,
@@ -207,7 +207,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Level,
         "name,description,ordinal,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Partition,
-        "name,expression")]
+        "name,description,expression,mode,dataView,queryGroup,retainDataTillForceCalculate")]
     [InlineData(ModelObjectKind.Expression,
         "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Function,

@@ -426,6 +426,25 @@ internal static class TomPropertyApplier
             case "name":
                 partition.Name = value;
                 break;
+            case "description":
+                partition.Description = value;
+                break;
+            case "mode":
+                partition.Mode = ParseEnum<ModeType>(value, displayName);
+                break;
+            case "dataview":
+                partition.DataView = ParseEnum<DataViewType>(value, displayName);
+                break;
+            case "retaindatatillforcecalculate" when partition.Source is CalculatedPartitionSource calculated:
+                calculated.RetainDataTillForceCalculate = ParseBool(value, displayName);
+                break;
+            case "retaindatatillforcecalculate":
+                throw new NotSupportedException(
+                    "Setting 'retainDataTillForceCalculate' is only supported for partitions with a calculated source; " +
+                    $"this partition's source is {partition.SourceType}.");
+            case "querygroup":
+                ApplyQueryGroup(partition, value, displayName);
+                break;
             case "expression" when partition.Source is MPartitionSource m:
                 m.Expression = value;
                 break;
@@ -434,17 +453,41 @@ internal static class TomPropertyApplier
                     "Setting 'expression' is only supported for partitions with an M source; " +
                     $"this partition's source is {partition.SourceType}.");
             default:
-                // 'expression' is only settable on M-source partitions, so keep it out of the
-                // hint for Entity/PolicyRange/Calculated partitions.
-                throw UnsupportedProperty(displayName, "partitions", ModelObjectKind.Partition,
-                    exclude: partition.Source is MPartitionSource ? null : "expression");
+                // Source-bound properties stay out of the hint for partitions that cannot take
+                // them: 'expression' needs an M source, 'retainDataTillForceCalculate' a
+                // calculated source.
+                var excludes = new List<string>();
+                if (partition.Source is not MPartitionSource)
+                    excludes.Add("expression");
+                if (partition.Source is not CalculatedPartitionSource)
+                    excludes.Add("retainDataTillForceCalculate");
+                throw UnsupportedProperty(displayName, "partitions", ModelObjectKind.Partition, exclude: excludes);
         }
     }
 
-    private static NotSupportedException UnsupportedProperty(
-        string displayName, string kindPlural, ModelObjectKind kind, string? exclude = null)
+    /// <summary>Resolves the query group by name on the model; empty clears it.</summary>
+    private static void ApplyQueryGroup(Partition partition, string value, string displayName)
     {
-        var writable = ModelPropertyCatalog.WritableTokens(kind).Where(t => t != exclude).ToList();
+        if (string.IsNullOrEmpty(value))
+        {
+            partition.QueryGroup = null;
+            return;
+        }
+
+        if (partition.Model is not { } model)
+            throw new NotSupportedException($"Cannot set '{displayName}' on a partition that is not attached to a model.");
+
+        partition.QueryGroup = model.QueryGroups.Find(value)
+            ?? throw new ArgumentException(
+                $"Query group '{value}' does not exist in the model; '{displayName}' must name an existing query group.");
+    }
+
+    private static NotSupportedException UnsupportedProperty(
+        string displayName, string kindPlural, ModelObjectKind kind, IReadOnlyList<string>? exclude = null)
+    {
+        var writable = ModelPropertyCatalog.WritableTokens(kind)
+            .Where(t => exclude is null || !exclude.Contains(t))
+            .ToList();
         var hint = writable.Count > 0
             ? $" Writable properties: {string.Join(", ", writable)}, {PropertyBagKeys.AnnotationPrefix}<name>."
             : "";

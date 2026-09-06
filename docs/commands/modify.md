@@ -73,6 +73,7 @@ tx set "Sales[OrderId]" -q isKey -i true
 tx set "Sales[Total Sales]" -t kpi -q statusGraphic -i "Cylinder"
 tx set "Sales Territory/'Sales Territories'" -q hideMembers -i HideBlankMembers
 tx set "Sales Territory/'Sales Territories'/Region" -q ordinal -i 2
+tx set Sales/Sales -t partition -q mode -i DirectQuery
 ```
 
 Columns accept every writable scalar property (`sourceColumn`, `dataType`,
@@ -100,6 +101,13 @@ Hierarchies accept every writable scalar property (`hideMembers` —
 everything `tx get` shows for the hierarchy. Levels accept `ordinal`,
 `lineageTag`, and `sourceLineageTag`; address a level with its full
 `Table/Hierarchy/Level` path.
+
+Partitions accept `description`, `mode` (`Import`, `DirectQuery`,
+`Default`, `Push`, `Dual`, `DirectLake`), `dataView`, and `queryGroup` —
+which must name an existing query group; an empty value clears it.
+`retainDataTillForceCalculate` is calculated-source-only, just as
+`expression` is M-source-only, and the set hint omits a source-bound
+property a partition cannot take.
 
 ## `mv` — move or rename
 

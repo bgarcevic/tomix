@@ -137,11 +137,14 @@ public static class ModelPropertyCatalog
     private static readonly IReadOnlyList<PropertyDescriptor> Partition =
     [
         Name(writable: true),
-        Description(writable: false),
+        Description(writable: true),
         Expression(writable: true),
-        new("mode", "Mode", o => o.Detail ?? ""),
-        new("dataView", "DataView", o => Bag(o, PropertyBagKeys.DataView), Diffable: true),
-        new("queryGroup", "QueryGroup", o => Bag(o, PropertyBagKeys.QueryGroup), Diffable: true)
+        // Not diffable: mode is the partition's Detail (which diff already compares in its
+        // fixed identity set) — marking it diffable would report the same edit twice.
+        new("mode", "Mode", o => o.Detail ?? "", Writable: true),
+        new("dataView", "DataView", o => Bag(o, PropertyBagKeys.DataView), Writable: true, Diffable: true),
+        new("queryGroup", "QueryGroup", o => Bag(o, PropertyBagKeys.QueryGroup), Writable: true, Diffable: true),
+        new("retainDataTillForceCalculate", "RetainDataTillForceCalculate", o => BoolBag(o, PropertyBagKeys.RetainDataTillForceCalculate), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Relationship =
