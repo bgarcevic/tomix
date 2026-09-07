@@ -58,7 +58,7 @@ public sealed class PropertyCatalogTests
 
     [Theory]
     [InlineData(ModelObjectKind.Table,
-        "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,refreshPolicySourceExpression,refreshPolicyPollingExpression,noSelectionExpression,multipleOrEmptySelectionExpression,defaultDetailRowsExpression,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag")]
+        "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,refreshPolicySourceExpression,refreshPolicyPollingExpression,noSelectionExpression,multipleOrEmptySelectionExpression,defaultDetailRowsExpression,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag,precedence")]
     [InlineData(ModelObjectKind.Measure,
         "name,description,isHidden,expression,formatString,displayFolder,dataType,detailRowsExpression,formatStringExpression,kpi,kpiTargetExpression,kpiStatusExpression,kpiTrendExpression,lineageTag,dataCategory,isSimpleMeasure,sourceLineageTag")]
     [InlineData(ModelObjectKind.Kpi,
@@ -83,6 +83,12 @@ public sealed class PropertyCatalogTests
         "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Function,
         "name,description,isHidden,expression,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.CalculationItem,
+        "name,description,isHidden,detail,expression,ordinal")]
+    [InlineData(ModelObjectKind.DataSource,
+        "name,description,isHidden,detail,expression,maxConnections,impersonationMode,isolation,timeout,contextExpression")]
+    [InlineData(ModelObjectKind.Model,
+        "name,description,isHidden,detail,expression,compatibilityLevel,culture,collation,discourageImplicitMeasures,discourageCompositeModels,discourageReportMeasures,defaultMode,defaultDataView,maxParallelismPerQuery,maxParallelismPerRefresh,sourceQueryCulture,forceUniqueNames")]
     public void For_PinsThePropertyContractPerKind(ModelObjectKind kind, string expectedKeys)
     {
         Assert.Equal(expectedKeys.Split(','), ModelPropertyCatalog.For(kind).Select(d => d.JsonKey));
@@ -207,7 +213,7 @@ public sealed class PropertyCatalogTests
 
     [Theory]
     [InlineData(ModelObjectKind.Table,
-        "name,description,isHidden,dataCategory,lineageTag,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag")]
+        "name,description,isHidden,dataCategory,lineageTag,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag,precedence")]
     [InlineData(ModelObjectKind.Measure,
         "name,description,isHidden,expression,formatString,displayFolder,lineageTag,dataCategory,isSimpleMeasure,sourceLineageTag")]
     [InlineData(ModelObjectKind.Column,
@@ -228,6 +234,12 @@ public sealed class PropertyCatalogTests
         "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Function,
         "name,description,isHidden,expression,lineageTag,sourceLineageTag")]
+    [InlineData(ModelObjectKind.CalculationItem,
+        "name,description,expression,ordinal")]
+    [InlineData(ModelObjectKind.DataSource,
+        "name,description,maxConnections,impersonationMode,isolation,timeout,contextExpression")]
+    [InlineData(ModelObjectKind.Model,
+        "description,compatibilityLevel,culture,collation,discourageImplicitMeasures,discourageCompositeModels,defaultMode,defaultDataView,maxParallelismPerQuery,maxParallelismPerRefresh,sourceQueryCulture,forceUniqueNames")]
     [InlineData(ModelObjectKind.Kpi,
         "description,targetExpression,statusExpression,trendExpression,targetFormatString,statusGraphic,trendGraphic,statusDescription,targetDescription,trendDescription")]
     [InlineData(ModelObjectKind.TablePermission,

@@ -47,9 +47,23 @@ and the API surface that major versions protect.
   member identity edit replaces the member, as renames already did. Role members now get their
   own property set in `get`/`ls`/`find` output (additive, replacing the generic fallback), and
   `diff` reports changes to the identity fields and both permission enums (#119).
+- `set` on the model root and shared objects now covers their writable scalar surface: the `.`
+  path accepts `compatibilityLevel` (already supported, now advertised), `description`,
+  `culture`, `collation`, `discourageImplicitMeasures`, `discourageCompositeModels`,
+  `defaultMode`, `defaultDataView`, `maxParallelismPerQuery`, `maxParallelismPerRefresh`,
+  `sourceQueryCulture`, and `forceUniqueNames`, with `tx get .` reading the whole surface back;
+  calculation-group tables accept `precedence`, calculation items accept `ordinal`, and data
+  sources accept `maxConnections`, provider-only `impersonationMode`/`isolation`/`timeout`, and
+  structured-only `contextExpression`, with the set hint omitting tokens the targeted source
+  kind cannot take. Calculation items and data sources now get their own property sets in
+  `get`/`ls`/`find` output (additive, replacing the generic fallback), and `diff` reports the
+  semantic scalars. `discourageReportMeasures` stays read-only: TOM's setter demands the
+  internal-only compatibility sentinel, so no real model can set it (#120).
 
 ### Changed
 
+- `set` no longer accepts `connectionString` on data sources: credentials are secrets, and
+  secrets are never accepted via argv — edit the source file or use `tx script` to change them (#120).
 - Destructive commands now ask for confirmation before running: `stage commit` (it overwrites
   the source and, for remote sources, deploys over the endpoint), `script --save` and `mv --save`
   (they overwrite the source and sync the workspace mirror), `bpa run --fix --allow-delete`

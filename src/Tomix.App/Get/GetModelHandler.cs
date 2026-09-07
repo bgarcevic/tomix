@@ -20,6 +20,13 @@ public sealed class GetModelHandler
         return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
         {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
+
+            // The model root is not a snapshot object: "." synthesizes one from the
+            // snapshot's model-level properties so get can read back what set accepts
+            // on the root (culture, compatibility level, and friends).
+            if (request.Path.Trim().Trim('/') == ".")
+                return TomixResult<GetModelResult>.Ok(Project(ModelRoot(snapshot), request.Query));
+
             var matches = ModelObjectLookup.Find(snapshot, request.Path, request.Type).ToList();
 
             if (matches.Count == 0)
@@ -36,18 +43,35 @@ public sealed class GetModelHandler
                     exitCode: 1,
                     hint: AmbiguousMatchMessage.Hint);
 
-            var obj = matches[0];
-            var properties = ModelPropertyCatalog.Project(obj);
-
-            if (!string.IsNullOrWhiteSpace(request.Query))
-                properties = ProjectSingleProperty(properties, request.Query);
-
-            return TomixResult<GetModelResult>.Ok(new GetModelResult(
-                ModelObjectProjection.KindLabel(obj.Kind),
-                obj.Path,
-                properties,
-                obj));
+            return TomixResult<GetModelResult>.Ok(Project(matches[0], request.Query));
         }, cancellationToken);
+    }
+
+    private static ModelObject ModelRoot(ModelSnapshot snapshot)
+        => new(
+            snapshot.Name,
+            ModelObjectKind.Model,
+            ".",
+            Detail: null,
+            Expression: null,
+            Description: snapshot.Description,
+            Hidden: false,
+            SourceColumn: null,
+            Children: [],
+            Properties: snapshot.Properties);
+
+    private static GetModelResult Project(ModelObject obj, string? query)
+    {
+        var properties = ModelPropertyCatalog.Project(obj);
+
+        if (!string.IsNullOrWhiteSpace(query))
+            properties = ProjectSingleProperty(properties, query);
+
+        return new GetModelResult(
+            ModelObjectProjection.KindLabel(obj.Kind),
+            obj.Path,
+            properties,
+            obj);
     }
 
     private static IReadOnlyDictionary<string, object?> ProjectSingleProperty(

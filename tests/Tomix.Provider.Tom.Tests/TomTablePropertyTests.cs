@@ -100,6 +100,32 @@ public sealed class TomTablePropertyTests
     }
 
     [Fact]
+    public void SetProperty_Precedence_AppliesOnCalculationGroupTables()
+    {
+        var (mutator, calcGroupTable) = NewCalcGroupModel();
+
+        mutator.SetProperty(Set("tables/CG", "precedence", "5"));
+
+        Assert.Equal(5, calcGroupTable.CalculationGroup!.Precedence);
+
+        var snapshot = TomModelSummarizer.Snapshot((Database)calcGroupTable.Model.Database, "M");
+        var projected = ModelPropertyCatalog.Project(snapshot.Objects.Single(o => o.Name == "CG"));
+        Assert.Equal(5, projected["precedence"]);
+    }
+
+    [Fact]
+    public void SetProperty_Precedence_RejectedOnPlainTables_AndOmittedFromTheirHint()
+    {
+        var (mutator, table) = NewModel();
+
+        var ex = Assert.Throws<NotSupportedException>(() => mutator.SetProperty(Set("tables/T", "precedence", "5")));
+        Assert.Contains("only supported for calculation group tables", ex.Message);
+
+        var unknown = Assert.Throws<NotSupportedException>(() => mutator.SetProperty(Set("tables/T", "bogus", "x")));
+        Assert.DoesNotContain("precedence", unknown.Message);
+    }
+
+    [Fact]
     public void SetProperty_UnknownTableProperty_HintListsWritableSet()
     {
         var (mutator, _) = NewModel();
@@ -111,7 +137,10 @@ public sealed class TomTablePropertyTests
     }
 
     private static ModelObjectSetRequest Set(string property, string value)
-        => new("tables/T", [new ModelPropertyAssignment(property, value)], ModelObjectKind.Table);
+        => Set("tables/T", property, value);
+
+    private static ModelObjectSetRequest Set(string path, string property, string value)
+        => new(path, [new ModelPropertyAssignment(property, value)], ModelObjectKind.Table);
 
     private static (TomModelMutator Mutator, Table Table) NewModel()
     {
@@ -127,5 +156,14 @@ public sealed class TomTablePropertyTests
         table.Columns.Add(new DataColumn { Name = "C", DataType = DataType.Int64 });
         db.Model.Tables.Add(table);
         return (new TomModelMutator(db), table);
+    }
+
+    private static (TomModelMutator Mutator, Table CalcGroupTable) NewCalcGroupModel()
+    {
+        var db = NewDatabase(compatibilityLevel: 1_000_000);
+        var calcGroupTable = new Table { Name = "CG" };
+        calcGroupTable.CalculationGroup = new CalculationGroup { Precedence = 1 };
+        db.Model.Tables.Add(calcGroupTable);
+        return (new TomModelMutator(db), calcGroupTable);
     }
 }

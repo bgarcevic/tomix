@@ -75,5 +75,23 @@ public static class PropertyBagKeys
     public const string HideMembers = "HideMembers";
     public const string ExpressionKind = "ExpressionKind";
     public const string RemoteParameterName = "RemoteParameterName";
+    public const string CompatibilityLevel = "CompatibilityLevel";
+    public const string Culture = "Culture";
+    public const string Collation = "Collation";
+    public const string DiscourageImplicitMeasures = "DiscourageImplicitMeasures";
+    public const string DiscourageCompositeModels = "DiscourageCompositeModels";
+    public const string DiscourageReportMeasures = "DiscourageReportMeasures";
+    public const string DefaultMode = "DefaultMode";
+    public const string DefaultDataView = "DefaultDataView";
+    public const string MaxParallelismPerQuery = "MaxParallelismPerQuery";
+    public const string MaxParallelismPerRefresh = "MaxParallelismPerRefresh";
+    public const string SourceQueryCulture = "SourceQueryCulture";
+    public const string ForceUniqueNames = "ForceUniqueNames";
+    public const string Precedence = "Precedence";
+    public const string MaxConnections = "MaxConnections";
+    public const string ImpersonationMode = "ImpersonationMode";
+    public const string Isolation = "Isolation";
+    public const string Timeout = "Timeout";
+    public const string ContextExpression = "ContextExpression";
     public const string AnnotationPrefix = "Annotation:";
 }

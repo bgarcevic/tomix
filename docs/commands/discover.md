@@ -42,7 +42,9 @@ Each object kind has its own property set: measures include `expression`,
 include their endpoint columns, cardinality, `crossFilteringBehavior`, and
 `isActive`; roles include `modelPermission` and `rlsExpression`; shared
 expressions include `expression`, `kind`, and `remoteParameterName`; DAX
-functions include `expression` and `isHidden`. Object
+functions include `expression` and `isHidden`. The model root has its own
+path — `tx get .` reports the compatibility level, `culture`,
+`defaultMode`, and the other model-level scalars. Object
 annotations are appended as `annotation:<name>` entries in text and JSON
 output (CSV keeps the fixed per-kind columns).
 
@@ -52,6 +54,7 @@ tx get "Sales/Total Sales" -q expression
 tx get "Sales/Total Sales" -q annotation:PBI_FormatHint
 tx get "Relationships/rel-customers"
 tx get "Expressions/Environment" -q expression   # a shared M parameter's value
+tx get . -q culture                              # a model-level scalar
 tx get Sales --output-format tmdl    # the object as TMDL
 ```
 

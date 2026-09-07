@@ -9,4 +9,5 @@ public sealed record ModelSnapshot(
     string Name,
     int CompatibilityLevel,
     IReadOnlyList<ModelObject> Objects,
-    IReadOnlyDictionary<string, string>? Properties = null);
+    IReadOnlyDictionary<string, string>? Properties = null,
+    string? Description = null);

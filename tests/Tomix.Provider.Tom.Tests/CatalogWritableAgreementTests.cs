@@ -79,7 +79,24 @@ public sealed class CatalogWritableAgreementTests
             ["metadataPermission"] = "None",
             ["memberId"] = "aad-object-id",
             ["identityProvider"] = "AzureAD",
-            ["memberType"] = "Group"
+            ["memberType"] = "Group",
+            ["compatibilityLevel"] = "1704",
+            ["culture"] = "en-US",
+            ["collation"] = "Latin1_General_BIN",
+            ["discourageImplicitMeasures"] = "true",
+            ["discourageCompositeModels"] = "true",
+            ["defaultMode"] = "Dual",
+            ["defaultDataView"] = "Full",
+            ["maxParallelismPerQuery"] = "2",
+            ["maxParallelismPerRefresh"] = "1",
+            ["sourceQueryCulture"] = "en-US",
+            ["forceUniqueNames"] = "true",
+            ["precedence"] = "1",
+            ["maxConnections"] = "5",
+            ["impersonationMode"] = "ImpersonateCurrentUser",
+            ["isolation"] = "Snapshot",
+            ["timeout"] = "30",
+            ["contextExpression"] = "true"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
@@ -87,6 +104,7 @@ public sealed class CatalogWritableAgreementTests
             ModelObjectKind.Hierarchy, ModelObjectKind.Level, ModelObjectKind.Partition,
             ModelObjectKind.Relationship, ModelObjectKind.Role, ModelObjectKind.RoleMember,
             ModelObjectKind.Expression, ModelObjectKind.Function,
+            ModelObjectKind.CalculationItem, ModelObjectKind.DataSource, ModelObjectKind.Model,
             ModelObjectKind.Kpi, ModelObjectKind.TablePermission);
 
     [Theory]
@@ -193,6 +211,17 @@ public sealed class CatalogWritableAgreementTests
         if (kind == ModelObjectKind.Partition && token == "retainDataTillForceCalculate")
             return ("T/Calc", ModelObjectKind.Partition);
 
+        // Precedence is a calculation-group table property; plain tables reject it.
+        if (kind == ModelObjectKind.Table && token == "precedence")
+            return ("tables/CG", ModelObjectKind.Table);
+
+        // Data-source fields are provider-only or structured-only, so the harness splits them
+        // across one data source of each kind.
+        if (kind == ModelObjectKind.DataSource)
+            return token == "contextExpression"
+                ? ("DataSources/SDS", ModelObjectKind.DataSource)
+                : ("DataSources/PDS", ModelObjectKind.DataSource);
+
         return kind switch
         {
             ModelObjectKind.Table => ("tables/T", null),
@@ -207,6 +236,9 @@ public sealed class CatalogWritableAgreementTests
             ModelObjectKind.RoleMember => ("Readers/user@contoso.com", ModelObjectKind.RoleMember),
             ModelObjectKind.Expression => ("Expressions/E", null),
             ModelObjectKind.Function => ("Functions/F", null),
+            // The model root is not a snapshot object; "." addresses it for every token.
+            ModelObjectKind.Model => (".", null),
+            ModelObjectKind.CalculationItem => ("CG/CI", ModelObjectKind.CalculationItem),
             ModelObjectKind.Kpi => ("T/M", ModelObjectKind.Kpi),
             ModelObjectKind.TablePermission => ("Readers/T", null),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -267,6 +299,21 @@ public sealed class CatalogWritableAgreementTests
             Expression = "\"v\" meta [IsParameterQuery=true]"
         });
         db.Model.Functions.Add(new Function { Name = "F", Expression = "(x) => x" });
+        // A calculation-group table so precedence and CalculationItem set paths resolve.
+        var calcGroupTable = new Table { Name = "CG" };
+        calcGroupTable.CalculationGroup = new CalculationGroup { Precedence = 1 };
+        calcGroupTable.CalculationGroup.CalculationItems.Add(
+            new CalculationItem { Name = "CI", Expression = "[M] * 2" });
+        db.Model.Tables.Add(calcGroupTable);
+        // One data source of each kind: provider fields (impersonation, isolation, timeout)
+        // resolve on PDS, the structured ContextExpression on SDS.
+        db.Model.DataSources.Add(new ProviderDataSource
+        {
+            Name = "PDS",
+            Provider = "SQLNCLI11",
+            ConnectionString = "Data Source=sql01"
+        });
+        db.Model.DataSources.Add(new StructuredDataSource { Name = "SDS" });
         // A query group so Partition set paths can resolve 'queryGroup' by name. The name is
         // derived from the folder path — TOM refuses to set Name directly.
         db.Model.QueryGroups.Add(new QueryGroup { Folder = "QG" });

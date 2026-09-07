@@ -97,11 +97,23 @@ public static class TomModelSummarizer
 
         var modelProps = new Dictionary<string, string>
         {
-            [PropDefaultPowerBIDataSourceVersion] = model.DefaultPowerBIDataSourceVersion.ToString()
+            [PropDefaultPowerBIDataSourceVersion] = model.DefaultPowerBIDataSourceVersion.ToString(),
+            [PropertyBagKeys.CompatibilityLevel] = database.CompatibilityLevel.ToString(),
+            [PropertyBagKeys.Culture] = model.Culture ?? "",
+            [PropertyBagKeys.Collation] = model.Collation ?? "",
+            [PropertyBagKeys.DiscourageImplicitMeasures] = model.DiscourageImplicitMeasures.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.DiscourageCompositeModels] = model.DiscourageCompositeModels.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.DiscourageReportMeasures] = model.DiscourageReportMeasures.ToString().ToLowerInvariant(),
+            [PropertyBagKeys.DefaultMode] = model.DefaultMode.ToString(),
+            [PropertyBagKeys.DefaultDataView] = model.DefaultDataView.ToString(),
+            [PropertyBagKeys.MaxParallelismPerQuery] = model.MaxParallelismPerQuery.ToString(),
+            [PropertyBagKeys.MaxParallelismPerRefresh] = model.MaxParallelismPerRefresh.ToString(),
+            [PropertyBagKeys.SourceQueryCulture] = model.SourceQueryCulture ?? "",
+            [PropertyBagKeys.ForceUniqueNames] = model.ForceUniqueNames.ToString().ToLowerInvariant()
         };
         AddAnnotations(modelProps, model.Annotations);
 
-        return new ModelSnapshot(name, database.CompatibilityLevel, objects, modelProps);
+        return new ModelSnapshot(name, database.CompatibilityLevel, objects, modelProps, model.Description);
     }
 
     private static ModelObject BuildTable(
@@ -129,6 +141,7 @@ public static class TomModelSummarizer
             [PropertyBagKeys.RefreshPolicyPollingExpression] = (table.RefreshPolicy as BasicRefreshPolicy)?.PollingExpression ?? "",
             [PropertyBagKeys.NoSelectionExpression] = table.CalculationGroup?.NoSelectionExpression?.Expression ?? "",
             [PropertyBagKeys.MultipleOrEmptySelectionExpression] = table.CalculationGroup?.MultipleOrEmptySelectionExpression?.Expression ?? "",
+            [PropertyBagKeys.Precedence] = table.CalculationGroup?.Precedence.ToString() ?? "",
             [PropertyBagKeys.DefaultDetailRowsExpression] = table.DefaultDetailRowsDefinition?.Expression ?? "",
             [PropertyBagKeys.IsPrivate] = table.IsPrivate.ToString().ToLowerInvariant(),
             [PropertyBagKeys.ExcludeFromModelRefresh] = table.ExcludeFromModelRefresh.ToString().ToLowerInvariant(),
@@ -507,7 +520,11 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: new Dictionary<string, string> { [PropObjectType] = "CalculationItem" });
+            Properties: new Dictionary<string, string>
+            {
+                [PropertyBagKeys.Ordinal] = item.Ordinal.ToString(),
+                [PropObjectType] = "CalculationItem"
+            });
 
     private static ModelObject BuildCalendar(Calendar calendar, string tablePath)
         => new(
@@ -523,7 +540,25 @@ public static class TomModelSummarizer
             Properties: new Dictionary<string, string> { [PropObjectType] = "Calendar" });
 
     private static ModelObject BuildDataSource(DataSource dataSource)
-        => new(
+    {
+        // Provider-only and structured-only fields surface as empty on the other kind,
+        // matching what set accepts for each source (the hint follows the same split).
+        var props = new Dictionary<string, string>
+        {
+            [PropDataSourceType] = dataSource is StructuredDataSource ? "Structured" : "Provider",
+            [PropertyBagKeys.MaxConnections] = dataSource.MaxConnections.ToString(),
+            [PropObjectType] = "DataSource"
+        };
+        if (dataSource is ProviderDataSource provider)
+        {
+            props[PropertyBagKeys.ImpersonationMode] = provider.ImpersonationMode.ToString();
+            props[PropertyBagKeys.Isolation] = provider.Isolation.ToString();
+            props[PropertyBagKeys.Timeout] = provider.Timeout.ToString();
+        }
+        if (dataSource is StructuredDataSource structured)
+            props[PropertyBagKeys.ContextExpression] = structured.ContextExpression ?? "";
+
+        return new(
             dataSource.Name,
             ModelObjectKind.DataSource,
             $"DataSources/{Segment(dataSource.Name)}",
@@ -533,11 +568,8 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: new Dictionary<string, string>
-            {
-                [PropDataSourceType] = dataSource is StructuredDataSource ? "Structured" : "Provider",
-                [PropObjectType] = "DataSource"
-            });
+            Properties: props);
+    }
 
     private static ModelObject BuildNamedExpression(NamedExpression expression)
     {

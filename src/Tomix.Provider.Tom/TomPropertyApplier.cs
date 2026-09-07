@@ -29,8 +29,8 @@ internal static class TomPropertyApplier
 
         switch (target)
         {
-            case Database database when property is "database.compatibilitylevel" or "compatibilitylevel":
-                database.CompatibilityLevel = ParseInt(value, assignment.Property);
+            case Database database:
+                ApplyModelRootProperty(database, property, value, assignment.Property);
                 return;
             case Table table:
                 ApplyTableProperty(table, property, value, assignment.Property);
@@ -206,6 +206,60 @@ internal static class TomPropertyApplier
         _ => throw new NotSupportedException($"Setting annotations is not supported for {target.GetType().Name}.")
     };
 
+    /// <summary>
+    /// The model root (the "." path resolves to the <see cref="Database"/>): database-level
+    /// compatibility plus the TOM <c>Model</c> scalars. The root is not a snapshot object,
+    /// so get reads these back through the snapshot's model-level properties bag.
+    /// </summary>
+    private static void ApplyModelRootProperty(Database database, string property, string value, string displayName)
+    {
+        var model = database.Model;
+        switch (property)
+        {
+            case "database.compatibilitylevel":
+            case "compatibilitylevel":
+                database.CompatibilityLevel = ParseInt(value, displayName);
+                break;
+            case "description":
+                model.Description = value;
+                break;
+            case "culture":
+                model.Culture = value;
+                break;
+            case "collation":
+                model.Collation = value;
+                break;
+            case "discourageimplicitmeasures":
+                model.DiscourageImplicitMeasures = ParseBool(value, displayName);
+                break;
+            case "discouragecompositemodels":
+                model.DiscourageCompositeModels = ParseBool(value, displayName);
+                break;
+            // DiscourageReportMeasures is deliberately absent: TOM's setter demands the
+            // internal-only compatibility sentinel, so the hint must not advertise it.
+            case "defaultmode":
+                model.DefaultMode = ParseEnum<ModeType>(value, displayName);
+                break;
+            case "defaultdataview":
+                model.DefaultDataView = ParseEnum<DataViewType>(value, displayName);
+                break;
+            case "maxparallelismperquery":
+                model.MaxParallelismPerQuery = ParseInt(value, displayName);
+                break;
+            case "maxparallelismperrefresh":
+                model.MaxParallelismPerRefresh = ParseInt(value, displayName);
+                break;
+            case "sourcequeryculture":
+                model.SourceQueryCulture = value;
+                break;
+            case "forceuniquenames":
+                model.ForceUniqueNames = ParseBool(value, displayName);
+                break;
+            default:
+                throw UnsupportedProperty(displayName, "the model root", ModelObjectKind.Model);
+        }
+    }
+
     private static void ApplyTableProperty(Table table, string property, string value, string displayName)
     {
         switch (property)
@@ -249,8 +303,19 @@ internal static class TomPropertyApplier
             case "directlakeindexingbehavior":
                 table.DirectLakeIndexingBehavior = ParseEnum<DirectLakeIndexingBehavior>(value, displayName);
                 break;
+            // Precedence lives on the CalculationGroup member of a calculation-group table,
+            // so the hint hides it from plain tables (partition's source-bound precedent).
+            case "precedence" when table.CalculationGroup is { } calculationGroup:
+                calculationGroup.Precedence = ParseInt(value, displayName);
+                break;
+            case "precedence":
+                throw new NotSupportedException(
+                    $"Setting '{displayName}' is only supported for calculation group tables.");
             default:
-                throw UnsupportedProperty(displayName, "tables", ModelObjectKind.Table);
+                var excludes = new List<string>();
+                if (table.CalculationGroup is null)
+                    excludes.Add("precedence");
+                throw UnsupportedProperty(displayName, "tables", ModelObjectKind.Table, exclude: excludes);
         }
     }
 
@@ -671,14 +736,48 @@ internal static class TomPropertyApplier
             case "description":
                 dataSource.Description = value;
                 break;
-            case "connectionstring" when dataSource is ProviderDataSource provider:
-                provider.ConnectionString = value;
+            case "maxconnections":
+                dataSource.MaxConnections = ParseInt(value, displayName);
                 break;
+            // Provider-only and structured-only fields guard on the source kind, and the
+            // hint trims the tokens the targeted source cannot take.
             case "provider" when dataSource is ProviderDataSource provider:
                 provider.Provider = value;
                 break;
+            case "impersonationmode" when dataSource is ProviderDataSource provider:
+                provider.ImpersonationMode = ParseEnum<ImpersonationMode>(value, displayName);
+                break;
+            case "isolation" when dataSource is ProviderDataSource provider:
+                provider.Isolation = ParseEnum<DatasourceIsolation>(value, displayName);
+                break;
+            case "timeout" when dataSource is ProviderDataSource provider:
+                // TOM stores the provider timeout as whole seconds.
+                provider.Timeout = ParseInt(value, displayName);
+                break;
+            case "contextexpression" when dataSource is StructuredDataSource structured:
+                structured.ContextExpression = value;
+                break;
+            // Credentials are secrets, and secrets are never accepted via argv
+            // (docs/cli-ux-guidelines.md); scripted edits are the escape hatch.
+            case "connectionstring":
+            case "connectiondetails":
+            case "credential":
+            case "account":
+            case "password":
+                throw new NotSupportedException(
+                    $"Setting '{displayName}' is not supported: secrets are never accepted via argv. "
+                    + "Edit the source file or use 'tx script' to change credentials.");
             default:
-                throw UnsupportedProperty(displayName, "data sources", ModelObjectKind.DataSource);
+                var excludes = new List<string>();
+                if (dataSource is not ProviderDataSource)
+                {
+                    excludes.Add("impersonationMode");
+                    excludes.Add("isolation");
+                    excludes.Add("timeout");
+                }
+                if (dataSource is not StructuredDataSource)
+                    excludes.Add("contextExpression");
+                throw UnsupportedProperty(displayName, "data sources", ModelObjectKind.DataSource, exclude: excludes);
         }
     }
 

@@ -138,6 +138,45 @@ tx set Readers/user@contoso.com -t member -q memberType -i Group
 tx set Readers/Customer -q metadataPermission -i None
 ```
 
+Shared expressions and functions accept `name`, `description`, and
+`expression`; expressions also accept `kind` and `remoteParameterName`,
+and functions accept `isHidden` — all of them carry lineage tags:
+
+```sh
+tx set "Expressions/Environment" -q remoteParameterName -i RangeStart
+```
+
+The model root is addressed with `.`: `compatibilityLevel`,
+`description`, `culture`, `collation`, `discourageImplicitMeasures`,
+`discourageCompositeModels`, `defaultMode` (`Import`, `DirectQuery`,
+`Default`, `Push`, `Dual`, `DirectLake`), `defaultDataView` (`Full`,
+`Sample`, `Default`), `maxParallelismPerQuery`,
+`maxParallelismPerRefresh`, `sourceQueryCulture`, and
+`forceUniqueNames` are all settable, and `tx get .` reads the whole
+surface back:
+
+```sh
+tx set . -q culture -i en-US --save
+tx get . -q defaultMode
+```
+
+Calculation-group tables accept `precedence` — a plain table rejects
+it — and calculation items accept `description`, `expression`, and
+`ordinal` via their `Table/Item` path.
+
+Data sources accept `description`, `maxConnections`, and — provider
+sources only — `impersonationMode` (`Default`, `ImpersonateAccount`,
+`ImpersonateAnonymous`, `ImpersonateCurrentUser`,
+`ImpersonateServiceAccount`, `ImpersonateUnattendedAccount`),
+`isolation` (`ReadCommitted`, `Snapshot`), and `timeout` (seconds);
+structured sources accept `contextExpression`. Connection strings,
+accounts, and passwords are secrets, so they are never accepted via
+argv — edit the source file or use `tx script` to change credentials:
+
+```sh
+tx set DataSources/Import -q maxConnections -i 5
+```
+
 ## `mv` — move or rename
 
 ```

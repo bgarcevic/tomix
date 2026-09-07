@@ -45,7 +45,9 @@ public static class ModelPropertyCatalog
         new("showAsVariationsOnly", "ShowAsVariationsOnly", o => BoolBag(o, PropertyBagKeys.ShowAsVariationsOnly), Writable: true),
         new("systemManaged", "SystemManaged", o => BoolBag(o, PropertyBagKeys.SystemManaged), Writable: true),
         new("directLakeIndexingBehavior", "DirectLakeIndexingBehavior", o => Bag(o, PropertyBagKeys.DirectLakeIndexingBehavior), Writable: true, Diffable: true),
-        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
+        new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true),
+        // Calculation-group precedence; set rejects it and the hint hides it on plain tables.
+        new("precedence", "Precedence", o => IntBag(o, PropertyBagKeys.Precedence), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Measure =
@@ -251,6 +253,62 @@ public static class ModelPropertyCatalog
         new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true)
     ];
 
+    // Calculation items carry no TOM lineage tags or hidden flag; the generic keys stay
+    // in place for schema stability and the writable surface is appended.
+    private static readonly IReadOnlyList<PropertyDescriptor> CalculationItem =
+    [
+        Name(writable: true),
+        Description(writable: true),
+        IsHidden(writable: false),
+        new("detail", "Detail", o => o.Detail ?? ""),
+        Expression(writable: true),
+        new("ordinal", "Ordinal", o => IntBag(o, PropertyBagKeys.Ordinal), Writable: true, Diffable: true)
+    ];
+
+    // Secret-bearing fields (connection strings, accounts, passwords, credentials) are
+    // deliberately absent: secrets are never accepted via argv (docs/cli-ux-guidelines.md).
+    // Provider-only and structured-only tokens are trimmed from hints applier-side.
+    private static readonly IReadOnlyList<PropertyDescriptor> DataSource =
+    [
+        Name(writable: true),
+        Description(writable: true),
+        IsHidden(writable: false),
+        new("detail", "Detail", o => o.Detail ?? ""),
+        Expression(writable: false),
+        new("maxConnections", "MaxConnections", o => IntBag(o, PropertyBagKeys.MaxConnections), Writable: true, Diffable: true),
+        new("impersonationMode", "ImpersonationMode", o => Bag(o, PropertyBagKeys.ImpersonationMode), Writable: true, Diffable: true),
+        new("isolation", "Isolation", o => Bag(o, PropertyBagKeys.Isolation), Writable: true, Diffable: true),
+        new("timeout", "Timeout", o => IntBag(o, PropertyBagKeys.Timeout), Writable: true),
+        new("contextExpression", "ContextExpression", o => Bag(o, PropertyBagKeys.ContextExpression), Writable: true, Diffable: true)
+    ];
+
+    // The model root ("." path) is not a snapshot object: this list is the property
+    // contract behind set hints and 'get .' read-back. compatibilityLevel stays out of
+    // diff (it has no per-kind bag identity); the semantic scalars diff normally.
+    private static readonly IReadOnlyList<PropertyDescriptor> Model =
+    [
+        Name(writable: false),
+        Description(writable: true),
+        IsHidden(writable: false),
+        new("detail", "Detail", o => o.Detail ?? ""),
+        Expression(writable: false),
+        new("compatibilityLevel", "CompatibilityLevel", o => IntBag(o, PropertyBagKeys.CompatibilityLevel), Writable: true),
+        new("culture", "Culture", o => Bag(o, PropertyBagKeys.Culture), Writable: true, Diffable: true),
+        new("collation", "Collation", o => Bag(o, PropertyBagKeys.Collation), Writable: true, Diffable: true),
+        new("discourageImplicitMeasures", "DiscourageImplicitMeasures", o => BoolBag(o, PropertyBagKeys.DiscourageImplicitMeasures), Writable: true, Diffable: true),
+        new("discourageCompositeModels", "DiscourageCompositeModels", o => BoolBag(o, PropertyBagKeys.DiscourageCompositeModels), Writable: true, Diffable: true),
+        // TOM's setter validates DiscourageReportMeasures against the internal-only
+        // compatibility sentinel (Int32.MaxValue), so no real model can ever set it;
+        // it stays a read-only field.
+        new("discourageReportMeasures", "DiscourageReportMeasures", o => BoolBag(o, PropertyBagKeys.DiscourageReportMeasures)),
+        new("defaultMode", "DefaultMode", o => Bag(o, PropertyBagKeys.DefaultMode), Writable: true, Diffable: true),
+        new("defaultDataView", "DefaultDataView", o => Bag(o, PropertyBagKeys.DefaultDataView), Writable: true, Diffable: true),
+        new("maxParallelismPerQuery", "MaxParallelismPerQuery", o => IntBag(o, PropertyBagKeys.MaxParallelismPerQuery), Writable: true, Diffable: true),
+        new("maxParallelismPerRefresh", "MaxParallelismPerRefresh", o => IntBag(o, PropertyBagKeys.MaxParallelismPerRefresh), Writable: true, Diffable: true),
+        new("sourceQueryCulture", "SourceQueryCulture", o => Bag(o, PropertyBagKeys.SourceQueryCulture), Writable: true, Diffable: true),
+        new("forceUniqueNames", "ForceUniqueNames", o => BoolBag(o, PropertyBagKeys.ForceUniqueNames), Writable: true, Diffable: true)
+    ];
+
     private static readonly IReadOnlyList<PropertyDescriptor> Generic =
     [
         Name(writable: false),
@@ -278,6 +336,9 @@ public static class ModelPropertyCatalog
         ModelObjectKind.TablePermission => TablePermission,
         ModelObjectKind.Expression => NamedExpression,
         ModelObjectKind.Function => Function,
+        ModelObjectKind.CalculationItem => CalculationItem,
+        ModelObjectKind.DataSource => DataSource,
+        ModelObjectKind.Model => Model,
         _ => Generic
     };
 

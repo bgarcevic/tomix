@@ -21,6 +21,20 @@ public sealed class ReadOnlyCommandHandlerTests
     }
 
     [Fact]
+    public async Task Get_ModelRoot_ProjectsSnapshotLevelProperties()
+    {
+        var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(
+            new GetModelRequest(new ModelReference("any"), ".", Query: null, Type: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("Model", result.Data!.Type);
+        Assert.Equal(".", result.Data.Path);
+        Assert.Equal(1601, result.Data.Properties["compatibilityLevel"]);
+        Assert.Equal("stub model", result.Data.Properties["description"]);
+    }
+
+    [Fact]
     public async Task Find_SearchesPartitionsButOmitsRelationships()
     {
         var result = await new FindModelHandler([new StubModelProvider()]).HandleAsync(
@@ -176,7 +190,9 @@ public sealed class ReadOnlyCommandHandlerTests
                 SourceColumn: null,
                 Children: []);
 
-            return Task.FromResult(new ModelSnapshot("(unnamed)", 1601, [table, relationship]));
+            return Task.FromResult(new ModelSnapshot("(unnamed)", 1601, [table, relationship],
+                Properties: new Dictionary<string, string> { ["CompatibilityLevel"] = "1601" },
+                Description: "stub model"));
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

@@ -22,5 +22,6 @@ public enum ModelObjectKind
     TablePermission,
     Calendar,
     Expression,
-    Function
+    Function,
+    Model
 }
