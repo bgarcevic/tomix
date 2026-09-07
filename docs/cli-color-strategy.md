@@ -58,6 +58,8 @@ Use `Palette.Sage` for Spectre widget styling (table borders, panel borders). Us
 | Diff removed       | Rose prefix `-`                               | `- table Sales`                                  |
 | Diff modified      | Amber prefix `~`                              | `~ table Sales`                                  |
 | Table              | Spectre `Table().RoundedBorder().BorderColor(Palette.Slate)` | Already established in `LsRenderer` |
+| Table row de-emphasis | Whole row in Slate (`Styling.Muted` per cell) | Hidden-object rows in `ls` are muted end to end |
+| Connection banner  | Slate on stderr                               | `Connected to: C:\models\Sales` before the model opens |
 | CI annotations     | Plain text, no markup                         | `::error::...` / `##vso[task.logissue...]`       |
 
 ## NO_COLOR Compliance

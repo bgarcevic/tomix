@@ -50,17 +50,27 @@ internal sealed partial class LsRenderer
 
         foreach (var o in objects)
         {
-            table.AddRow(
-                Styling.MarkupEscape(o.Name),
+            table.AddRow(RowCells(o,
+                o.Name,
                 Count(o, ModelObjectKind.Column),
                 Count(o, ModelObjectKind.Measure),
                 Count(o, ModelObjectKind.Partition),
                 BoolText(o.Hidden),
-                Styling.MarkupEscape(o.Description ?? ""));
+                o.Description ?? ""));
         }
 
         AnsiConsole.Write(table);
     }
+
+    /// <summary>
+    /// Styles one table row: a hidden object's whole row is muted so hidden objects read at a
+    /// glance (the grey "True" cell alone was too easy to miss). Cells are plain text — the
+    /// helper applies the single style pass, so markup-producing values must not be passed in.
+    /// </summary>
+    private static string[] RowCells(LsObject o, params string[] cells)
+        => o.Hidden
+            ? cells.Select(Styling.Muted).ToArray()
+            : cells.Select(Styling.MarkupEscape).ToArray();
 
     private static void RenderGrouped(IReadOnlyList<LsObject> objects, bool noMultiline)
     {
@@ -109,12 +119,12 @@ internal sealed partial class LsRenderer
 
         foreach (var o in objects)
         {
-            table.AddRow(
-                Styling.MarkupEscape(o.Name),
-                Styling.MarkupEscape(o.SourceColumn ?? ""),
-                Styling.MarkupEscape(ColumnDataTypeDisplay(o)),
-                Styling.MarkupEscape(o.Description ?? ""),
-                BoolText(o.Hidden));
+            table.AddRow(RowCells(o,
+                o.Name,
+                o.SourceColumn ?? "",
+                ColumnDataTypeDisplay(o),
+                o.Description ?? "",
+                BoolText(o.Hidden)));
         }
 
         AnsiConsole.Write(table);
@@ -132,12 +142,12 @@ internal sealed partial class LsRenderer
                 ? string.Join("\n", lines.Take(MeasureExpressionPreviewLines))
                   + $"\n... (+{hidden} {(hidden == 1 ? "line" : "lines")})"
                 : string.Join("\n", lines);
-            table.AddRow(
-                Styling.MarkupEscape(o.Name),
-                Styling.MarkupEscape(o.Description ?? ""),
+            table.AddRow(RowCells(o,
+                o.Name,
+                o.Description ?? "",
                 BoolText(o.Hidden),
-                Styling.MarkupEscape(expression),
-                Styling.MarkupEscape(Projected(o, "formatString")));
+                expression,
+                Projected(o, "formatString")));
         }
 
         AnsiConsole.Write(table);
@@ -152,15 +162,15 @@ internal sealed partial class LsRenderer
 
         foreach (var obj in objects)
         {
-            var rows = new List<string>
+            var cells = new List<string>
             {
-                Styling.MarkupEscape(obj.Name),
+                obj.Name,
                 Count(obj, ModelObjectKind.Level),
                 BoolText(obj.Hidden)
             };
             if (showDescription)
-                rows.Add(Styling.MarkupEscape(obj.Description ?? ""));
-            table.AddRow(rows.ToArray());
+                cells.Add(obj.Description ?? "");
+            table.AddRow(RowCells(obj, cells.ToArray()));
         }
 
         AnsiConsole.Write(table);
@@ -259,8 +269,9 @@ internal sealed partial class LsRenderer
     private static string Count(LsObject obj, ModelObjectKind kind)
         => obj.ChildCounts.GetValueOrDefault(kind).ToString();
 
+    /// <summary>Plain "True"/"False" for <see cref="RowCells"/>; the row style provides the grey.</summary>
     private static string BoolText(bool value)
-        => Styling.BoolText(value);
+        => value ? "True" : "False";
 
     private static string ColumnDataTypeDisplay(LsObject obj)
         => DataTypeDisplay(Projected(obj, "dataType"));

@@ -64,7 +64,10 @@ the bottom for where each concern lives.
 - Suggest the next command after workflow steps (Slate `Guidance`), and give every
   empty result a message plus a hint — never print nothing.
 - Crossing the program boundary (network calls, writing files not named by the
-  user) should be visible: name the server/file on stderr as it happens.
+  user) should be visible: name the server/file on stderr as it happens. A command
+  that opens a model resolved implicitly from the active connection prints one
+  muted stderr line (`Connected to: …`) naming it; explicit model/--server/--recent
+  targets stay silent, and `--quiet`/JSON/CSV suppress the line entirely.
 - Color with intention only, via `Styling` helpers — one warm accent per line,
   semantic roles only. Never hard-code ANSI or markup in commands.
 - Disable color when: stdout/stderr is not a TTY (check each stream separately),

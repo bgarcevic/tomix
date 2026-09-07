@@ -26,7 +26,16 @@ internal static class RecentConnections
         string? Model,
         string? Server,
         string? Database,
-        CliConnectionState? RecentEntry);
+        CliConnectionState? RecentEntry)
+    {
+        /// <summary>
+        /// True when the model comes entirely from the saved active connection: no explicit
+        /// model path, no <c>--server</c>, no <c>--recent</c>. Only implicit targets get the
+        /// "Connected to:" banner (<see cref="ConnectionBanner"/>).
+        /// </summary>
+        public bool IsImplicit
+            => string.IsNullOrWhiteSpace(Model) && string.IsNullOrWhiteSpace(Server) && RecentEntry is null;
+    }
 
     /// <summary>
     /// Reads the --server/--database globals and applies the --recent override on top:
@@ -107,6 +116,8 @@ internal static class RecentConnections
         }
 
         reference = CreateResolver(source, store).ResolveReference(source.Model, source.Database, source.Server);
+        if (source.IsImplicit)
+            ConnectionBanner.Announce(parseResult, reference);
         return true;
     }
 

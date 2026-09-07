@@ -116,6 +116,14 @@ internal sealed class TestCommand : ICommandModule
                 Parameters: parameters.Count > 0 ? parameters : null,
                 MaxRows: parseResult.GetValue(maxRowsOption) ?? 10000);
 
+            // Name the session-resolved target on stderr before the model opens; an explicit
+            // model/--server target is the user's own and stays silent.
+            ConnectionBanner.AnnounceIfImplicit(
+                parseResult,
+                request.Model,
+                () => new ActiveModelResolver(_loadCurrentSession)
+                    .ResolveReference(request.Model, request.Database, request.Server));
+
             var result = await CliSpinner.RunAsync(
                 "Running tests...",
                 () => new TestRunHandler(_providers, _loadCurrentSession).HandleAsync(request, cancellationToken),

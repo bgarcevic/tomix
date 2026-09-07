@@ -198,6 +198,11 @@ internal sealed class StageCommand : ICommandModule
         reference = GlobalOptions.RecentSpecified(parseResult)
             ? RecentConnections.CreateResolver(source, _state).ResolveReference(source.Model, source.Database, source.Server)
             : new ActiveModelResolver(_state).ResolveReference(source.Model, source.Database);
+
+        // --server does not make the target explicit here: stage resolution ignores it (above),
+        // so without a model path or --recent the target still comes from the active session.
+        if (string.IsNullOrWhiteSpace(source.Model) && source.RecentEntry is null)
+            ConnectionBanner.Announce(parseResult, reference);
         return true;
     }
 }

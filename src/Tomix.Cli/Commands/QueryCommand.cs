@@ -186,6 +186,14 @@ internal sealed class QueryCommand : ICommandModule
                 Cold: parseResult.GetValue(coldOption),
                 Runs: parseResult.GetValue(runsOption) ?? 1);
 
+            // Name the session-resolved target on stderr before the model opens; an explicit
+            // model/--server target is the user's own and stays silent.
+            ConnectionBanner.AnnounceIfImplicit(
+                parseResult,
+                request.Model,
+                () => new ActiveModelResolver(_loadCurrentSession)
+                    .ResolveReference(request.Model, request.Database, request.Server));
+
             // The raw-event dump reuses the shared trace-writer plumbing (file, or "-" for stderr).
             using var rawTraceWriter = TraceWriter.Open(rawTracePath, quiet);
 

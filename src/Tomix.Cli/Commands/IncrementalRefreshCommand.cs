@@ -62,6 +62,10 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
+            ConnectionBanner.AnnounceIfImplicit(
+                parseResult,
+                GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                () => reference);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Loading model...",
@@ -190,6 +194,10 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
+            ConnectionBanner.AnnounceIfImplicit(
+                parseResult,
+                GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                () => reference);
             var label = MutationSpinnerLabel.For(
                 parseResult.GetValue(saveOption),
                 parseResult.GetValue(saveToOption),
@@ -303,6 +311,10 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                 parseResult.GetValue(GlobalOptions.Database),
                 parseResult.GetValue(GlobalOptions.Server));
+            ConnectionBanner.AnnounceIfImplicit(
+                parseResult,
+                GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                () => reference);
             var label = MutationSpinnerLabel.For(
                 parseResult.GetValue(saveOption),
                 parseResult.GetValue(saveToOption),
@@ -364,6 +376,16 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
 
             var table = parseResult.GetValue(tableArgument) ?? "";
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+
+            // The handler resolves the session itself; pre-resolve only to name the target on
+            // stderr when no model/--server was given.
+            ConnectionBanner.AnnounceIfImplicit(
+                parseResult,
+                GlobalOptions.ModelValue(parseResult),
+                () => new ActiveModelResolver(_loadCurrentSession).ResolveReference(
+                    GlobalOptions.ModelValue(parseResult),
+                    parseResult.GetValue(GlobalOptions.Database),
+                    parseResult.GetValue(GlobalOptions.Server)));
             var result = await CliSpinner.RunAsync(
                 $"Applying refresh policy for {table}...",
                 () => new ApplyRefreshPolicyHandler(_providers, _loadCurrentSession).HandleAsync(

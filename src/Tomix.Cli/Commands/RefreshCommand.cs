@@ -140,6 +140,14 @@ internal sealed class RefreshCommand : ICommandModule
                     out var recentExit))
                 return recentExit;
 
+            // The handler resolves the same triple internally; pre-resolve only to name the
+            // target on stderr when it came implicitly from the active connection.
+            if (source.IsImplicit)
+                ConnectionBanner.Announce(
+                    parseResult,
+                    RecentConnections.CreateResolver(source, _state)
+                        .ResolveReference(source.Model, source.Database, source.Server));
+
             var request = new RefreshModelRequest(
                 Model: source.Model,
                 Server: source.Server,

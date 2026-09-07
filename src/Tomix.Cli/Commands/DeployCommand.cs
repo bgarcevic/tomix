@@ -156,6 +156,12 @@ internal sealed class DeployCommand : ICommandModule
                 reference = new ActiveModelResolver(_state).ResolveReference(
                     explicitModel,
                     parseResult.GetValue(GlobalOptions.Database));
+
+                // --server/--database address the deploy target, not the source, so they do not
+                // make the source explicit: without a model path the source came from the
+                // active session and the banner names it.
+                if (string.IsNullOrWhiteSpace(explicitModel))
+                    ConnectionBanner.Announce(parseResult, reference);
             }
 
             var server = parseResult.GetValue(GlobalOptions.Server);

@@ -27,7 +27,11 @@ internal static class ConsoleCapture
     /// rendered through Spectre (tables, help, panels); plain <c>Console.WriteLine</c> output is
     /// captured either way.
     /// </param>
-    public static Captured Run(Func<int> run, bool captureAnsiConsole = false)
+    /// <param name="forceAnsi">
+    /// With <paramref name="captureAnsiConsole"/>, emit true-color ANSI escapes instead of
+    /// stripping color. Use when a test asserts on styling, not just text.
+    /// </param>
+    public static Captured Run(Func<int> run, bool captureAnsiConsole = false, bool forceAnsi = false)
     {
         var stdout = new StringWriter();
         var stderr = new StringWriter();
@@ -38,7 +42,12 @@ internal static class ConsoleCapture
         Console.SetOut(stdout);
         Console.SetError(stderr);
         if (captureAnsiConsole)
-            AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(stdout) });
+            AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
+            {
+                Out = new AnsiConsoleOutput(stdout),
+                Ansi = forceAnsi ? AnsiSupport.Yes : AnsiSupport.Detect,
+                ColorSystem = forceAnsi ? ColorSystemSupport.TrueColor : ColorSystemSupport.Detect
+            });
 
         try
         {
