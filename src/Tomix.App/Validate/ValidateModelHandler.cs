@@ -29,7 +29,7 @@ public sealed class ValidateModelHandler
                 var issues = request.ServerOnly
                     ? new LocalIssues([], [])
                     : ValidateLocal(snapshot);
-                return Complete(request, stopwatch, issues);
+                return Complete(request, stopwatch, issues, snapshot.Name);
             }, noProviderMessage: null, noProviderHint: null, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -40,18 +40,20 @@ public sealed class ValidateModelHandler
             var issues = new LocalIssues(
                 [new ValidationIssue("TOMIX_MODEL_LOAD_FAILED", ex.Message, request.Model.Value, Expression: null)],
                 []);
-            return Complete(request, stopwatch, issues);
+            return Complete(request, stopwatch, issues, request.Model.Value);
         }
     }
 
     private static TomixResult<ValidateModelResult> Complete(
         ValidateModelRequest request,
         Stopwatch stopwatch,
-        LocalIssues issues)
+        LocalIssues issues,
+        string modelName)
     {
         stopwatch.Stop();
 
         var result = new ValidateModelResult(
+            ModelName: modelName,
             Valid: issues.Errors.Count == 0,
             DurationMs: Math.Max(0, stopwatch.ElapsedMilliseconds),
             Errors: issues.Errors,

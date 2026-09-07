@@ -81,6 +81,49 @@ public sealed class TmdlModelSessionTests
         => Assert.True(capability.IsAssignableFrom(typeof(TmdlModelSession)),
             $"TmdlModelSession should implement {capability.Name}");
 
+    [Fact]
+    public async Task GetSnapshotAsync_NamelessModel_FallsBackToFolderName()
+    {
+        // basic-tmdl's database.tmdl carries no name, so the folder name is the only identity.
+        using var temp = new TempDir();
+        var modelDir = SampleModel.CopyTo(temp, "renamed-basic-tmdl");
+
+        await using var session = new TmdlModelSession(modelDir);
+
+        var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
+        Assert.Equal("renamed-basic-tmdl", snapshot.Name);
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_PlatformDisplayName_BeatsFolderName()
+    {
+        using var temp = new TempDir();
+        var modelDir = temp.CreateSubdirectory("AdventureWorks Sales.SemanticModel");
+        SampleModel.CopyDirectory(SampleModel.Locate(), modelDir);
+        File.WriteAllText(Path.Combine(modelDir, ".platform"),
+            """{ "metadata": { "type": "SemanticModel", "displayName": "AdventureWorks Sales" } }""");
+
+        await using var session = new TmdlModelSession(modelDir);
+
+        var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
+        Assert.Equal("AdventureWorks Sales", snapshot.Name);
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_NamedDatabase_TomNameWins()
+    {
+        using var temp = new TempDir();
+        var modelDir = temp.CreateSubdirectory("Fallback Folder");
+        SampleModel.CopyDirectory(SampleModel.Locate(), modelDir);
+        File.WriteAllText(Path.Combine(modelDir, "database.tmdl"),
+            "database TomName\n\tid: SemanticModel\n\tcompatibilityLevel: 1601\n");
+
+        await using var session = new TmdlModelSession(modelDir);
+
+        var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
+        Assert.Equal("TomName", snapshot.Name);
+    }
+
     [Theory]
     [InlineData(typeof(IModelQuerySession))]
     [InlineData(typeof(IModelRefreshSession))]

@@ -7,6 +7,10 @@ Adapter around Microsoft Tabular Object Model.
 - Translate TOM objects into tomix core abstractions.
 - Centralize TOM-specific logic.
 - Hide TOM implementation details from the rest of the codebase.
+- Resolve the model display name shown by every command (`ModelDisplayName`):
+  TOM database name → sibling `.platform` displayName → file/folder name
+  (a PBIP `definition` folder inherits its item root's name) → caller fallback
+  → `(unnamed)`.
 
 ## Mutation structure
 

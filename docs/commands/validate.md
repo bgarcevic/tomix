@@ -112,6 +112,18 @@ tx validate --ci github
 tx validate --trx results.trx
 ```
 
+The banner names the model being validated: the TOM database name, falling
+back to the Fabric `.platform` displayName, then to the file/folder name —
+so a nameless TMDL folder still shows its own name instead of `(unnamed)`.
+
+```console
+$ tx validate ./samples/basic-tmdl
+Validating...
+Validating: basic-tmdl
+
+No validation errors found.
+```
+
 ## `test` — DAX regression tests
 
 ```

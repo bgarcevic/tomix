@@ -77,7 +77,10 @@ public sealed class TmdlModelSessionSaveRoundTripTests : IDisposable
 
         await using var reopened = new TmdlModelSession(targetPath);
         var after = await reopened.GetSummaryAsync(CancellationToken.None);
-        Assert.Equal(before, after);
+
+        // For a nameless model the display name is folder-derived, so the saved copy carries
+        // its own folder's name ("saved-copy"); everything content-shaped must still match.
+        Assert.Equal(before with { Name = after.Name }, after);
     }
 
     private string CopySample() => SampleModel.CopyTo(_tempDir, "basic-tmdl");

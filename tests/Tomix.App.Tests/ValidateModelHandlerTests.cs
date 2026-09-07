@@ -246,6 +246,17 @@ public sealed class ValidateModelHandlerTests
         var issue = Assert.Single(result.Data.Errors);
         Assert.Equal("TOMIX_MODEL_LOAD_FAILED", issue.Code);
         Assert.Contains("cannot be resolved", issue.Message);
+        // No snapshot exists on a load failure, so the model reference stands in as the name.
+        Assert.Equal("any", result.Data!.ModelName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CarriesSnapshotName_AsModelName()
+    {
+        var result = await ValidateAsync(ValidSnapshot());
+
+        Assert.True(result.Data!.Valid);
+        Assert.Equal("test", result.Data.ModelName);
     }
 
     [Fact]

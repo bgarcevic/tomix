@@ -10,7 +10,7 @@ in a terminal, in scripts, in CI, in a diff.
 
 ```console
 $ tx connect ./samples/basic-tmdl
-Model: (unnamed)
+Model: basic-tmdl
   CL: 1601
   tables: 3  measures: 4  relationships: 2  roles: 0
 

@@ -1,6 +1,7 @@
 namespace Tomix.App.Validate;
 
 public sealed record ValidateModelResult(
+    string ModelName,
     bool Valid,
     long DurationMs,
     IReadOnlyList<ValidationIssue> Errors,

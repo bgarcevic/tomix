@@ -102,6 +102,7 @@ public sealed class TrxWriterTests : IDisposable
     public void ValidateProjection_MapsErrorsWarningsAndExpression()
     {
         var result = new ValidateModelResult(
+            ModelName: "Sales Model",
             Valid: false,
             DurationMs: 1,
             Errors: [new ValidationIssue("TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", "SUM('X'[Y])")],
@@ -121,7 +122,7 @@ public sealed class TrxWriterTests : IDisposable
     [Fact]
     public void ValidateProjection_CleanModel_YieldsSinglePassedTest()
     {
-        var result = new ValidateModelResult(Valid: true, DurationMs: 1, Errors: [], Warnings: []);
+        var result = new ValidateModelResult(ModelName: "Sales Model", Valid: true, DurationMs: 1, Errors: [], Warnings: []);
 
         var test = Assert.Single(ValidateRenderer.ToTrxTests(result));
         Assert.Equal(TrxWriter.TrxOutcome.Passed, test.Outcome);

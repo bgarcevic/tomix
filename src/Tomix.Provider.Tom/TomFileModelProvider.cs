@@ -182,10 +182,8 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
         return json;
     }
 
-    private static string ModelName(TabularDatabase database)
-        => string.IsNullOrWhiteSpace(database.Name)
-            ? Path.GetFileNameWithoutExtension(database.ID)
-            : database.Name;
+    private string ModelName(TabularDatabase database)
+        => ModelDisplayName.Resolve(database.Name, _path);
 
     private static string InferSerialization(string path)
     {

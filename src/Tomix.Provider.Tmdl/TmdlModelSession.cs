@@ -135,6 +135,6 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
         }
     }
 
-    private static string ModelName(Database database)
-        => string.IsNullOrWhiteSpace(database.Name) ? "(unnamed)" : database.Name;
+    private string ModelName(Database database)
+        => ModelDisplayName.Resolve(database.Name, _path);
 }

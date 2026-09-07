@@ -104,7 +104,7 @@ public sealed class InitModelHandler
         var definitionPath = Path.Combine(semanticModelPath, "definition");
         Directory.CreateDirectory(definitionPath);
         WriteTmdlDefinition(definitionPath, name, compatibilityMode, compatibilityLevel);
-        WriteSemanticModelFiles(semanticModelPath);
+        WriteSemanticModelFiles(semanticModelPath, name);
 
         var reportPath = Path.Combine(outputPath, $"{projectName}.Report");
         Directory.CreateDirectory(Path.Combine(reportPath, "definition", "pages"));
@@ -112,7 +112,7 @@ public sealed class InitModelHandler
         File.WriteAllText(Path.Combine(reportPath, "definition", "version.json"), "{\"version\":\"4.0\"}");
         File.WriteAllText(Path.Combine(reportPath, "definition", "pages", "pages.json"), "{\"pages\":[]}");
         File.WriteAllText(Path.Combine(reportPath, "definition.pbir"), "{}");
-        File.WriteAllText(Path.Combine(reportPath, ".platform"), PlatformJson("Report"));
+        File.WriteAllText(Path.Combine(reportPath, ".platform"), PlatformJson("Report", projectName));
 
         File.WriteAllText(Path.Combine(outputPath, $"{projectName}.pbip"), PbipJson(projectName));
         return outputPath;
@@ -150,7 +150,7 @@ public sealed class InitModelHandler
         File.WriteAllText(Path.Combine(directory, "model.tmdl"), modelBody);
     }
 
-    private static void WriteSemanticModelFiles(string semanticModelPath)
+    private static void WriteSemanticModelFiles(string semanticModelPath, string name)
     {
         File.WriteAllText(Path.Combine(semanticModelPath, "definition.pbism"), """
             {
@@ -161,7 +161,7 @@ public sealed class InitModelHandler
               }
             }
             """);
-        File.WriteAllText(Path.Combine(semanticModelPath, ".platform"), PlatformJson("SemanticModel"));
+        File.WriteAllText(Path.Combine(semanticModelPath, ".platform"), PlatformJson("SemanticModel", name));
     }
 
     private static string CreateBimJson(string name, string compatibilityMode, int compatibilityLevel)
@@ -215,12 +215,13 @@ public sealed class InitModelHandler
             }
             """;
 
-    private static string PlatformJson(string type)
+    private static string PlatformJson(string type, string displayName)
         => $$"""
             {
               "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
               "metadata": {
-                "type": "{{type}}"
+                "type": "{{type}}",
+                "displayName": "{{displayName}}"
               }
             }
             """;

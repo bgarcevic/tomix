@@ -17,7 +17,7 @@ internal static class ValidateRenderer
     {
         if (includeBanner)
             AnsiConsole.MarkupLine(Styling.Value("Validating..."));
-        AnsiConsole.MarkupLine(Styling.Muted("Validating: (unnamed)"));
+        AnsiConsole.MarkupLine(Styling.Muted($"Validating: {result.ModelName}"));
         AnsiConsole.WriteLine();
 
         if (result.Valid)
