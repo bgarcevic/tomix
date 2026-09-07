@@ -50,6 +50,9 @@ public static class PropertyBagKeys
     public const string ToCardinality = "ToCardinality";
     public const string CrossFilteringBehavior = "CrossFilteringBehavior";
     public const string IsActive = "IsActive";
+    public const string SecurityFilteringBehavior = "SecurityFilteringBehavior";
+    public const string RelyOnReferentialIntegrity = "RelyOnReferentialIntegrity";
+    public const string JoinOnDateBehavior = "JoinOnDateBehavior";
     public const string RlsExpression = "RlsExpression";
     public const string DataView = "DataView";
     public const string QueryGroup = "QueryGroup";

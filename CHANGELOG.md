@@ -34,6 +34,12 @@ and the API surface that major versions protect.
   `expression` remains M-source-only), and `queryGroup`, which must name an existing query
   group and clears on an empty value. `diff` reports changes to them, and the unsupported-
   property hint omits source-bound tokens the targeted partition cannot take (#117).
+- `set` on relationships now covers their writable scalar surface: `name`, `isActive`,
+  `crossFilteringBehavior`, `fromCardinality`, and `toCardinality` were already settable but
+  are now advertised in the set hint, and `securityFilteringBehavior`,
+  `relyOnReferentialIntegrity`, and `joinOnDateBehavior` are new. `get`/`ls`/`find` JSON, CSV,
+  and text output gain the matching read-side keys (additive), and `diff` reports changes to
+  the security-filtering, referential-integrity, and date-join behavior (#118).
 
 ### Changed
 

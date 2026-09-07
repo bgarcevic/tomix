@@ -26,6 +26,9 @@ public static class TomModelSummarizer
     private const string PropToCardinality = PropertyBagKeys.ToCardinality;
     private const string PropCrossFilteringBehavior = PropertyBagKeys.CrossFilteringBehavior;
     private const string PropIsActive = PropertyBagKeys.IsActive;
+    private const string PropSecurityFilteringBehavior = PropertyBagKeys.SecurityFilteringBehavior;
+    private const string PropRelyOnReferentialIntegrity = PropertyBagKeys.RelyOnReferentialIntegrity;
+    private const string PropJoinOnDateBehavior = PropertyBagKeys.JoinOnDateBehavior;
     private const string PropPartitionSourceType = "PartitionSourceType";
     private const string PropPartitionMode = "PartitionMode";
     private const string PropPartitionDataView = "DataView";
@@ -395,6 +398,9 @@ public static class TomModelSummarizer
             [PropToCardinality] = single.ToCardinality.ToString(),
             [PropCrossFilteringBehavior] = single.CrossFilteringBehavior.ToString(),
             [PropIsActive] = single.IsActive.ToString().ToLowerInvariant(),
+            [PropSecurityFilteringBehavior] = single.SecurityFilteringBehavior.ToString(),
+            [PropRelyOnReferentialIntegrity] = single.RelyOnReferentialIntegrity.ToString().ToLowerInvariant(),
+            [PropJoinOnDateBehavior] = single.JoinOnDateBehavior.ToString(),
             [PropObjectType] = "Relationship"
         };
         AddAnnotations(props, single.Annotations);

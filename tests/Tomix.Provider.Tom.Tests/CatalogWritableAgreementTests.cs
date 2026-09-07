@@ -67,13 +67,20 @@ public sealed class CatalogWritableAgreementTests
             ["mode"] = "Dual",
             ["dataView"] = "Full",
             ["retainDataTillForceCalculate"] = "true",
-            ["queryGroup"] = "QG"
+            ["queryGroup"] = "QG",
+            ["isActive"] = "false",
+            ["crossFilteringBehavior"] = "BothDirections",
+            ["fromCardinality"] = "Many",
+            ["toCardinality"] = "One",
+            ["securityFilteringBehavior"] = "BothDirections",
+            ["relyOnReferentialIntegrity"] = "true",
+            ["joinOnDateBehavior"] = "DatePartOnly"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
         => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column,
             ModelObjectKind.Hierarchy, ModelObjectKind.Level, ModelObjectKind.Partition,
-            ModelObjectKind.Expression, ModelObjectKind.Function,
+            ModelObjectKind.Relationship, ModelObjectKind.Expression, ModelObjectKind.Function,
             ModelObjectKind.Kpi, ModelObjectKind.TablePermission);
 
     [Theory]
@@ -188,6 +195,8 @@ public sealed class CatalogWritableAgreementTests
             ModelObjectKind.Hierarchy => ("T/H", ModelObjectKind.Hierarchy),
             ModelObjectKind.Level => ("T/H/L", ModelObjectKind.Level),
             ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
+            // Endpoint addressing, the canonical way to target a relationship.
+            ModelObjectKind.Relationship => ("T[D]->T2[D]", ModelObjectKind.Relationship),
             ModelObjectKind.Expression => ("Expressions/E", null),
             ModelObjectKind.Function => ("Functions/F", null),
             ModelObjectKind.Kpi => ("T/M", ModelObjectKind.Kpi),
@@ -213,11 +222,29 @@ public sealed class CatalogWritableAgreementTests
         });
         table.Columns.Add(new DataColumn { Name = "C", DataType = DataType.Int64 });
         table.Columns.Add(new DataColumn { Name = "C2", DataType = DataType.String });
+        table.Columns.Add(new DataColumn { Name = "D", DataType = DataType.DateTime });
         table.Measures.Add(new Measure { Name = "M", Expression = "1" });
         var hierarchy = new Hierarchy { Name = "H" };
         hierarchy.Levels.Add(new Level { Name = "L", Column = table.Columns["C"] });
         table.Hierarchies.Add(hierarchy);
         db.Model.Tables.Add(table);
+        // A second table so a relationship can join across the two; date-time columns because
+        // joinOnDateBehavior is only meaningful for datetime joins.
+        var table2 = new Table { Name = "T2" };
+        table2.Partitions.Add(new Partition
+        {
+            Name = "T2",
+            Source = new MPartitionSource { Expression = "let x = 2 in x" }
+        });
+        table2.Columns.Add(new DataColumn { Name = "D", DataType = DataType.DateTime });
+        db.Model.Tables.Add(table2);
+        db.Model.Relationships.Add(new SingleColumnRelationship
+        {
+            FromColumn = table.Columns["D"],
+            ToColumn = table2.Columns["D"],
+            FromCardinality = RelationshipEndCardinality.Many,
+            ToCardinality = RelationshipEndCardinality.One
+        });
         // KPI on the measure so Kpi-kind set paths resolve; role + permission so
         // TablePermission set paths resolve.
         table.Measures["M"].KPI = new KPI { TargetExpression = "0", StatusExpression = "0" };

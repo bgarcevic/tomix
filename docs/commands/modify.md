@@ -109,6 +109,21 @@ which must name an existing query group; an empty value clears it.
 `expression` is M-source-only, and the set hint omits a source-bound
 property a partition cannot take.
 
+Relationships accept `name`, `isActive`, `crossFilteringBehavior`
+(`OneDirection`, `BothDirections`, `Automatic`), `fromCardinality` and
+`toCardinality` (`One`, `Many`), `securityFilteringBehavior`
+(`OneDirection`, `BothDirections`, `None`), `relyOnReferentialIntegrity`,
+and `joinOnDateBehavior` (`DateAndTime`, `DatePartOnly`). Address a
+relationship by its endpoints:
+
+```sh
+tx set "Sales[OrderId]->Dates[Date]" -q isActive -i false
+```
+
+The endpoint columns themselves stay read-only, and cardinality or
+active-state edits surface in `diff` through the relationship's detail
+line.
+
 ## `mv` — move or rename
 
 ```

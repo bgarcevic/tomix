@@ -151,16 +151,24 @@ public static class ModelPropertyCatalog
     [
         // Not searchable: the name is synthesized from the endpoint columns, not authored
         // text, and replace never rewrites it. Relationship annotations remain searchable.
-        new("name", "Name", o => o.Name),
+        // Writable 'name' sets the underlying TOM relationship name; the display name here
+        // stays endpoint-derived.
+        new("name", "Name", o => o.Name, Writable: true),
         // Endpoints, cardinality, and active state are also encoded in the relationship's Detail
         // string, which diff already compares in its fixed identity set — only properties absent
-        // from Detail are diffable here, so an edit is never reported twice.
+        // from Detail are diffable here, so an edit is never reported twice. The endpoints
+        // themselves are read-only: re-pointing a relationship is not a supported edit.
         new("fromColumn", "FromColumn", o => Bag(o, PropertyBagKeys.FromColumn)),
         new("toColumn", "ToColumn", o => Bag(o, PropertyBagKeys.ToColumn)),
-        new("fromCardinality", "FromCardinality", o => Bag(o, PropertyBagKeys.FromCardinality)),
-        new("toCardinality", "ToCardinality", o => Bag(o, PropertyBagKeys.ToCardinality)),
-        new("crossFilteringBehavior", "CrossFilteringBehavior", o => Bag(o, PropertyBagKeys.CrossFilteringBehavior), Diffable: true),
-        new("isActive", "IsActive", o => Bag(o, PropertyBagKeys.IsActive) == "true")
+        new("fromCardinality", "FromCardinality", o => Bag(o, PropertyBagKeys.FromCardinality), Writable: true),
+        new("toCardinality", "ToCardinality", o => Bag(o, PropertyBagKeys.ToCardinality), Writable: true),
+        new("crossFilteringBehavior", "CrossFilteringBehavior", o => Bag(o, PropertyBagKeys.CrossFilteringBehavior), Writable: true, Diffable: true),
+        new("isActive", "IsActive", o => Bag(o, PropertyBagKeys.IsActive) == "true", Writable: true),
+        // RelyOnReferentialIntegrity is documented "Unused; reserved for future use" in TOM but
+        // is a real settable bool, so it stays in the writable surface.
+        new("securityFilteringBehavior", "SecurityFilteringBehavior", o => Bag(o, PropertyBagKeys.SecurityFilteringBehavior), Writable: true, Diffable: true),
+        new("relyOnReferentialIntegrity", "RelyOnReferentialIntegrity", o => BoolBag(o, PropertyBagKeys.RelyOnReferentialIntegrity), Writable: true, Diffable: true),
+        new("joinOnDateBehavior", "JoinOnDateBehavior", o => Bag(o, PropertyBagKeys.JoinOnDateBehavior), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Role =
@@ -285,8 +293,8 @@ public static class ModelPropertyCatalog
 
     /// <summary>
     /// JSON keys of the properties the mutator can set on this kind, for error hints: exactly the
-    /// catalog's writable descriptors, so kinds that model none (relationship, role, the generic
-    /// fallback) yield an empty list — the mutator stays the authority for what is settable.
+    /// catalog's writable descriptors, so kinds that model none (role, the generic fallback) yield
+    /// an empty list — the mutator stays the authority for what is settable.
     /// </summary>
     public static IReadOnlyList<string> WritableTokens(ModelObjectKind kind)
         => For(kind).Where(d => d.Writable).Select(d => d.JsonKey).ToList();

@@ -68,7 +68,7 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Partition,
         "name,description,expression,mode,dataView,queryGroup,retainDataTillForceCalculate")]
     [InlineData(ModelObjectKind.Relationship,
-        "name,fromColumn,toColumn,fromCardinality,toCardinality,crossFilteringBehavior,isActive")]
+        "name,fromColumn,toColumn,fromCardinality,toCardinality,crossFilteringBehavior,isActive,securityFilteringBehavior,relyOnReferentialIntegrity,joinOnDateBehavior")]
     [InlineData(ModelObjectKind.Role,
         "name,description,modelPermission,rlsExpression,members")]
     [InlineData(ModelObjectKind.Hierarchy,
@@ -162,13 +162,19 @@ public sealed class PropertyCatalogTests
                 [PropertyBagKeys.FromCardinality] = "Many",
                 [PropertyBagKeys.ToCardinality] = "One",
                 [PropertyBagKeys.CrossFilteringBehavior] = "OneDirection",
-                [PropertyBagKeys.IsActive] = "true"
+                [PropertyBagKeys.IsActive] = "true",
+                [PropertyBagKeys.SecurityFilteringBehavior] = "BothDirections",
+                [PropertyBagKeys.RelyOnReferentialIntegrity] = "false",
+                [PropertyBagKeys.JoinOnDateBehavior] = "DatePartOnly"
             }
         };
         var projected = ModelPropertyCatalog.Project(relationship);
         Assert.Equal("Sales[CustomerId]", projected["fromColumn"]);
         Assert.Equal("One", projected["toCardinality"]);
         Assert.Equal(true, projected["isActive"]);
+        Assert.Equal("BothDirections", projected["securityFilteringBehavior"]);
+        Assert.Equal(false, projected["relyOnReferentialIntegrity"]);
+        Assert.Equal("DatePartOnly", projected["joinOnDateBehavior"]);
 
         var member = Leaf(ModelObjectKind.RoleMember);
         var role = Leaf(ModelObjectKind.Role) with
@@ -208,6 +214,8 @@ public sealed class PropertyCatalogTests
         "name,description,ordinal,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Partition,
         "name,description,expression,mode,dataView,queryGroup,retainDataTillForceCalculate")]
+    [InlineData(ModelObjectKind.Relationship,
+        "name,fromCardinality,toCardinality,crossFilteringBehavior,isActive,securityFilteringBehavior,relyOnReferentialIntegrity,joinOnDateBehavior")]
     [InlineData(ModelObjectKind.Expression,
         "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Function,
@@ -224,11 +232,11 @@ public sealed class PropertyCatalogTests
     [Fact]
     public void WritableTokens_KindsWithoutWritableDescriptors_AreEmpty()
     {
-        // A consequence of the mirror invariant, not an override: Role and Relationship model
-        // no writable descriptors yet, so they advertise nothing. Adding descriptors (issues
-        // #118/#119) makes the tokens — and the set hint — appear here for free.
+        // A consequence of the mirror invariant, not an override: Role models no writable
+        // descriptors yet, so it advertises nothing. Adding descriptors (issue #119) makes the
+        // tokens — and the set hint — appear here for free. Relationship gained its full
+        // writable surface in #118 and is pinned in the theory above.
         Assert.Empty(ModelPropertyCatalog.WritableTokens(ModelObjectKind.Role));
-        Assert.Empty(ModelPropertyCatalog.WritableTokens(ModelObjectKind.Relationship));
     }
 
     private static ModelObject Leaf(ModelObjectKind kind)

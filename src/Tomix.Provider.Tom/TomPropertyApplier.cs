@@ -801,6 +801,15 @@ internal static class TomPropertyApplier
             case "tocardinality":
                 relationship.ToCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
                 break;
+            case "securityfilteringbehavior":
+                relationship.SecurityFilteringBehavior = ParseEnum<SecurityFilteringBehavior>(value, displayName);
+                break;
+            case "relyonreferentialintegrity":
+                relationship.RelyOnReferentialIntegrity = ParseBool(value, displayName);
+                break;
+            case "joinondatebehavior":
+                relationship.JoinOnDateBehavior = ParseEnum<DateTimeRelationshipBehavior>(value, displayName);
+                break;
             default:
                 throw UnsupportedProperty(displayName, "relationships", ModelObjectKind.Relationship);
         }
