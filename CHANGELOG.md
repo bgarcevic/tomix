@@ -40,6 +40,13 @@ and the API surface that major versions protect.
   `relyOnReferentialIntegrity`, and `joinOnDateBehavior` are new. `get`/`ls`/`find` JSON, CSV,
   and text output gain the matching read-side keys (additive), and `diff` reports changes to
   the security-filtering, referential-integrity, and date-join behavior (#118).
+- `set` on security objects now covers their writable scalar surface: roles gain `modelPermission`
+  (plus writable `name`/`description`), role members gain `memberId` and — external members only —
+  `identityProvider` and `memberType`, with a clear error for Windows members, and table
+  permissions gain `metadataPermission`. TOM freezes a member's identity once attached, so every
+  member identity edit replaces the member, as renames already did. Role members now get their
+  own property set in `get`/`ls`/`find` output (additive, replacing the generic fallback), and
+  `diff` reports changes to the identity fields and both permission enums (#119).
 
 ### Changed
 

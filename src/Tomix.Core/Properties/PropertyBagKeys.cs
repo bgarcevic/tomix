@@ -54,6 +54,9 @@ public static class PropertyBagKeys
     public const string RelyOnReferentialIntegrity = "RelyOnReferentialIntegrity";
     public const string JoinOnDateBehavior = "JoinOnDateBehavior";
     public const string RlsExpression = "RlsExpression";
+    public const string MemberId = "MemberId";
+    public const string IdentityProvider = "IdentityProvider";
+    public const string MemberType = "MemberType";
     public const string DataView = "DataView";
     public const string QueryGroup = "QueryGroup";
     public const string RetainDataTillForceCalculate = "RetainDataTillForceCalculate";

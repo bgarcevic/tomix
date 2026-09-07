@@ -74,13 +74,19 @@ public sealed class CatalogWritableAgreementTests
             ["toCardinality"] = "One",
             ["securityFilteringBehavior"] = "BothDirections",
             ["relyOnReferentialIntegrity"] = "true",
-            ["joinOnDateBehavior"] = "DatePartOnly"
+            ["joinOnDateBehavior"] = "DatePartOnly",
+            ["modelPermission"] = "Administrator",
+            ["metadataPermission"] = "None",
+            ["memberId"] = "aad-object-id",
+            ["identityProvider"] = "AzureAD",
+            ["memberType"] = "Group"
         };
 
     public static TheoryData<ModelObjectKind> CatalogedKinds
         => new(ModelObjectKind.Table, ModelObjectKind.Measure, ModelObjectKind.Column,
             ModelObjectKind.Hierarchy, ModelObjectKind.Level, ModelObjectKind.Partition,
-            ModelObjectKind.Relationship, ModelObjectKind.Expression, ModelObjectKind.Function,
+            ModelObjectKind.Relationship, ModelObjectKind.Role, ModelObjectKind.RoleMember,
+            ModelObjectKind.Expression, ModelObjectKind.Function,
             ModelObjectKind.Kpi, ModelObjectKind.TablePermission);
 
     [Theory]
@@ -197,6 +203,8 @@ public sealed class CatalogWritableAgreementTests
             ModelObjectKind.Partition => ("T/T", ModelObjectKind.Partition),
             // Endpoint addressing, the canonical way to target a relationship.
             ModelObjectKind.Relationship => ("T[D]->T2[D]", ModelObjectKind.Relationship),
+            ModelObjectKind.Role => ("Readers", ModelObjectKind.Role),
+            ModelObjectKind.RoleMember => ("Readers/user@contoso.com", ModelObjectKind.RoleMember),
             ModelObjectKind.Expression => ("Expressions/E", null),
             ModelObjectKind.Function => ("Functions/F", null),
             ModelObjectKind.Kpi => ("T/M", ModelObjectKind.Kpi),
@@ -246,9 +254,10 @@ public sealed class CatalogWritableAgreementTests
             ToCardinality = RelationshipEndCardinality.One
         });
         // KPI on the measure so Kpi-kind set paths resolve; role + permission so
-        // TablePermission set paths resolve.
+        // TablePermission set paths resolve, and an external member so RoleMember paths do.
         table.Measures["M"].KPI = new KPI { TargetExpression = "0", StatusExpression = "0" };
         var role = new ModelRole { Name = "Readers" };
+        role.Members.Add(new ExternalModelRoleMember { MemberName = "user@contoso.com", IdentityProvider = "AzureAD" });
         role.TablePermissions.Add(new TablePermission { Name = "T", Table = table, FilterExpression = "TRUE()" });
         db.Model.Roles.Add(role);
         db.Model.Expressions.Add(new NamedExpression

@@ -199,6 +199,8 @@ internal static class TomPropertyApplier
         Measure measure => measure.Annotations,
         Partition partition => partition.Annotations,
         ModelRole role => role.Annotations,
+        ModelRoleMember member => member.Annotations,
+        TablePermission permission => permission.Annotations,
         Hierarchy hierarchy => hierarchy.Annotations,
         Relationship relationship => relationship.Annotations,
         _ => throw new NotSupportedException($"Setting annotations is not supported for {target.GetType().Name}.")
@@ -504,6 +506,9 @@ internal static class TomPropertyApplier
             case "description":
                 role.Description = value;
                 break;
+            case "modelpermission":
+                role.ModelPermission = ParseEnum<ModelPermission>(value, displayName);
+                break;
             default:
                 throw UnsupportedProperty(displayName, "roles", ModelObjectKind.Role);
         }
@@ -725,6 +730,9 @@ internal static class TomPropertyApplier
             case "filterexpression":
                 permission.FilterExpression = value;
                 break;
+            case "metadatapermission":
+                permission.MetadataPermission = ParseEnum<MetadataPermission>(value, displayName);
+                break;
             default:
                 throw UnsupportedProperty(displayName, "table permissions", ModelObjectKind.TablePermission);
         }
@@ -736,40 +744,65 @@ internal static class TomPropertyApplier
         {
             case "name":
             case "membername":
-                RenameMember(member, value);
+                ReplaceMember(member, newName: value);
                 break;
             case "memberid":
-                member.MemberID = value;
+                ReplaceMember(member, memberId: value);
                 break;
+            // Identity fields (MemberName, MemberID, IdentityProvider, MemberType) are all
+            // frozen by TOM once the member is attached, so every one of them replaces the
+            // member. The provider fields exist only on ExternalModelRoleMember; a Windows
+            // member gets a tailored error and those tokens stay out of its hint.
+            case "identityprovider" when member is ExternalModelRoleMember:
+                ReplaceMember(member, identityProvider: value);
+                break;
+            case "membertype" when member is ExternalModelRoleMember external:
+                ReplaceMember(member, memberType: ParseEnum<RoleMemberType>(value, displayName));
+                break;
+            case "identityprovider":
+            case "membertype":
+                throw new NotSupportedException(
+                    $"Setting '{displayName}' is only supported for external role members; this member is a Windows member.");
             default:
-                throw UnsupportedProperty(displayName, "role members", ModelObjectKind.RoleMember);
+                var excludes = new List<string>();
+                if (member is not ExternalModelRoleMember)
+                {
+                    excludes.Add("identityProvider");
+                    excludes.Add("memberType");
+                }
+                throw UnsupportedProperty(displayName, "role members", ModelObjectKind.RoleMember, exclude: excludes);
         }
     }
 
     /// <summary>
-    /// TOM freezes <c>ModelRoleMember.MemberName</c> once set, so a rename must replace the
-    /// member with an equivalent one under the new name. MemberID, identity-provider fields,
-    /// and annotation values carry over (annotations as clones — TOM refuses to reattach
-    /// removed objects). Also used by TomTextReplacer.
+    /// TOM freezes every identity field of an attached <c>ModelRoleMember</c> (member name and
+    /// ID, and on external members the identity provider and member type), so changing any of
+    /// them must replace the member with an equivalent one. Annotation values carry over
+    /// (as clones — TOM refuses to reattach removed objects). Also used by TomTextReplacer.
     /// </summary>
-    internal static ModelRoleMember RenameMember(ModelRoleMember member, string newName)
+    internal static ModelRoleMember ReplaceMember(
+        ModelRoleMember member,
+        string? newName = null,
+        string? memberId = null,
+        string? identityProvider = null,
+        RoleMemberType? memberType = null)
     {
         if (member.Role is not { } role)
-            throw new NotSupportedException("Cannot rename a role member that is not attached to a role.");
+            throw new NotSupportedException("Cannot replace a role member that is not attached to a role.");
 
         ModelRoleMember renamed = member switch
         {
             ExternalModelRoleMember external => new ExternalModelRoleMember
             {
-                MemberName = newName,
-                MemberID = external.MemberID,
-                IdentityProvider = external.IdentityProvider,
-                MemberType = external.MemberType
+                MemberName = newName ?? external.MemberName,
+                MemberID = memberId ?? external.MemberID,
+                IdentityProvider = identityProvider ?? external.IdentityProvider,
+                MemberType = memberType ?? external.MemberType
             },
             _ => new WindowsModelRoleMember
             {
-                MemberName = newName,
-                MemberID = member.MemberID
+                MemberName = newName ?? member.MemberName,
+                MemberID = memberId ?? member.MemberID
             }
         };
 

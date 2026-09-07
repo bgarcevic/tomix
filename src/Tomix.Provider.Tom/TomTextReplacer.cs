@@ -274,7 +274,7 @@ internal sealed class TomTextReplacer
                     // alongside name ops, so no op can point at the discarded member).
                     var target = member;
                     yield return Op(memberPath, "Name", member.MemberName,
-                        v => TomPropertyApplier.RenameMember(target, v));
+                        v => TomPropertyApplier.ReplaceMember(target, newName: v));
                 }
 
                 if (In("annotations"))

@@ -173,12 +173,28 @@ public static class ModelPropertyCatalog
 
     private static readonly IReadOnlyList<PropertyDescriptor> Role =
     [
-        Name(writable: false),
-        Description(writable: false),
+        Name(writable: true),
+        Description(writable: true),
         // ModelPermission is the role's Detail, which diff already compares — not diffable here.
-        new("modelPermission", "ModelPermission", o => o.Detail ?? ""),
+        new("modelPermission", "ModelPermission", o => o.Detail ?? "", Writable: true),
         new("rlsExpression", "RlsExpression", o => Bag(o, PropertyBagKeys.RlsExpression), Diffable: true),
         new("members", "Members", o => Count(o, ModelObjectKind.RoleMember))
+    ];
+
+    // The generic keys members answered before the catalog modeled them (description, isHidden,
+    // detail, and expression are always empty — TOM has no such member properties) stay in place
+    // so existing JSON/CSV consumers keep their schema; the identity fields are appended.
+    private static readonly IReadOnlyList<PropertyDescriptor> RoleMember =
+    [
+        Name(writable: true),
+        Description(writable: false),
+        IsHidden(writable: false),
+        new("detail", "Detail", o => o.Detail ?? ""),
+        Expression(writable: false),
+        // memberId is plumbing like the lineage tags — writable but not diffed.
+        new("memberId", "MemberId", o => Bag(o, PropertyBagKeys.MemberId), Writable: true),
+        new("identityProvider", "IdentityProvider", o => Bag(o, PropertyBagKeys.IdentityProvider), Writable: true, Diffable: true),
+        new("memberType", "MemberType", o => Bag(o, PropertyBagKeys.MemberType), Writable: true, Diffable: true)
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Kpi =
@@ -207,7 +223,7 @@ public static class ModelPropertyCatalog
         // table, so the site is find/replace-addressable only via the table, and renaming throws.
         new("name", "Name", o => o.Name),
         // MetadataPermission is the permission's Detail, which diff already compares — not diffable here.
-        new("metadataPermission", "MetadataPermission", o => o.Detail ?? ""),
+        new("metadataPermission", "MetadataPermission", o => o.Detail ?? "", Writable: true),
         // The RLS filter is diffed via the parent role's rlsExpression — not diffable here.
         // It is searchable here (the role's aggregated rlsExpression is not) so find reports
         // each filter exactly once, at the object replace rewrites.
@@ -257,6 +273,7 @@ public static class ModelPropertyCatalog
         ModelObjectKind.Partition => Partition,
         ModelObjectKind.Relationship => Relationship,
         ModelObjectKind.Role => Role,
+        ModelObjectKind.RoleMember => RoleMember,
         ModelObjectKind.Kpi => Kpi,
         ModelObjectKind.TablePermission => TablePermission,
         ModelObjectKind.Expression => NamedExpression,
@@ -293,8 +310,8 @@ public static class ModelPropertyCatalog
 
     /// <summary>
     /// JSON keys of the properties the mutator can set on this kind, for error hints: exactly the
-    /// catalog's writable descriptors, so kinds that model none (role, the generic fallback) yield
-    /// an empty list — the mutator stays the authority for what is settable.
+    /// catalog's writable descriptors, so kinds that model none (the generic fallback) yield an
+    /// empty list — the mutator stays the authority for what is settable.
     /// </summary>
     public static IReadOnlyList<string> WritableTokens(ModelObjectKind kind)
         => For(kind).Where(d => d.Writable).Select(d => d.JsonKey).ToList();

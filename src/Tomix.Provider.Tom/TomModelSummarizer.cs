@@ -34,6 +34,9 @@ public static class TomModelSummarizer
     private const string PropPartitionDataView = "DataView";
     private const string PropPartitionQueryGroup = "QueryGroup";
     private const string PropRlsExpression = PropertyBagKeys.RlsExpression;
+    private const string PropMemberId = PropertyBagKeys.MemberId;
+    private const string PropIdentityProvider = PropertyBagKeys.IdentityProvider;
+    private const string PropMemberType = PropertyBagKeys.MemberType;
     private const string PropUsedInRelationships = "UsedInRelationships";
     private const string PropDetailRowsExpression = "DetailRowsExpression";
     private const string PropFormatStringExpression = "FormatStringExpression";
@@ -422,11 +425,7 @@ public static class TomModelSummarizer
     {
         var path = $"Roles/{Segment(role.Name)}";
         var children = role.Members
-            .Select(m => Leaf(
-                m.MemberName,
-                ModelObjectKind.RoleMember,
-                $"{path}/{Segment(m.MemberName)}",
-                detail: null))
+            .Select(m => BuildRoleMember(m, path))
             .ToList();
 
         children.AddRange(role.TablePermissions.Select(tp => BuildTablePermission(tp, path)));
@@ -455,6 +454,32 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: children,
+            Properties: props);
+    }
+
+    private static ModelObject BuildRoleMember(ModelRoleMember member, string rolePath)
+    {
+        // Identity-provider fields exist only on external members; Windows members surface
+        // them as empty, matching what set accepts for each member kind.
+        var props = new Dictionary<string, string>
+        {
+            [PropMemberId] = member.MemberID ?? "",
+            [PropIdentityProvider] = member is ExternalModelRoleMember external ? external.IdentityProvider ?? "" : "",
+            [PropMemberType] = member is ExternalModelRoleMember typed ? typed.MemberType.ToString() : "",
+            [PropObjectType] = "ModelRoleMember"
+        };
+        AddAnnotations(props, member.Annotations);
+
+        return new ModelObject(
+            member.MemberName,
+            ModelObjectKind.RoleMember,
+            $"{rolePath}/{Segment(member.MemberName)}",
+            Detail: null,
+            Expression: null,
+            Description: null,
+            Hidden: false,
+            SourceColumn: null,
+            Children: [],
             Properties: props);
     }
 

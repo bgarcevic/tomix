@@ -124,6 +124,20 @@ The endpoint columns themselves stay read-only, and cardinality or
 active-state edits surface in `diff` through the relationship's detail
 line.
 
+Roles accept `name`, `description`, and `modelPermission` (`None`,
+`Read`, `ReadRefresh`, `Refresh`, `Administrator`). Role members accept
+`name` or `memberName`, `memberId`, and — external members only —
+`identityProvider` and `memberType` (`Auto`, `User`, `Group`); TOM
+freezes a member's identity once attached, so changing any of these
+fields replaces the member under the hood, and Windows members get a
+clear error for the provider fields. Table permissions accept
+`filterExpression` and `metadataPermission` (`Default`, `None`, `Read`):
+
+```sh
+tx set Readers/user@contoso.com -t member -q memberType -i Group
+tx set Readers/Customer -q metadataPermission -i None
+```
+
 ## `mv` — move or rename
 
 ```

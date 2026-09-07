@@ -71,6 +71,10 @@ public sealed class PropertyCatalogTests
         "name,fromColumn,toColumn,fromCardinality,toCardinality,crossFilteringBehavior,isActive,securityFilteringBehavior,relyOnReferentialIntegrity,joinOnDateBehavior")]
     [InlineData(ModelObjectKind.Role,
         "name,description,modelPermission,rlsExpression,members")]
+    [InlineData(ModelObjectKind.RoleMember,
+        "name,description,isHidden,detail,expression,memberId,identityProvider,memberType")]
+    [InlineData(ModelObjectKind.TablePermission,
+        "name,metadataPermission,filterExpression")]
     [InlineData(ModelObjectKind.Hierarchy,
         "name,description,isHidden,detail,expression,displayFolder,hideMembers,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Level,
@@ -216,6 +220,10 @@ public sealed class PropertyCatalogTests
         "name,description,expression,mode,dataView,queryGroup,retainDataTillForceCalculate")]
     [InlineData(ModelObjectKind.Relationship,
         "name,fromCardinality,toCardinality,crossFilteringBehavior,isActive,securityFilteringBehavior,relyOnReferentialIntegrity,joinOnDateBehavior")]
+    [InlineData(ModelObjectKind.Role,
+        "name,description,modelPermission")]
+    [InlineData(ModelObjectKind.RoleMember,
+        "name,memberId,identityProvider,memberType")]
     [InlineData(ModelObjectKind.Expression,
         "name,description,expression,kind,remoteParameterName,lineageTag,sourceLineageTag")]
     [InlineData(ModelObjectKind.Function,
@@ -223,20 +231,10 @@ public sealed class PropertyCatalogTests
     [InlineData(ModelObjectKind.Kpi,
         "description,targetExpression,statusExpression,trendExpression,targetFormatString,statusGraphic,trendGraphic,statusDescription,targetDescription,trendDescription")]
     [InlineData(ModelObjectKind.TablePermission,
-        "filterExpression")]
+        "metadataPermission,filterExpression")]
     public void WritableTokens_PinTheHintVocabularyPerKind(ModelObjectKind kind, string expectedTokens)
     {
         Assert.Equal(expectedTokens.Split(','), ModelPropertyCatalog.WritableTokens(kind));
-    }
-
-    [Fact]
-    public void WritableTokens_KindsWithoutWritableDescriptors_AreEmpty()
-    {
-        // A consequence of the mirror invariant, not an override: Role models no writable
-        // descriptors yet, so it advertises nothing. Adding descriptors (issue #119) makes the
-        // tokens — and the set hint — appear here for free. Relationship gained its full
-        // writable surface in #118 and is pinned in the theory above.
-        Assert.Empty(ModelPropertyCatalog.WritableTokens(ModelObjectKind.Role));
     }
 
     private static ModelObject Leaf(ModelObjectKind kind)
