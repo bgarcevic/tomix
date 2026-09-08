@@ -59,6 +59,70 @@ public sealed class TomModelDeployPlanTests
     }
 
     /// <summary>
+    /// A #128 nuance: preserving shared expressions and data sources still deploys entries that
+    /// are new in the source. Dropping preserved kinds from the plan wholesale would hide real
+    /// additions, so the plan must carry them and the dry run must report them.
+    /// </summary>
+    [Fact]
+    public void BuildPlan_PreserveDefaults_SourceOnlyExpressionsAndDataSources_RemainInPlan()
+    {
+        var source = Fixture(partitions: ["Fact"], sharedExpressions: ["RangeBuffer"]);
+        source.Model.DataSources.Add(new ProviderDataSource
+        {
+            Name = "Audit",
+            ConnectionString = "Data Source=audit"
+        });
+        var target = Fixture(partitions: ["2024"], name: "Prod");
+
+        var plan = TomModelDeployer.BuildPlan(source, target, "Prod", Request());
+
+        Assert.Contains(plan.Planned.Objects,
+            o => o.Kind == ModelObjectKind.Expression && o.Name == "RangeBuffer");
+        Assert.Contains(plan.Planned.Objects,
+            o => o.Kind == ModelObjectKind.DataSource && o.Name == "Audit");
+    }
+
+    /// <summary>
+    /// A #128 nuance: <c>--deploy-partitions</c> without <c>--deploy-policy-partitions</c> is a
+    /// mixed outcome, not a plain overwrite — tables whose target refresh policy carries a
+    /// <c>sourceExpression</c> keep the target's partitions, while plain tables take the source's.
+    /// The dry run must show both halves.
+    /// </summary>
+    [Fact]
+    public void BuildPlan_DeployPartitionsOnly_KeepsTargetPolicyTable_OverwritesPlainTable()
+    {
+        var source = Fixture(partitions: ["Fact"], plainTablePartitions: ["Plain"]);
+        var target = Fixture(
+            partitions: ["2023Q1", "2023Q2", "2024"], name: "Prod", plainTablePartitions: ["OldPlain"]);
+
+        var plan = TomModelDeployer.BuildPlan(
+            source, target, "Prod", Request(new ModelDeployOptions(DeployPartitions: true)));
+
+        Assert.Equal(["2023Q1", "2023Q2", "2024"], PartitionNames(plan.Planned, "Fact"));
+        Assert.Equal(["Plain"], PartitionNames(plan.Planned, "Plain"));
+    }
+
+    /// <summary>
+    /// A #128 nuance: preservation is keyed by name, so a renamed table does not match its old
+    /// target self — the planned model carries the new name with the source's partitions, and
+    /// the old table is gone. A rename genuinely changes partitions on the target, and the dry
+    /// run must say so.
+    /// </summary>
+    [Fact]
+    public void BuildPlan_RenamedTable_PlannedWithSourcePartitions_TargetNameGone()
+    {
+        var source = Fixture(partitions: ["Fact"]);
+        source.Model.Tables.Single(t => t.Name == "Fact").Name = "Facts";
+        var target = Fixture(partitions: ["2024"], name: "Prod");
+
+        var plan = TomModelDeployer.BuildPlan(source, target, "Prod", Request());
+
+        Assert.DoesNotContain(plan.Planned.Objects,
+            o => o.Kind == ModelObjectKind.Table && o.Name == "Fact");
+        Assert.Equal(["Fact"], PartitionNames(plan.Planned, "Facts"));
+    }
+
+    /// <summary>
     /// Preserved data sources are copied from the target verbatim, so the planned model's data
     /// sources must be indistinguishable from the target's — otherwise every dry run against a
     /// credentialed target would report noise the deploy never causes. Compared as property bags
@@ -102,11 +166,14 @@ public sealed class TomModelDeployPlanTests
         => new("localhost:59962", "Prod", CreateOnly: false, Force: false, options);
 
     /// <summary>A single incremental-refresh table plus a data source, so one fixture exercises
-    /// both the partition and the connection preservation paths.</summary>
+    /// both the partition and the connection preservation paths. Optional extras widen it to the
+    /// remaining preservation surfaces without disturbing the existing tests.</summary>
     private static Database Fixture(
         string[] partitions,
         string name = "Source",
-        string connectionString = "Data Source=dev")
+        string connectionString = "Data Source=dev",
+        string[]? plainTablePartitions = null,
+        string[]? sharedExpressions = null)
     {
         var db = new Database
         {
@@ -138,6 +205,33 @@ public sealed class TomModelDeployPlanTests
         };
 
         db.Model.Tables.Add(fact);
+
+        if (plainTablePartitions is { Length: > 0 })
+        {
+            var plain = new Table { Name = "Plain" };
+            plain.Columns.Add(new DataColumn { Name = "Qty", DataType = DataType.Int64, SourceColumn = "Qty" });
+            foreach (var partition in plainTablePartitions)
+            {
+                plain.Partitions.Add(new Partition
+                {
+                    Name = partition,
+                    Mode = ModeType.Import,
+                    Source = new MPartitionSource { Expression = "let Source = Sql.Database(\"srv\", \"db\") in Source" }
+                });
+            }
+
+            db.Model.Tables.Add(plain);
+        }
+
+        foreach (var expression in sharedExpressions ?? [])
+        {
+            db.Model.Expressions.Add(new NamedExpression
+            {
+                Name = expression,
+                Expression = "\"text\" meta [IsParameterQuery=true, Type=\"Text\", IsParameterQueryRequired=true]"
+            });
+        }
+
         db.Model.DataSources.Add(new ProviderDataSource
         {
             Name = "Warehouse",
