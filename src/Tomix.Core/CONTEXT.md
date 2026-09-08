@@ -11,6 +11,10 @@ Core domain types and abstractions.
 - Provider interfaces.
 - Common enums and value objects.
 - The property descriptor catalog (`Properties/ModelPropertyCatalog`) — the single definition of every model-object property (JSON key, CSV/text header, value extraction, writable/searchable/diffable flags). get, ls, find, diff, and the mutator's error hints all consume it; add or change properties there, never in a command.
+- The DAX language engine (`Dax/`) — vendored lexer/parser/classifier (`Dax/Engine/`, see
+  `THIRD-PARTY-NOTICES.md`) behind the `DaxLanguage.Classify` highlighting facade and the
+  `DaxSyntaxCheck` offline syntax analyzer. Pure BCL, model-agnostic: it knows syntax, never the
+  model. Model-aware DAX analysis (reference extraction, validation) lives in `/src/Tomix.App/Dax`.
 
 ## Cross-folder dependencies
 

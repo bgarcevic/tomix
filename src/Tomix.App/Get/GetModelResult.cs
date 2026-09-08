@@ -7,4 +7,5 @@ public sealed record GetModelResult(
     string Type,
     string Path,
     IReadOnlyDictionary<string, object?> Properties,
-    [property: JsonIgnore] ModelObject Object);
+    [property: JsonIgnore] ModelObject Object,
+    [property: JsonIgnore] IReadOnlySet<string>? MeasureNames = null);

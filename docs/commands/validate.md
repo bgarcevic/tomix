@@ -97,6 +97,15 @@ destructive `Delete()` fixes — those are only available via
 tx validate [model] [options]
 ```
 
+Offline analysis runs on every DAX-bearing expression (measures, calculated
+columns/items/tables, role filters, secondary measure expressions). Syntax is
+checked first: illegal characters, unterminated string/table/bracket literals
+and block comments, and unbalanced parentheses or braces are reported as
+`DAX0004`/`DAX0005` errors — and when an expression's syntax is broken, its
+reference checks are skipped, since a never-closed bracket makes everything
+after it read wrong. Syntactically valid expressions then get the offline
+reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).
+
 | Option | Description |
 |--------|-------------|
 | `--ci <github\|vsts>` | Emit CI logging commands to stderr so findings annotate the PR. |

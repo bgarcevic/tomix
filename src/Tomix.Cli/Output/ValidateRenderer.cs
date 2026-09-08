@@ -61,8 +61,6 @@ internal static class ValidateRenderer
 
         if (!errorsOnly)
             AnsiConsole.MarkupLine($"  {Styling.KeyValue("Warnings:", result.Warnings.Count.ToString())}");
-
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Anti-patterns:", "0")}");
     }
 
     public static void EmitCi(string? ci, ValidateModelResult result)

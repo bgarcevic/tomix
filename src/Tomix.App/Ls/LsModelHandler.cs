@@ -1,3 +1,4 @@
+using Tomix.App.Dax;
 using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
@@ -31,7 +32,8 @@ public sealed class LsModelHandler
                 .ToList();
 
             return TomixResult<LsModelResult>.Ok(
-                new LsModelResult(snapshot.Name, snapshot.CompatibilityLevel, matches));
+                new LsModelResult(snapshot.Name, snapshot.CompatibilityLevel, matches,
+                    DaxModelNames.MeasureNames(snapshot)));
         }, cancellationToken);
     }
 }

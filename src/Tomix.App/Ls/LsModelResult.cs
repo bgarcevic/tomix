@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Ls;
@@ -6,7 +7,8 @@ namespace Tomix.App.Ls;
 public sealed record LsModelResult(
     string ModelName,
     int CompatibilityLevel,
-    IReadOnlyList<LsObject> Objects);
+    IReadOnlyList<LsObject> Objects,
+    [property: JsonIgnore] IReadOnlySet<string>? MeasureNames = null);
 
 /// <summary>
 /// A flat, render-ready projection of a matched <see cref="ModelObject"/>. The child tree itself is

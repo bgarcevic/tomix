@@ -396,18 +396,15 @@ public static class BpaModelBuilder
 
         foreach (var measure in measures)
             measure.ReferencedBy = MakeReferencedBy([MeasureKey(measure.Name)], measuresByRef, countByRef);
+        // A column is referenced by qualified refs to its exact table[name], plus any
+        // unqualified [name] refs (which DAX resolves by context and we cannot disambiguate).
         foreach (var column in columns)
-            column.ReferencedBy = MakeReferencedBy(
-                // A column is referenced by qualified refs to its exact table[name], plus any
-                // unqualified [name] refs (which DAX resolves by context and we cannot disambiguate).
-                [ColumnKey(column.Table.Name, column.Name), ColumnWildcardKey(column.Name)],
-                measuresByRef,
-                countByRef);
+            column.ReferencedBy = MakeReferencedBy([ColumnKey(column.Table.Name, column.Name), ColumnWildcardKey(column.Name)], measuresByRef, countByRef);
     }
 
-    private static string MeasureKey(string name) => "M " + name;
-    private static string ColumnKey(string table, string name) => "C " + table + " " + name;
-    private static string ColumnWildcardKey(string name) => "C * " + name;
+    private static string MeasureKey(string name) => "M\0" + name;
+    private static string ColumnKey(string table, string name) => "C\0" + table + "\0" + name;
+    private static string ColumnWildcardKey(string name) => "C\0*\0" + name;
 
     private static string ReferenceKey(BpaReference reference)
         => reference.ObjectType.Equals("Measure", StringComparison.OrdinalIgnoreCase)

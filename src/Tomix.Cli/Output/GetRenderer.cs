@@ -1,4 +1,6 @@
 using System.Globalization;
+using Spectre.Console;
+using Tomix.App.Dax;
 using Tomix.App.Get;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
@@ -50,8 +52,17 @@ internal static class GetRenderer
     private static void RenderProperties(GetModelResult result)
     {
         Console.WriteLine($"{result.Path} ({result.Type})");
+
+        // DAX-bearing values render syntax-highlighted; M and everything else stays plain.
+        // Matched by value, not by property key: the display keys are the camelCase catalog keys
+        // while DaxExpressions reports the snapshot contract's PascalCase keys.
         foreach (var (key, value) in result.Properties)
-            Console.WriteLine($"{key}: {value}");
+        {
+            if (value is string text && DaxExpressions.IsDaxValue(result.Object, text))
+                AnsiConsole.MarkupLine($"{Styling.MarkupEscape(key)}: {Styling.ExpressionMarkup(isDax: true, text, result.MeasureNames)}");
+            else
+                Console.WriteLine($"{key}: {value}");
+        }
     }
 
     private static void RenderScalar(object? value)

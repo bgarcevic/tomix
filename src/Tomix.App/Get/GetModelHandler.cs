@@ -1,3 +1,4 @@
+using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Models;
 using Tomix.Core.Models;
@@ -20,12 +21,13 @@ public sealed class GetModelHandler
         return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
         {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            var measureNames = DaxModelNames.MeasureNames(snapshot);
 
             // The model root is not a snapshot object: "." synthesizes one from the
             // snapshot's model-level properties so get can read back what set accepts
             // on the root (culture, compatibility level, and friends).
             if (request.Path.Trim().Trim('/') == ".")
-                return TomixResult<GetModelResult>.Ok(Project(ModelRoot(snapshot), request.Query));
+                return TomixResult<GetModelResult>.Ok(Project(ModelRoot(snapshot), request.Query, measureNames));
 
             var matches = ModelObjectLookup.Find(snapshot, request.Path, request.Type).ToList();
 
@@ -43,7 +45,7 @@ public sealed class GetModelHandler
                     exitCode: 1,
                     hint: AmbiguousMatchMessage.Hint);
 
-            return TomixResult<GetModelResult>.Ok(Project(matches[0], request.Query));
+            return TomixResult<GetModelResult>.Ok(Project(matches[0], request.Query, measureNames));
         }, cancellationToken);
     }
 
@@ -60,7 +62,7 @@ public sealed class GetModelHandler
             Children: [],
             Properties: snapshot.Properties);
 
-    private static GetModelResult Project(ModelObject obj, string? query)
+    private static GetModelResult Project(ModelObject obj, string? query, IReadOnlySet<string> measureNames)
     {
         var properties = ModelPropertyCatalog.Project(obj);
 
@@ -71,7 +73,8 @@ public sealed class GetModelHandler
             ModelObjectProjection.KindLabel(obj.Kind),
             obj.Path,
             properties,
-            obj);
+            obj,
+            measureNames);
     }
 
     private static IReadOnlyDictionary<string, object?> ProjectSingleProperty(

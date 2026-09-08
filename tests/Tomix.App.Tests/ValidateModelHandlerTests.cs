@@ -130,6 +130,49 @@ public sealed class ValidateModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ReportsUnclosedGroup_AsSyntaxError()
+    {
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", "SUM(Sales[Amount]")));
+
+        Assert.False(result.Data!.Valid);
+        var issue = Assert.Single(result.Data.Errors);
+        Assert.Equal("DAX0004", issue.Code);
+        Assert.Contains("'(' has no matching", issue.Message);
+        Assert.Equal("1", issue.Expression);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SyntaxError_SuppressesReferenceChecks()
+    {
+        // Sales[Missing] would be a DAX0002 if the reference scan ran; the unclosed group makes
+        // everything after it read wrong, so only the syntax error is reported.
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", "SUM(Sales[Missing]")));
+
+        var issue = Assert.Single(result.Data!.Errors);
+        Assert.Equal("DAX0004", issue.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsUnterminatedString_AsSyntaxError()
+    {
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", "\"Sales[Nope] & SUM(Sales[Amount])")));
+
+        var issue = Assert.Single(result.Data!.Errors);
+        Assert.Equal("DAX0005", issue.Code);
+        Assert.Contains("Unterminated string literal", issue.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsLineOfSyntaxError()
+    {
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", "SUM(Sales[Amount])\n+ ( SUM(Sales[Amount])")));
+
+        var issue = Assert.Single(result.Data!.Errors);
+        Assert.Equal("DAX0004", issue.Code);
+        Assert.Equal("2", issue.Expression);
+    }
+
+    [Fact]
     public async Task HandleAsync_WarnsOnUnresolvedUnqualifiedReference()
     {
         var result = await ValidateAsync(SalesSnapshot(Measure("Total", "[No Such Measure] + 1")));

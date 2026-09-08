@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Spectre.Console;
+using Tomix.App.Dax;
 using Tomix.App.Ls;
 using Tomix.Core.Models;
 
@@ -40,7 +41,7 @@ internal sealed partial class LsRenderer
         }
         else
         {
-            RenderGrouped(data.Objects, noMultiline);
+            RenderGrouped(data.Objects, noMultiline, data.MeasureNames);
         }
     }
 
@@ -66,13 +67,39 @@ internal sealed partial class LsRenderer
     /// Styles one table row: a hidden object's whole row is muted so hidden objects read at a
     /// glance (the grey "True" cell alone was too easy to miss). Cells are plain text — the
     /// helper applies the single style pass, so markup-producing values must not be passed in.
+    /// An expression cell goes through <see cref="ExpressionCell"/> instead.
     /// </summary>
     private static string[] RowCells(LsObject o, params string[] cells)
         => o.Hidden
             ? cells.Select(Styling.Muted).ToArray()
             : cells.Select(Styling.MarkupEscape).ToArray();
 
-    private static void RenderGrouped(IReadOnlyList<LsObject> objects, bool noMultiline)
+    /// <summary>
+    /// The expression cell of a grouped table: DAX renders syntax-highlighted — with the
+    /// model's measure names resolving bracketed references to their own role — while M and
+    /// other text stay escaped plain, and a hidden object mutes the whole cell like the rest of
+    /// its row. The cell shows <c>Expression ?? Detail</c>, so text that did not come from the
+    /// object's expression (a partition's mode, a role's RLS summary) never highlights, even
+    /// for a DAX-bearing kind. A preview note ("... (+2 lines)") rides in
+    /// <paramref name="suffix"/> so it escapes plain inside a highlighted cell.
+    /// </summary>
+    private static string ExpressionCell(
+        LsObject o,
+        string text,
+        IReadOnlySet<string>? measureNames,
+        string? suffix = null)
+        => o.Hidden
+            ? Styling.Muted(text + suffix)
+            : Styling.ExpressionMarkup(
+                o.Expression is not null && DaxExpressions.IsDaxExpression(o.Kind, o.Detail),
+                text,
+                measureNames,
+                suffix);
+
+    private static void RenderGrouped(
+        IReadOnlyList<LsObject> objects,
+        bool noMultiline,
+        IReadOnlySet<string>? measureNames)
     {
         var groups = objects
             .GroupBy(o => o.Kind)
@@ -95,19 +122,19 @@ internal sealed partial class LsRenderer
                     RenderColumns(items);
                     break;
                 case ModelObjectKind.Measure:
-                    RenderMeasures(items, noMultiline);
+                    RenderMeasures(items, noMultiline, measureNames);
                     break;
                 case ModelObjectKind.Hierarchy:
                     RenderHierarchies(items);
                     break;
                 case ModelObjectKind.Partition:
-                    RenderPartitions(items, noMultiline);
+                    RenderPartitions(items, noMultiline, measureNames);
                     break;
                 case ModelObjectKind.Level:
                     RenderLevels(items);
                     break;
                 default:
-                    RenderGeneric(items, noMultiline);
+                    RenderGeneric(items, noMultiline, measureNames);
                     break;
             }
         }
@@ -130,7 +157,10 @@ internal sealed partial class LsRenderer
         AnsiConsole.Write(table);
     }
 
-    private static void RenderMeasures(IReadOnlyList<LsObject> objects, bool noMultiline)
+    private static void RenderMeasures(
+        IReadOnlyList<LsObject> objects,
+        bool noMultiline,
+        IReadOnlySet<string>? measureNames)
     {
         var table = NewTable("Name", "Description", "Hidden", "Expression", "FormatString");
 
@@ -138,16 +168,16 @@ internal sealed partial class LsRenderer
         {
             var lines = ExpressionLines(o, noMultiline);
             var hidden = lines.Count - MeasureExpressionPreviewLines;
-            var expression = hidden > 0
-                ? string.Join("\n", lines.Take(MeasureExpressionPreviewLines))
-                  + $"\n... (+{hidden} {(hidden == 1 ? "line" : "lines")})"
-                : string.Join("\n", lines);
-            table.AddRow(RowCells(o,
-                o.Name,
-                o.Description ?? "",
-                BoolText(o.Hidden),
-                expression,
-                Projected(o, "formatString")));
+            var shown = string.Join("\n", lines.Take(MeasureExpressionPreviewLines));
+            var suffix = hidden > 0
+                ? $"\n... (+{hidden} {(hidden == 1 ? "line" : "lines")})"
+                : null;
+            table.AddRow(
+            [
+                .. RowCells(o, o.Name, o.Description ?? "", BoolText(o.Hidden)),
+                ExpressionCell(o, shown, measureNames, suffix),
+                .. RowCells(o, Projected(o, "formatString"))
+            ]);
         }
 
         AnsiConsole.Write(table);
@@ -176,7 +206,10 @@ internal sealed partial class LsRenderer
         AnsiConsole.Write(table);
     }
 
-    private static void RenderPartitions(IReadOnlyList<LsObject> objects, bool noMultiline)
+    private static void RenderPartitions(
+        IReadOnlyList<LsObject> objects,
+        bool noMultiline,
+        IReadOnlySet<string>? measureNames)
     {
         var showDescription = objects.Any(o => !string.IsNullOrEmpty(o.Description));
         var showExpression = objects.Any(o => !string.IsNullOrEmpty(o.Expression ?? o.Detail));
@@ -204,7 +237,7 @@ internal sealed partial class LsRenderer
             if (showExpression)
             {
                 var lines = exprLines[obj];
-                rows.Add(Styling.MarkupEscape(string.Join("\n", lines)));
+                rows.Add(ExpressionCell(obj, string.Join("\n", lines), measureNames));
             }
             if (showDescription)
                 rows.Add(Styling.MarkupEscape(obj.Description ?? ""));
@@ -238,7 +271,10 @@ internal sealed partial class LsRenderer
         AnsiConsole.Write(table);
     }
 
-    private static void RenderGeneric(IReadOnlyList<LsObject> objects, bool noMultiline)
+    private static void RenderGeneric(
+        IReadOnlyList<LsObject> objects,
+        bool noMultiline,
+        IReadOnlySet<string>? measureNames)
     {
         var showDescription = objects.Any(o => !string.IsNullOrEmpty(o.Description));
         var detailLines = objects.ToDictionary(o => o, o => DetailLines(o, noMultiline));
@@ -253,7 +289,7 @@ internal sealed partial class LsRenderer
             var rows = new List<string>
             {
                 Styling.MarkupEscape(obj.Name),
-                Styling.MarkupEscape(string.Join("\n", lines))
+                ExpressionCell(obj, string.Join("\n", lines), measureNames)
             };
             if (showDescription)
                 rows.Add(Styling.MarkupEscape(obj.Description ?? ""));

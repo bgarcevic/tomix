@@ -4,19 +4,20 @@ Reference for all ANSI color usage in `tx`. Read this before adding or changing 
 
 ## Palette
 
-All colors are chosen for readability on both dark and light terminal backgrounds.
+Every role keeps at least ~3.3:1 contrast on both dark (`#1E1E1E`) and light (`#FFFFFF`) terminal backgrounds — the practical ceiling for a single palette, since 4.5:1 (WCAG normal text) on both is mathematically impossible: it would require every color's luminance to sit in a near-zero-width band. Roles that appear in the same view are separated by lightness as well as hue, so the distinction survives for red-green color-blind readers (see [Palette construction](#palette-construction)). The guarantees are enforced by `PaletteTests`.
 
 | Role    | Name    | Hex       | Example                    | Use                          |
 |---------|---------|-----------|----------------------------|------------------------------|
-| Title   | Sage    | `#3E9287` | `MyCli`                    | App names, section headers   |
+| Title   | Sage    | `#34897E` | `MyCli`                    | App names, section headers   |
 | Command | Default | —         | `mycli build`              | Commands (bold, no color)    |
-| Option  | Lav     | `#8E7BB8` | `--project`                | Flags and options            |
-| Value   | Terra   | `#B5805C` | `api-service`              | IDs, names, literals         |
-| Path    | Harbor  | `#4E8AB5` | `./src/api-service`        | Files and folders            |
-| Success | Moss    | `#5C9D52` | `OK Project initialized`   | Completed actions            |
-| Warning | Amber   | `#B5832F` | `WARN Config not found`    | Recoverable issues           |
-| Error   | Rose    | `#C25E5E` | `ERROR Build failed`       | Failures                     |
-| Muted   | Slate   | `#768089` | `(2.3s elapsed)`           | Hints, timings, secondary    |
+| Option  | Lav     | `#8572AF` | `--project`                | Flags and options            |
+| Value   | Terra   | `#966442` | `api-service`              | IDs, names, literals         |
+| Path    | Harbor  | `#4582AC` | `./src/api-service`        | Files and folders            |
+| Success | Moss    | `#408139` | `OK Project initialized`   | Completed actions            |
+| Warning | Amber   | `#B07E2A` | `WARN Config not found`    | Recoverable issues           |
+| Error   | Rose    | `#CC6766` | `ERROR Build failed`       | Failures                     |
+| Measures| Orchid  | `#CF67AC` | `[Profit]` in DAX          | Measure references in DAX    |
+| Muted   | Slate   | `#757F88` | `(2.3s elapsed)`           | Hints, timings, secondary    |
 
 ## Palette Implementation
 
@@ -29,18 +30,29 @@ namespace Tomix.Cli.Output;
 
 internal static class Palette
 {
-    public static readonly Color Sage   = new(0x3E, 0x92, 0x87);
-    public static readonly Color Lav    = new(0x8E, 0x7B, 0xB8);
-    public static readonly Color Terra  = new(0xB5, 0x80, 0x5C);
-    public static readonly Color Harbor = new(0x4E, 0x8A, 0xB5);
-    public static readonly Color Moss   = new(0x5C, 0x9D, 0x52);
-    public static readonly Color Amber  = new(0xB5, 0x83, 0x2F);
-    public static readonly Color Rose   = new(0xC2, 0x5E, 0x5E);
-    public static readonly Color Slate  = new(0x76, 0x80, 0x89);
+    public static readonly Color Sage   = new(0x34, 0x89, 0x7E);
+    public static readonly Color Lav    = new(0x85, 0x72, 0xAF);
+    public static readonly Color Terra  = new(0x96, 0x64, 0x42);
+    public static readonly Color Harbor = new(0x45, 0x82, 0xAC);
+    public static readonly Color Moss   = new(0x40, 0x81, 0x39);
+    public static readonly Color Amber  = new(0xB0, 0x7E, 0x2A);
+    public static readonly Color Rose   = new(0xCC, 0x67, 0x66);
+    public static readonly Color Orchid = new(0xCF, 0x67, 0xAC);
+    public static readonly Color Slate  = new(0x75, 0x7F, 0x88);
 }
 ```
 
 Use `Palette.Sage` for Spectre widget styling (table borders, panel borders). Use the markup helpers below for inline text.
+
+## Palette Construction
+
+The palette is derived, not hand-picked: hues and chroma come from the original design, and each color's CIELAB lightness is set deliberately.
+
+- **Contrast first.** Lightness targets pull every role toward the luminance that maximizes its worst-case contrast against dark and light backgrounds, so no role drops below ~3.3:1 on either.
+- **Lightness as a second channel.** Roles that appear side by side get a deliberate lightness gap in addition to their hue difference (columns darker than measures, variables darker than literals). Under red-green color vision deficiency the hue difference vanishes and the lightness gap carries the distinction: the columns/measures pair improves from ΔE 13 to 29 under deuteranopia simulation, variables/literals from 13 to 16.
+- **Enforced by tests.** `PaletteTests` computes WCAG contrast ratios and CIELAB ΔE76 for every role and fails when a color falls below 3.2:1 on either background or a same-view pair drifts under ΔE 25.
+
+When changing a palette color, keep this contract: adjust lightness before hue, and let `PaletteTests` arbitrate.
 
 ## Message Categories
 
@@ -60,6 +72,7 @@ Use `Palette.Sage` for Spectre widget styling (table borders, panel borders). Us
 | Table              | Spectre `Table().RoundedBorder().BorderColor(Palette.Slate)` | Already established in `LsRenderer` |
 | Table row de-emphasis | Whole row in Slate (`Styling.Muted` per cell) | Hidden-object rows in `ls` are muted end to end |
 | Connection banner  | Slate on stderr                               | `Connected to: C:\models\Sales` before the model opens |
+| DAX highlighting   | Role-mapped palette on text output only       | `get` property view and `ls` expression cells: keywords Lav, functions Harbor, tables Sage, columns Moss, measures Orchid, variables Terra, literals Amber, comments Slate; M expressions and JSON/CSV/TMDL/BIM stay markup-free |
 | CI annotations     | Plain text, no markup                         | `::error::...` / `##vso[task.logissue...]`       |
 
 ## NO_COLOR Compliance
@@ -91,6 +104,8 @@ All output helpers live in `src/Tomix.Cli/Output/Styling.cs`. Use these instead 
 | `Styling.KeyValue(label, value)`        | Bold label + plain value                 |
 | `Styling.Guidance(text)`                | Slate                                    |
 | `Styling.MarkupEscape(text)`            | Escapes `[` and `]` for Spectre markup  |
+| `Styling.DaxMarkup(expression)`         | Syntax-highlighted DAX as escaped markup (see Message Categories) |
+| `Styling.ExpressionMarkup(isDax, text)` | The shared entry point for expression text: highlighted when `isDax` (from `DaxExpressions.IsDaxValue`/`IsDaxExpression`), escaped plain otherwise; optional `measureNames` resolves measure references to their own color, optional `suffix` (e.g. `... (+2 lines)`) stays plain |
 | `Styling.SeverityMarkup(severity)`      | Colored severity label (Error/Warning/Info) |
 | `Styling.NewTable(params columns)`      | Rounded-border table with Slate border   |
 

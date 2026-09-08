@@ -3,6 +3,7 @@ using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Models;
 using Tomix.App.Mutations;
+using Tomix.Core.Dax;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -99,6 +100,20 @@ public sealed class ValidateModelHandler
         List<ValidationIssue> errors,
         List<ValidationIssue> warnings)
     {
+        // Broken syntax cascades: a never-closed bracket makes every reference after it read
+        // wrong, so report the syntax and skip the reference checks entirely.
+        var syntax = DaxSyntaxCheck.Analyze(site.Expression);
+        if (syntax.Count > 0)
+        {
+            foreach (var issue in syntax)
+                errors.Add(new ValidationIssue(
+                    SyntaxCode(issue.Kind),
+                    issue.Message,
+                    obj.Path,
+                    Line(site.Expression, issue.Start)));
+            return;
+        }
+
         foreach (var reference in DaxReferenceExtractor.Extract(site.Expression))
         {
             switch (reference.Shape)
@@ -146,6 +161,12 @@ public sealed class ValidateModelHandler
             }
         }
     }
+
+    /// <summary>DAX0004 for illegal characters and unbalanced groups, DAX0005 for unterminated literals/comments.</summary>
+    private static string SyntaxCode(DaxSyntaxErrorKind kind) =>
+        kind is DaxSyntaxErrorKind.UnterminatedLiteral or DaxSyntaxErrorKind.UnterminatedComment
+            ? "DAX0005"
+            : "DAX0004";
 
     private static void CheckStructure(ModelObject obj, ModelNameIndex index, List<ValidationIssue> errors)
     {

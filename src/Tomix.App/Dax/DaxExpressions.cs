@@ -31,6 +31,28 @@ public static class DaxExpressions
         => Sites(obj).Select(site => site.Expression);
 
     /// <summary>
+    /// Whether <paramref name="text"/> is one of <paramref name="obj"/>'s DAX expressions —
+    /// the check output renderers use to decide between highlighting and plain text.
+    /// </summary>
+    public static bool IsDaxValue(ModelObject obj, string text)
+        => ForObject(obj).Contains(text, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether an object's main <c>Expression</c> text is DAX rather than M or none, for
+    /// renderers that hold only the flattened kind/detail projection (no property bag).
+    /// Mirrors <see cref="Sites"/>: measures, calculated columns, calculation items and
+    /// functions carry DAX, as do calculated-table partitions (detail "calculated"); M-query
+    /// partitions and shared expressions are M.
+    /// </summary>
+    public static bool IsDaxExpression(ModelObjectKind kind, string? detail)
+        => kind is ModelObjectKind.Measure
+            or ModelObjectKind.Column
+            or ModelObjectKind.CalculationItem
+            or ModelObjectKind.Function
+            || (kind is ModelObjectKind.Partition
+                && string.Equals(detail, "calculated", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Enumerates the DAX expressions of <paramref name="obj"/> with the property key each lives
     /// under, so a rewrite can be routed back to the right property.
     /// </summary>

@@ -36,7 +36,7 @@ Shared output wiring for all commands.
 - `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), `--dry-run` TMSL pretty-print, and the live `AnsiConsole.Status()` progress display fed by XMLA trace events.
 - `UpdateRenderer` — `update` command rendering: `--check` release-notes preview with `[breaking]` badges, and the performed-update summary line.
 - `IncrementalRefreshRenderer` — text rendering for the `incremental-refresh` subcommands (`show`, `set`, `rm`, `apply`).
-- `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions.
+- `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions; `ExpressionMarkup`/`DaxMarkup` are the shared DAX highlighting path.
 
 ## Color Strategy
 
@@ -47,6 +47,7 @@ Key rules:
 - Use `Styling` helpers and `Palette` constants. Do not hard-code Spectre markup strings or raw ANSI escape codes.
 - Tables use `Styling.NewTable()` (rounded border, Slate border color).
 - All user-facing text must go through `Styling.MarkupEscape()` to prevent bracket injection.
+- DAX-bearing text goes through `Styling.ExpressionMarkup` (highlighted when `DaxExpressions.IsDaxValue`/`IsDaxExpression` says it is DAX; M and other text escaped plain) so every renderer classifies and highlights expressions the same way.
 - JSON, CSV, TMDL, BIM, and CI annotation output paths must never contain markup.
 - `noColor` config and `NO_COLOR` env var disable color via `AnsiConsole.Profile.Capabilities.ColorSystem`.
 

@@ -19,6 +19,32 @@ dialect are interoperability conventions (also used by Tabular Editor) so that m
 elsewhere work with `tx`; **no Tabular Editor source code is used or included.** Tabular Editor 2 is
 itself MIT-licensed (Copyright (c) Tabular Editor ApS).
 
+## Vendored DAX language engine
+
+The DAX lexer, parser, and syntax classifier under `src/Tomix.Core/Dax/Engine/` are **used and
+adapted from the SQLBI Whiteboard DAX engine**, used under the MIT License.
+
+- License: MIT — Copyright (c) 2026 SQLBI Corp.
+
+  > Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+  > and associated documentation files (the "Software"), to deal in the Software without
+  > restriction, including without limitation the rights to use, copy, modify, merge, publish,
+  > distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+  > Software is furnished to do so, subject to the following conditions:
+  >
+  > The above copyright notice and this permission notice shall be included in all copies or
+  > substantial portions of the Software.
+  >
+  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+  > BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  > NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  > DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The files carry the copyright header and are adapted to this repository (namespaces, the doubled
+closing-bracket escape in the lexer's bracket scan, and comment rewording). The `Tomix.Core.Dax`
+facade and the offline `DaxSyntaxCheck` analyzer are tomix code built on that engine.
+
 ## NuGet dependencies (redistributed)
 
 | Package | Version | License | Copyright / Project |
