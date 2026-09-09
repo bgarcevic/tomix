@@ -26,8 +26,9 @@ relationships use `Sales[Key]->Product[Key]` (many side → one side).
 | Option | Description |
 |--------|-------------|
 | `-t, --type <type>` | Object type: `Table`, `CalcTable`, `CalcGroup`, `Measure`, `CalcColumn`, `DataColumn`, `Hierarchy`, `Level`, `Calendar`, `CalcItem`, `KPI`, `Partition`, `MPartition`, `EntityPartition`, `PolicyRangePartition`, `Expression`, `Function`, `Perspective`, `Culture`, `ProviderDataSource`, `StructuredDataSource`, `Role`, `TablePermission`, `Member`, `Relationship`. Often inferred from a container keyword in the path; data sources always require `-t`. |
-| `-i <value>` | Expression or value for the new object. `-` reads from stdin. |
-| `-q <property>` | Extra property to set on the new object; pair each `-q` with a following `-i`. Repeatable. |
+| `--expression <value>` (`-e`) | Expression or value for the new object. `-` reads from stdin. |
+| `--set <name=value>` | Set a property on the new object, e.g. `--set formatString="#,0"`. Repeatable. |
+| `-i <value>` / `-q <property>` | Compatibility form of `--expression`/`--set`: an unpaired `-i` is the object's value; pair each `-q` with a following `-i` to set a property. |
 | `--file <file>` | Read the expression from a file. |
 | `--columns <names>` | Comma-separated columns to create on a new table (Table type only). |
 | `--if-not-exists` | Succeed silently if the object already exists (exit 0). |
@@ -49,9 +50,9 @@ relationships use `Sales[Key]->Product[Key]` (many side → one side).
     | `--range-granularity <g>` | `Day` (default), `Month`, `Quarter`, `Year`. |
 
 ```sh
-tx add "Sales/Revenue" -t Measure -i "CALCULATE(SUM(Sales[Amount]))" --save
-tx add tables/Sales/measures/Revenue -i - < expression.dax
-tx add "Sales/Revenue" -i "SUM(Sales[Amt])" -q formatString -i "$#,0"
+tx add "Sales/Revenue" -t Measure --expression "CALCULATE(SUM(Sales[Amount]))" --save
+tx add tables/Sales/measures/Revenue --expression - < expression.dax
+tx add "Sales/Revenue" -e "SUM(Sales[Amt])" --set formatString="$#,0"
 ```
 
 ## `set` — set a property
@@ -62,8 +63,8 @@ tx set <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `-q <property>` | Property expression. Accepts dotted paths, bracket indexers, and DisplayName matching. |
-| `-i <value>` | Value for the preceding `-q`. `-` reads from stdin. |
+| `--set <name=value>` | Property assignment, e.g. `--set expression="SUM(Sales[Amount])"`. Accepts dotted paths, bracket indexers, and DisplayName matching. |
+| `-q <property>` / `-i <value>` | Compatibility form of `--set`. `-` reads from stdin. |
 | `-t, --type <type>` | Disambiguate when the path matches multiple objects. |
 | `--strict-refs` | Fail when a rename leaves DAX references broken. |
 | `--no-fix-refs` | Do not rewrite DAX references to a renamed object; warn instead. |

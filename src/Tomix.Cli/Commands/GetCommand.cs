@@ -33,9 +33,9 @@ internal sealed class GetCommand : ICommandModule
 
         var queryOption = new Option<string?>("--query")
         {
-            Description = "Query a specific property (e.g., -q expression, -q formatString)"
+            Description = "Query a specific property (e.g., --query expression, --query formatString)"
         };
-        queryOption.Aliases.Add("-q");
+
 
         var typeOption = new Option<string?>("--type")
         {

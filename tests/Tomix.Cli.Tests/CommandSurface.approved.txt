@@ -12,15 +12,17 @@ tx - CLI for semantic models
   opt --debug  Show the full stack trace on stderr when an unexpected error occurs
   opt --non-interactive  Disable all interactive prompts. Fail with an actionable error if required input is missing.
   opt --yes, -y  Skip confirmation prompts for destructive operations
-  opt --quiet  Suppress non-essential output (spinners, progress, hints). Errors and data still print.
+  opt --quiet, -q  Suppress non-essential output (spinners, progress, hints). Errors and data still print.
 
 # tx add
 Add an object to the model
   arg <path>  Object path of the new object. Slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX forms also accepted: "'Sales'[Revenue]". Pair with -t. Relationships use 'Sales[Key]->Product[Key]' (many side -> one side).
   arg [model]  Path to model (if not using --model)
   opt --type, -t <type>  Object type. Known values: Table, CalcTable, CalcGroup, Measure, CalcColumn, DataColumn, Hierarchy, Level, Calendar, CalcItem, KPI, Partition, MPartition, EntityPartition, PolicyRangePartition, Expression, Function, Perspective, Culture, ProviderDataSource, StructuredDataSource, Role, TablePermission, Member, Relationship. Data sources always require -t (no path keyword infers them).
-  opt -i <i>  Expression or value for the new object. Use '-' to read from stdin. When paired with a preceding -q, applies as that property's value -- so you can set extra properties on the new object in one command, e.g. -i "SUM(...)" -q description -i "my measure" -q formatString -i "$#,0".
-  opt -q <q>  Property name to set on the newly-created object. Pair each -q with a following -i value. Repeatable. Names accept dotted paths, bracket indexers, and DisplayName matching.
+  opt -i <i>  Compatibility form of --expression / --set: an unpaired -i is the new object's value; pair each -q with a following -i to set a property. Use '-' to read from stdin.
+  opt -q <q>  Compatibility form of --set: property name to set on the newly-created object; pair each -q with a following -i value. Repeatable.
+  opt --expression, -e <expression>  Expression or value for the new object. Use '-' to read from stdin.
+  opt --set <set>  Set a property on the newly-created object as name=value, e.g. --set formatString="#,0". Repeatable. Names accept dotted paths, bracket indexers, and DisplayName matching.
   opt --file <file>  Read expression from file
   opt --if-not-exists  Succeed silently if the object already exists (exit 0)
   opt --force, -f  Save despite validation errors
@@ -258,7 +260,7 @@ Format DAX or M/Power Query expressions (-e inline, -p object path, or all)
 Get properties of a model object
   arg <path>  Object path. Slash-separated: 'Sales', 'Sales/Amount'. DAX forms also accepted.
   arg [model]  Path to model (if not using --model)
-  opt --query, -q <query>  Query a specific property (e.g., -q expression, -q formatString)
+  opt --query <query>  Query a specific property (e.g., --query expression, --query formatString)
   opt --type, -t <type>  Disambiguate when the path matches multiple table-children.
 
 # tx incremental-refresh
@@ -371,8 +373,8 @@ Show details of a saved connection profile
   arg <name>  Profile name to show
 
 # tx query
-Execute a DAX or DMV query against a live model (-q inline, --file, or stdin)
-  opt --query, -q <query>  Inline query text ('-' = read from stdin).
+Execute a DAX or DMV query against a live model (--query inline, --file, or stdin)
+  opt --query <query>  Inline query text ('-' = read from stdin).
   opt --file <file>  Read the query from a file ('-' = read from stdin).
   opt --param <param>  Query parameter as name=value, referenced as @name in DAX. Repeatable.
   opt --limit <limit>  Maximum number of rows to return.
@@ -478,8 +480,9 @@ Show current session details (ID, file path, active state)
 Set a property on a model object
   arg <path>  Object path. Slash-separated paths and DAX forms are accepted.
   arg [model]  Path to model (if not using --model)
-  opt -q <q>  Property expression.
+  opt -q <q>  Compatibility form of --set: the property to set; give its value with -i.
   opt -i <i>  Value for the preceding -q. Use '-' to read from stdin.
+  opt --set <set>  Property assignment as name=value, e.g. --set expression="SUM(Sales[Amount])". Names accept dotted paths, bracket indexers, and DisplayName matching.
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).

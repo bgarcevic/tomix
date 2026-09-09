@@ -45,9 +45,9 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx deps tables/Sales --downstream",
         ],
         ["query"] = [
-            "tx query -q \"EVALUATE Sales\"",
+            "tx query --query \"EVALUATE Sales\"",
             "tx query --file query.dax --limit 10",
-            "tx query -q \"EVALUATE VALUES(Sales[Region])\" --output-format json",
+            "tx query --query \"EVALUATE VALUES(Sales[Region])\" --output-format json",
         ],
         ["test"] = [
             "tx test ./tests -s MyWorkspace -d MyModel",
@@ -60,7 +60,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx add Sales/Revenue -t Measure -i \"CALCULATE(SUM(Sales[Amount]))\"",
         ],
         ["set"] = [
-            "tx set \"Table[Measure]\" -q \"CALCULATE(SUM(Sales[Amount]))\"",
+            "tx set \"Table[Measure]\" --set expression=\"CALCULATE(SUM(Sales[Amount]))\"",
             "tx set tables/Sales/Name -i \"Sales_v2\"",
         ],
         ["mv"] = [

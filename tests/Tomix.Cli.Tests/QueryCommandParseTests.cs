@@ -25,7 +25,7 @@ public sealed class QueryCommandParseTests
     [InlineData("-3")]
     public void Query_LimitBelowOne_FailsAtParseTime(string limit)
     {
-        var result = Parse("query", "-q", "EVALUATE x", "--limit", limit);
+        var result = Parse("query", "--query", "EVALUATE x", "--limit", limit);
 
         Assert.Contains(result.Errors, e => e.Message.Contains("--limit must be at least 1"));
     }
@@ -33,7 +33,7 @@ public sealed class QueryCommandParseTests
     [Fact]
     public void Query_AliasesAndRepeatableParams_Bind()
     {
-        var result = Parse("query", "-q", "EVALUATE x", "-o", "out.csv", "--param", "a=1", "--param", "b=2");
+        var result = Parse("query", "--query", "EVALUATE x", "-o", "out.csv", "--param", "a=1", "--param", "b=2");
 
         Assert.Empty(result.Errors);
     }
@@ -130,7 +130,7 @@ public sealed class QueryCommandParseTests
     [InlineData("-2")]
     public void Query_RunsBelowOne_FailsAtParseTime(string runs)
     {
-        var result = Parse("query", "-q", "EVALUATE x", "--runs", runs);
+        var result = Parse("query", "--query", "EVALUATE x", "--runs", runs);
 
         Assert.Contains(result.Errors, e => e.Message.Contains("--runs must be at least 1"));
     }
@@ -139,7 +139,7 @@ public sealed class QueryCommandParseTests
     public void Query_PerfFlags_Bind()
     {
         // Bare --trace (ZeroOrOne) placed last so it doesn't swallow a following option as its value.
-        var result = Parse("query", "-q", "EVALUATE x", "--plan", "--cold", "--runs", "3", "--trace");
+        var result = Parse("query", "--query", "EVALUATE x", "--plan", "--cold", "--runs", "3", "--trace");
 
         Assert.Empty(result.Errors);
     }
@@ -147,7 +147,7 @@ public sealed class QueryCommandParseTests
     [Fact]
     public void Query_TraceWithPath_Binds()
     {
-        var result = Parse("query", "-q", "EVALUATE x", "--trace", "trace.log");
+        var result = Parse("query", "--query", "EVALUATE x", "--trace", "trace.log");
 
         Assert.Empty(result.Errors);
     }

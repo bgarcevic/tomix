@@ -129,7 +129,8 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_QUERY_REQUIRED` | 2 | `query` called without `-q`, `--file`, or piped stdin. |
-| `TOMIX_QUERY_INPUT_CONFLICT` | 2 | `-q` and `--file` were passed together; choose one. |
+| `TOMIX_QUERY_INPUT_CONFLICT` | 2 | `--query` and `--file` were passed together; choose one. |
+| `TOMIX_SET_INPUT_CONFLICT` | 2 | `--set` and the compatibility `-q`/`-i` pair were passed together; choose one. |
 | `TOMIX_QUERY_FILE_NOT_FOUND` | 2 | The `--file` path does not exist. |
 | `TOMIX_QUERY_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_QUERY_OUTPUT_FORMAT` | 2 | `-o`/`--output-file` could not resolve a json or csv format (pass `--output-format json\|csv` or use a `.json`/`.csv` extension). |
@@ -281,6 +282,7 @@ come from structural integrity checks.
 | `TOMIX_INVALID_OUTPUT_FORMAT` | 2 | `--output-format` value is not one of: auto, text, json, csv, tmsl, bim, tmdl. |
 | `TOMIX_INVALID_TYPE` | 2 | `--type` value is not a known object kind; the hint lists the valid types. |
 | `TOMIX_ADD_VALUE_REQUIRED` | 2 | `tx add -q <property>` has no matching `-i <value>`. Pair each `-q` with a following `-i`. |
+| `TOMIX_ADD_INPUT_CONFLICT` | 2 | `--expression` and an unpaired `-i` were both passed; give the new object's value once. |
 | `TOMIX_CONFIRMATION_REQUIRED` | 1 | A destructive action needed confirmation but prompting was unavailable (`--non-interactive`, `--quiet`, json/csv output, or redirected stdin/stderr). Pass `--yes`. |
 | `TOMIX_OPTION_CONFLICT` | 2 | Mutually-exclusive options were combined (e.g. `--recent` with a model path, `--profile` with an explicit server/database). The message names the pair; which options conflict is command-specific, so branch on the code rather than the wording. |
 | `TOMIX_RECENT_INVALID` | 2 | `--recent` was given a value that is not a positive index (`1` = most recently used). |

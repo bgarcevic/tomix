@@ -37,7 +37,7 @@ tx get <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `-q, --query <property>` | Query a specific property (e.g. `-q expression`, `-q formatString`). |
+| `--query <property>` | Query a specific property (e.g. `--query expression`, `--query formatString`). |
 | `-t, --type <type>` | Disambiguate when the path matches multiple table-children. |
 
 Each object kind has its own property set: measures include `expression`,
@@ -53,11 +53,11 @@ output (CSV keeps the fixed per-kind columns).
 
 ```sh
 tx get "Sales/Total Sales"
-tx get "Sales/Total Sales" -q expression
-tx get "Sales/Total Sales" -q annotation:PBI_FormatHint
+tx get "Sales/Total Sales" --query expression
+tx get "Sales/Total Sales" --query annotation:PBI_FormatHint
 tx get "Relationships/rel-customers"
 tx get "Expressions/Environment" -q expression   # a shared M parameter's value
-tx get . -q culture                              # a model-level scalar
+tx get . --query culture                         # a model-level scalar
 tx get Sales --output-format tmdl    # the object as TMDL
 ```
 
@@ -124,7 +124,7 @@ for the performance-analysis workflow.
 
 | Option | Description |
 |--------|-------------|
-| `-q, --query <text>` | Inline query (`-` = stdin). |
+| `--query <text>` | Inline query (`-` = stdin). |
 | `--file <file>` | Read the query from a file (`-` = stdin). |
 | `--param <name=value>` | Query parameter, referenced as `@name` in DAX. Repeatable. |
 | `--limit <n>` | Maximum rows to return. |
@@ -136,6 +136,6 @@ for the performance-analysis workflow.
 | `--no-validate` | Skip the EVALUATE/DEFINE/SELECT keyword pre-check. |
 
 ```sh
-tx query -q 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
+tx query --query 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
 tx query --file heavy.dax --cold --runs 5
 ```

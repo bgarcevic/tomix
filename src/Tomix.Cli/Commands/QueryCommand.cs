@@ -30,7 +30,7 @@ internal sealed class QueryCommand : ICommandModule
         {
             Description = "Inline query text ('-' = read from stdin)."
         };
-        queryOption.Aliases.Add("-q");
+
 
         var fileOption = new Option<string?>("--file")
         {
@@ -90,7 +90,7 @@ internal sealed class QueryCommand : ICommandModule
                 result.AddError("--runs must be at least 1.");
         });
 
-        var command = new Command("query", "Execute a DAX or DMV query against a live model (-q inline, --file, or stdin)")
+        var command = new Command("query", "Execute a DAX or DMV query against a live model (--query inline, --file, or stdin)")
         {
             queryOption,
             fileOption,
@@ -257,8 +257,8 @@ internal sealed class QueryCommand : ICommandModule
             return (null, new TomixDiagnostic(
                 "TOMIX_QUERY_INPUT_CONFLICT",
                 DiagnosticSeverity.Error,
-                "Pass either -q or --file, not both.",
-                Hint: "Use -q \"EVALUATE ...\" for inline text or --file query.dax for a file."));
+                "Pass either --query or --file, not both.",
+                Hint: "Use --query \"EVALUATE ...\" for inline text or --file query.dax for a file."));
 
         if (!string.IsNullOrWhiteSpace(file) && file != "-" && !File.Exists(file))
             return (null, new TomixDiagnostic(

@@ -81,8 +81,10 @@ internal static class GlobalOptions
         Server.Aliases.Add("-s");
         Database.Aliases.Add("-d");
         Yes.Aliases.Add("-y");
-        // No -q alias: several commands (add, set, get, bpa) use a local -q for
-        // property/query input, so -q-as-quiet would be silently shadowed there.
+        Quiet.Aliases.Add("-q");
+        // add and set declare a local -q (the bare compatibility property form, retired at
+        // 1.0); the local option shadows the global alias there, so -q keeps its documented
+        // compat meaning on exactly those two commands and means quiet everywhere else.
         OutputFormat.Recursive = true;
     }
 

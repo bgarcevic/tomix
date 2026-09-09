@@ -4,6 +4,7 @@ using Tomix.App.Mutations;
 using Tomix.App.Set;
 using Tomix.App.State;
 using Tomix.Cli.Output;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Commands;
@@ -35,12 +36,22 @@ internal sealed class SetCommand : ICommandModule
         };
         var queryOption = new Option<string?>("-q")
         {
-            Description = "Property expression."
+            Description = "Compatibility form of --set: the property to set; give its value with -i."
         };
         var valueOption = new Option<string?>("-i")
         {
             Description = "Value for the preceding -q. Use '-' to read from stdin."
         };
+        var setOption = new Option<string?>("--set")
+        {
+            Description = "Property assignment as name=value, e.g. --set expression=\"SUM(Sales[Amount])\". Names accept dotted paths, bracket indexers, and DisplayName matching."
+        };
+        setOption.Validators.Add(result =>
+        {
+            var value = result.GetValueOrDefault<string?>();
+            if (value is not null && AddCommand.SplitSetName(value).Length == 0)
+                result.AddError($"--set '{value}' must be name=value.");
+        });
         var overwriteOption = LifecycleOptions.Overwrite();
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
@@ -69,6 +80,7 @@ internal sealed class SetCommand : ICommandModule
             modelArgument,
             queryOption,
             valueOption,
+            setOption,
             overwriteOption,
             dryRunOption,
             typeOption,
@@ -101,10 +113,27 @@ internal sealed class SetCommand : ICommandModule
             }
 
             var query = parseResult.GetValue(queryOption);
-            var value = InputValueResolver.Resolve(parseResult.GetValue(valueOption));
-            IReadOnlyList<ModelPropertyAssignment> assignments = string.IsNullOrWhiteSpace(query)
-                ? Array.Empty<ModelPropertyAssignment>()
-                : [new ModelPropertyAssignment(query, value ?? "")];
+            var rawValue = parseResult.GetValue(valueOption);
+            var set = parseResult.GetValue(setOption);
+            if (set is not null && (!string.IsNullOrWhiteSpace(query) || rawValue is not null))
+            {
+                ErrorOutput.Write(
+                    [new TomixDiagnostic(
+                        "TOMIX_SET_INPUT_CONFLICT",
+                        DiagnosticSeverity.Error,
+                        "Pass either --set or -q/-i, not both.",
+                        "Prefer --set name=value; -q/-i remain as the compatibility form.")],
+                    GlobalOptions.ErrorFormatValue(parseResult, formatValue));
+                return 2;
+            }
+
+            IReadOnlyList<ModelPropertyAssignment> assignments = set is not null
+                ? [new ModelPropertyAssignment(
+                    AddCommand.SplitSetName(set),
+                    InputValueResolver.Resolve(set[(set.IndexOf('=') + 1)..]) ?? "")]
+                : string.IsNullOrWhiteSpace(query)
+                    ? Array.Empty<ModelPropertyAssignment>()
+                    : [new ModelPropertyAssignment(query, InputValueResolver.Resolve(rawValue) ?? "")];
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),

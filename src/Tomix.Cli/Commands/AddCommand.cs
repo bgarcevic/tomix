@@ -42,14 +42,30 @@ internal sealed class AddCommand : ICommandModule
         typeOption.Aliases.Add("-t");
         var valueOption = new Option<string[]?>("-i")
         {
-            Description = "Expression or value for the new object. Use '-' to read from stdin. When paired with a preceding -q, applies as that property's value -- so you can set extra properties on the new object in one command, e.g. -i \"SUM(...)\" -q description -i \"my measure\" -q formatString -i \"$#,0\".",
+            Description = "Compatibility form of --expression / --set: an unpaired -i is the new object's value; pair each -q with a following -i to set a property. Use '-' to read from stdin.",
             Arity = ArgumentArity.ZeroOrMore
         };
         var queryOption = new Option<string[]?>("-q")
         {
-            Description = "Property name to set on the newly-created object. Pair each -q with a following -i value. Repeatable. Names accept dotted paths, bracket indexers, and DisplayName matching.",
+            Description = "Compatibility form of --set: property name to set on the newly-created object; pair each -q with a following -i value. Repeatable.",
             Arity = ArgumentArity.ZeroOrMore
         };
+        var expressionOption = new Option<string?>("--expression")
+        {
+            Description = "Expression or value for the new object. Use '-' to read from stdin."
+        };
+        expressionOption.Aliases.Add("-e");
+        var setOption = new Option<string[]?>("--set")
+        {
+            Description = "Set a property on the newly-created object as name=value, e.g. --set formatString=\"#,0\". Repeatable. Names accept dotted paths, bracket indexers, and DisplayName matching.",
+            Arity = ArgumentArity.ZeroOrMore
+        };
+        setOption.Validators.Add(result =>
+        {
+            foreach (var value in result.GetValueOrDefault<string[]?>() ?? [])
+                if (SplitSetName(value).Length == 0)
+                    result.AddError($"--set '{value}' must be name=value.");
+        });
         var fileOption = new Option<string?>("--file")
         {
             Description = "Read expression from file"
@@ -147,6 +163,8 @@ internal sealed class AddCommand : ICommandModule
             typeOption,
             valueOption,
             queryOption,
+            expressionOption,
+            setOption,
             fileOption,
             ifNotExistsOption,
             forceOption,
@@ -171,6 +189,19 @@ internal sealed class AddCommand : ICommandModule
 
             var file = parseResult.GetValue(fileOption);
             var parsed = ParseInterleavedQi(parseResult);
+            var expression = parseResult.GetValue(expressionOption);
+            if (expression is not null && parsed.PrimaryValue is not null)
+            {
+                ErrorOutput.Write(
+                    [new TomixDiagnostic(
+                        "TOMIX_ADD_INPUT_CONFLICT",
+                        DiagnosticSeverity.Error,
+                        "Pass either --expression or an unpaired -i, not both.",
+                        "Give the new object's value once: --expression <value> or a single -i <value>.")],
+                    GlobalOptions.ErrorFormatValue(parseResult, formatValue));
+                return 2;
+            }
+
             if (parsed.DanglingProperty is not null)
             {
                 // Was AnsiConsole.MarkupLine, which writes to stdout — so `tx add ... | jq` got
@@ -186,8 +217,12 @@ internal sealed class AddCommand : ICommandModule
                 return 2;
             }
 
-            var value = InputValueResolver.Resolve(parsed.PrimaryValue, file);
-            IReadOnlyList<ModelPropertyAssignment> properties = parsed.Properties;
+            var value = InputValueResolver.Resolve(expression ?? parsed.PrimaryValue, file);
+            IReadOnlyList<ModelPropertyAssignment> properties =
+            [
+                .. parsed.Properties,
+                .. ParseSetAssignments(parseResult.GetValue(setOption)),
+            ];
 
             if (!RecentConnections.TryResolveModel(
                     parseResult,
@@ -272,6 +307,33 @@ internal sealed class AddCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
         else if (result.SyncWarning is not null)
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+    }
+
+    /// <summary>Splits a --set value at the first '='; empty name means it was malformed.</summary>
+    internal static string SplitSetName(string raw)
+    {
+        var eq = raw.IndexOf('=');
+        return eq > 0 ? raw[..eq].Trim() : "";
+    }
+
+    internal static IReadOnlyList<ModelPropertyAssignment> ParseSetAssignments(IEnumerable<string?>? raw)
+    {
+        if (raw is null)
+            return [];
+
+        var assignments = new List<ModelPropertyAssignment>();
+        foreach (var value in raw)
+        {
+            if (value is null)
+                continue;
+            var name = SplitSetName(value);
+            if (name.Length == 0)
+                continue; // parse-time validator already rejected it
+            var eq = value.IndexOf('=');
+            assignments.Add(new ModelPropertyAssignment(name, value[(eq + 1)..]));
+        }
+
+        return assignments;
     }
 
     internal static (string? PrimaryValue, IReadOnlyList<ModelPropertyAssignment> Properties, string? DanglingProperty) ParseInterleavedQi(

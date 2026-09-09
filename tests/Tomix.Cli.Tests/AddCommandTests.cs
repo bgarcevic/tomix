@@ -88,10 +88,6 @@ public sealed class AddCommandTests
         Assert.Equal("formatString", property.Property);
     }
 
-    [Fact]
-    public void QuietOption_HasNoShortAlias()
-        => Assert.DoesNotContain("-q", GlobalOptions.Quiet.Aliases);
-
     // ── Parse-time validators ───────────────────────────────────────────────
 
     [Theory]
