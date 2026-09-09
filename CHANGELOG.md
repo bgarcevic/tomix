@@ -59,6 +59,15 @@ and the API surface that major versions protect.
   `get`/`ls`/`find` output (additive, replacing the generic fallback), and `diff` reports the
   semantic scalars. `discourageReportMeasures` stays read-only: TOM's setter demands the
   internal-only compatibility sentinel, so no real model can set it (#120).
+- Contributor onboarding: bug-report and feature-request issue forms and a pull-request
+  template carrying the reviewer checklist (docs page, command-surface snapshot, CHANGELOG),
+  plus `scripts/dev.sh` / `scripts/dev.ps1` task runners (`build`, `test`, `format`,
+  `snapshot`, `docs`) that work from any directory — including a cross-platform snapshot
+  recipe, since `TOMIX_UPDATE_SNAPSHOTS=1 …` is not valid PowerShell (#147).
+- CI hygiene: every workflow job now has a timeout and a concurrency group (releases and
+  post-release smoke runs queue instead of being cancelled mid-publish), the NuGet cache keys
+  on `Directory.Packages.props` so Dependabot bumps stop missing the cache, and the
+  deploy-script selftest checker (`scripts/qa/selftest-checker.sh`) runs on the Linux CI leg (#147).
 
 ### Changed
 
@@ -74,6 +83,11 @@ and the API surface that major versions protect.
   stay unprompted. In non-interactive contexts these commands fail fast with
   `TOMIX_CONFIRMATION_REQUIRED`; pass `--yes` to skip the prompt (#145).
 
+### Removed
+
+- The unused `coverlet.collector` reference from every test project: no workflow or script ever
+  collected a report from it, so it was dead weight in every restore (#147).
+
 ### Fixed
 
 - `set` error hints now list the writable properties for every kind the catalog models, not
@@ -85,6 +99,12 @@ and the API surface that major versions protect.
 - The catalog no longer advertises `name` as writable on table permissions: TOM derives the
   name from the referenced table and rejects the assignment, so `tx set` now reports it as
   unsupported (with the valid tokens) instead of surfacing the underlying TOM error (#144).
+- Contributor docs and scripts: `AGENTS.md` and the CONTRIBUTING files now list all source and
+  test projects (including `Tomix.Platform`, `Tomix.Auth`, and `Tomix.Provider.Vpax`) and
+  document the `dotnet format` CI gate, and the duplicated output/color routing rows in
+  `AGENTS.md` are merged; `src/Tomix.Provider.Tmdl/CONTEXT.md` no longer describes the provider
+  as read-only now that writes ship through `TmdlModelSession.SaveAsync`; and
+  `scripts/install-dev.ps1` / `install-dev.sh` work from any working directory (#147).
 
 ## [0.1.0] - 2026-08-22
 

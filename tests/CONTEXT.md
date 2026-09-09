@@ -121,8 +121,11 @@ pass. Change the production behavior deliberately, then update the pin in the sa
 - `Tomix.Cli.Tests/CommandSurfaceSnapshotTests` — the CLI surface. Regenerate deliberately:
 
 ```bash
-TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests
+./scripts/dev.sh snapshot        # macOS/Linux
+.\scripts\dev.ps1 snapshot       # Windows
 ```
+
+Both set `TOMIX_UPDATE_SNAPSHOTS=1` and run `dotnet test --filter CommandSurfaceSnapshotTests`.
 
 Redundancy is acceptable in a pin when the duplicate carries information the general assertion
 cannot — a named test whose failure message documents a specific past regression is worth keeping

@@ -17,9 +17,14 @@ dotnet run --project src/Tomix.Cli -- doctor
 
 If `doctor` is happy, you're ready. For the inner loop, `./tx <command>`
 (`.\tx.ps1` on Windows) is a thin wrapper around `dotnet run` — short to type
-and always reflects your current source. To try your build as a genuinely
-globally installed tool, `scripts/install-dev.ps1` (Windows) or
-`scripts/install-dev.sh` (macOS/Linux) packs and installs it from source.
+and always reflects your current source. `./scripts/dev.sh`
+(`.\scripts\dev.ps1` on Windows) wraps the common chores — `build`, `test`,
+`format`, `snapshot` (regenerate the command-surface snapshot), and `docs`
+(strict docs build) — and works from any directory. One gate to know about:
+CI runs `dotnet format --verify-no-changes` (Linux leg) as a required check,
+so run the `format` task before pushing. To try your build as a genuinely
+globally installed tool, `.\scripts\install-dev.ps1` (Windows) or
+`./scripts/install-dev.sh` (macOS/Linux) packs and installs it from source.
 
 The sample model at `samples/basic-tmdl` is the standard fixture for manual
 testing: `dotnet run --project src/Tomix.Cli -- connect ./samples/basic-tmdl`.
@@ -34,9 +39,10 @@ suite, works on Linux and macOS.
 src/Tomix.Cli        CLI surface: parsing, rendering, exit codes. No business logic.
 src/Tomix.App        Application handlers: one handler per operation.
 src/Tomix.Core       Domain model, provider abstractions.
-src/Tomix.Provider.* Model providers (TMDL folders, TOM/XMLA).
+src/Tomix.Platform   Dependency-free filesystem and OS primitives shared by outer projects.
+src/Tomix.Provider.* Model providers (TMDL folders, TOM/XMLA, VPAX).
 src/Tomix.Auth       Authentication and credential caching.
-tests/             Tomix.Cli.Tests and Tomix.App.Tests, mirroring the source tree.
+tests/               Six projects: Core, App, CLI, TOM, TMDL, and VPAX tests, mirroring the source tree.
 ```
 
 Each directory has a `CONTEXT.md` describing its responsibilities and
@@ -85,8 +91,8 @@ model, also look at how `set`/`rm` route changes through the staging flow
 - **Docs stay current.** If your PR adds or changes a command, an argument,
   or an option, update the matching page under `docs/commands/`. The
   command-surface snapshot test fails until you regenerate it
-  (`TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests`)
-  — treat that failure as the reminder to update the docs, not just the
+  (`./scripts/dev.sh snapshot`; `.\scripts\dev.ps1 snapshot` on Windows) —
+  treat that failure as the reminder to update the docs, not just the
   snapshot.
 - **Scope.** Small, focused PRs merge fast. If you're planning something
   larger than a single command or fix, open an issue first so we agree on the

@@ -1,0 +1,30 @@
+name: Feature request
+description: A workflow you are trying to achieve that tx does not support yet.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the workflow you're trying to achieve rather than the flag
+        you want — it usually leads somewhere better.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: What are you trying to do?
+      description: The goal, in terms of your model or workflow — not the proposed solution.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do today?
+      description: The workaround, script, or manual steps this would replace. "Nothing" is a fine answer.
+    validations:
+      required: false
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like tx to do?
+      description: If you have a concrete command shape in mind, show it; if not, the goal above is enough.
+    validations:
+      required: false

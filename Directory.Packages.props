@@ -5,7 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Dax.Formatter" Version="1.2.2" />
     <PackageVersion Include="Dax.Model.Extractor" Version="1.12.1" />
     <PackageVersion Include="Dax.ViewModel" Version="1.12.1" />

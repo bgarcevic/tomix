@@ -18,9 +18,15 @@ on:
 permissions:
   contents: read
 
+# No cancel-in-progress: a queued smoke run verifies a real release, so a
+# newer run must never kill it. The group just stops stacked duplicates.
+concurrency:
+  group: smoke-${{ github.ref }}
+
 jobs:
   smoke:
     name: smoke ${{ matrix.rid }}
+    timeout-minutes: 20
     # For workflow_run, head_branch is the pushed tag; skip dispatch-triggered
     # release runs (no tag, nothing published) and failed release runs.
     if: >

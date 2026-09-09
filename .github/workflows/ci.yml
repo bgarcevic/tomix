@@ -8,8 +8,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +36,10 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          # Directory.Packages.props holds the central package versions and
+          # '**/Directory.Build.props' covers both the root file and tests/;
+          # without them a Dependabot bump silently restores a stale cache.
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore
       # Formatting is platform-independent; verify on one leg to keep CI fast.
@@ -41,3 +49,9 @@ jobs:
       # in Directory.Build.props, so local builds fail the same way CI does.
       - run: dotnet build -m:1 --configuration Release --no-restore
       - run: dotnet test -m:1 --configuration Release --no-build
+      # Free signal on the deploy-splice invariants (see scripts/qa/README.md):
+      # offline and deterministic, but bash-based, so it runs on this leg only.
+      # Inside the existing required check, so branch rulesets stay untouched.
+      - name: QA selftest (deploy-script checker invariants)
+        if: matrix.os == 'ubuntu-latest'
+        run: bash scripts/qa/selftest-checker.sh

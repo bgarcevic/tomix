@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+# Anchor on the script location so this works from any directory (like ./tx).
+cd "$(dirname "$0")/.."
 # Remove only this tool's own packages before packing. NuGet orders prereleases
 # alphabetically, so a leftover 0.1.0-dev outranks a fresh 0.1.0-alpha.N and would
 # be (re)installed instead of the current build. `dotnet pack` regenerates every

@@ -17,7 +17,8 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - `/src/Tomix.App` - Application use cases and command handlers
 - `/src/Tomix.Core` - Core abstractions, diagnostics, results, and shared domain types
 - `/src/Tomix.Platform` - Dependency-free filesystem and operating-system primitives shared by outer projects
-- `/src/Tomix.Provider.*` - Model providers for TOM and TMDL
+- `/src/Tomix.Provider.*` - Model providers for TOM, TMDL, and VPAX
+- `/src/Tomix.Auth` - Authentication and credential caching
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
 - `/samples` - Sample models used by tests and documentation
 - `/docs` - CLI UX guidelines, color strategy, error codes, and detailed contributor context
@@ -26,17 +27,15 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 | Task | Go to | Read | Notes |
 |------|-------|------|-------|
-| Add or change a CLI command | `/src/Tomix.Cli`, `/src/Tomix.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers. Update the matching page in `/docs/commands` and regenerate `CommandSurface.approved.txt` (`TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests`) |
-| Change command output or color styling | `/src/Tomix.Cli/Output` | `Output/CONTEXT.md`, `/docs/cli-color-strategy.md` | Use `Styling` helpers; do not hard-code ANSI |
+| Add or change a CLI command | `/src/Tomix.Cli`, `/src/Tomix.App` | `CONTEXT.md` in each folder | Keep CLI thin; put behavior in handlers. Update the matching page in `/docs/commands` and regenerate `CommandSurface.approved.txt` (`./scripts/dev.sh snapshot`; `.\scripts\dev.ps1 snapshot` on Windows) |
+| Change command output or color styling | `/src/Tomix.Cli/Output`, `/tests/Tomix.Cli.Tests` | `Output/CONTEXT.md`, `/docs/cli-color-strategy.md` | Use `Styling` helpers; do not hard-code ANSI; update the palette in one place only. Preserve JSON contracts (`GetLsParityTests`, `PropertyCatalogTests`) |
 | Add domain types, diagnostics, or result models | `/src/Tomix.Core` | `CONTEXT.md` | Core must stay dependency-light and infrastructure-free |
 | Add shared local paths or filesystem primitives | `/src/Tomix.Platform` | `CONTEXT.md` | BCL-only; no feature stores or external adapters |
-| Change command output | `/src/Tomix.Cli/Output`, `/tests/Tomix.Cli.Tests` | `CONTEXT.md` in relevant folders | Preserve JSON contracts (`GetLsParityTests`, `PropertyCatalogTests`) |
-| Add TMDL or TOM support | `/src/Tomix.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
+| Add TMDL, TOM, or VPAX support | `/src/Tomix.Provider.*` | Provider `CONTEXT.md` files | Do not leak provider-specific types |
 | Add or change tests | `/tests` | `CONTEXT.md` (`Writing and maintaining tests`) | Prefer fast deterministic tests. Reuse the shared helpers, prefer `[Theory]` for input matrices, and prove a new test can fail before committing it |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
 | Change the docs site (pages, nav, theme) | `/docs`, `zensical.toml` | `docs/contributing.md` | Built with Zensical via uv; verify with `uv run zensical build --clean --strict` |
 | Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |
-| Change the color palette or message categories | `/src/Tomix.Cli/Output/Styling.cs` | `/docs/cli-color-strategy.md` | Update palette in one place only |
 
 ## Local Context Files
 
@@ -57,10 +56,12 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 ## Development Commands
 
+- Dev tasks (work from any directory): `./scripts/dev.sh <task>` (`.\scripts\dev.ps1 <task>` on Windows) — tasks: `build`, `test`, `format`, `snapshot` (regenerate `CommandSurface.approved.txt`), `docs` (strict docs build); extra args pass through to the underlying command
 - Build: `dotnet build`
 - Test: `dotnet test`
+- Format (required CI gate, checked on the Linux leg): `dotnet format` applies fixes; CI runs `dotnet format --verify-no-changes`, so run it before pushing
 - Run CLI (dev, short + always fresh): `./tx doctor` (`.\tx.ps1 doctor` on Windows) — wraps `dotnet run`, no install needed; reflects current source on every call
 - Run CLI (dev, explicit): `dotnet run --project src/Tomix.Cli -- doctor`
 - Run JSON output (dev): `./tx doctor --output-format json`
-- Install/update global tool: `./scripts/install-dev.ps1` (Windows) or `./scripts/install-dev.sh` (macOS/Linux) — packs and installs `tx` globally so you can run `tx <command>` directly (re-run after each change to pick up edits)
-- Docs site (requires [uv](https://docs.astral.sh/uv/)): `uv run zensical serve` (live preview), `uv run zensical build --clean --strict` (what CI runs)
+- Install/update global tool: `.\scripts\install-dev.ps1` (Windows) or `./scripts/install-dev.sh` (macOS/Linux) — packs and installs `tx` globally so you can run `tx <command>` directly (re-run after each change to pick up edits)
+- Docs site (requires [uv](https://docs.astral.sh/uv/)): `uv run zensical serve` (live preview), `./scripts/dev.sh docs` or `uv run zensical build --clean --strict` (what CI runs)

@@ -7,7 +7,7 @@ Provider for TMDL folder-based semantic models.
 - Open local TMDL models.
 - Read model metadata.
 - Map TMDL-backed models into tomix abstractions.
-- Later: support safe writes.
+- Write models back through `TmdlModelSession.SaveAsync` (the `add`/`set`/`rm`/`save` commands all route through it).
 
 ## Cross-folder dependencies
 
@@ -18,7 +18,7 @@ Provider for TMDL folder-based semantic models.
 
 ## Rules
 
-- Start read-only unless the task explicitly requires saving.
+- Route all writes through `TmdlModelSession.SaveAsync`; do not write TMDL files ad hoc.
 - Preserve file formatting where possible.
 - Do not make destructive changes without preview or `--save`.
 - Do not leak provider-specific types into `Tomix.Core`.

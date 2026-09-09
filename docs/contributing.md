@@ -16,8 +16,11 @@ dotnet run --project src/Tomix.Cli -- doctor
 
 If `doctor` is happy, you're ready. For the inner loop, `./tx <command>`
 (`.\tx.ps1` on Windows) wraps `dotnet run` and always reflects your current
-source. The sample model at `samples/basic-tmdl` is the standard fixture for
-manual testing.
+source. `./scripts/dev.sh` (`.\scripts\dev.ps1` on Windows) wraps the common
+chores — `build`, `test`, `format`, `snapshot`, `docs` — and works from any
+directory. CI runs `dotnet format --verify-no-changes` as a required check,
+so run the `format` task before pushing. The sample model at
+`samples/basic-tmdl` is the standard fixture for manual testing.
 
 ## How the code is organized
 
@@ -25,7 +28,8 @@ manual testing.
 src/Tomix.Cli        CLI surface: parsing, rendering, exit codes. No business logic.
 src/Tomix.App        Application handlers: one handler per operation.
 src/Tomix.Core       Domain model, provider abstractions.
-src/Tomix.Provider.* Model providers (TMDL folders, TOM/XMLA).
+src/Tomix.Platform   Dependency-free filesystem and OS primitives shared by outer projects.
+src/Tomix.Provider.* Model providers (TMDL folders, TOM/XMLA, VPAX).
 src/Tomix.Auth       Authentication and credential caching.
 tests/               Core, App, CLI, TOM, TMDL, and VPAX test projects.
 ```
@@ -59,7 +63,9 @@ uv run zensical build --clean --strict # what CI runs
 The site deploys to GitHub Pages automatically on every push to `main` that
 touches `docs/` or `zensical.toml`. When you add, remove, or change a command
 or its options, update the matching page under `docs/commands/` — the
-help-snapshot test in `Tomix.Cli.Tests` will remind you if you forget.
+help-snapshot test in `Tomix.Cli.Tests` will remind you if you forget, and
+`./scripts/dev.sh snapshot` (`.\scripts\dev.ps1 snapshot` on Windows)
+regenerates the snapshot.
 
 ## Bugs and ideas
 

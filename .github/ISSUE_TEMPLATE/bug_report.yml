@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in tx is broken, wrong, or misleading.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file this. The `tx doctor` output below
+        is the first thing maintainers look at — please paste it even if it
+        looks uninteresting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: |
+        The command you ran, what you expected, and what happened instead.
+        For bugs, include the output of `tx doctor`, the command you ran,
+        and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor-output
+    attributes:
+      label: tx doctor output
+      description: Run `tx doctor` and paste the full output.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: error-json
+    attributes:
+      label: JSON error output
+      description: |
+        If the failing command printed an error, re-run it with
+        `--error-format json` and paste the output here.
+      render: json
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: tx version
+      description: Output of `tx --version`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true

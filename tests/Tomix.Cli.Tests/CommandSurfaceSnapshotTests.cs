@@ -13,7 +13,8 @@ namespace Tomix.Cli.Tests;
 /// arguments, options) from the parser object model — not from rendered help, so it is
 /// independent of console width and styling. When it fails: update the affected pages
 /// under docs/commands/, then regenerate the snapshot with
-/// <c>TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests</c>.
+/// <c>.\scripts\dev.ps1 snapshot</c> (Windows) or <c>./scripts/dev.sh snapshot</c>
+/// (macOS/Linux).
 /// </summary>
 public sealed class CommandSurfaceSnapshotTests
 {
@@ -39,7 +40,7 @@ public sealed class CommandSurfaceSnapshotTests
         Assert.Fail(
             "The CLI command surface changed but the approved snapshot did not." + Environment.NewLine +
             "1. Update the affected reference pages under docs/commands/." + Environment.NewLine +
-            "2. Regenerate: TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests" + Environment.NewLine +
+            "2. Regenerate: .\\scripts\\dev.ps1 snapshot (Windows) or ./scripts/dev.sh snapshot (macOS/Linux)" + Environment.NewLine +
             Environment.NewLine +
             DescribeFirstDifferences(approved, Normalize(actual)));
     }
