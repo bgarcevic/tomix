@@ -38,6 +38,7 @@ internal sealed class MvCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
         var overwriteOption = LifecycleOptions.Overwrite();
+        var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple table-children."
@@ -64,6 +65,7 @@ internal sealed class MvCommand : ICommandModule
             destinationArgument,
             modelArgument,
             overwriteOption,
+            dryRunOption,
             typeOption,
             stageOption,
             revertOption,
@@ -146,7 +148,8 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(noSyncOption),
                         parseResult.GetValue(strictRefsOption),
                         FixRefs: !parseResult.GetValue(noFixRefsOption),
-                        Overwrite: parseResult.GetValue(overwriteOption)),
+                        Overwrite: parseResult.GetValue(overwriteOption),
+                        DryRun: parseResult.GetValue(dryRunOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -167,6 +170,8 @@ internal sealed class MvCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Moved: {result.Moved} -> {result.To}")));
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
+        else if (result.DryRun == true)
+            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
         else if (result.Saved is false)
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
         else

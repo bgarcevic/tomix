@@ -60,6 +60,7 @@ internal sealed class AddCommand : ICommandModule
         };
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
+        var dryRunOption = LifecycleOptions.DryRun();
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
         var saveOption = LifecycleOptions.Save();
@@ -150,6 +151,7 @@ internal sealed class AddCommand : ICommandModule
             ifNotExistsOption,
             forceOption,
             overwriteOption,
+            dryRunOption,
             saveToOption,
             serializationOption,
             saveOption,
@@ -230,7 +232,8 @@ internal sealed class AddCommand : ICommandModule
                         parseResult.GetValue(rangeStartOption),
                         parseResult.GetValue(rangeEndOption),
                         parseResult.GetValue(rangeGranularityOption),
-                        Overwrite: parseResult.GetValue(overwriteOption)),
+                        Overwrite: parseResult.GetValue(overwriteOption),
+                        DryRun: parseResult.GetValue(dryRunOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -258,6 +261,8 @@ internal sealed class AddCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.Success($"Added: {result.Added}"));
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
+        else if (result.DryRun == true)
+            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
         else if (result.Saved is false)
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
         else

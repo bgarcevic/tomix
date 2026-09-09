@@ -6,7 +6,8 @@ with `--save`, batch with `--stage`, or write elsewhere with
 `--save-to <path>` (which implies `--save`). `--serialization tmdl|bim`
 controls the on-disk format, `--force` (alias `-f`) saves past validation
 errors, `--overwrite` lets `--save-to` replace an existing target, and
-`--no-sync` skips the workspace mirror. Two commands keep a command-scoped
+`--no-sync` skips the workspace mirror. `--dry-run` previews: the change is
+applied to the in-memory model and rendered, but nothing is written. Two commands keep a command-scoped
 `--force` with a different meaning: `rm --force` removes despite DAX
 dependents, and `init`/`connect`/`stage commit`/`deploy`/`config init` use
 `--force` to bypass their own destructive guards.

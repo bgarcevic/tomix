@@ -38,6 +38,28 @@ public sealed class MutationLifecycleModeTests
     }
 
     [Fact]
+    public void DryRun_SuppressesSaveStageAndSaveTo()
+    {
+        var error = MutationLifecycle.ResolveMode(
+            Options(save: true, saveTo: "out", stage: false, revert: false) with { DryRun = true },
+            out var mode);
+
+        Assert.Null(error);
+        Assert.Equal(MutationMode.None, mode);
+    }
+
+    [Fact]
+    public void DryRunWithRevert_RevertStillWins()
+    {
+        // Revert discards staged work, so it must not be silently disabled by --dry-run.
+        var error = MutationLifecycle.ResolveMode(
+            Options(revert: true) with { DryRun = true }, out var mode);
+
+        Assert.Null(error);
+        Assert.Equal(MutationMode.Revert, mode);
+    }
+
+    [Fact]
     public void RevertAlone_ResolvesRevert()
     {
         var error = MutationLifecycle.ResolveMode(Options(revert: true), out var mode);

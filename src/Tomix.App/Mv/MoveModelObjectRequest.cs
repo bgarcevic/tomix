@@ -15,4 +15,5 @@ public sealed record MoveModelObjectRequest(
     bool NoSync = false,
     bool StrictRefs = false,
     bool FixRefs = true,
-    bool Overwrite = false);
+    bool Overwrite = false,
+    bool DryRun = false);

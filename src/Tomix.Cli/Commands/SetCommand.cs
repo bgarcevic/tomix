@@ -42,6 +42,7 @@ internal sealed class SetCommand : ICommandModule
             Description = "Value for the preceding -q. Use '-' to read from stdin."
         };
         var overwriteOption = LifecycleOptions.Overwrite();
+        var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name)."
@@ -69,6 +70,7 @@ internal sealed class SetCommand : ICommandModule
             queryOption,
             valueOption,
             overwriteOption,
+            dryRunOption,
             typeOption,
             saveOption,
             saveToOption,
@@ -132,7 +134,8 @@ internal sealed class SetCommand : ICommandModule
                         parseResult.GetValue(noSyncOption),
                         parseResult.GetValue(strictRefsOption),
                         FixRefs: !parseResult.GetValue(noFixRefsOption),
-                        Overwrite: parseResult.GetValue(overwriteOption)),
+                        Overwrite: parseResult.GetValue(overwriteOption),
+                        DryRun: parseResult.GetValue(dryRunOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -153,6 +156,8 @@ internal sealed class SetCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.Success($"Set: {result.Set}.{result.Property}"));
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
+        else if (result.DryRun == true)
+            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
         else if (result.Saved is false)
             AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
         else

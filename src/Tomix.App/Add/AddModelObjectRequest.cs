@@ -29,4 +29,5 @@ public sealed record AddModelObjectRequest(
     string? RangeStart = null,
     string? RangeEnd = null,
     string? RangeGranularity = null,
-    bool Overwrite = false);
+    bool Overwrite = false,
+    bool DryRun = false);

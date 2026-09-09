@@ -32,6 +32,15 @@ internal static class LifecycleOptions
         Description = description ?? "Allow --save-to to overwrite an existing target"
     };
 
+    /// <summary>
+    /// The uniform mutation preview: the change is applied to the in-memory model and its result
+    /// is rendered, but nothing is written — no save, no stage, no workspace sync.
+    /// </summary>
+    public static Option<bool> DryRun() => new("--dry-run")
+    {
+        Description = "Preview: show the change without saving, staging, or syncing"
+    };
+
     public static Option<bool> Save(string? description = null) => new("--save")
     {
         Description = description ??

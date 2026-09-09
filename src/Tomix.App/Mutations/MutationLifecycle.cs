@@ -14,7 +14,8 @@ public sealed record MutationOptions(
     string Serialization,
     bool Force,
     bool Overwrite = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    bool DryRun = false);
 
 /// <summary>Where a handler should open/mutate and how it should persist, resolved up front by <see cref="MutationLifecycle"/>.</summary>
 public sealed record MutationContext(
@@ -67,6 +68,8 @@ public static class MutationLifecycle
 
         if (options.Revert)
             mode = MutationMode.Revert;
+        else if (options.DryRun)
+            mode = MutationMode.None; // --dry-run suppresses --save/--stage/--save-to
         else if (options.Stage)
             mode = MutationMode.Stage;
         else if (MutationSave.Requested(options.Save, options.SaveTo))

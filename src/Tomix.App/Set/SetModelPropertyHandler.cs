@@ -34,7 +34,7 @@ public sealed class SetModelPropertyHandler
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: false, request.Overwrite, request.NoSync);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: false, request.Overwrite, request.NoSync, DryRun: request.DryRun);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "set", _stores,
@@ -68,7 +68,8 @@ public sealed class SetModelPropertyHandler
                         SyncTarget: outcome.SyncTarget,
                         SyncWarning: outcome.SyncWarning,
                         BrokenReferences: broken.Count > 0 ? broken : null,
-                        FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null));
+                        FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null,
+                        DryRun: request.DryRun));
             },
             new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: 0),
             cancellationToken);

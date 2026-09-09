@@ -70,6 +70,7 @@ internal sealed class FormatCommand : ICommandModule
         var saveOption = LifecycleOptions.Save();
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
+        var dryRunOption = LifecycleOptions.DryRun();
         var stageOption = LifecycleOptions.Stage();
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
@@ -88,6 +89,7 @@ internal sealed class FormatCommand : ICommandModule
             saveOption,
             forceOption,
             overwriteOption,
+            dryRunOption,
             stageOption,
             revertOption,
             noSyncOption
@@ -135,12 +137,13 @@ internal sealed class FormatCommand : ICommandModule
                         parseResult.GetValue(noSpaceAfterFunctionOption),
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
-                        "",
-                        parseResult.GetValue(forceOption),
-                        parseResult.GetValue(overwriteOption),
-                        parseResult.GetValue(stageOption),
-                        parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        Serialization: "",
+                        Force: parseResult.GetValue(forceOption),
+                        Overwrite: parseResult.GetValue(overwriteOption),
+                        Stage: parseResult.GetValue(stageOption),
+                        Revert: parseResult.GetValue(revertOption),
+                        NoSync: parseResult.GetValue(noSyncOption),
+                        DryRun: parseResult.GetValue(dryRunOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
@@ -168,6 +171,8 @@ internal sealed class FormatCommand : ICommandModule
 
             case ObjectFormatResult obj:
                 AnsiConsole.WriteLine(obj.Formatted);
+                if (obj.DryRun == true)
+                    AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 if (obj.Synced)
                     AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(obj.SyncTarget!)}"));
                 else if (obj.SyncWarning is not null)
@@ -183,6 +188,8 @@ internal sealed class FormatCommand : ICommandModule
                     AnsiConsole.MarkupLine(Styling.Success("Model saved."));
                 else if (model.Staged == true)
                     AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
+                else if (model.DryRun == true)
+                    AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 else if (model.Formatted > 0)
                     AnsiConsole.MarkupLine(Styling.Muted("Not saved — re-run with --save to persist or --stage to stage."));
 

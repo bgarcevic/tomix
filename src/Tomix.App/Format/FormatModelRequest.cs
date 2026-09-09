@@ -18,4 +18,5 @@ public sealed record FormatModelRequest(
     bool Overwrite = false,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    bool DryRun = false);

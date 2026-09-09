@@ -25,6 +25,7 @@ Add an object to the model
   opt --if-not-exists  Succeed silently if the object already exists (exit 0)
   opt --force, -f  Save despite validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
@@ -248,6 +249,7 @@ Format DAX or M/Power Query expressions (-e inline, -p object path, or all)
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --force, -f  Save despite validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
@@ -337,6 +339,7 @@ Move or rename a model object, including in and out of display folders
   arg <destination>  Destination object path
   arg [model]  Path to model (if not using --model)
   opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --type, -t <type>  Disambiguate when the path matches multiple table-children.
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
@@ -478,6 +481,7 @@ Set a property on a model object
   opt -q <q>  Property expression.
   opt -i <i>  Value for the preceding -q. Use '-' to read from stdin.
   opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)

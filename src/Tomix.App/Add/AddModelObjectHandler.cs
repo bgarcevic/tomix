@@ -20,7 +20,7 @@ public sealed class AddModelObjectHandler
         CancellationToken cancellationToken)
     {
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync, DryRun: request.DryRun);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "add", _stores,
@@ -50,7 +50,7 @@ public sealed class AddModelObjectHandler
                 // Changed == false is only reachable via --if-not-exists (everything else throws).
                 var existing = mutation.Changed ? null : mutation.Path;
                 return (mutation.Changed, $"add {mutation.Path}",
-                    outcome => new AddModelObjectResult(added, outcome.Saved, outcome.Staged, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning, ExistingPath: existing));
+                    outcome => new AddModelObjectResult(added, outcome.Saved, outcome.Staged, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning, ExistingPath: existing, DryRun: request.DryRun));
             },
             new AddModelObjectResult(false, false, null, Reverted: true),
             cancellationToken);
