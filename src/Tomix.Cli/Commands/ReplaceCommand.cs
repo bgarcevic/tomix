@@ -43,6 +43,11 @@ internal sealed class ReplaceCommand : ICommandModule
         {
             Description = "Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all. 'all' covers every scope except annotations (explicit-only: values are often tool-generated JSON)."
         };
+        var typeOption = new Option<string?>("--type")
+        {
+            Description = $"Only replace in objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}."
+        };
+        typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")
         {
             Description = "Treat pattern as a regular expression"
@@ -91,6 +96,7 @@ internal sealed class ReplaceCommand : ICommandModule
             replacementArgument,
             modelArgument,
             inOption,
+            typeOption,
             regexOption,
             caseSensitiveOption,
             dryRunOption,
@@ -111,6 +117,17 @@ internal sealed class ReplaceCommand : ICommandModule
 
             var pattern = parseResult.GetValue(patternArgument) ?? "";
             var dryRun = parseResult.GetValue(dryRunOption);
+
+            ModelObjectKind? type = null;
+            var typeValue = parseResult.GetValue(typeOption);
+            if (!string.IsNullOrWhiteSpace(typeValue))
+            {
+                var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
+                if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
+                    return TypeValidation.WriteInvalidTypeError(errorFormat);
+
+                type = parsed;
+            }
 
             if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
                 "Replace", $"'{pattern}'", parseResult, formatValue))
@@ -141,7 +158,8 @@ internal sealed class ReplaceCommand : ICommandModule
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        type),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

@@ -16,4 +16,5 @@ public sealed record ReplaceModelTextRequest(
     bool Force,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    ModelObjectKind? Type = null);

@@ -10,6 +10,10 @@ Core domain types and abstractions.
 - Object paths.
 - Provider interfaces.
 - Common enums and value objects.
+- The `--type` vocabulary (`Models/ModelObjectTypeCatalog`) — the single definition of the
+  object-kind tokens every `--type` flag accepts (the discovery list) plus the creation tokens
+  `add` advertises. The parser and every help/error text derive from it; do not hardcode type
+  lists in commands.
 - The property descriptor catalog (`Properties/ModelPropertyCatalog`) — the single definition of every model-object property (JSON key, CSV/text header, value extraction, writable/searchable/diffable flags). get, ls, find, diff, and the mutator's error hints all consume it; add or change properties there, never in a command.
 - The DAX language engine (`Dax/`) — vendored lexer/parser/classifier (`Dax/Engine/`, see
   `THIRD-PARTY-NOTICES.md`) behind the `DaxLanguage.Classify` highlighting facade and the

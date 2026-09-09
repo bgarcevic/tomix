@@ -125,7 +125,7 @@ tx refresh [options]
 
 | Option | Description |
 |--------|-------------|
-| `--type <type>` | `full`, `dataonly`, `automatic` (default), `calculate`, `clearvalues`, `defragment`, `add`. |
+| `--refresh-type <type>` | `full`, `dataonly`, `automatic` (default), `calculate`, `clearvalues`, `defragment`, `add`. Named `--refresh-type` (not `--type`): `--type` means an object kind on every other command. |
 | `--table <name>` | Refresh specific table(s). Repeatable. |
 | `--partition <Table.Partition>` | Refresh specific partition(s). Repeatable. |
 | `--apply-refresh-policy [true\|false]` / `--skip-refresh-policy` | Apply incremental refresh policy (default: `true`); `--skip-refresh-policy` is shorthand for `--apply-refresh-policy false`. |
@@ -136,12 +136,12 @@ tx refresh [options]
 | `--trace [path]` | Dump raw XMLA trace events (stderr, or a log file). |
 
 ```sh
-tx refresh --type full
+tx refresh --refresh-type full
 tx refresh --table Sales --table Customers
 ```
 
 Routine refreshes run without prompting. The partition-risky variants —
-`--type clearvalues` (wipes partition data), `--skip-refresh-policy` /
+`--refresh-type clearvalues` (wipes partition data), `--skip-refresh-policy` /
 `--apply-refresh-policy false` (refreshes all historical partitions), and
 `--effective-date` (shifts policy window boundaries) — ask for confirmation
 first; `--dry-run` never does. Pass `--yes` to skip the prompt in scripts.

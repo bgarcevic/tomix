@@ -40,10 +40,9 @@ internal sealed class LsCommand : ICommandModule
 
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Filter by type: table, measure, column, calculatedcolumn, hierarchy, " +
-                          "partition, relationship, role, perspective, culture, kpi, tablepermission, " +
-                          "calendar, expression, function."
+            Description = $"Filter by type: {ModelObjectTypeCatalog.DiscoveryListText}."
         };
+        typeOption.Aliases.Add("-t");
 
         var pathsOnlyOption = new Option<bool>("--paths-only")
         {
@@ -64,6 +63,7 @@ internal sealed class LsCommand : ICommandModule
             pathsOnlyOption,
             noMultilineOption
         };
+        command.Aliases.Add("list");
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {

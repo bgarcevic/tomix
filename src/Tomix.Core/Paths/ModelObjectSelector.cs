@@ -29,7 +29,7 @@ public static class ModelObjectSelector
             : Resolve(snapshot, segments);
 
         if (type is { } filter)
-            result = result.Where(o => o.Kind == filter);
+            result = result.Where(o => o.Kind.Matches(filter));
 
         return result.ToList();
     }
@@ -47,7 +47,7 @@ public static class ModelObjectSelector
             {
                 current = i == 0
                     ? AllOfKind(snapshot, kind)
-                    : current.SelectMany(n => n.Children).Where(n => n.Kind == kind);
+                    : current.SelectMany(n => n.Children).Where(n => n.Kind.Matches(kind));
                 lastWasName = false;
             }
             else
@@ -78,7 +78,7 @@ public static class ModelObjectSelector
         {
             foreach (var node in nodes)
             {
-                if (node.Kind == kind)
+                if (node.Kind.Matches(kind))
                     matches.Add(node);
 
                 if (node.Children.Count > 0)

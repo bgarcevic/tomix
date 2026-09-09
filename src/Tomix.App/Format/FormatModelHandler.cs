@@ -189,7 +189,7 @@ public sealed class FormatModelHandler
             .Where(o => !string.IsNullOrWhiteSpace(o.Expression));
 
         if (type is not null)
-            objects = objects.Where(o => o.Kind == type.Value);
+            objects = objects.Where(o => o.Kind.Matches(type.Value));
         else
             objects = language == FormatterLanguages.PowerQuery
                 ? objects.Where(o => o.Kind == ModelObjectKind.Partition)

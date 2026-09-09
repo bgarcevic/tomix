@@ -1,10 +1,12 @@
 using Tomix.Core.Diagnostics;
+using Tomix.Core.Models;
 
 namespace Tomix.Cli.Output;
 
 internal static class TypeValidation
 {
-    private static readonly string ValidTypes = "table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, relationship, role, member, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function";
+    /// <summary>Derived from the shared vocabulary so it cannot drift from the parser.</summary>
+    private static readonly string ValidTypes = ModelObjectTypeCatalog.DiscoveryListText;
 
     /// <summary>
     /// Reports an unrecognized <c>--type</c> value and returns exit code 2. Routed through

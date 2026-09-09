@@ -139,7 +139,7 @@ public sealed class DiffModelHandler
     /// present on both sides still have their properties compared.
     /// </summary>
     private static bool IsEngineMaterialized(ModelObject obj)
-        => obj.Kind == ModelObjectKind.Column
+        => obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
            && obj.Property(PropertyBagKeys.ColumnType) == "CalculatedTableColumn";
 
     private static IEnumerable<DiffChange> CompareProperties(

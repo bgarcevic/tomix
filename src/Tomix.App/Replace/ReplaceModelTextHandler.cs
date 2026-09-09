@@ -46,7 +46,8 @@ public sealed class ReplaceModelTextHandler
                     request.Scope,
                     request.Regex,
                     request.CaseSensitive,
-                    Apply: persist));
+                    Apply: persist,
+                    Type: request.Type));
 
                 if (!persist)
                 {

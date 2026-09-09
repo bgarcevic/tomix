@@ -41,6 +41,11 @@ internal sealed class TomTextReplacer
     {
         var scope = NormalizeReplaceScope(request.Scope);
 
+        // A --type filter narrows the walk to the matching object kinds. The model-level
+        // description/annotation sites below belong to the model itself, so they are only
+        // visited when no kind filter is requested.
+        bool Included(ModelObjectKind kind) => request.Type is null || kind.Matches(request.Type.Value);
+
         // Annotations are explicit-only: values are often tool-generated JSON, so a blanket
         // '--in all' replace must not rewrite them.
         bool In(string candidate) => scope == candidate || (scope == "all" && candidate != "annotations");
@@ -57,48 +62,57 @@ internal sealed class TomTextReplacer
             }
         }
 
-        if (In("descriptions"))
-            yield return Op(".", "Description", _database.Model.Description, v => _database.Model.Description = v);
-        if (In("annotations"))
+        if (Included(ModelObjectKind.Model))
         {
-            foreach (var op in AnnotationOps(".", _database.Model.Annotations))
-                yield return op;
+            if (In("descriptions"))
+                yield return Op(".", "Description", _database.Model.Description, v => _database.Model.Description = v);
+            if (In("annotations"))
+            {
+                foreach (var op in AnnotationOps(".", _database.Model.Annotations))
+                    yield return op;
+            }
         }
 
         foreach (var table in _database.Model.Tables)
         {
             var tablePath = Segment(table.Name);
-            if (In("names"))
-                yield return Op(tablePath, "Name", table.Name, v => table.Name = v);
-            if (In("descriptions"))
-                yield return Op(tablePath, "Description", table.Description, v => table.Description = v);
-            if (In("expressions"))
+            if (Included(ModelObjectKind.Table))
             {
-                if (table.DefaultDetailRowsDefinition is { } defaultDetailRows)
-                    yield return Op(tablePath, "DefaultDetailRowsExpression", defaultDetailRows.Expression, v => defaultDetailRows.Expression = v);
-                if (table.RefreshPolicy is BasicRefreshPolicy policy)
+                if (In("names"))
+                    yield return Op(tablePath, "Name", table.Name, v => table.Name = v);
+                if (In("descriptions"))
+                    yield return Op(tablePath, "Description", table.Description, v => table.Description = v);
+                if (In("expressions"))
                 {
-                    yield return Op(tablePath, "RefreshPolicySourceExpression", policy.SourceExpression, v => policy.SourceExpression = v);
-                    yield return Op(tablePath, "RefreshPolicyPollingExpression", policy.PollingExpression, v => policy.PollingExpression = v);
+                    if (table.DefaultDetailRowsDefinition is { } defaultDetailRows)
+                        yield return Op(tablePath, "DefaultDetailRowsExpression", defaultDetailRows.Expression, v => defaultDetailRows.Expression = v);
+                    if (table.RefreshPolicy is BasicRefreshPolicy policy)
+                    {
+                        yield return Op(tablePath, "RefreshPolicySourceExpression", policy.SourceExpression, v => policy.SourceExpression = v);
+                        yield return Op(tablePath, "RefreshPolicyPollingExpression", policy.PollingExpression, v => policy.PollingExpression = v);
+                    }
+
+                    if (table.CalculationGroup is { } group)
+                    {
+                        if (group.NoSelectionExpression is { } noSelection)
+                            yield return Op(tablePath, "NoSelectionExpression", noSelection.Expression, v => noSelection.Expression = v);
+                        if (group.MultipleOrEmptySelectionExpression is { } multiSelection)
+                            yield return Op(tablePath, "MultipleOrEmptySelectionExpression", multiSelection.Expression, v => multiSelection.Expression = v);
+                    }
                 }
 
-                if (table.CalculationGroup is { } group)
+                if (In("annotations"))
                 {
-                    if (group.NoSelectionExpression is { } noSelection)
-                        yield return Op(tablePath, "NoSelectionExpression", noSelection.Expression, v => noSelection.Expression = v);
-                    if (group.MultipleOrEmptySelectionExpression is { } multiSelection)
-                        yield return Op(tablePath, "MultipleOrEmptySelectionExpression", multiSelection.Expression, v => multiSelection.Expression = v);
+                    foreach (var op in AnnotationOps(tablePath, table.Annotations))
+                        yield return op;
                 }
-            }
-
-            if (In("annotations"))
-            {
-                foreach (var op in AnnotationOps(tablePath, table.Annotations))
-                    yield return op;
             }
 
             foreach (var measure in table.Measures)
             {
+                if (!Included(ModelObjectKind.Measure))
+                    continue;
+
                 var path = $"{tablePath}/{Segment(measure.Name)}";
                 if (In("names"))
                     yield return Op(path, "Name", measure.Name, v => measure.Name = v);
@@ -123,7 +137,7 @@ internal sealed class TomTextReplacer
                         yield return op;
                 }
 
-                if (measure.KPI is { } kpi)
+                if (measure.KPI is { } kpi && Included(ModelObjectKind.Kpi))
                 {
                     var kpiPath = $"{path}/KPI";
                     if (In("expressions"))
@@ -147,6 +161,12 @@ internal sealed class TomTextReplacer
 
             foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
             {
+                var columnKind = column.Type == ColumnType.Calculated || column is CalculatedTableColumn
+                    ? ModelObjectKind.CalculatedColumn
+                    : ModelObjectKind.Column;
+                if (!Included(columnKind))
+                    continue;
+
                 var path = $"{tablePath}/{Segment(column.Name)}";
                 if (In("names"))
                     yield return Op(path, "Name", column.Name, v => column.Name = v);
@@ -167,6 +187,9 @@ internal sealed class TomTextReplacer
 
             foreach (var hierarchy in table.Hierarchies)
             {
+                if (!Included(ModelObjectKind.Hierarchy))
+                    continue;
+
                 var path = $"{tablePath}/{Segment(hierarchy.Name)}";
                 if (In("names"))
                     yield return Op(path, "Name", hierarchy.Name, v => hierarchy.Name = v);
@@ -182,6 +205,9 @@ internal sealed class TomTextReplacer
 
                 foreach (var level in hierarchy.Levels)
                 {
+                    if (!Included(ModelObjectKind.Level))
+                        continue;
+
                     var levelPath = $"{path}/{Segment(level.Name)}";
                     if (In("names"))
                         yield return Op(levelPath, "Name", level.Name, v => level.Name = v);
@@ -195,7 +221,7 @@ internal sealed class TomTextReplacer
                 }
             }
 
-            if (table.CalculationGroup is { } calculationGroup)
+            if (table.CalculationGroup is { } calculationGroup && Included(ModelObjectKind.CalculationItem))
             {
                 foreach (var item in calculationGroup.CalculationItems)
                 {
@@ -216,6 +242,9 @@ internal sealed class TomTextReplacer
 
             foreach (var calendar in table.Calendars)
             {
+                if (!Included(ModelObjectKind.Calendar))
+                    continue;
+
                 var path = $"{tablePath}/{Segment(calendar.Name)}";
                 if (In("names"))
                     yield return Op(path, "Name", calendar.Name, v => calendar.Name = v);
@@ -225,6 +254,9 @@ internal sealed class TomTextReplacer
 
             foreach (var partition in table.Partitions)
             {
+                if (!Included(ModelObjectKind.Partition))
+                    continue;
+
                 var path = $"{tablePath}/{Segment(partition.Name)}";
                 if (In("names"))
                     yield return Op(path, "Name", partition.Name, v => partition.Name = v);
@@ -254,52 +286,62 @@ internal sealed class TomTextReplacer
         foreach (var role in _database.Model.Roles)
         {
             var path = $"Roles/{Segment(role.Name)}";
-            if (In("names"))
-                yield return Op(path, "Name", role.Name, v => role.Name = v);
-            if (In("descriptions"))
-                yield return Op(path, "Description", role.Description, v => role.Description = v);
-            if (In("annotations"))
+            var roleIncluded = Included(ModelObjectKind.Role);
+            if (roleIncluded)
             {
-                foreach (var op in AnnotationOps(path, role.Annotations))
-                    yield return op;
-            }
-
-            foreach (var member in role.Members)
-            {
-                var memberPath = $"{path}/{Segment(member.MemberName)}";
                 if (In("names"))
-                {
-                    // TOM freezes MemberName, so the rename replaces the member (safe here:
-                    // annotation ops only exist under the explicit annotations scope, never
-                    // alongside name ops, so no op can point at the discarded member).
-                    var target = member;
-                    yield return Op(memberPath, "Name", member.MemberName,
-                        v => TomPropertyApplier.ReplaceMember(target, newName: v));
-                }
-
+                    yield return Op(path, "Name", role.Name, v => role.Name = v);
+                if (In("descriptions"))
+                    yield return Op(path, "Description", role.Description, v => role.Description = v);
                 if (In("annotations"))
                 {
-                    foreach (var op in AnnotationOps(memberPath, member.Annotations))
+                    foreach (var op in AnnotationOps(path, role.Annotations))
                         yield return op;
+                }
+            }
+
+            if (Included(ModelObjectKind.RoleMember))
+            {
+                foreach (var member in role.Members)
+                {
+                    var memberPath = $"{path}/{Segment(member.MemberName)}";
+                    if (In("names"))
+                    {
+                        // TOM freezes MemberName, so the rename replaces the member (safe here:
+                        // annotation ops only exist under the explicit annotations scope, never
+                        // alongside name ops, so no op can point at the discarded member).
+                        var target = member;
+                        yield return Op(memberPath, "Name", member.MemberName,
+                            v => TomPropertyApplier.ReplaceMember(target, newName: v));
+                    }
+
+                    if (In("annotations"))
+                    {
+                        foreach (var op in AnnotationOps(memberPath, member.Annotations))
+                            yield return op;
+                    }
                 }
             }
 
             // Table-permission names are absent by design: TOM derives them from the referenced
             // table, so renaming the table (covered above) is the only way they change.
-            foreach (var permission in role.TablePermissions)
+            if (Included(ModelObjectKind.TablePermission))
             {
-                var permissionPath = $"{path}/{Segment(permission.Name)}";
-                if (In("expressions"))
-                    yield return Op(permissionPath, "FilterExpression", permission.FilterExpression, v => permission.FilterExpression = v);
-                if (In("annotations"))
+                foreach (var permission in role.TablePermissions)
                 {
-                    foreach (var op in AnnotationOps(permissionPath, permission.Annotations))
-                        yield return op;
+                    var permissionPath = $"{path}/{Segment(permission.Name)}";
+                    if (In("expressions"))
+                        yield return Op(permissionPath, "FilterExpression", permission.FilterExpression, v => permission.FilterExpression = v);
+                    if (In("annotations"))
+                    {
+                        foreach (var op in AnnotationOps(permissionPath, permission.Annotations))
+                            yield return op;
+                    }
                 }
             }
         }
 
-        if (In("annotations"))
+        if (Included(ModelObjectKind.Relationship) && In("annotations"))
         {
             foreach (var relationship in _database.Model.Relationships)
             {
@@ -310,6 +352,9 @@ internal sealed class TomTextReplacer
 
         foreach (var perspective in _database.Model.Perspectives)
         {
+            if (!Included(ModelObjectKind.Perspective))
+                continue;
+
             var path = $"Perspectives/{Segment(perspective.Name)}";
             if (In("names"))
                 yield return Op(path, "Name", perspective.Name, v => perspective.Name = v);
@@ -324,6 +369,9 @@ internal sealed class TomTextReplacer
 
         foreach (var culture in _database.Model.Cultures)
         {
+            if (!Included(ModelObjectKind.Culture))
+                continue;
+
             var path = $"Cultures/{Segment(culture.Name)}";
             if (In("names"))
                 yield return Op(path, "Name", culture.Name, v => culture.Name = v);
@@ -336,6 +384,9 @@ internal sealed class TomTextReplacer
 
         foreach (var dataSource in _database.Model.DataSources)
         {
+            if (!Included(ModelObjectKind.DataSource))
+                continue;
+
             var path = $"DataSources/{Segment(dataSource.Name)}";
             if (In("names"))
                 yield return Op(path, "Name", dataSource.Name, v => dataSource.Name = v);
@@ -350,6 +401,9 @@ internal sealed class TomTextReplacer
 
         foreach (var expression in _database.Model.Expressions)
         {
+            if (!Included(ModelObjectKind.Expression))
+                continue;
+
             var path = $"Expressions/{Segment(expression.Name)}";
             if (In("names"))
                 yield return Op(path, "Name", expression.Name, v => expression.Name = v);
@@ -366,6 +420,9 @@ internal sealed class TomTextReplacer
 
         foreach (var function in _database.Model.Functions)
         {
+            if (!Included(ModelObjectKind.Function))
+                continue;
+
             var path = $"Functions/{Segment(function.Name)}";
             if (In("names"))
                 yield return Op(path, "Name", function.Name, v => function.Name = v);

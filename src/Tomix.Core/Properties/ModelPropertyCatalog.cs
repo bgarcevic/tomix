@@ -24,7 +24,7 @@ public static class ModelPropertyCatalog
         IsHidden(writable: true),
         new("dataCategory", "DataCategory", o => Bag(o, PropertyBagKeys.DataCategory), Writable: true, Diffable: true),
         new("lineageTag", "LineageTag", o => Bag(o, PropertyBagKeys.LineageTag), Writable: true),
-        new("columns", "Columns", o => Count(o, ModelObjectKind.Column)),
+        new("columns", "Columns", o => Count(o, ModelObjectKind.Column, ModelObjectKind.CalculatedColumn)),
         new("measures", "Measures", o => Count(o, ModelObjectKind.Measure)),
         new("hierarchies", "Hierarchies", o => Count(o, ModelObjectKind.Hierarchy)),
         new("partitions", "Partitions", o => Count(o, ModelObjectKind.Partition)),
@@ -325,7 +325,8 @@ public static class ModelPropertyCatalog
     {
         ModelObjectKind.Table => Table,
         ModelObjectKind.Measure => Measure,
-        ModelObjectKind.Column => Column,
+        // Calculated columns project the same property surface as data columns.
+        ModelObjectKind.Column or ModelObjectKind.CalculatedColumn => Column,
         ModelObjectKind.Hierarchy => Hierarchy,
         ModelObjectKind.Level => Level,
         ModelObjectKind.Partition => Partition,
@@ -421,6 +422,6 @@ public static class ModelPropertyCatalog
     private static int IntBag(ModelObject obj, string key)
         => int.TryParse(Bag(obj, key), out var parsed) ? parsed : 0;
 
-    private static int Count(ModelObject obj, ModelObjectKind kind)
-        => obj.Children.Count(c => c.Kind == kind);
+    private static int Count(ModelObject obj, params ModelObjectKind[] kinds)
+        => obj.Children.Count(c => kinds.Contains(c.Kind));
 }

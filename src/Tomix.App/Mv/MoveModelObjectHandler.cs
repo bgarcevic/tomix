@@ -88,7 +88,7 @@ public sealed class MoveModelObjectHandler
     }
 
     private static bool SupportsFolders(ModelObjectKind kind)
-        => kind is ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.Hierarchy;
+        => kind is ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.CalculatedColumn or ModelObjectKind.Hierarchy;
 
     private static string CurrentFolder(ModelObject obj)
         => obj.Property(PropertyBagKeys.DisplayFolder) ?? "";

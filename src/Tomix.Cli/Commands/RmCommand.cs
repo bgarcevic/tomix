@@ -91,6 +91,7 @@ internal sealed class RmCommand : ICommandModule
             revertOption,
             noSyncOption
         };
+        command.Aliases.Add("remove");
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {

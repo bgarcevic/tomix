@@ -36,7 +36,8 @@ internal sealed class AddCommand : ICommandModule
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Object type. Known values: Table, CalcTable, CalcGroup, Measure, CalcColumn, DataColumn, Hierarchy, Level, Calendar, CalcItem, KPI, Partition, MPartition, EntityPartition, PolicyRangePartition, Expression, Function, Perspective, Culture, ProviderDataSource, StructuredDataSource, Role, TablePermission, Member, Relationship. Data sources always require -t (no path keyword infers them)."
+            Description = $"Object type. Known values: {ModelObjectTypeCatalog.CreationListText}. " +
+                          "Data sources always require -t (no path keyword infers them)."
         };
         typeOption.Aliases.Add("-t");
         var valueOption = new Option<string[]?>("-i")

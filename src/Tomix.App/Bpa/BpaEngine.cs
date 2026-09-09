@@ -215,7 +215,7 @@ public sealed class BpaEngine
         return obj.Kind switch
         {
             ModelObjectKind.Table => "Table (Import)",
-            ModelObjectKind.Column => "Column",
+            ModelObjectKind.Column or ModelObjectKind.CalculatedColumn => "Column",
             ModelObjectKind.Measure => "Measure",
             ModelObjectKind.Partition => "Partition",
             ModelObjectKind.Relationship => "Relationship",
@@ -232,7 +232,7 @@ public sealed class BpaEngine
         return obj.Kind switch
         {
             ModelObjectKind.Table => $"'{obj.Name}'",
-            ModelObjectKind.Column when parts.Length >= 2 => $"'{parts[0]}'[{obj.Name}]",
+            ModelObjectKind.Column or ModelObjectKind.CalculatedColumn when parts.Length >= 2 => $"'{parts[0]}'[{obj.Name}]",
             ModelObjectKind.Measure => $"[{obj.Name}]",
             _ => obj.Name
         };

@@ -71,7 +71,7 @@ tx validate             # DAX and relationship integrity
 
 ```sh
 tx deploy --server MyWorkspace --database basic-tmdl
-tx refresh --type full
+tx refresh --refresh-type full
 ```
 
 Deploys run the BPA gate first (`--skip-bpa` to bypass), and `--dry-run`

@@ -114,13 +114,13 @@ internal sealed class DependencyGraph
         var result = new List<DependencyObject>();
         foreach (var obj in _objects)
         {
-            if (obj.Kind is not (ModelObjectKind.Measure or ModelObjectKind.Column))
+            if (obj.Kind is not (ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.CalculatedColumn))
                 continue;
             if (hiddenOnly && !obj.Hidden)
                 continue;
             if (_reverse.ContainsKey(Key(obj)))
                 continue;
-            if (obj.Kind == ModelObjectKind.Column && IsColumnStructurallyUsed(obj))
+            if (obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn && IsColumnStructurallyUsed(obj))
                 continue;
 
             result.Add(ToDependency(obj, []));
@@ -169,7 +169,7 @@ internal sealed class DependencyGraph
                 _tableByName.TryAdd(obj.Name, obj);
             else if (obj.Kind == ModelObjectKind.Measure)
                 _measureByName.TryAdd(obj.Name, obj);
-            else if (obj.Kind == ModelObjectKind.Column)
+            else if (obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn)
             {
                 if (!_columnsByName.TryGetValue(obj.Name, out var list))
                     _columnsByName[obj.Name] = list = [];

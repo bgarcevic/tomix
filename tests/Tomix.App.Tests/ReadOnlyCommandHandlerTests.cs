@@ -60,6 +60,26 @@ public sealed class ReadOnlyCommandHandlerTests
     }
 
     [Theory]
+    [InlineData(ModelObjectKind.Measure, new[] { "Sales/Total Sales", "Sales/Order Count" })]
+    [InlineData(ModelObjectKind.Column, new string[] { })]
+    [InlineData(ModelObjectKind.CalculatedColumn, new string[] { })]
+    public async Task Find_TypeFilter_NarrowsToObjectKind(ModelObjectKind type, string[] expectedPaths)
+    {
+        var result = await new FindModelHandler([new StubModelProvider()]).HandleAsync(
+            new FindModelRequest(
+                new ModelReference("any"),
+                "Sales",
+                Scope: "all",
+                Regex: false,
+                CaseSensitive: false,
+                Type: type),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(expectedPaths, result.Data!.Matches.Select(m => m.Path).Distinct().ToArray());
+    }
+
+    [Theory]
     [InlineData("formatStrings", "#,0", "FormatString")]
     [InlineData("displayFolders", "KPIs", "DisplayFolder")]
     [InlineData("annotations", "isGeneralNumber", "Annotation:PBI_FormatHint")]

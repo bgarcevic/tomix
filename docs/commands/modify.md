@@ -223,6 +223,8 @@ asks for confirmation; pass `--yes` to skip the prompt in scripts.
 
 ## `rm` — remove an object
 
+Alias: `remove`.
+
 ```
 tx rm <path> [model] [options]
 ```
@@ -262,6 +264,7 @@ tx replace [pattern] [replacement] [model] [options]
 | Option | Description |
 |--------|-------------|
 | `--in <scope>` | `names`, `expressions`, `descriptions`, `displayFolders`, `formatStrings`, `annotations`, `all` (default; excludes annotations). |
+| `-t, --type <type>` | Only replace in objects of this kind (same vocabulary as `ls --type`). |
 | `--regex` | Treat the pattern as a regular expression. |
 | `--case-sensitive` | Case-sensitive matching. |
 | `--dry-run` | Preview changes without applying. |
@@ -281,6 +284,7 @@ rewrites in that scope; a test enforces the pairing.
 ```sh
 tx replace "[OrderDate]" "[ShipDate]" --dry-run
 tx replace "old_name" "new_name" --in names --save
+tx replace "Sales" "Revenue" -t measure --dry-run
 ```
 
 ## `format` — format DAX and M

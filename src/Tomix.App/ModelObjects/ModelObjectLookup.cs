@@ -13,7 +13,7 @@ internal static partial class ModelObjectLookup
     {
         var objects = ModelObjectProjection
             .Flatten(snapshot)
-            .Where(o => type is null || o.Kind == type)
+            .Where(o => type is null || o.Kind.Matches(type.Value))
             .ToList();
 
         var normalized = NormalizePath(path);
@@ -29,7 +29,7 @@ internal static partial class ModelObjectLookup
         if (stripped != normalized && impliedKind is not null)
         {
             var strippedMatches = objects
-                .Where(o => o.Kind == impliedKind &&
+                .Where(o => o.Kind.Matches(impliedKind.Value) &&
                             string.Equals(NormalizePath(o.Path), stripped, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 

@@ -106,7 +106,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ],
         ["refresh"] = [
             "tx refresh",
-            "tx refresh --type full",
+            "tx refresh --refresh-type full",
             "tx refresh --table Sales --table Customers",
             "tx refresh --partition Sales.FY2024 --dry-run",
         ],

@@ -241,7 +241,12 @@ public static class TomModelSummarizer
 
         return new ModelObject(
             column.Name,
-            ModelObjectKind.Column,
+            // Calculated columns (including calculated-table columns) are their own kind so
+            // --type calculatedcolumn can filter them; "column" keeps matching both via
+            // ModelObjectKindExtensions.Matches.
+            column.Type == ColumnType.Calculated || column is CalculatedTableColumn
+                ? ModelObjectKind.CalculatedColumn
+                : ModelObjectKind.Column,
             colPath,
             Detail: ColumnDetail(column),
             Expression: column.Type == ColumnType.Calculated

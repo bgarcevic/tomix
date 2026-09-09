@@ -61,7 +61,7 @@ public sealed class DestructiveConfirmationTests
     [InlineData("replace", "foo", "bar")]
     [InlineData("deploy", "model.bim")]
     [InlineData("incremental-refresh", "rm", "SomeTable")]
-    [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--type", "clearvalues")]
+    [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--skip-refresh-policy")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--effective-date", "2026-01-01")]
     [InlineData("script", "--model", "SomeModel", "--save")]
@@ -89,7 +89,7 @@ public sealed class DestructiveConfirmationTests
     [InlineData("replace", "foo", "bar", "--quiet")]
     [InlineData("deploy", "model.bim", "--quiet")]
     [InlineData("incremental-refresh", "rm", "SomeTable", "--quiet")]
-    [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--type", "clearvalues", "--quiet")]
+    [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues", "--quiet")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--skip-refresh-policy", "--quiet")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--effective-date", "2026-01-01", "--quiet")]
     [InlineData("script", "--model", "SomeModel", "--save", "--quiet")]
@@ -106,7 +106,7 @@ public sealed class DestructiveConfirmationTests
     [InlineData("replace", "foo", "bar", "--output-format", "json")]
     [InlineData("deploy", "model.bim", "--output-format", "json")]
     [InlineData("incremental-refresh", "rm", "SomeTable", "--output-format", "json")]
-    [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--type", "clearvalues", "--output-format", "json")]
+    [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues", "--output-format", "json")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--skip-refresh-policy", "--output-format", "json")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--effective-date", "2026-01-01", "--output-format", "json")]
     [InlineData("script", "--model", "SomeModel", "--save", "--output-format", "json")]
@@ -225,7 +225,7 @@ public sealed class DestructiveConfirmationTests
     public void Refresh_DryRun_ClearValues_NeedsNoConfirmation()
     {
         var (exitCode, _, stderr) = Invoke(
-            "refresh", "-s", RemoteEndpoint, "-d", "Sales", "--type", "clearvalues",
+            "refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues",
             "--dry-run", "--non-interactive", "--output-format", "json");
 
         Assert.Equal(2, exitCode);

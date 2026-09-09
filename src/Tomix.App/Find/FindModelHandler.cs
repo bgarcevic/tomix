@@ -41,6 +41,9 @@ public sealed class FindModelHandler
             var matches = new List<FindMatch>();
             foreach (var obj in ModelObjectProjection.Flatten(snapshot))
             {
+                if (request.Type is { } type && !obj.Kind.Matches(type))
+                    continue;
+
                 foreach (var (field, value) in SearchFields(obj, request.Scope))
                 {
                     if (value is null || !TryMatch(

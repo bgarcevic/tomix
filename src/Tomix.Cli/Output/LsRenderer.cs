@@ -102,7 +102,7 @@ internal sealed partial class LsRenderer
         IReadOnlySet<string>? measureNames)
     {
         var groups = objects
-            .GroupBy(o => o.Kind)
+            .GroupBy(o => GroupKey(o.Kind))
             .OrderBy(g => KindOrder(g.Key))
             .Select(g => (Kind: g.Key, Items: (IReadOnlyList<LsObject>)g.ToList()))
             .ToList();
@@ -366,9 +366,16 @@ internal sealed partial class LsRenderer
             : single;
     }
 
+    /// <summary>
+    /// Calculated columns render in the same "Columns" group as data columns — the split kind
+    /// exists for --type filtering, not for a separate tree section.
+    /// </summary>
+    private static ModelObjectKind GroupKey(ModelObjectKind kind)
+        => kind == ModelObjectKind.CalculatedColumn ? ModelObjectKind.Column : kind;
+
     private static int KindOrder(ModelObjectKind kind) => kind switch
     {
-        ModelObjectKind.Column => 0,
+        ModelObjectKind.Column or ModelObjectKind.CalculatedColumn => 0,
         ModelObjectKind.Measure => 1,
         ModelObjectKind.Hierarchy => 2,
         ModelObjectKind.Level => 3,
@@ -383,7 +390,7 @@ internal sealed partial class LsRenderer
 
     private static string KindPlural(ModelObjectKind kind) => kind switch
     {
-        ModelObjectKind.Column => "Columns",
+        ModelObjectKind.Column or ModelObjectKind.CalculatedColumn => "Columns",
         ModelObjectKind.Measure => "Measures",
         ModelObjectKind.Hierarchy => "Hierarchies",
         ModelObjectKind.Level => "Levels",

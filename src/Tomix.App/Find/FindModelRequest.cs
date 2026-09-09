@@ -7,4 +7,5 @@ public sealed record FindModelRequest(
     string Pattern,
     string Scope,
     bool Regex,
-    bool CaseSensitive);
+    bool CaseSensitive,
+    ModelObjectKind? Type = null);

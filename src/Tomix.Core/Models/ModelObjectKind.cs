@@ -8,6 +8,7 @@ public enum ModelObjectKind
     Table,
     Measure,
     Column,
+    CalculatedColumn,
     Hierarchy,
     Level,
     Partition,

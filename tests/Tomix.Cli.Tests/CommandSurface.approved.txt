@@ -223,6 +223,7 @@ Search for text across model objects
   arg <pattern>  Text or regex pattern to search for
   arg [model]  Path to model (if not using --model)
   opt --in <in>  Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all (default: all; annotations are only searched when requested explicitly)
+  opt --type, -t <type>  Only search objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --regex  Treat pattern as a regular expression
   opt --case-sensitive  Enable case-sensitive matching
   opt --paths-only  Output one matching object path per line, suitable for piping
@@ -315,11 +316,11 @@ Create a new empty semantic model
 Load a semantic model and display summary
   arg [model]  Path to model, Fabric path, or omit for active connection
 
-# tx ls
+# tx ls (aliases: list)
 List model objects
   arg [path-filter]  Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard ('Sa*', '*/Amount'); quote names with spaces ("'Net Sales'/'Sales Amount'"); inside quotes, '' is a literal apostrophe.
   arg [model]  Path to model (if not using --model)
-  opt --type <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, partition, relationship, role, perspective, culture, kpi, tablepermission, calendar, expression, function.
+  opt --type, -t <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --paths-only  Output one object path per line, suitable for piping to other commands.
   opt --no-multiline  Collapse multi-line cell content (e.g. measure expressions) to a single line and truncate. Text output only.
 
@@ -373,8 +374,8 @@ Execute a DAX or DMV query against a live model (-q inline, --file, or stdin)
   opt --runs <runs>  Execute the query N times and report per-run timings with Avg/Min/Max/StdDev (default: 1).
 
 # tx refresh
-Trigger a data refresh on a deployed model (--type full|auto|calculate|...)
-  opt --type <type>  Refresh type: full, dataonly, automatic, calculate, clearvalues, defragment, add (default: automatic)
+Trigger a data refresh on a deployed model (--refresh-type full|auto|calculate|...)
+  opt --refresh-type <refresh-type>  Refresh type: full, dataonly, automatic, calculate, clearvalues, defragment, add (default: automatic)
   opt --table <table>  Specific table(s) to refresh. If omitted, refreshes the entire model. Repeatable.
   opt --partition <partition>  Specific partition(s) to refresh as TableName.PartitionName. Requires --table to be omitted. Repeatable.
   opt --apply-refresh-policy  Apply incremental refresh policy (default: true). Set to false to skip policy-based partitioning.
@@ -391,6 +392,7 @@ Find and replace text across model objects
   arg [replacement]  Replacement text
   arg [model]  Path to model (if not using --model)
   opt --in <in>  Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all. 'all' covers every scope except annotations (explicit-only: values are often tool-generated JSON).
+  opt --type, -t <type>  Only replace in objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --regex  Treat pattern as a regular expression
   opt --case-sensitive  Enable case-sensitive matching
   opt --dry-run  Preview changes without applying
@@ -402,7 +404,7 @@ Find and replace text across model objects
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
 
-# tx rm
+# tx rm (aliases: remove)
 Remove an object from the model
   arg <path>  Object path to remove.
   arg [model]  Path to model (if not using --model)

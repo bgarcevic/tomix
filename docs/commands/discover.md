@@ -7,23 +7,26 @@ print CSV; `get` additionally emits `tmdl`, `bim`, and `tmsl`.
 
 ## `ls` — list model objects
 
+Alias: `list`.
+
 ```
 tx ls [path-filter] [model] [options]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `partition`, `relationship`, `role`, `perspective`, `culture`, `kpi`, `tablepermission`, `calendar`, `expression`, `function`. |
+| `-t, --type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `level`, `partition`, `calculationitem`, `member`, `relationship`, `role`, `perspective`, `culture`, `datasource`, `kpi`, `tablepermission`, `calendar`, `expression`, `function`. `column` matches data and calculated columns; `calculatedcolumn` narrows to calculated ones. |
 | `--paths-only` | One object path per line, suitable for piping. |
 | `--no-multiline` | Collapse multi-line cell content (e.g. measure expressions) to a single line. Text output only. |
 
 ```sh
 tx ls                                # everything
-tx ls --type table --paths-only
+tx list --type table --paths-only    # 'list' is an alias of 'ls'
 tx ls Sales/Measures                 # children of a container
 tx ls Expressions                    # shared M expressions (parameters)
 tx ls Functions                      # DAX user-defined functions
 tx ls "Sa*"                          # wildcard filter
+tx ls --type calculatedcolumn        # only calculated columns
 ```
 
 ## `get` — properties of one object
@@ -67,6 +70,7 @@ tx find <pattern> [model] [options]
 | Option | Description |
 |--------|-------------|
 | `--in <scope>` | `names`, `expressions`, `descriptions`, `displayFolders`, `formatStrings`, `annotations`, `all` (default; annotations only when requested explicitly). |
+| `-t, --type <type>` | Only search objects of this kind (same vocabulary as `ls --type`). |
 | `--regex` | Treat the pattern as a regular expression. |
 | `--case-sensitive` | Case-sensitive matching. |
 | `--paths-only` | One matching object path per line, suitable for piping. |
@@ -83,6 +87,7 @@ relationship annotations are searched under `--in annotations`.
 ```sh
 tx find "SUM" --in expressions
 tx find "TODO|FIXME" --regex --in descriptions
+tx find "Qty" -t measure --paths-only
 ```
 
 ## `deps` — dependency analysis

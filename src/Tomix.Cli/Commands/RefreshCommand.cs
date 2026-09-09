@@ -28,7 +28,9 @@ internal sealed class RefreshCommand : ICommandModule
 
     public Command Build()
     {
-        var typeOption = new Option<string?>("--type")
+        // "refresh-type" rather than "type": --type means an object kind everywhere else, and
+        // this option selects the refresh operation instead (docs/cli-ux-guidelines.md).
+        var typeOption = new Option<string?>("--refresh-type")
         {
             Description = "Refresh type: full, dataonly, automatic, calculate, clearvalues, defragment, add (default: automatic)"
         };
@@ -82,7 +84,7 @@ internal sealed class RefreshCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var command = new Command("refresh", "Trigger a data refresh on a deployed model (--type full|auto|calculate|...)")
+        var command = new Command("refresh", "Trigger a data refresh on a deployed model (--refresh-type full|auto|calculate|...)")
         {
             typeOption,
             tableOption,

@@ -39,6 +39,11 @@ internal sealed class FindCommand : ICommandModule
         };
         inOption.AcceptAmongIgnoreCase(
             "all", "names", "expressions", "descriptions", "formatStrings", "displayFolders", "annotations");
+        var typeOption = new Option<string?>("--type")
+        {
+            Description = $"Only search objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}."
+        };
+        typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")
         {
             Description = "Treat pattern as a regular expression"
@@ -61,6 +66,7 @@ internal sealed class FindCommand : ICommandModule
             patternArgument,
             modelArgument,
             inOption,
+            typeOption,
             regexOption,
             caseSensitiveOption,
             pathsOnlyOption,
@@ -77,6 +83,16 @@ internal sealed class FindCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "find", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            ModelObjectKind? type = null;
+            var typeValue = parseResult.GetValue(typeOption);
+            if (!string.IsNullOrWhiteSpace(typeValue))
+            {
+                if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
+                    return TypeValidation.WriteInvalidTypeError(errorFormat);
+
+                type = parsed;
+            }
+
             if (!RecentConnections.TryResolveModel(
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
@@ -92,7 +108,8 @@ internal sealed class FindCommand : ICommandModule
                         pattern,
                         parseResult.GetValue(inOption) ?? "all",
                         parseResult.GetValue(regexOption),
-                        parseResult.GetValue(caseSensitiveOption)),
+                        parseResult.GetValue(caseSensitiveOption),
+                        type),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

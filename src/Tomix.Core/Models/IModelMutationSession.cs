@@ -64,7 +64,8 @@ public sealed record ModelReplaceRequest(
     string Scope,
     bool Regex,
     bool CaseSensitive,
-    bool Apply);
+    bool Apply,
+    ModelObjectKind? Type = null);
 
 public sealed record ModelPropertyAssignment(
     string Property,

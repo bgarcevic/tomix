@@ -12,6 +12,7 @@ public sealed class ModelObjectSelectorTests
         var sales = Node("Sales", ModelObjectKind.Table,
             Node("SaleID", ModelObjectKind.Column),
             Node("Amount", ModelObjectKind.Column),
+            Node("Margin", ModelObjectKind.CalculatedColumn),
             Node("Total Sales", ModelObjectKind.Measure),
             Node("Geography", ModelObjectKind.Hierarchy,
                 Node("Country", ModelObjectKind.Level),
@@ -61,7 +62,7 @@ public sealed class ModelObjectSelectorTests
 
     [Fact]
     public void ExactTableName_ExpandsToChildren()
-        => Assert.Equal(["SaleID", "Amount", "Total Sales", "Geography", "Sales"], Names("Sales"));
+        => Assert.Equal(["SaleID", "Amount", "Margin", "Total Sales", "Geography", "Sales"], Names("Sales"));
 
     [Fact]
     public void WildcardTable_ListsTablesNotChildren()
@@ -110,6 +111,18 @@ public sealed class ModelObjectSelectorTests
     [Fact]
     public void TypeFilter_NarrowsAPathResult()
         => Assert.Equal(["Total Sales"], Names("Sales", ModelObjectKind.Measure));
+
+    [Fact]
+    public void ColumnFilter_IncludesCalculatedColumns()
+        => Assert.Equal(["SaleID", "Amount", "Margin"], Names("Sales/Columns", ModelObjectKind.Column));
+
+    [Fact]
+    public void CalculatedColumnFilter_NarrowsToCalculatedColumns()
+        => Assert.Equal(["Margin"], Names("Sales", ModelObjectKind.CalculatedColumn));
+
+    [Fact]
+    public void ColumnsKeyword_IncludesCalculatedColumns()
+        => Assert.Equal(["SaleID", "Amount", "Margin"], Names("Sales/Columns"));
 
     [Fact]
     public void Keywords_ResolveModelLevelCollections()
