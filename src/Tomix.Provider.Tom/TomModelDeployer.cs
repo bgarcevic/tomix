@@ -186,7 +186,7 @@ public static class TomModelDeployer
     /// it is written to a file or stdout. Only executed scripts include the target's restricted
     /// information: preserved connection strings must survive a real deploy, but credentials
     /// must never leak into script output (CI artifacts, logs, working directories).</param>
-    private static string BuildScript(
+    internal static string BuildScript(
         Database sourceDatabase,
         TabularDatabase? existing,
         string targetName,
@@ -220,8 +220,10 @@ public static class TomModelDeployer
         if (existing is not null && options.RequiresTargetRead)
         {
             // The Databases collection is shallow until refreshed; read the full model so
-            // preserved objects reflect the target's actual current state.
-            existing.Refresh(true);
+            // preserved objects reflect the target's actual current state. A detached database
+            // (an in-memory fixture) has nothing to refresh from and is already complete.
+            if (existing.Server is not null)
+                existing.Refresh(true);
 
             targetJson = TabularJsonSerializer.SerializeDatabase(
                 existing,
