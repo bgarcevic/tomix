@@ -19,7 +19,7 @@ most commands accept paths as input:
 
 ```sh
 # Format every object whose expression mentions CALCULATE
-tx find "CALCULATE" --in expressions --paths-only | xargs -I{} tx format -p "{}"
+tx find "CALCULATE" --in expressions --paths-only | xargs -I{} tx format --path "{}"
 
 # Count columns per table
 tx ls --type column --output-format json |

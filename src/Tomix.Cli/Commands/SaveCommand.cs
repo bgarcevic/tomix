@@ -31,7 +31,7 @@ internal sealed class SaveCommand : ICommandModule
             Description = "Path to model, Fabric path, or omit for active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
-        var outputPathOption = new Option<string?>("--output-path")
+        var outputPathOption = new Option<string?>("--output-file")
         {
             Description = "File system path to write the model to. Omit to save the loaded model back to its source."
         };

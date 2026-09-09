@@ -90,7 +90,7 @@ Remote targets authenticate via `tx auth`:
 ```sh
 tx auth login                              # interactive browser login
 tx auth login --device-code                # no local browser (SSH, containers)
-tx auth login -u $APP_ID -t $TENANT --password-file ./secret.txt
+tx auth login -u $APP_ID --tenant $TENANT --password-file ./secret.txt
 tx auth status
 tx auth logout
 ```
@@ -105,7 +105,7 @@ stdin (`--password -`); certificate auth (`--certificate`) follows the same
 pattern. In CI:
 
 ```sh
-printf '%s' "$SECRET" | tx auth login -u $APP_ID -t $TENANT --password -
+printf '%s' "$SECRET" | tx auth login -u $APP_ID --tenant $TENANT --password -
 ```
 
 Saved credentials renew silently on Windows, macOS, and Linux. See the

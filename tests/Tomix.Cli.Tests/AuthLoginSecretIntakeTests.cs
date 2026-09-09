@@ -46,7 +46,7 @@ public sealed class AuthLoginSecretIntakeTests
     public void MissingSecretSource_NonInteractive_FailsFastWithGuidance()
     {
         // Console input is redirected under the test runner, so the interaction gate is closed.
-        var (exitCode, stderr) = Invoke("auth", "login", "-u", "app", "-t", "tenant");
+        var (exitCode, stderr) = Invoke("auth", "login", "-u", "app", "--tenant", "tenant");
 
         Assert.Equal(2, exitCode);
         Assert.Contains("--password -", stderr);

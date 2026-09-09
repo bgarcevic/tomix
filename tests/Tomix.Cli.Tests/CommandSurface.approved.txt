@@ -54,9 +54,9 @@ Manage authentication for remote workspaces
 # tx auth login
 Log in to a Power BI / Fabric / Azure AS account
   opt --username, -u <username>  Service-principal application (client) id
-  opt --password, -p <password>  Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file.
+  opt --password <password>  Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file.
   opt --password-file <password-file>  Path to a file containing the service-principal client secret (trailing newline ignored)
-  opt --tenant, -t <tenant>  Tenant id or domain (required for service principal)
+  opt --tenant <tenant>  Tenant id or domain (required for service principal)
   opt --identity, -I  Sign in with a managed identity (Azure-hosted; use --username for user-assigned)
   opt --certificate <certificate>  Path to certificate file (PEM or PKCS12) for service principal auth
   opt --certificate-password <certificate-password>  Certificate password source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --certificate-password-file.
@@ -238,10 +238,10 @@ Search for text across model objects
   opt --no-multiline  Collapse multi-line match context to a single line. Text output only.
 
 # tx format
-Format DAX or M/Power Query expressions (-e inline, -p object path, or all)
+Format DAX or M/Power Query expressions (--expression inline, --path object path, or all)
   arg [model]  Path to model (if not using --model)
   opt --expression, -e <expression>  Format an inline expression
-  opt --path, -p <path>  Format the expression on a model object path
+  opt --path <path>  Format the expression on a model object path
   opt --semicolons  Use semicolons as DAX list separators
   opt --long  Prefer long-line formatting
   opt --no-space-after-function  Do not insert a space between a DAX function name and '('
@@ -436,7 +436,7 @@ Remove an object from the model
 # tx save
 Save a model to disk in a specified format (like fab export)
   arg [model]  Path to model, Fabric path, or omit for active connection
-  opt --output-path, -o <output-path>  File system path to write the model to. Omit to save the loaded model back to its source.
+  opt --output-file, -o <output-file>  File system path to write the model to. Omit to save the loaded model back to its source.
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted). Defaults to the loaded model's format.
   opt --overwrite  Overwrite an existing output file or directory
   opt --fix-bpa  Auto-fix BPA violations before saving (applies FixExpressions where available)
@@ -447,7 +447,7 @@ Save a model to disk in a specified format (like fab export)
 # tx script
 Execute C# script(s) against a semantic model
   arg [model]  Path to model, Fabric path, or omit for active connection
-  opt --script, -S <script>  Path(s) to .cs or .csx script file(s). Can be repeated.
+  opt --file, --script <file>  Path(s) to .cs or .csx script file(s). Can be repeated.
   opt --expression, -e <expression>  Inline C# expression(s) to execute. Use '-' to read from stdin.
   opt --save-to <save-to>  Save model to a different path after all scripts execute
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)

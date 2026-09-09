@@ -30,7 +30,7 @@ internal sealed class ScriptCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var scriptOption = new Option<string[]>("--script", "-S")
+        var scriptOption = new Option<string[]>("--file", "--script")
         {
             Description = "Path(s) to .cs or .csx script file(s). Can be repeated.",
             Arity = ArgumentArity.ZeroOrMore,
@@ -90,7 +90,7 @@ internal sealed class ScriptCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "script", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
-            var scriptValues = CollectRepeatedValues(parseResult, "-S", "--script");
+            var scriptValues = CollectRepeatedValues(parseResult, "--file", "--script");
             var expressionValues = CollectRepeatedValues(parseResult, "-e", "--expression");
             var scriptFiles = scriptValues.Count > 0
                 ? scriptValues
@@ -210,7 +210,7 @@ internal sealed class ScriptCommand : ICommandModule
     {
         "-e",
         "--expression",
-        "-S",
+        "--file",
         "--script",
         "--save-to",
         "--serialization",

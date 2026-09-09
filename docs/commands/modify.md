@@ -313,7 +313,7 @@ expression in the model.
 
 ```sh
 tx format -e "CALCULATE(sum(sales[amt]))"
-tx format -p "Sales[Total Sales]" --save
+tx format --path "Sales[Total Sales]" --save
 tx format --save                     # whole model
 ```
 
@@ -328,7 +328,7 @@ anything the built-in commands don't cover.
 
 | Option | Description |
 |--------|-------------|
-| `-S, --script <file>` | Path(s) to `.cs`/`.csx` script file(s). Repeatable. |
+| `--file <file>` | Path(s) to `.cs`/`.csx` script file(s). Repeatable (`--script` still accepted). |
 | `-e, --expression <code>` | Inline C# expression(s). `-` reads from stdin. |
 | `--dry-run` | Compile and report errors without executing. |
 

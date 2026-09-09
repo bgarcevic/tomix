@@ -163,7 +163,7 @@ tx save [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output-path <path>` | Where to write. Omit to save back to the source. |
+| `-o, --output-file <path>` | Where to write. Omit to save back to the source. |
 | `--serialization <tmdl\|bim>` | Output format (defaults to the loaded model's). |
 | `--supporting-files` | Wrap output in a `{modelName}.SemanticModel/` folder with `.platform` and `definition.pbism`. |
 | `--fix-bpa` / `--bpa-rules <file>` | Auto-fix BPA violations before saving, optionally with specific rule files. |

@@ -78,7 +78,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["format"] = [
             "tx format",
             "tx format -e \"CALCULATE(sum(sales[amt]))\"",
-            "tx format -p \"Table[Measure]\"",
+            "tx format --path \"Table[Measure]\"",
         ],
         ["script"] = [
             "tx script -e \"Model.Tables.Count\"",

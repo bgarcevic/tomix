@@ -38,11 +38,9 @@ internal sealed class AuthCommand : ICommandModule
         var usernameOption = new Option<string?>("--username") { Description = "Service-principal application (client) id" };
         usernameOption.Aliases.Add("-u");
         var passwordOption = new Option<string?>("--password") { Description = "Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file." };
-        passwordOption.Aliases.Add("-p");
         AddStdinSentinelValidator(passwordOption, "--password", "--password-file");
         var passwordFileOption = new Option<string?>("--password-file") { Description = "Path to a file containing the service-principal client secret (trailing newline ignored)" };
         var tenantOption = new Option<string?>("--tenant") { Description = "Tenant id or domain (required for service principal)" };
-        tenantOption.Aliases.Add("-t");
         var identityOption = new Option<bool>("--identity") { Description = "Sign in with a managed identity (Azure-hosted; use --username for user-assigned)" };
         identityOption.Aliases.Add("-I");
         var certificateOption = new Option<string?>("--certificate") { Description = "Path to certificate file (PEM or PKCS12) for service principal auth" };

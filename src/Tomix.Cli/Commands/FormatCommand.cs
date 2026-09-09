@@ -44,7 +44,6 @@ internal sealed class FormatCommand : ICommandModule
         {
             Description = "Format the expression on a model object path"
         };
-        pathOption.Aliases.Add("-p");
         var semicolonsOption = new Option<bool>("--semicolons")
         {
             Description = "Use semicolons as DAX list separators"
@@ -75,7 +74,7 @@ internal sealed class FormatCommand : ICommandModule
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var command = new Command("format", "Format DAX or M/Power Query expressions (-e inline, -p object path, or all)")
+        var command = new Command("format", "Format DAX or M/Power Query expressions (--expression inline, --path object path, or all)")
         {
             modelArgument,
             expressionOption,

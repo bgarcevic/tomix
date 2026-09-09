@@ -63,7 +63,7 @@ Emitted by `MutationRunner` and handlers that participate in the mutation lifecy
 
 ## Object Lookup Codes (`TOMIX_OBJECT_*`)
 
-Emitted by `get`, `deps`, and `format -p` when a model object path fails to resolve.
+Emitted by `get`, `deps`, and `format --path` when a model object path fails to resolve.
 
 | Code | Exit | Trigger |
 |------|------|---------|
