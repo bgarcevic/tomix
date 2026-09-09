@@ -25,6 +25,10 @@ CLI entry point for `tx`.
   code. Each module is the feature-level composition root; `Program` owns process-wide dependencies
   and registers modules. Commands may render prompts and trivial one-line messages; complex tables,
   trees, serialization, and projections live in `Output/`.
+- `Commands/GlobalOptions` - the recursive global options; `Commands/LifecycleOptions` - the
+  factory for the shared mutation lifecycle flags (`--save`, `--save-to`, `--serialization`,
+  `--stage`, `--revert`, `--no-sync`). Mutating commands must take these from the factory rather
+  than declaring their own copies, so descriptions stay uniform.
 - `Output/` - shared output wiring used by every command. See `Output/CONTEXT.md` for details.
   - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
   - `JsonOutput` - the single JSON serializer (the `--format json` contract).

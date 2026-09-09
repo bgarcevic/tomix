@@ -57,10 +57,7 @@ internal sealed class FormatCommand : ICommandModule
         {
             Description = "Do not insert a space between a DAX function name and '('"
         };
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save formatted model to a different path"
-        };
+        var saveToOption = LifecycleOptions.SaveTo();
         var langOption = new Option<string?>("--lang")
         {
             Description = "Expression language: dax or m"
@@ -70,26 +67,14 @@ internal sealed class FormatCommand : ICommandModule
             Description = "Disambiguate object type"
         };
         typeOption.Aliases.Add("-t");
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Persist formatted expressions to the source model"
-        };
+        var saveOption = LifecycleOptions.Save();
         var forceOption = new Option<bool>("--force")
         {
             Description = "Save even if this mutation introduces validation errors"
         };
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
+        var stageOption = LifecycleOptions.Stage();
+        var revertOption = LifecycleOptions.Revert();
+        var noSyncOption = LifecycleOptions.NoSync();
 
         var command = new Command("format", "Format DAX or M/Power Query expressions (-e inline, -p object path, or all)")
         {

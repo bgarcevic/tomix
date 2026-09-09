@@ -86,36 +86,17 @@ internal sealed class BpaCommand : ICommandModule
             Description = "With --fix: also apply destructive Delete() fixes that remove model objects"
         };
 
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Save model back to source after applying fixes"
-        };
+        var saveOption = LifecycleOptions.Save();
 
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save model to a different path after applying fixes"
-        };
+        var saveToOption = LifecycleOptions.SaveTo();
 
-        var serializationOption = new Option<string?>("--serialization")
-        {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
-        };
-        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
+        var serializationOption = LifecycleOptions.Serialization();
 
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
+        var stageOption = LifecycleOptions.Stage();
 
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
+        var revertOption = LifecycleOptions.Revert();
 
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
+        var noSyncOption = LifecycleOptions.NoSync();
 
         var ruleOption = new Option<string[]>("--rule")
         {
@@ -422,31 +403,12 @@ internal sealed class BpaCommand : ICommandModule
     {
         var ruleIdArgument = new Argument<string>("rule-id") { Description = "Rule ID" };
         var modelArgument = OptionalModelArgument();
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage."
-        };
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save model to a different path"
-        };
-        var serializationOption = new Option<string?>("--serialization")
-        {
-            Description = "Model serialization when saving: tmdl, bim (tmsl and auto also accepted)"
-        };
-        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
+        var saveOption = LifecycleOptions.Save();
+        var saveToOption = LifecycleOptions.SaveTo();
+        var serializationOption = LifecycleOptions.Serialization();
+        var stageOption = LifecycleOptions.Stage();
+        var revertOption = LifecycleOptions.Revert();
+        var noSyncOption = LifecycleOptions.NoSync();
 
         var command = new Command(name, description)
         {

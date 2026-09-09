@@ -46,16 +46,9 @@ internal sealed class ScriptCommand : ICommandModule
             CustomParser = result => result.Tokens.Select(token => token.Value).ToArray()
         };
 
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save model to a different path after all scripts execute"
-        };
+        var saveToOption = LifecycleOptions.SaveTo("Save model to a different path after all scripts execute");
 
-        var serializationOption = new Option<string?>("--serialization")
-        {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
-        };
-        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
+        var serializationOption = LifecycleOptions.Serialization();
 
         var dryRunOption = new Option<bool>("--dry-run")
         {
@@ -67,25 +60,13 @@ internal sealed class ScriptCommand : ICommandModule
             Description = "Save even if this mutation introduces DAX validation errors"
         };
 
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage."
-        };
+        var saveOption = LifecycleOptions.Save();
 
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
+        var stageOption = LifecycleOptions.Stage();
 
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
+        var revertOption = LifecycleOptions.Revert();
 
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
+        var noSyncOption = LifecycleOptions.NoSync();
 
         var command = new Command("script", "Execute C# script(s) against a semantic model")
         {

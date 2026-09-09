@@ -45,36 +45,17 @@ internal sealed class RmCommand : ICommandModule
         {
             Description = "Succeed silently if the object does not exist"
         };
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save to a different path (implies --save)"
-        };
-        var serializationOption = new Option<string?>("--serialization")
-        {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
-        };
-        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
+        var saveToOption = LifecycleOptions.SaveTo();
+        var serializationOption = LifecycleOptions.Serialization();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple table-children."
         };
         typeOption.Aliases.Add("-t");
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Persist this command's mutation to the source location"
-        };
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
+        var saveOption = LifecycleOptions.Save();
+        var stageOption = LifecycleOptions.Stage();
+        var revertOption = LifecycleOptions.Revert();
+        var noSyncOption = LifecycleOptions.NoSync();
 
         var command = new Command("rm", "Remove an object from the model")
         {

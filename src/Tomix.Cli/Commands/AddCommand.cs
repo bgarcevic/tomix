@@ -62,31 +62,12 @@ internal sealed class AddCommand : ICommandModule
         {
             Description = "Save even if this mutation introduces validation errors"
         };
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save to a different path (implies --save)"
-        };
-        var serializationOption = new Option<string?>("--serialization")
-        {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
-        };
-        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage."
-        };
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
+        var saveToOption = LifecycleOptions.SaveTo();
+        var serializationOption = LifecycleOptions.Serialization();
+        var saveOption = LifecycleOptions.Save();
+        var stageOption = LifecycleOptions.Stage();
+        var revertOption = LifecycleOptions.Revert();
+        var noSyncOption = LifecycleOptions.NoSync();
 
         var modeOption = new Option<string?>("--mode")
         {

@@ -87,8 +87,8 @@ Add a rule to the model's ignore list
   arg <rule-id>  Rule ID
   arg [model]  Path to model
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
-  opt --save-to <save-to>  Save model to a different path
-  opt --serialization <serialization>  Model serialization when saving: tmdl, bim (tmsl and auto also accepted)
+  opt --save-to <save-to>  Save to a different path (implies --save)
+  opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
@@ -107,8 +107,8 @@ Remove a rule from the model's ignore list
   arg <rule-id>  Rule ID
   arg [model]  Path to model
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
-  opt --save-to <save-to>  Save model to a different path
-  opt --serialization <serialization>  Model serialization when saving: tmdl, bim (tmsl and auto also accepted)
+  opt --save-to <save-to>  Save to a different path (implies --save)
+  opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
@@ -123,8 +123,8 @@ Run BPA rules against a model (--fix to auto-fix)
   opt --fail-on <fail-on>  Failure threshold: error (default) or warning
   opt --fix  Apply fix expressions to auto-fix violations where possible
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
-  opt --save  Save model back to source after applying fixes
-  opt --save-to <save-to>  Save model to a different path after applying fixes
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
+  opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --rule <rule>  Run only specific rule(s) by ID
   opt --ci <ci>  Emit CI logging commands to stderr: vsts or github
@@ -237,10 +237,10 @@ Format DAX or M/Power Query expressions (-e inline, -p object path, or all)
   opt --semicolons  Use semicolons as DAX list separators
   opt --long  Prefer long-line formatting
   opt --no-space-after-function  Do not insert a space between a DAX function name and '('
-  opt --save-to <save-to>  Save formatted model to a different path
+  opt --save-to <save-to>  Save to a different path (implies --save)
   opt --lang <lang>  Expression language: dax or m
   opt --type, -t <type>  Disambiguate object type
-  opt --save  Persist formatted expressions to the source model
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --force  Save even if this mutation introduces validation errors
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
@@ -269,7 +269,7 @@ Remove the incremental refresh policy from a table
   arg [model]  Path to model (if not using --model)
   opt --if-exists  Succeed silently if the table has no policy
   opt --force  Allow --save-to to overwrite an existing target
-  opt --save  Persist this command's mutation to the source location
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --stage  Stage this command's mutation
@@ -291,7 +291,7 @@ Create or edit the incremental refresh policy on a table
   opt --source-expression <source-expression>  M source query filtering on RangeStart/RangeEnd. Use '-' to read from stdin.
   opt --source-expression-file <source-expression-file>  Read the source expression from a file
   opt --force  Save despite validation errors; also lets --save-to overwrite an existing target
-  opt --save  Persist this command's mutation to the source location
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --stage  Stage this command's mutation
@@ -334,7 +334,7 @@ Move or rename a model object, including in and out of display folders
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
-  opt --save  Persist this command's mutation to the source location
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --strict-refs  Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail).
@@ -400,7 +400,7 @@ Find and replace text across model objects
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
-  opt --save  Persist this command's mutation to the source location
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
 
@@ -414,7 +414,7 @@ Remove an object from the model
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --type, -t <type>  Disambiguate when the path matches multiple table-children.
-  opt --save  Persist this command's mutation to the source location
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
@@ -469,7 +469,7 @@ Set a property on a model object
   opt -i <i>  Value for the preceding -q. Use '-' to read from stdin.
   opt --force  Allow --save-to to overwrite an existing target
   opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).
-  opt --save  Persist this command's mutation to the source location
+  opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --stage  Stage this command's mutation

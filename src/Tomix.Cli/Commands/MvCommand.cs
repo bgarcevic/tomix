@@ -46,31 +46,12 @@ internal sealed class MvCommand : ICommandModule
             Description = "Disambiguate when the path matches multiple table-children."
         };
         typeOption.Aliases.Add("-t");
-        var stageOption = new Option<bool>("--stage")
-        {
-            Description = "Stage this command's mutation"
-        };
-        var revertOption = new Option<bool>("--revert")
-        {
-            Description = "Revert a staged mutation"
-        };
-        var noSyncOption = new Option<bool>("--no-sync")
-        {
-            Description = "Skip workspace sync when workspace mode is active."
-        };
-        var saveOption = new Option<bool>("--save")
-        {
-            Description = "Persist this command's mutation to the source location"
-        };
-        var saveToOption = new Option<string?>("--save-to")
-        {
-            Description = "Save to a different path (implies --save)"
-        };
-        var serializationOption = new Option<string?>("--serialization")
-        {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
-        };
-        serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
+        var stageOption = LifecycleOptions.Stage();
+        var revertOption = LifecycleOptions.Revert();
+        var noSyncOption = LifecycleOptions.NoSync();
+        var saveOption = LifecycleOptions.Save();
+        var saveToOption = LifecycleOptions.SaveTo();
+        var serializationOption = LifecycleOptions.Serialization();
         var strictRefsOption = new Option<bool>("--strict-refs")
         {
             Description = "Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail)."
