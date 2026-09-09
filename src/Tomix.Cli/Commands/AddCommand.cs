@@ -58,10 +58,8 @@ internal sealed class AddCommand : ICommandModule
         {
             Description = "Succeed silently if the object already exists (exit 0)"
         };
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Save even if this mutation introduces validation errors"
-        };
+        var forceOption = LifecycleOptions.Force();
+        var overwriteOption = LifecycleOptions.Overwrite();
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
         var saveOption = LifecycleOptions.Save();
@@ -151,6 +149,7 @@ internal sealed class AddCommand : ICommandModule
             fileOption,
             ifNotExistsOption,
             forceOption,
+            overwriteOption,
             saveToOption,
             serializationOption,
             saveOption,
@@ -230,7 +229,8 @@ internal sealed class AddCommand : ICommandModule
                         parseResult.GetValue(sourceSchemaOption),
                         parseResult.GetValue(rangeStartOption),
                         parseResult.GetValue(rangeEndOption),
-                        parseResult.GetValue(rangeGranularityOption)),
+                        parseResult.GetValue(rangeGranularityOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

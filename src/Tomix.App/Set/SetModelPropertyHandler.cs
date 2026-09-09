@@ -34,7 +34,7 @@ public sealed class SetModelPropertyHandler
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: false, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "set", _stores,

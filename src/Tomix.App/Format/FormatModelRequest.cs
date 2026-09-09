@@ -15,6 +15,7 @@ public sealed record FormatModelRequest(
     string? SaveTo,
     string Serialization = "",
     bool Force = false,
+    bool Overwrite = false,
     bool Stage = false,
     bool Revert = false,
     bool NoSync = false);

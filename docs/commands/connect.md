@@ -167,7 +167,7 @@ tx save [model] [options]
 | `--serialization <tmdl\|bim>` | Output format (defaults to the loaded model's). |
 | `--supporting-files` | Wrap output in a `{modelName}.SemanticModel/` folder with `.platform` and `definition.pbism`. |
 | `--fix-bpa` / `--bpa-rules <file>` | Auto-fix BPA violations before saving, optionally with specific rule files. |
-| `--force` | Skip validation and overwrite existing output. |
+| `--overwrite` | Overwrite an existing output file or directory. |
 
 ```sh
 tx save -s MyWorkspace -d Sales -o ./sales.tmdl          # download a deployed model

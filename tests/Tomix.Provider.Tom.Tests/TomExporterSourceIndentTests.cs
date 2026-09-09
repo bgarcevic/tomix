@@ -134,7 +134,7 @@ public sealed class TomExporterSourceIndentTests
 
         using var dir = new TempDir();
         await TomModelExporter.ExportAsync(
-            db, new ModelExportRequest(dir.Path, "tmdl", Force: true, SupportingFiles: false), CancellationToken.None);
+            db, new ModelExportRequest(dir.Path, "tmdl", Overwrite: true, SupportingFiles: false), CancellationToken.None);
 
         var text = await File.ReadAllTextAsync(dir.Combine("tables", "Sales.tmdl"));
         Assert.Contains("\t\tsource =\n\t\t\tlet\n", text.ReplaceLineEndings("\n"));
@@ -161,7 +161,7 @@ public sealed class TomExporterSourceIndentTests
         var db = NewDatabase();
         await TomModelExporter.ExportAsync(
             db,
-            new ModelExportRequest(targetPath, "tmdl", Force: true, SupportingFiles: false),
+            new ModelExportRequest(targetPath, "tmdl", Overwrite: true, SupportingFiles: false),
             CancellationToken.None);
 
         Assert.False(File.Exists(junkPath), "stale file should be cleared when force=true");

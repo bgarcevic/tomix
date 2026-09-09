@@ -60,10 +60,8 @@ internal sealed class ReplaceCommand : ICommandModule
         {
             Description = "Preview changes without applying"
         };
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Save even if the replacement introduces validation errors"
-        };
+        var forceOption = LifecycleOptions.Force();
+        var overwriteOption = LifecycleOptions.Overwrite();
         var stageOption = LifecycleOptions.Stage();
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
@@ -82,6 +80,7 @@ internal sealed class ReplaceCommand : ICommandModule
             caseSensitiveOption,
             dryRunOption,
             forceOption,
+            overwriteOption,
             stageOption,
             revertOption,
             noSyncOption,
@@ -140,7 +139,8 @@ internal sealed class ReplaceCommand : ICommandModule
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         parseResult.GetValue(noSyncOption),
-                        type),
+                        type,
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

@@ -48,7 +48,6 @@ public sealed class SetModelPropertyHandlerTests
             Save: false,
             SaveTo: null,
             Serialization: "",
-            Force: false,
             Stage: false,
             Revert: revert,
             NoSync: false);

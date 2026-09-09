@@ -206,7 +206,7 @@ public sealed class MoveModelObjectHandlerTests
         var request = new MoveModelObjectRequest(
             new ModelReference($"/nonexistent/{Guid.NewGuid():N}.bim"),
             "x", "x", Type: null,
-            Save: false, SaveTo: null, Serialization: "", Force: false,
+            Save: false, SaveTo: null, Serialization: "", Overwrite: false,
             Revert: true);
 
         var result = await new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores)
@@ -362,7 +362,7 @@ public sealed class MoveModelObjectHandlerTests
             new MoveModelObjectRequest(
                 new ModelReference("model.bim"),
                 source, destination, Type: type,
-                Save: false, SaveTo: null, Serialization: "", Force: false),
+                Save: false, SaveTo: null, Serialization: "", Overwrite: false),
             CancellationToken.None);
 
     /// <summary>Move-capable session over Sales with an extra measure whose DAX references

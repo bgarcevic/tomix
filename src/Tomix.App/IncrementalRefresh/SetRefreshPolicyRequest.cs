@@ -24,7 +24,8 @@ public sealed record SetRefreshPolicyRequest(
     string Serialization,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false)
+    bool NoSync = false,
+    bool Overwrite = false)
 {
     public bool HasPolicyOptions =>
         Mode is not null

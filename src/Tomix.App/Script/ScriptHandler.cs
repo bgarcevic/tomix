@@ -49,6 +49,7 @@ public sealed class ScriptHandler
             request.Revert,
             request.Serialization ?? "",
             request.Force,
+            request.Overwrite,
             request.NoSync);
         var stagingStore = _stores.Staging;
         var connection = _stores.ResolveSession();
@@ -191,7 +192,8 @@ public sealed record ScriptRunRequest(
     string? Serialization,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    bool Overwrite = false);
 
 public sealed record ScriptRunResult(
     string ModelName,

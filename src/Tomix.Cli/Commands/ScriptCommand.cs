@@ -55,10 +55,8 @@ internal sealed class ScriptCommand : ICommandModule
             Description = "Compile script and report errors without executing"
         };
 
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Save even if this mutation introduces DAX validation errors"
-        };
+        var forceOption = LifecycleOptions.Force("Save even if this mutation introduces DAX validation errors");
+        var overwriteOption = LifecycleOptions.Overwrite();
 
         var saveOption = LifecycleOptions.Save();
 
@@ -77,6 +75,7 @@ internal sealed class ScriptCommand : ICommandModule
             serializationOption,
             dryRunOption,
             forceOption,
+            overwriteOption,
             saveOption,
             stageOption,
             revertOption,
@@ -141,7 +140,8 @@ internal sealed class ScriptCommand : ICommandModule
                         parseResult.GetValue(serializationOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 

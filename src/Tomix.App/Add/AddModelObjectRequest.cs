@@ -28,4 +28,5 @@ public sealed record AddModelObjectRequest(
     string? SourceSchema = null,
     string? RangeStart = null,
     string? RangeEnd = null,
-    string? RangeGranularity = null);
+    string? RangeGranularity = null,
+    bool Overwrite = false);

@@ -13,7 +13,7 @@ public sealed record BpaRulesIgnoreRequest(
     bool Save = false,
     string? SaveTo = null,
     string Serialization = "",
-    bool Force = false,
+    bool Overwrite = false,
     bool Stage = false,
     bool Revert = false,
     bool NoSync = false);
@@ -53,7 +53,7 @@ public sealed class BpaRulesIgnoreHandler
 
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert,
-            request.Serialization, request.Force, request.NoSync);
+            request.Serialization, Force: false, Overwrite: request.Overwrite, NoSync: request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "bpa-ignore", _stores,

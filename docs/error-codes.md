@@ -98,7 +98,7 @@ Emitted by `get`, `deps`, and `format -p` when a model object path fails to reso
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_SAVE_OUTPUT_REQUIRED` | 2 | `save` called without an output path and none could be inferred. |
-| `TOMIX_SAVE_OUTPUT_EXISTS` | 2 | The output path already exists (use `--force` to overwrite). |
+| `TOMIX_SAVE_OUTPUT_EXISTS` | 2 | The output path already exists (use `--overwrite` to replace it). |
 | `TOMIX_SAVE_FIX_UNSUPPORTED` | 2 | `save --fix` is not supported by the provider. |
 | `TOMIX_SAVE_UNSUPPORTED_PROVIDER` | 1 | The provider does not support model export/saving. |
 | `TOMIX_SAVE_UNSUPPORTED_SERIALIZATION` | 2 | The requested serialization format is not supported. |

@@ -236,7 +236,7 @@ public sealed class IncrementalRefreshHandlerTests : IDisposable
 
         var rmResult = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
             new RemoveRefreshPolicyRequest(reference, "Sales", IfExists: false,
-                Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
+                Save: true, SaveTo: null, Serialization: "", Overwrite: false, NoSync: true),
             CancellationToken.None);
         Assert.True(rmResult.Success);
         Assert.Equal("Sales", rmResult.Data!.Removed);
@@ -307,7 +307,7 @@ public sealed class IncrementalRefreshHandlerTests : IDisposable
         // documented code, not the generic TOMIX_MUTATION_FAILED.
         var result = await new RemoveRefreshPolicyHandler(providers, TestStores).HandleAsync(
             new RemoveRefreshPolicyRequest(new ModelReference(model.Path), "Sales", IfExists: false,
-                Save: true, SaveTo: null, Serialization: "", Force: false, NoSync: true),
+                Save: true, SaveTo: null, Serialization: "", Overwrite: false, NoSync: true),
             CancellationToken.None);
 
         Assert.False(result.Success);

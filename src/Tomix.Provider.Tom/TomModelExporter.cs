@@ -18,8 +18,8 @@ public static class TomModelExporter
         var format = NormalizeFormat(request.Serialization);
         var savedPath = format switch
         {
-            "bim" => ExportBim(database, request.OutputPath, request.Force),
-            "tmdl" => ExportTmdl(database, request.OutputPath, request.Force, request.SupportingFiles),
+            "bim" => ExportBim(database, request.OutputPath, request.Overwrite),
+            "tmdl" => ExportTmdl(database, request.OutputPath, request.Overwrite, request.SupportingFiles),
             _ => throw new NotSupportedException($"Unsupported serialization: {request.Serialization}")
         };
 
@@ -29,7 +29,7 @@ public static class TomModelExporter
     private static string ExportTmdl(
         Database database,
         string outputPath,
-        bool force,
+        bool overwrite,
         bool supportingFiles)
     {
         var target = Path.GetFullPath(outputPath);
@@ -41,7 +41,7 @@ public static class TomModelExporter
             target = Path.Combine(semanticModel, "definition");
         }
 
-        PrepareDirectory(target, force);
+        PrepareDirectory(target, overwrite);
         TmdlSerializer.SerializeDatabaseToFolder(database, target);
         AlignSourceBlocksWithDesktop(target);
         return supportingFiles ? Directory.GetParent(target)!.FullName : target;
@@ -160,7 +160,7 @@ public static class TomModelExporter
         return count;
     }
 
-    private static string ExportBim(Database database, string outputPath, bool force)
+    private static string ExportBim(Database database, string outputPath, bool overwrite)
     {
         var target = Path.GetFullPath(outputPath);
         if (!Path.HasExtension(target))
@@ -170,7 +170,7 @@ public static class TomModelExporter
         if (!string.IsNullOrEmpty(parent))
             Directory.CreateDirectory(parent);
 
-        if (File.Exists(target) && !force)
+        if (File.Exists(target) && !overwrite)
             throw new OutputExistsException($"Output file already exists: {target}");
 
         File.WriteAllText(
@@ -211,13 +211,13 @@ public static class TomModelExporter
         }
     }
 
-    private static void PrepareDirectory(string path, bool force)
+    private static void PrepareDirectory(string path, bool overwrite)
     {
         if (Directory.Exists(path))
         {
             if (Directory.EnumerateFileSystemEntries(path).Any())
             {
-                if (!force)
+                if (!overwrite)
                     throw new OutputExistsException($"Output directory already exists: {path}");
 
                 ClearDirectory(path);

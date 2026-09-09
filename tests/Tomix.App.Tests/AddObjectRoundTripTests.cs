@@ -47,9 +47,9 @@ public sealed class AddObjectRoundTripTests
             var bimPath = Path.Combine(temp.FullName, "model.bim");
 
             await TomModelExporter.ExportAsync(
-                db, new ModelExportRequest(tmdlDir, "tmdl", Force: true, SupportingFiles: false), CancellationToken.None);
+                db, new ModelExportRequest(tmdlDir, "tmdl", Overwrite: true, SupportingFiles: false), CancellationToken.None);
             await TomModelExporter.ExportAsync(
-                db, new ModelExportRequest(bimPath, "bim", Force: true, SupportingFiles: false), CancellationToken.None);
+                db, new ModelExportRequest(bimPath, "bim", Overwrite: true, SupportingFiles: false), CancellationToken.None);
 
             var fromTmdl = TmdlSerializer.DeserializeDatabaseFromFolder(tmdlDir);
             var fromBim = TabularJsonSerializer.DeserializeDatabase(

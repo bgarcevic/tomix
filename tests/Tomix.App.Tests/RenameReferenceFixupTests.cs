@@ -251,7 +251,6 @@ public sealed class RenameReferenceFixupTests
             Save: false,
             SaveTo: null,
             Serialization: "",
-            Force: false,
             StrictRefs: strictRefs,
             FixRefs: fixRefs);
 
@@ -265,7 +264,6 @@ public sealed class RenameReferenceFixupTests
             Save: false,
             SaveTo: null,
             Serialization: "",
-            Force: false,
             StrictRefs: strictRefs,
             FixRefs: fixRefs);
 

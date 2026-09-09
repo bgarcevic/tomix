@@ -42,10 +42,7 @@ internal sealed class SaveCommand : ICommandModule
             Description = "Model serialization: tmdl, bim (tmsl and auto also accepted). Defaults to the loaded model's format."
         };
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Skip validation and overwrite existing output. Does not override layout-safety refusals."
-        };
+        var overwriteOption = LifecycleOptions.Overwrite("Overwrite an existing output file or directory");
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
             Description = "Auto-fix BPA violations before saving (applies FixExpressions where available)"
@@ -69,7 +66,7 @@ internal sealed class SaveCommand : ICommandModule
             modelArgument,
             outputPathOption,
             serializationOption,
-            forceOption,
+            overwriteOption,
             fixBpaOption,
             bpaRulesOption,
             supportingFilesOption,
@@ -85,7 +82,7 @@ internal sealed class SaveCommand : ICommandModule
 
             var outputPath = parseResult.GetValue(outputPathOption);
             var serialization = parseResult.GetValue(serializationOption) ?? "";
-            var force = parseResult.GetValue(forceOption);
+            var overwrite = parseResult.GetValue(overwriteOption);
             var supportingFiles = parseResult.GetValue(supportingFilesOption);
             var fixBpa = parseResult.GetValue(fixBpaOption);
             var bpaRules = parseResult.GetValue(bpaRulesOption);
@@ -117,7 +114,7 @@ internal sealed class SaveCommand : ICommandModule
                         reference,
                         outputPath,
                         serialization,
-                        force,
+                        overwrite,
                         supportingFiles,
                         fixBpa,
                         bpaRules,

@@ -86,6 +86,9 @@ internal sealed class BpaCommand : ICommandModule
             Description = "With --fix: also apply destructive Delete() fixes that remove model objects"
         };
 
+        var forceOption = LifecycleOptions.Force("Save fixes despite validation errors");
+        var overwriteOption = LifecycleOptions.Overwrite();
+
         var saveOption = LifecycleOptions.Save();
 
         var saveToOption = LifecycleOptions.SaveTo();
@@ -164,6 +167,8 @@ internal sealed class BpaCommand : ICommandModule
             failOnOption,
             fixOption,
             allowDeleteOption,
+            forceOption,
+            overwriteOption,
             saveOption,
             saveToOption,
             serializationOption,
@@ -232,12 +237,13 @@ internal sealed class BpaCommand : ICommandModule
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         parseResult.GetValue(serializationOption) ?? "",
-                        Force: false,
+                        Force: parseResult.GetValue(forceOption),
                         parseResult.GetValue(noModelRulesOption),
                         parseResult.GetValue(allowExternalRulesOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        NoSync: parseResult.GetValue(noSyncOption)),
+                        NoSync: parseResult.GetValue(noSyncOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 
@@ -403,6 +409,7 @@ internal sealed class BpaCommand : ICommandModule
     {
         var ruleIdArgument = new Argument<string>("rule-id") { Description = "Rule ID" };
         var modelArgument = OptionalModelArgument();
+        var overwriteOption = LifecycleOptions.Overwrite();
         var saveOption = LifecycleOptions.Save();
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
@@ -414,6 +421,7 @@ internal sealed class BpaCommand : ICommandModule
         {
             ruleIdArgument,
             modelArgument,
+            overwriteOption,
             saveOption,
             saveToOption,
             serializationOption,
@@ -441,6 +449,7 @@ internal sealed class BpaCommand : ICommandModule
                     model,
                     parseResult.GetValue(ruleIdArgument)!,
                     Ignore: ignore,
+                    Overwrite: parseResult.GetValue(overwriteOption),
                     Save: parseResult.GetValue(saveOption),
                     SaveTo: parseResult.GetValue(saveToOption),
                     Serialization: parseResult.GetValue(serializationOption) ?? "",

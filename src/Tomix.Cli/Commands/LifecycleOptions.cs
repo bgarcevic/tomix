@@ -10,6 +10,28 @@ namespace Tomix.Cli.Commands;
 /// </summary>
 internal static class LifecycleOptions
 {
+    /// <summary>
+    /// Bypass validation that would otherwise block the save (DAX/refresh-policy errors).
+    /// Deliberately narrow: overwriting an existing target needs <see cref="Overwrite"/>,
+    /// and destructive-guard bypasses (rm dependents, init/connect overwrite, deploy checks)
+    /// keep their own command-scoped --force with an explicit description.
+    /// </summary>
+    public static Option<bool> Force(string? description = null)
+    {
+        var option = new Option<bool>("--force")
+        {
+            Description = description ?? "Save despite validation errors"
+        };
+        option.Aliases.Add("-f");
+        return option;
+    }
+
+    /// <summary>Lets the save output (--save-to, or the save/export target) replace an existing file.</summary>
+    public static Option<bool> Overwrite(string? description = null) => new("--overwrite")
+    {
+        Description = description ?? "Allow --save-to to overwrite an existing target"
+    };
+
     public static Option<bool> Save(string? description = null) => new("--save")
     {
         Description = description ??

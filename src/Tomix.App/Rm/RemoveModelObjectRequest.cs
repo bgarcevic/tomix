@@ -14,4 +14,5 @@ public sealed record RemoveModelObjectRequest(
     bool Force,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    bool Overwrite = false);

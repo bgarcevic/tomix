@@ -35,7 +35,7 @@ public sealed class SetRefreshPolicyHandler
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.NoSync);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "incremental-refresh", _stores,

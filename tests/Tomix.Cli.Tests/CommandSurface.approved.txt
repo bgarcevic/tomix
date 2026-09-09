@@ -23,7 +23,8 @@ Add an object to the model
   opt -q <q>  Property name to set on the newly-created object. Pair each -q with a following -i value. Repeatable. Names accept dotted paths, bracket indexers, and DisplayName matching.
   opt --file <file>  Read expression from file
   opt --if-not-exists  Succeed silently if the object already exists (exit 0)
-  opt --force  Save even if this mutation introduces validation errors
+  opt --force, -f  Save despite validation errors
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
@@ -86,6 +87,7 @@ Re-enable a previously disabled built-in BPA rule
 Add a rule to the model's ignore list
   arg <rule-id>  Rule ID
   arg [model]  Path to model
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
@@ -106,6 +108,7 @@ List BPA rules from all sources with status
 Remove a rule from the model's ignore list
   arg <rule-id>  Rule ID
   arg [model]  Path to model
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
@@ -123,6 +126,8 @@ Run BPA rules against a model (--fix to auto-fix)
   opt --fail-on <fail-on>  Failure threshold: error (default) or warning
   opt --fix  Apply fix expressions to auto-fix violations where possible
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
+  opt --force, -f  Save fixes despite validation errors
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
@@ -241,7 +246,8 @@ Format DAX or M/Power Query expressions (-e inline, -p object path, or all)
   opt --lang <lang>  Expression language: dax or m
   opt --type, -t <type>  Disambiguate object type
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
-  opt --force  Save even if this mutation introduces validation errors
+  opt --force, -f  Save despite validation errors
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
@@ -268,7 +274,7 @@ Remove the incremental refresh policy from a table
   arg <table>  Table name.
   arg [model]  Path to model (if not using --model)
   opt --if-exists  Succeed silently if the table has no policy
-  opt --force  Allow --save-to to overwrite an existing target
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
@@ -290,7 +296,8 @@ Create or edit the incremental refresh policy on a table
   opt --polling-expression-file <polling-expression-file>  Read the polling expression from a file
   opt --source-expression <source-expression>  M source query filtering on RangeStart/RangeEnd. Use '-' to read from stdin.
   opt --source-expression-file <source-expression-file>  Read the source expression from a file
-  opt --force  Save despite validation errors; also lets --save-to overwrite an existing target
+  opt --force, -f  Save despite validation errors
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
@@ -329,7 +336,7 @@ Move or rename a model object, including in and out of display folders
   arg <source>  Source object path
   arg <destination>  Destination object path
   arg [model]  Path to model (if not using --model)
-  opt --force  Allow --save-to to overwrite an existing target
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --type, -t <type>  Disambiguate when the path matches multiple table-children.
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
@@ -396,7 +403,8 @@ Find and replace text across model objects
   opt --regex  Treat pattern as a regular expression
   opt --case-sensitive  Enable case-sensitive matching
   opt --dry-run  Preview changes without applying
-  opt --force  Save even if the replacement introduces validation errors
+  opt --force, -f  Save despite validation errors
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
@@ -408,7 +416,8 @@ Find and replace text across model objects
 Remove an object from the model
   arg <path>  Object path to remove.
   arg [model]  Path to model (if not using --model)
-  opt --force  Force removal even if object has dependents
+  opt --force, -f  Remove even if the object has DAX dependents (they break; inspect with 'tx deps')
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Show what would be removed without saving
   opt --if-exists  Succeed silently if the object does not exist
   opt --save-to <save-to>  Save to a different path (implies --save)
@@ -424,7 +433,7 @@ Save a model to disk in a specified format (like fab export)
   arg [model]  Path to model, Fabric path, or omit for active connection
   opt --output-path, -o <output-path>  File system path to write the model to. Omit to save the loaded model back to its source.
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted). Defaults to the loaded model's format.
-  opt --force  Skip validation and overwrite existing output. Does not override layout-safety refusals.
+  opt --overwrite  Overwrite an existing output file or directory
   opt --fix-bpa  Auto-fix BPA violations before saving (applies FixExpressions where available)
   opt --bpa-rules <bpa-rules>  Path(s) to BPA rule file(s) for this save. Overrides bpa.rules in CLI config.
   opt --supporting-files  Wrap output in a {modelName}.SemanticModel/ folder with .platform and definition.pbism. Only for tmdl/bim on bare targets.
@@ -438,7 +447,8 @@ Execute C# script(s) against a semantic model
   opt --save-to <save-to>  Save model to a different path after all scripts execute
   opt --serialization <serialization>  Model serialization: tmdl, bim (tmsl and auto also accepted)
   opt --dry-run  Compile script and report errors without executing
-  opt --force  Save even if this mutation introduces DAX validation errors
+  opt --force, -f  Save even if this mutation introduces DAX validation errors
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
@@ -467,7 +477,7 @@ Set a property on a model object
   arg [model]  Path to model (if not using --model)
   opt -q <q>  Property expression.
   opt -i <i>  Value for the preceding -q. Use '-' to read from stdin.
-  opt --force  Allow --save-to to overwrite an existing target
+  opt --overwrite  Allow --save-to to overwrite an existing target
   opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).
   opt --save  Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage.
   opt --save-to <save-to>  Save to a different path (implies --save)

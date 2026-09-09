@@ -48,6 +48,7 @@ public sealed class BpaRunHandler
             request.Revert,
             request.Serialization,
             request.Force,
+            request.Overwrite,
             request.NoSync);
         var stagingStore = _stores.Staging;
         var connection = _stores.ResolveSession();

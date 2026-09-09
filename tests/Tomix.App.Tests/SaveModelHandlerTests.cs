@@ -15,7 +15,7 @@ public sealed class SaveModelHandlerTests
                 Model: new ModelReference(dir.Path),
                 OutputPath: dir.Path,
                 Serialization: "tmdl",
-                Force: true,
+                Overwrite: true,
                 SupportingFiles: false,
                 SyncTarget: new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel")),
             CancellationToken.None);
@@ -37,7 +37,7 @@ public sealed class SaveModelHandlerTests
                 Model: new ModelReference(dir.Path),
                 OutputPath: dir.Path,
                 Serialization: "tmdl",
-                Force: true,
+                Overwrite: true,
                 SupportingFiles: false,
                 SyncTarget: new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel")),
             CancellationToken.None);
@@ -60,7 +60,7 @@ public sealed class SaveModelHandlerTests
                 Model: new ModelReference(dir.Path),
                 OutputPath: dir.Path,
                 Serialization: "tmdl",
-                Force: true,
+                Overwrite: true,
                 SupportingFiles: false),
             CancellationToken.None);
 
@@ -80,7 +80,7 @@ public sealed class SaveModelHandlerTests
                 Model: new ModelReference(dir.Path),
                 OutputPath: dir.Path,
                 Serialization: "tmdl",
-                Force: true,
+                Overwrite: true,
                 SupportingFiles: false,
                 SyncTarget: new ModelReference("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel")),
             CancellationToken.None);

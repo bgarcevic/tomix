@@ -68,10 +68,8 @@ internal sealed class FormatCommand : ICommandModule
         };
         typeOption.Aliases.Add("-t");
         var saveOption = LifecycleOptions.Save();
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Save even if this mutation introduces validation errors"
-        };
+        var forceOption = LifecycleOptions.Force();
+        var overwriteOption = LifecycleOptions.Overwrite();
         var stageOption = LifecycleOptions.Stage();
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
@@ -89,6 +87,7 @@ internal sealed class FormatCommand : ICommandModule
             typeOption,
             saveOption,
             forceOption,
+            overwriteOption,
             stageOption,
             revertOption,
             noSyncOption
@@ -138,6 +137,7 @@ internal sealed class FormatCommand : ICommandModule
                         parseResult.GetValue(saveToOption),
                         "",
                         parseResult.GetValue(forceOption),
+                        parseResult.GetValue(overwriteOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         parseResult.GetValue(noSyncOption)),

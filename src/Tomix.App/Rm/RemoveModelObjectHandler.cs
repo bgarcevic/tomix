@@ -26,6 +26,7 @@ public sealed class RemoveModelObjectHandler
             request.Revert,
             request.Serialization,
             request.Force,
+            request.Overwrite,
             request.NoSync);
 
         return await MutationRunner.RunAsync(

@@ -13,6 +13,7 @@ public sealed record MutationOptions(
     bool Revert,
     string Serialization,
     bool Force,
+    bool Overwrite = false,
     bool NoSync = false);
 
 /// <summary>Where a handler should open/mutate and how it should persist, resolved up front by <see cref="MutationLifecycle"/>.</summary>
@@ -23,7 +24,8 @@ public sealed record MutationContext(
     string Serialization,
     bool Force,
     StagingHandle? Staging,
-    ModelReference? SyncTarget = null);
+    ModelReference? SyncTarget = null,
+    bool Overwrite = false);
 
 /// <summary>A failed pre-flight: the code/message/exit-code the handler should return verbatim.</summary>
 public sealed record MutationError(string Code, string Message, int ExitCode);
@@ -102,7 +104,7 @@ public static class MutationLifecycle
 
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(
-                new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null, syncTarget),
+                new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null, syncTarget, options.Overwrite),
                 null);
 
         if (mode == MutationMode.Revert)
@@ -150,7 +152,7 @@ public static class MutationLifecycle
         switch (context.Mode)
         {
             case MutationMode.Save:
-                var export = await mutator.SaveAsync(context.SaveTarget, context.Serialization, context.Force, cancellationToken);
+                var export = await mutator.SaveAsync(context.SaveTarget, context.Serialization, context.Overwrite, cancellationToken);
                 var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
                     mutator, context.SyncTarget, context.Force,
                     WorkspaceSync.SyncOptionsFor(command), cancellationToken);
@@ -158,7 +160,7 @@ public static class MutationLifecycle
 
             case MutationMode.Stage:
                 // Flush the in-memory mutation into the working copy on disk, then record the op.
-                await mutator.SaveAsync(null, context.Serialization, force: true, cancellationToken);
+                await mutator.SaveAsync(null, context.Serialization, overwrite: true, cancellationToken);
                 await context.Staging!.AppendOpAsync(command, summary, cancellationToken);
                 return new MutationOutcome(false, true);
 

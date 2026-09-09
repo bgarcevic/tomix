@@ -196,7 +196,7 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
     public Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,
-        bool force,
+        bool overwrite,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -219,7 +219,7 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
 
         return TomModelExporter.ExportAsync(
             _database,
-            new ModelExportRequest(outputPath, string.IsNullOrWhiteSpace(serialization) ? "tmdl" : serialization, force, SupportingFiles: false),
+            new ModelExportRequest(outputPath, string.IsNullOrWhiteSpace(serialization) ? "tmdl" : serialization, overwrite, SupportingFiles: false),
             cancellationToken);
     }
 

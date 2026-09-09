@@ -73,7 +73,7 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
         CancellationToken cancellationToken)
     {
         var effective = SamePath(request.OutputPath, _path)
-            ? request with { Force = true }
+            ? request with { Overwrite = true }
             : request;
         return TomModelExporter.ExportAsync(GetDatabase(), effective, cancellationToken);
     }
@@ -108,7 +108,7 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
     public Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,
-        bool force,
+        bool overwrite,
         CancellationToken cancellationToken)
     {
         var inPlace = string.IsNullOrWhiteSpace(outputPath) || SamePath(outputPath, _path);
@@ -118,7 +118,7 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
             new ModelExportRequest(
                 string.IsNullOrWhiteSpace(outputPath) ? _path : outputPath,
                 format,
-                Force: force || inPlace,
+                Overwrite: overwrite || inPlace,
                 SupportingFiles: false),
             cancellationToken);
     }

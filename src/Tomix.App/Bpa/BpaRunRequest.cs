@@ -20,4 +20,5 @@ public sealed record BpaRunRequest(
     bool AllowExternalRules = false,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    bool Overwrite = false);

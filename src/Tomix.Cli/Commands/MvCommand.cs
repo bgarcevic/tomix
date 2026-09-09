@@ -37,10 +37,7 @@ internal sealed class MvCommand : ICommandModule
             Description = "Path to model (if not using --model)",
             Arity = ArgumentArity.ZeroOrOne
         };
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Allow --save-to to overwrite an existing target"
-        };
+        var overwriteOption = LifecycleOptions.Overwrite();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple table-children."
@@ -66,7 +63,7 @@ internal sealed class MvCommand : ICommandModule
             sourceArgument,
             destinationArgument,
             modelArgument,
-            forceOption,
+            overwriteOption,
             typeOption,
             stageOption,
             revertOption,
@@ -144,12 +141,12 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         parseResult.GetValue(serializationOption) ?? "",
-                        parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         parseResult.GetValue(noSyncOption),
                         parseResult.GetValue(strictRefsOption),
-                        FixRefs: !parseResult.GetValue(noFixRefsOption)),
+                        FixRefs: !parseResult.GetValue(noFixRefsOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

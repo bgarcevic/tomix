@@ -131,10 +131,8 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         {
             Description = "Read the source expression from a file"
         };
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Save despite validation errors; also lets --save-to overwrite an existing target"
-        };
+        var forceOption = LifecycleOptions.Force();
+        var overwriteOption = LifecycleOptions.Overwrite();
         var saveOption = LifecycleOptions.Save();
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
@@ -157,6 +155,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             sourceExpressionOption,
             sourceExpressionFileOption,
             forceOption,
+            overwriteOption,
             saveOption,
             saveToOption,
             serializationOption,
@@ -209,7 +208,8 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                         parseResult.GetValue(serializationOption) ?? "",
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -231,10 +231,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         {
             Description = "Succeed silently if the table has no policy"
         };
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Allow --save-to to overwrite an existing target"
-        };
+        var overwriteOption = LifecycleOptions.Overwrite();
         var saveOption = LifecycleOptions.Save();
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
@@ -247,7 +244,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
             tableArgument,
             modelArgument,
             ifExistsOption,
-            forceOption,
+            overwriteOption,
             saveOption,
             saveToOption,
             serializationOption,
@@ -293,10 +290,10 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         parseResult.GetValue(serializationOption) ?? "",
-                        parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         revert,
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

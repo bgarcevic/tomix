@@ -35,8 +35,10 @@ internal sealed class RmCommand : ICommandModule
         };
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Force removal even if object has dependents"
+            Description = "Remove even if the object has DAX dependents (they break; inspect with 'tx deps')"
         };
+        forceOption.Aliases.Add("-f");
+        var overwriteOption = LifecycleOptions.Overwrite();
         var dryRunOption = new Option<bool>("--dry-run")
         {
             Description = "Show what would be removed without saving"
@@ -62,6 +64,7 @@ internal sealed class RmCommand : ICommandModule
             pathArgument,
             modelArgument,
             forceOption,
+            overwriteOption,
             dryRunOption,
             ifExistsOption,
             saveToOption,
@@ -127,7 +130,8 @@ internal sealed class RmCommand : ICommandModule
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
-                        parseResult.GetValue(noSyncOption)),
+                        parseResult.GetValue(noSyncOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

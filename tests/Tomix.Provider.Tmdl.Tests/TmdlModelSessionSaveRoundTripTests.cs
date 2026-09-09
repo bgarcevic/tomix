@@ -23,7 +23,7 @@ public sealed class TmdlModelSessionSaveRoundTripTests : IDisposable
         {
             before = await session.GetSummaryAsync(CancellationToken.None);
             var result = await session.SaveAsync(
-                outputPath: null, "tmdl", force: false, CancellationToken.None);
+                outputPath: null, "tmdl", overwrite: false, CancellationToken.None);
             Assert.Equal(modelPath, result.SavedPath);
         }
 
@@ -46,7 +46,7 @@ public sealed class TmdlModelSessionSaveRoundTripTests : IDisposable
                 Type: null));
             Assert.True(mutation.Changed);
 
-            await session.SaveAsync(outputPath: null, "tmdl", force: false, CancellationToken.None);
+            await session.SaveAsync(outputPath: null, "tmdl", overwrite: false, CancellationToken.None);
         }
 
         await using var reopened = new TmdlModelSession(modelPath);
@@ -69,7 +69,7 @@ public sealed class TmdlModelSessionSaveRoundTripTests : IDisposable
         {
             before = await session.GetSummaryAsync(CancellationToken.None);
             var result = await session.SaveAsync(
-                targetPath, "tmdl", force: false, CancellationToken.None);
+                targetPath, "tmdl", overwrite: false, CancellationToken.None);
             Assert.Equal(targetPath, result.SavedPath);
         }
 

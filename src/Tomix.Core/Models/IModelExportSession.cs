@@ -10,7 +10,7 @@ public interface IModelExportSession
 public sealed record ModelExportRequest(
     string OutputPath,
     string Serialization,
-    bool Force,
+    bool Overwrite,
     bool SupportingFiles);
 
 public sealed record ModelExportResult(

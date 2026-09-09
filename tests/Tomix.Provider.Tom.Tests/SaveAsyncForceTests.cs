@@ -66,7 +66,7 @@ public sealed class SaveAsyncForceTests
 
         await using var session = new TomFileModelSession(sourcePath, null);
 
-        var result = await session.SaveAsync(outputPath: null, "bim", force: false, CancellationToken.None);
+        var result = await session.SaveAsync(outputPath: null, "bim", overwrite: false, CancellationToken.None);
         Assert.Equal(sourcePath, result.SavedPath);
     }
 

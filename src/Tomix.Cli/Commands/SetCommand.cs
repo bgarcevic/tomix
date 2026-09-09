@@ -41,10 +41,7 @@ internal sealed class SetCommand : ICommandModule
         {
             Description = "Value for the preceding -q. Use '-' to read from stdin."
         };
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Allow --save-to to overwrite an existing target"
-        };
+        var overwriteOption = LifecycleOptions.Overwrite();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name)."
@@ -71,7 +68,7 @@ internal sealed class SetCommand : ICommandModule
             modelArgument,
             queryOption,
             valueOption,
-            forceOption,
+            overwriteOption,
             typeOption,
             saveOption,
             saveToOption,
@@ -130,12 +127,12 @@ internal sealed class SetCommand : ICommandModule
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         parseResult.GetValue(serializationOption) ?? "",
-                        parseResult.GetValue(forceOption),
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         parseResult.GetValue(noSyncOption),
                         parseResult.GetValue(strictRefsOption),
-                        FixRefs: !parseResult.GetValue(noFixRefsOption)),
+                        FixRefs: !parseResult.GetValue(noFixRefsOption),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

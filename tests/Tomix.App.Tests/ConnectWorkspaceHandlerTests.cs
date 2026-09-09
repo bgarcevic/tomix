@@ -78,7 +78,7 @@ public class ConnectWorkspaceHandlerTests
         Assert.NotNull(session.LastRequest);
         Assert.Equal(workspace, session.LastRequest!.OutputPath);
         Assert.Equal("tmdl", session.LastRequest.Serialization);
-        Assert.True(session.LastRequest.Force);
+        Assert.True(session.LastRequest.Overwrite);
         Assert.False(session.LastRequest.SupportingFiles);
     }
 

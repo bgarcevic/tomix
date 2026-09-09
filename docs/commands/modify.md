@@ -4,8 +4,12 @@ Commands that change the model. They share the mutation lifecycle described
 in [Editing & staging](../guides/editing.md): **preview by default**, persist
 with `--save`, batch with `--stage`, or write elsewhere with
 `--save-to <path>` (which implies `--save`). `--serialization tmdl|bim`
-controls the on-disk format, `--force` saves past validation errors, and
-`--no-sync` skips the workspace mirror.
+controls the on-disk format, `--force` (alias `-f`) saves past validation
+errors, `--overwrite` lets `--save-to` replace an existing target, and
+`--no-sync` skips the workspace mirror. Two commands keep a command-scoped
+`--force` with a different meaning: `rm --force` removes despite DAX
+dependents, and `init`/`connect`/`stage commit`/`deploy`/`config init` use
+`--force` to bypass their own destructive guards.
 
 Those shared lifecycle options are not repeated in the tables below.
 
@@ -360,7 +364,8 @@ tx incremental-refresh <show|set|rm|apply> <table> [options]
 | `--incremental-offset <n>` | Periods to shift the window head from today (e.g. for future-dated data). |
 | `--polling-expression <m>` / `--polling-expression-file <file>` | M expression polled per partition to detect data changes (`-` reads from stdin / read from a file). |
 | `--source-expression <m>` / `--source-expression-file <file>` | M source query filtering on `RangeStart`/`RangeEnd` (`-` reads from stdin / read from a file). |
-| `--force` | Save despite validation errors; also lets `--save-to` overwrite an existing target. |
+| `--force` (`-f`) | Save despite validation errors. |
+| `--overwrite` | Let `--save-to` overwrite an existing target. |
 
 ```sh
 tx incremental-refresh show Sales

@@ -51,7 +51,7 @@ public sealed class TmdlModelSessionSaveForceTests : IDisposable
 
         // In-place save (null output) must succeed even without --force, and must not throw
         // an OutputExistsException for the source directory.
-        var result = await session.SaveAsync(outputPath: null, "tmdl", force: false, CancellationToken.None);
+        var result = await session.SaveAsync(outputPath: null, "tmdl", overwrite: false, CancellationToken.None);
         Assert.Equal(sourcePath, result.SavedPath);
     }
 
@@ -64,7 +64,7 @@ public sealed class TmdlModelSessionSaveForceTests : IDisposable
 
         // ExportAsync to the source path (the tx save path) must succeed without force.
         var result = await session.ExportAsync(
-            new ModelExportRequest(sourcePath, "tmdl", Force: false, SupportingFiles: false),
+            new ModelExportRequest(sourcePath, "tmdl", Overwrite: false, SupportingFiles: false),
             CancellationToken.None);
         Assert.Equal(sourcePath, result.SavedPath);
     }
@@ -79,7 +79,7 @@ public sealed class TmdlModelSessionSaveForceTests : IDisposable
         await using var session = new TmdlModelSession(sourcePath);
 
         await Assert.ThrowsAsync<OutputExistsException>(() =>
-            session.SaveAsync(otherPath, "tmdl", force: false, CancellationToken.None));
+            session.SaveAsync(otherPath, "tmdl", overwrite: false, CancellationToken.None));
     }
 
     private string CopySample() => SampleModel.CopyTo(_tempDir, "source-tmdl");

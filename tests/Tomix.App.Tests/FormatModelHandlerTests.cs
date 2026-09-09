@@ -259,7 +259,7 @@ public sealed class FormatModelHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ForceFlag_PassesForceToSave()
+    public async Task HandleAsync_OverwriteFlag_PassesOverwriteToSave()
     {
         var session = new StubSession(Snapshot());
         var handler = new FormatModelHandler([new StubProvider(session)], new RecordingFormatter(), TestStores);
@@ -277,11 +277,11 @@ public sealed class FormatModelHandlerTests
                 Save: true,
                 SaveTo: "out",
                 Serialization: "",
-                Force: true),
+                Overwrite: true),
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.True(session.SaveForceValue);
+        Assert.True(session.SaveOverwriteValue);
     }
 
     private static ModelSnapshot AmbiguousSnapshot()
@@ -389,7 +389,7 @@ public sealed class FormatModelHandlerTests
 
         public string? SaveOutputPath { get; private set; }
 
-        public bool SaveForceValue { get; private set; }
+        public bool SaveOverwriteValue { get; private set; }
 
         public Task<ModelSummary> GetSummaryAsync(CancellationToken cancellationToken)
             => Task.FromResult(new ModelSummary("stub", 1601, 1, 1, 2, 0, 0));
@@ -421,11 +421,11 @@ public sealed class FormatModelHandlerTests
         public Task<ModelExportResult> SaveAsync(
             string? outputPath,
             string serialization,
-            bool force,
+            bool overwrite,
             CancellationToken cancellationToken)
         {
             SaveOutputPath = outputPath;
-            SaveForceValue = force;
+            SaveOverwriteValue = overwrite;
             return Task.FromResult(new ModelExportResult(outputPath ?? "source", "tmdl"));
         }
     }

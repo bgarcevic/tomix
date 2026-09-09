@@ -82,7 +82,7 @@ public sealed class ConnectWorkspaceHandler
         }
 
         await exporter.ExportAsync(
-            new ModelExportRequest(target, serialization, Force: true, SupportingFiles: false),
+            new ModelExportRequest(target, serialization, Overwrite: true, SupportingFiles: false),
             cancellationToken);
 
         return new ConnectWorkspaceInitResult(Initialized: true, request.Workspace, serialization);

@@ -479,8 +479,35 @@ public sealed class AddModelObjectHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ForceFlag_PassesForceToSave()
+    public async Task HandleAsync_OverwriteFlag_PassesOverwriteToSave()
     {
+        var session = new StubMutationSession();
+        var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
+
+        var result = await handler.HandleAsync(
+            new AddModelObjectRequest(
+                new ModelReference("any"),
+                "Sales/Revenue",
+                "Measure",
+                "1",
+                [],
+                IfNotExists: false,
+                Save: true,
+                SaveTo: null,
+                Serialization: "",
+                Force: false,
+                Overwrite: true),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(session.SaveOverwriteValue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ForceFlag_AloneDoesNotEnableOverwrite()
+    {
+        // The #146 split: --force bypasses validation only; overwriting an existing
+        // --save-to target requires --overwrite.
         var session = new StubMutationSession();
         var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);
 
@@ -499,7 +526,7 @@ public sealed class AddModelObjectHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.True(session.SaveForceValue);
+        Assert.False(session.SaveOverwriteValue);
     }
 
     [Fact]
@@ -585,7 +612,7 @@ public sealed class AddModelObjectHandlerTests
         public bool ReturnChanged { get; set; } = true;
         public string? SaveOutputPath { get; private set; }
         public string SaveSerializationValue { get; private set; } = "";
-        public bool SaveForceValue { get; private set; }
+        public bool SaveOverwriteValue { get; private set; }
 
         public Task<ModelSummary> GetSummaryAsync(CancellationToken ct)
             => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
@@ -607,11 +634,11 @@ public sealed class AddModelObjectHandlerTests
             => throw new NotSupportedException();
 
         public Task<ModelExportResult> SaveAsync(
-            string? outputPath, string serialization, bool force, CancellationToken ct)
+            string? outputPath, string serialization, bool overwrite, CancellationToken ct)
         {
             SaveOutputPath = outputPath;
             SaveSerializationValue = serialization;
-            SaveForceValue = force;
+            SaveOverwriteValue = overwrite;
             return Task.FromResult(new ModelExportResult(outputPath ?? "source", serialization));
         }
     }
@@ -634,7 +661,7 @@ public sealed class AddModelObjectHandlerTests
         public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request) => throw new NotSupportedException();
         public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request) => throw new NotSupportedException();
         public ModelReplaceResult ReplaceText(ModelReplaceRequest request) => throw new NotSupportedException();
-        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
+        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool overwrite, CancellationToken ct)
             => throw new NotSupportedException();
     }
 
@@ -653,7 +680,7 @@ public sealed class AddModelObjectHandlerTests
         public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request) => throw new NotSupportedException();
         public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request) => throw new NotSupportedException();
         public ModelReplaceResult ReplaceText(ModelReplaceRequest request) => throw new NotSupportedException();
-        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool force, CancellationToken ct)
+        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool overwrite, CancellationToken ct)
             => throw new IOException("disk full");
     }
 }

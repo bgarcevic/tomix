@@ -111,7 +111,7 @@ public static class MutationStubs
         }
 
         public Task<ModelExportResult> SaveAsync(
-            string? outputPath, string serialization, bool force, CancellationToken cancellationToken)
+            string? outputPath, string serialization, bool overwrite, CancellationToken cancellationToken)
             => Task.FromResult(new ModelExportResult(outputPath ?? "/local/model", serialization));
     }
 

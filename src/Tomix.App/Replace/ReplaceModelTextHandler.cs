@@ -32,6 +32,7 @@ public sealed class ReplaceModelTextHandler
             request.Revert,
             request.Serialization,
             request.Force,
+            request.Overwrite,
             request.NoSync);
 
         return await MutationRunner.RunAsync(

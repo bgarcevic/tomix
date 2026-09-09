@@ -13,7 +13,7 @@ public interface IModelMutationSession
     Task<ModelExportResult> SaveAsync(
         string? outputPath,
         string serialization,
-        bool force,
+        bool overwrite,
         CancellationToken cancellationToken);
 }
 

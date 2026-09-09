@@ -68,11 +68,11 @@ public sealed class SaveModelHandler
         try
         {
             var export = await exporter.ExportAsync(
-                new ModelExportRequest(outputPath, serialization, request.Force, request.SupportingFiles),
+                new ModelExportRequest(outputPath, serialization, request.Overwrite, request.SupportingFiles),
                 cancellationToken);
 
             var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
-                session, request.SyncTarget, request.Force,
+                session, request.SyncTarget, request.Overwrite,
                 // 'save' never edits a refresh policy, so the mirror's policy partitions (and their
                 // processed data) are preserved — see WorkspaceSync.SyncOptionsFor.
                 WorkspaceSync.SyncOptionsFor("save"), cancellationToken);

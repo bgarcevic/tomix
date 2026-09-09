@@ -169,7 +169,7 @@ public sealed class StageHandler
                         "TOMIX_STAGE_COMMIT_LOCAL_FAILED", $"Working copy cannot be exported: {manifest.WorkingCopy}", 2);
 
                 var export = await exporter.ExportAsync(
-                    new ModelExportRequest(manifest.Source, manifest.Serialization, Force: true, SupportingFiles: false),
+                    new ModelExportRequest(manifest.Source, manifest.Serialization, Overwrite: true, SupportingFiles: false),
                     cancellationToken);
                 localSaved = export.SavedPath;
             }

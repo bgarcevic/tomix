@@ -70,7 +70,7 @@ public sealed class StagingStore
                 : workingRoot;
 
             var export = await exporter.ExportAsync(
-                new ModelExportRequest(workingTarget, serialization, Force: true, SupportingFiles: false),
+                new ModelExportRequest(workingTarget, serialization, Overwrite: true, SupportingFiles: false),
                 cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
