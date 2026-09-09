@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-09
+
 ### Added
 
 - `set` on tables now accepts every writable scalar property TOM exposes, in addition to the
@@ -574,5 +576,6 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bgarcevic/tomix-cli/releases/tag/v0.1.0
