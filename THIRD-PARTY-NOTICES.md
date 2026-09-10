@@ -43,14 +43,14 @@ adapted from the SQLBI Whiteboard DAX engine**, used under the MIT License.
 
 The files carry the copyright header and are adapted to this repository (namespaces, the doubled
 closing-bracket escape in the lexer's bracket scan, and comment rewording). The `Tomix.Core.Dax`
-facade and the offline `DaxSyntaxCheck` analyzer are tomix code built on that engine.
+facade, the offline `DaxSyntaxCheck` analyzer, and the offline DAX formatter that powers
+`tx format` (`DaxCodeFormatter`/`DaxPrinter`/`Doc`) are tomix code built on that engine.
 
 ## NuGet dependencies (redistributed)
 
 | Package | Version | License | Copyright / Project |
 |---------|---------|---------|---------------------|
 | System.Linq.Dynamic.Core | 1.7.2 | Apache-2.0 | Copyright (c) ZZZ Projects / Stef Heyenrath — <https://github.com/zzzprojects/System.Linq.Dynamic.Core> |
-| Dax.Formatter | 1.2.0 | MIT | SQLBI — <https://github.com/sql-bi/DaxFormatter> |
 | Dax.Metadata / Dax.Model.Extractor / Dax.ViewModel / Dax.Vpax (VertiPaq-Analyzer) | 1.12.1 | MIT | SQLBI, Copyright (c) Marco Russo — <https://github.com/sql-bi/VertiPaq-Analyzer> |
 | Dax.Vpax.Obfuscator | 1.2.1 | MIT | SQLBI — <https://github.com/sql-bi/Vpax-Obfuscator> |
 | Microsoft.AnalysisServices (TOM) | 19.114.0 | Microsoft Software License Terms (redistributable client libraries) | Copyright (c) Microsoft Corporation — <https://www.nuget.org/packages/Microsoft.AnalysisServices> |

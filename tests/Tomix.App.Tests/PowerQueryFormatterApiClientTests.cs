@@ -18,7 +18,7 @@ public sealed class PowerQueryFormatterApiClientTests
             new HttpClient(new ThrowingHandler(new TaskCanceledException("timeout"))), Endpoint);
 
         var response = await client.FormatAsync(
-            new ExpressionFormatRequest("let x = 1 in x", FormatterLanguages.PowerQuery, false, false, false),
+            new ExpressionFormatRequest("let x = 1 in x", FormatterLanguages.PowerQuery, false),
             CancellationToken.None);
 
         Assert.False(response.Success);
@@ -35,7 +35,7 @@ public sealed class PowerQueryFormatterApiClientTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => client.FormatAsync(
-                new ExpressionFormatRequest("let x = 1 in x", FormatterLanguages.PowerQuery, false, false, false),
+                new ExpressionFormatRequest("let x = 1 in x", FormatterLanguages.PowerQuery, false),
                 cts.Token));
     }
 

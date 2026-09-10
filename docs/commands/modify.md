@@ -299,21 +299,23 @@ tx replace "Sales" "Revenue" -t measure --dry-run
 tx format [model] [options]
 ```
 
-Uses the DAX and Power Query formatter APIs. With no target, formats every
-expression in the model.
+DAX is formatted offline by the engine bundled with `tx` — no network, no rate limits, same
+result air-gapped. DAX output uses the bundled formatter's style: a 65-column prettier-style
+layout with keywords and known function names upper-cased, so results differ from the
+daxformatter.com style previous releases produced (and from Power BI's format button). Power
+Query (M) formatting still uses a network API. With no target, formats every expression in
+the model.
 
 | Option | Description |
 |--------|-------------|
 | `-e, --expression <expr>` | Format an inline expression (no model needed). |
-| `-p, --path <path>` | Format the expression on one object. |
+| `--path <path>` | Format the expression on one object. |
 | `--lang <dax\|m>` | Expression language. |
-| `--semicolons` | Use semicolons as DAX list separators. |
-| `--long` | Prefer long-line formatting. |
-| `--no-space-after-function` | No space between a DAX function name and `(`. |
+| `--long` | Prefer long lines when formatting M. |
 
 ```sh
 tx format -e "CALCULATE(sum(sales[amt]))"
-tx format --path "Sales[Total Sales]" --save
+tx format --path "Sales/Total Sales" --save
 tx format --save                     # whole model
 ```
 

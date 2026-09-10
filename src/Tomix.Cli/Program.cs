@@ -65,7 +65,7 @@ internal static class Program
         var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var formatter = new CompositeExpressionFormatterClient(
             [
-                new DaxFormatterApiClient(),
+                new OfflineDaxFormatterClient(),
                 new PowerQueryFormatterApiClient(httpClient)
             ]);
         var workspaceCatalog = new PowerBiWorkspaceCatalog(httpClient, tokenProvider);

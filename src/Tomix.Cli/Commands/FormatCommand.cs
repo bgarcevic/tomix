@@ -44,17 +44,9 @@ internal sealed class FormatCommand : ICommandModule
         {
             Description = "Format the expression on a model object path"
         };
-        var semicolonsOption = new Option<bool>("--semicolons")
-        {
-            Description = "Use semicolons as DAX list separators"
-        };
         var longOption = new Option<bool>("--long")
         {
-            Description = "Prefer long-line formatting"
-        };
-        var noSpaceAfterFunctionOption = new Option<bool>("--no-space-after-function")
-        {
-            Description = "Do not insert a space between a DAX function name and '('"
+            Description = "Prefer long lines when formatting M"
         };
         var saveToOption = LifecycleOptions.SaveTo();
         var langOption = new Option<string?>("--lang")
@@ -79,9 +71,7 @@ internal sealed class FormatCommand : ICommandModule
             modelArgument,
             expressionOption,
             pathOption,
-            semicolonsOption,
             longOption,
-            noSpaceAfterFunctionOption,
             saveToOption,
             langOption,
             typeOption,
@@ -132,8 +122,6 @@ internal sealed class FormatCommand : ICommandModule
                         parseResult.GetValue(langOption) ?? "",
                         type,
                         parseResult.GetValue(longOption),
-                        parseResult.GetValue(semicolonsOption),
-                        parseResult.GetValue(noSpaceAfterFunctionOption),
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         Serialization: "",

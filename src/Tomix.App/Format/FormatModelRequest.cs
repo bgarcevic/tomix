@@ -9,8 +9,6 @@ public sealed record FormatModelRequest(
     string Language,
     ModelObjectKind? Type,
     bool Long,
-    bool Semicolons,
-    bool NoSpaceAfterFunction,
     bool Save,
     string? SaveTo,
     string Serialization = "",

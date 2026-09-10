@@ -43,6 +43,19 @@ internal static class DaxCodeFormatter
     }
 
     /// <summary>
+    /// Parses and prints <paramref name="source"/> without the safety fallback, so callers can
+    /// compare the printed result against the input themselves: <paramref name="prepared"/> is
+    /// the source after <see cref="PrepareSource"/>, <paramref name="printed"/> the printer's
+    /// output, and the result reports whether printing preserved the input's tokens.
+    /// </summary>
+    internal static bool TryFormatChecked(string source, int maximumLineLength, out string prepared, out string printed)
+    {
+        prepared = PrepareSource(source, maximumLineLength);
+        printed = DaxPrinter.Print(DaxParser.Parse(prepared), maximumLineLength);
+        return PreservesTokens(prepared, printed);
+    }
+
+    /// <summary>
     /// Validates the line limit and returns the DAX the clipboard text actually contains, so that
     /// every formatter is given the same code.
     /// </summary>

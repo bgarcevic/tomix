@@ -145,6 +145,27 @@ public sealed class TomColumnPropertyTests
     }
 
     [Fact]
+    public void SetProperty_Expression_OnCalculatedColumn_Writes()
+    {
+        var (mutator, table) = NewModel();
+        table.Columns.Add(new CalculatedColumn { Name = "Calc", DataType = DataType.Int64, Expression = "1" });
+
+        mutator.SetProperty(Set("T/Calc", "expression", "2 + 2"));
+
+        Assert.Equal("2 + 2", ((CalculatedColumn)table.Columns["Calc"]).Expression);
+    }
+
+    [Fact]
+    public void SetProperty_Expression_OnDataColumn_StillRejected()
+    {
+        var (mutator, _) = NewModel();
+
+        var ex = Assert.Throws<NotSupportedException>(() => mutator.SetProperty(Set("T/C", "expression", "1")));
+
+        Assert.Contains("not supported for columns", ex.Message);
+    }
+
+    [Fact]
     public void SetProperty_SortByColumn_ResolvesSibling()
     {
         var (mutator, table) = NewModel();

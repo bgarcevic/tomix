@@ -242,9 +242,7 @@ Format DAX or M/Power Query expressions (--expression inline, --path object path
   arg [model]  Path to model (if not using --model)
   opt --expression, -e <expression>  Format an inline expression
   opt --path <path>  Format the expression on a model object path
-  opt --semicolons  Use semicolons as DAX list separators
-  opt --long  Prefer long-line formatting
-  opt --no-space-after-function  Do not insert a space between a DAX function name and '('
+  opt --long  Prefer long lines when formatting M
   opt --save-to <save-to>  Save to a different path (implies --save)
   opt --lang <lang>  Expression language: dax or m
   opt --type, -t <type>  Disambiguate object type

@@ -10,6 +10,32 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed
+
+- `format` formats DAX offline with the bundled formatter engine instead of calling the
+  daxformatter.com API: no network, no rate limits, air-gap safe. The output layout differs —
+  a 65-column prettier-style layout with keywords and known function names upper-cased — so
+  the first `format` run over a model formatted with a previous release rewrites every
+  expression. Power Query (M) formatting still uses a network API, and `--long` now affects
+  only M line width.
+- `format` reports DAX syntax errors with their line numbers and refuses to reformat invalid
+  expressions; when the offline formatter declines an expression, the message names the line
+  of the first difference it would have introduced.
+- `format` treats expressions that differ from the formatter's output only in line endings as
+  unchanged (the formatter emits CRLF on Windows while TMDL stores LF), so repeat runs no
+  longer re-report every multi-line expression as formatted.
+
+### Fixed
+
+- `format --type calculatedcolumn` and `set` can write the `expression` property on calculated
+  columns; the TOM provider rejected it as unsupported for columns.
+
+### Removed
+
+- `format --semicolons` and `format --no-space-after-function` — they only fed the retired
+  daxformatter.com API; the offline formatter has no equivalents.
+- The `Dax.Formatter` NuGet dependency.
+
 ## [0.2.1] - 2026-09-10
 
 ### Fixed

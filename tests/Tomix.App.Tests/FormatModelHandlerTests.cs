@@ -11,7 +11,7 @@ public sealed class FormatModelHandlerTests
             Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"), "test-session"),
         () => null);
     [Fact]
-    public async Task HandleAsync_InlineDax_UsesFormatterOptions()
+    public async Task HandleAsync_InlineDax_PassesLongOption()
     {
         var formatter = new RecordingFormatter();
         var handler = new FormatModelHandler([], formatter, TestStores);
@@ -24,8 +24,6 @@ public sealed class FormatModelHandlerTests
                 Language: "dax",
                 Type: null,
                 Long: true,
-                Semicolons: true,
-                NoSpaceAfterFunction: true,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -37,8 +35,6 @@ public sealed class FormatModelHandlerTests
         var request = Assert.Single(formatter.Requests);
         Assert.Equal("dax", request.Language);
         Assert.True(request.Long);
-        Assert.True(request.Semicolons);
-        Assert.True(request.NoSpaceAfterFunction);
     }
 
     [Fact]
@@ -55,8 +51,6 @@ public sealed class FormatModelHandlerTests
                 Language: "dax",
                 Type: null,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -81,8 +75,6 @@ public sealed class FormatModelHandlerTests
                 Language: "dax",
                 Type: null,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -107,8 +99,6 @@ public sealed class FormatModelHandlerTests
                 Language: "",
                 Type: ModelObjectKind.Measure,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: true,
                 SaveTo: "out"),
             CancellationToken.None);
@@ -140,8 +130,6 @@ public sealed class FormatModelHandlerTests
                 Language: "",
                 Type: null,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -168,8 +156,6 @@ public sealed class FormatModelHandlerTests
                 Language: "m",
                 Type: null,
                 Long: true,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -198,8 +184,6 @@ public sealed class FormatModelHandlerTests
                 Language: "",
                 Type: ModelObjectKind.Expression,
                 Long: true,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -224,8 +208,6 @@ public sealed class FormatModelHandlerTests
                 Language: "",
                 Type: null,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -248,8 +230,6 @@ public sealed class FormatModelHandlerTests
                 Language: "dax",
                 Type: null,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: false,
                 SaveTo: null),
             CancellationToken.None);
@@ -272,8 +252,6 @@ public sealed class FormatModelHandlerTests
                 Language: "",
                 Type: ModelObjectKind.Measure,
                 Long: false,
-                Semicolons: false,
-                NoSpaceAfterFunction: false,
                 Save: true,
                 SaveTo: "out",
                 Serialization: "",
@@ -282,6 +260,60 @@ public sealed class FormatModelHandlerTests
 
         Assert.True(result.Success);
         Assert.True(session.SaveOverwriteValue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExpressionDiffersOnlyInLineEndings_ReportsUnchangedAndSkipsWrite()
+    {
+        // TMDL stores LF while the formatter emits the platform's CRLF; that difference is not a
+        // formatting change, so the sweep reports unchanged and must not write.
+        var session = new StubSession(LineEndingsSnapshot());
+        var handler = new FormatModelHandler([new StubProvider(session)], new CrlfFormatter(), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: null,
+                Language: "",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var model = Assert.IsType<ModelFormatResult>(result.Data);
+        Assert.Equal(0, model.Formatted);
+        Assert.Equal(1, model.Unchanged);
+        Assert.Empty(session.SetRequests);
+    }
+
+    private static ModelSnapshot LineEndingsSnapshot()
+    {
+        var totalSales = new ModelObject(
+            "Total Sales", ModelObjectKind.Measure, "Sales/Total Sales",
+            Detail: null, Expression: "CALCULATE (\n    [Sales]\n)", Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var sales = new ModelObject(
+            "Sales", ModelObjectKind.Table, "Sales",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [totalSales]);
+
+        return new ModelSnapshot("stub", 1601, [sales]);
+    }
+
+    private sealed class CrlfFormatter : IExpressionFormatterClient
+    {
+        public bool CanFormat(string language) => language == "dax";
+
+        public Task<ExpressionFormatResponse> FormatAsync(
+            ExpressionFormatRequest request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new ExpressionFormatResponse(
+                true,
+                request.Expression.Replace("\n", "\r\n"),
+                []));
     }
 
     private static ModelSnapshot AmbiguousSnapshot()

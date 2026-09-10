@@ -275,7 +275,7 @@ come from structural integrity checks.
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |
-| `TOMIX_FORMAT_FAILED` | 1 | `format --expression` failed to format the inline expression (invalid DAX/M, or the formatter service was unreachable). The message includes the formatter's error details. |
+| `TOMIX_FORMAT_FAILED` | 1 | `format --expression` failed to format the inline expression. DAX is formatted offline; M is formatted by a network service, so unreachable-service errors apply to M only. The message includes the formatter's error details. |
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_COMPLETION_SHELL_REQUIRED` | 2 | `completion` called without its required shell argument. |
 | `TOMIX_PROFILE_TARGET_REQUIRED` | 2 | A new profile has no usable remote, local-model, Desktop, or active-session target. |

@@ -59,12 +59,15 @@ public sealed class FormatModelHandler
                     if (!formatted.Success)
                         throw new InvalidOperationException($"Formatting failed for: {obj.Path}");
 
-                    mutator.SetProperty(new ModelObjectSetRequest(
-                        obj.Path,
-                        [new ModelPropertyAssignment("expression", formatted.Formatted)],
-                        obj.Kind));
-
                     var status = Status(obj.Expression!, formatted.Formatted);
+                    if (status == "formatted")
+                    {
+                        mutator.SetProperty(new ModelObjectSetRequest(
+                            obj.Path,
+                            [new ModelPropertyAssignment("expression", formatted.Formatted)],
+                            obj.Kind));
+                    }
+
                     return (status == "formatted", $"format {obj.Path}",
                         outcome => (FormatModelResult)new ObjectFormatResult(
                             formatted.Success, obj.Path, FormatterLanguages.DisplayName(language),
@@ -104,11 +107,15 @@ public sealed class FormatModelHandler
 
                     var status = Status(obj.Expression!, response.Formatted);
                     if (status == "formatted")
+                    {
                         formattedCount++;
+                        successful.Add((obj, response.Formatted));
+                    }
                     else
+                    {
                         unchangedCount++;
+                    }
 
-                    successful.Add((obj, response.Formatted));
                     results.Add(ToModelResult(obj, status));
                 }
 
@@ -147,9 +154,7 @@ public sealed class FormatModelHandler
             new ExpressionFormatRequest(
                 request.Expression!,
                 language,
-                request.Long,
-                request.Semicolons,
-                request.NoSpaceAfterFunction),
+                request.Long),
             cancellationToken);
 
         if (!formatted.Success)
@@ -176,9 +181,7 @@ public sealed class FormatModelHandler
             new ExpressionFormatRequest(
                 expression,
                 language,
-                request.Long,
-                request.Semicolons,
-                request.NoSpaceAfterFunction),
+                request.Long),
             cancellationToken);
 
     private static IEnumerable<ModelObject> FormatTargets(
@@ -222,7 +225,15 @@ public sealed class FormatModelHandler
     }
 
     private static string Status(string before, string after)
-        => string.Equals(before, after, StringComparison.Ordinal) ? "unchanged" : "formatted";
+        => string.Equals(NormalizeLineEndings(before), NormalizeLineEndings(after), StringComparison.Ordinal)
+            ? "unchanged"
+            : "formatted";
+
+    // The formatter emits the platform's line endings (CRLF on Windows) while TMDL stores LF, so
+    // an already-formatted expression read back from a file differs from the formatter's output
+    // by line endings alone. That is not a formatting change: compare normalized, and the sweep
+    // skips the write.
+    private static string NormalizeLineEndings(string text) => text.Replace("\r\n", "\n");
 
     private static ModelFormatObjectResult ToModelResult(ModelObject obj, string status)
     {

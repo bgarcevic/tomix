@@ -368,6 +368,9 @@ internal static class TomPropertyApplier
             case "description":
                 column.Description = value;
                 break;
+            case "expression" when column is CalculatedColumn calculated:
+                calculated.Expression = value;
+                break;
             case "formatstring":
                 column.FormatString = value;
                 break;

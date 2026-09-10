@@ -30,8 +30,11 @@ Application use cases and command handlers.
   guarded session opening, and disposal. Specialized multi-session or staging lifecycles may stay
   explicit when they have different operation-level diagnostics.
 - One command should usually have one handler.
-- Formatting behavior uses external formatter APIs:
-  - DAX formatting uses the SQLBI DaxFormatter API/client from https://github.com/sql-bi/DaxFormatter.
+- Formatting behavior:
+  - DAX formatting is offline: the vendored SQLBI engine behind `Tomix.Core.Dax.DaxFormatter`,
+    wrapped by `Format/OfflineDaxFormatterClient` — no network, no rate limits. The formatter
+    never changes code: when printing would not preserve the expression's tokens, strings, and
+    comments, it reports a failure and the original text comes back.
   - Power Query formatting uses the Power Query Formatter API from https://www.powerqueryformatter.com/api.
 - Workspace discovery uses the Power BI REST API (`GET /v1.0/myorg/groups`) via `Connect/PowerBiWorkspaceCatalog`, authenticated with the shared `IAccessTokenProvider` token (same scope as XMLA). Interactive picking lives in the CLI, not here.
 - Release discovery uses the GitHub Releases API via `Update/GitHubReleaseSource` behind `Update/IReleaseSource` (unauthenticated, per-request headers on the shared `HttpClient`). The throttled-check cache lives in `Update/UpdateCheckStore`; install-type detection in `Update/InstallationInspector`.
