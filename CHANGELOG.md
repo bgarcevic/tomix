@@ -10,6 +10,17 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-10
+
+### Fixed
+
+- `update` no longer ends with a stale "A new version of tx is available" notice for the very
+  update it just applied. The end-of-command notice compares the running process's version
+  against the cached latest; a successful in-place update leaves that version old while the
+  update check has just cached the new one, so the notice announced the update that had just
+  happened and invited a pointless re-run. `tx update` (including `update --check`) now never
+  triggers the throttled notice — the command reports its own result (#191).
+
 ## [0.2.0] - 2026-09-09
 
 ### Added
@@ -576,6 +587,7 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bgarcevic/tomix-cli/releases/tag/v0.1.0

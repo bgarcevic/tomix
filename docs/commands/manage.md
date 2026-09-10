@@ -157,4 +157,6 @@ tx update --version 0.2.0 --yes
 ```
 
 Related: the throttled update notice printed after commands can be disabled
-with `tx config set updateCheck false` or `TOMIX_NO_UPDATE_CHECK=1`.
+with `tx config set updateCheck false` or `TOMIX_NO_UPDATE_CHECK=1`. The
+notice never fires after `tx update` itself — the command reports its own
+result.

@@ -41,7 +41,8 @@ internal static class UpdateNotice
                 envOptOut: Environment.GetEnvironmentVariable("TOMIX_NO_UPDATE_CHECK") is not null,
                 configOptOut: configOptOut,
                 kind: InstallationInspector.Detect(),
-                version: version))
+                version: version,
+                invokedUpdate: IsUpdateInvocation(parseResult)))
             {
                 return;
             }
@@ -90,6 +91,17 @@ internal static class UpdateNotice
         return GlobalOptions.OutputFormatValue(parseResult);
     }
 
+    /// <summary>
+    /// True when the invoked command is <c>update</c> (including <c>update --check</c>). That
+    /// command renders its own authoritative result — "Updated X -> Y", "tx is up to date", or
+    /// the check preview — so the throttled notice is redundant there, and worse than redundant
+    /// after a successful apply: the running assembly's version is stale (the binary on disk is
+    /// new, but this process still reports the old one) while the check step has just cached
+    /// the new version, so the notice would announce the very update that just happened.
+    /// </summary>
+    internal static bool IsUpdateInvocation(ParseResult parseResult)
+        => string.Equals(parseResult.CommandResult.Command.Name, "update", StringComparison.OrdinalIgnoreCase);
+
     internal static bool ShouldShow(
         string outputFormat,
         bool quiet,
@@ -98,7 +110,8 @@ internal static class UpdateNotice
         bool envOptOut,
         bool configOptOut,
         InstallKind kind,
-        string version)
+        string version,
+        bool invokedUpdate = false)
     {
         if (!OutputFormats.IsTextLike(outputFormat))
             return false;
@@ -107,6 +120,8 @@ internal static class UpdateNotice
         if (kind is InstallKind.Development or InstallKind.Unknown)
             return false;
         if (version == "0.0.0")
+            return false;
+        if (invokedUpdate)
             return false;
 
         return true;
