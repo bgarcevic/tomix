@@ -167,18 +167,20 @@ internal sealed class FormatCommand : ICommandModule
         }
     }
 
-    private static void Render(FormatModelResult result)
+    internal static void Render(FormatModelResult result)
     {
         switch (result)
         {
             case InlineFormatResult inline:
-                AnsiConsole.WriteLine(inline.Formatted);
+                AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
+                    FormatterLanguages.IsDax(inline.Language), inline.Formatted));
                 foreach (var error in inline.Errors)
                     Console.Error.WriteLine(error);
                 break;
 
             case ObjectFormatResult obj:
-                AnsiConsole.WriteLine(obj.Formatted);
+                AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
+                    FormatterLanguages.IsDax(obj.Language), obj.Formatted));
                 if (obj.DryRun == true)
                     AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 if (obj.Synced)

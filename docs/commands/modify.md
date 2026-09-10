@@ -82,6 +82,11 @@ tx set "Sales Territory/'Sales Territories'/Region" -q ordinal -i 2
 tx set Sales/Sales -t partition -q mode -i DirectQuery
 ```
 
+When the edited property carries DAX (for example a measure's `expression`),
+text output previews the change with `Before:`/`After:` lines and syntax
+colors. Non-DAX properties, unchanged values, and `--output-format json`
+show no preview.
+
 Columns accept every writable scalar property (`sourceColumn`, `dataType`,
 `dataCategory`, `summarizeBy`, `sortByColumn`, `isKey`, `isNullable`,
 `isUnique`, `isAvailableInMDX`, `keepUniqueRows`, `encodingHint`, lineage
@@ -307,6 +312,10 @@ Query (M) formatting still uses a network API. With no target, formats every exp
 the model. Objects that fail to format are counted in `Failed: N` and the formatter's error
 is reported per object on stderr (deduplicated with a `(+N more)` count when objects share
 the same failure); `--output-format json` carries it in each result row's `error` field.
+
+Formatted DAX is syntax-highlighted in text output, for both inline `-e` and
+`--path`; piping or redirecting strips the color, so the output stays safe to
+copy back into a model.
 
 | Option | Description |
 |--------|-------------|

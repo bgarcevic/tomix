@@ -31,10 +31,32 @@ public sealed class FormatModelHandlerTests
         Assert.True(result.Success);
         var inline = Assert.IsType<InlineFormatResult>(result.Data);
         Assert.Equal("formatted:dax:SUM(Sales[Amount])", inline.Formatted);
+        Assert.Equal("dax", inline.Language);
 
         var request = Assert.Single(formatter.Requests);
         Assert.Equal("dax", request.Language);
         Assert.True(request.Long);
+    }
+
+    [Fact]
+    public async Task HandleAsync_InlinePowerQuery_ReportsDisplayName()
+    {
+        var handler = new FormatModelHandler([], new RecordingFormatter(), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference(""),
+                Expression: "let x = 1 in x",
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("m", Assert.IsType<InlineFormatResult>(result.Data).Language);
     }
 
     [Fact]

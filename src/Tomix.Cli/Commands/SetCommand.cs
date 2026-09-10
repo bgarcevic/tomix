@@ -174,7 +174,7 @@ internal sealed class SetCommand : ICommandModule
         return command;
     }
 
-    private static void Render(SetModelPropertyResult result)
+    internal static void Render(SetModelPropertyResult result)
     {
         if (string.IsNullOrEmpty(result.Property))
         {
@@ -183,6 +183,16 @@ internal sealed class SetCommand : ICommandModule
         }
 
         AnsiConsole.MarkupLine(Styling.Success($"Set: {result.Set}.{result.Property}"));
+
+        // DAX edits get a Before/After preview so the change can be reviewed before saving.
+        // Identical values skip it (the write still went through the lifecycle).
+        if (result.IsDaxProperty
+            && !string.Equals(result.OldValue, result.Value, StringComparison.Ordinal))
+        {
+            AnsiConsole.MarkupLine($"{Styling.Bold("Before:")} {Styling.ExpressionMarkup(isDax: true, result.OldValue ?? "")}");
+            AnsiConsole.MarkupLine($"{Styling.Bold("After:")} {Styling.ExpressionMarkup(isDax: true, result.Value)}");
+        }
+
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
         else if (result.DryRun == true)

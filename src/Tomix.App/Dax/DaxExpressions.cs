@@ -53,6 +53,21 @@ public static class DaxExpressions
                 && string.Equals(detail, "calculated", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// Whether a property key can name a DAX value on some object kind — the union of the keys
+    /// <see cref="Sites"/> yields. A candidate edit uses this to decide whether resolving the
+    /// object's current value is worth a snapshot read; the authoritative check is
+    /// <see cref="Sites"/> against the actual object.
+    /// </summary>
+    public static bool MayBeDaxProperty(string property)
+    {
+        var key = property.Trim();
+        return string.Equals(key, "Expression", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "DefaultDetailRowsExpression", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "RlsExpression", StringComparison.OrdinalIgnoreCase)
+            || MeasureExpressionProperties.Contains(key, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Enumerates the DAX expressions of <paramref name="obj"/> with the property key each lives
     /// under, so a rewrite can be routed back to the right property.
     /// </summary>

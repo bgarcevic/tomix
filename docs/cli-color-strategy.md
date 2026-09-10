@@ -72,7 +72,7 @@ When changing a palette color, keep this contract: adjust lightness before hue, 
 | Table              | Spectre `Table().RoundedBorder().BorderColor(Palette.Slate)` | Already established in `LsRenderer` |
 | Table row de-emphasis | Whole row in Slate (`Styling.Muted` per cell) | Hidden-object rows in `ls` are muted end to end |
 | Connection banner  | Slate on stderr                               | `Connected to: C:\models\Sales` before the model opens |
-| DAX highlighting   | Role-mapped palette on text output only       | `get` property view and `ls` expression cells: keywords Lav, functions Harbor, tables Sage, columns Moss, measures Orchid, variables Terra, literals Amber, comments Slate; M expressions and JSON/CSV/TMDL/BIM stay markup-free |
+| DAX highlighting   | Role-mapped palette on text output only       | `get` properties, `ls` expression cells, `validate` offending lines, `set` DAX before/after previews, and `format` inline/`--path` output: keywords Lav, functions Harbor, tables Sage, columns Moss, measures Orchid, variables Terra, literals Amber, comments Slate; M expressions and JSON/CSV/TMDL/BIM stay markup-free; `script` and `bpa run --fix` stay plain because neither carries DAX today |
 | CI annotations     | Plain text, no markup                         | `::error::...` / `##vso[task.logissue...]`       |
 
 ## NO_COLOR Compliance

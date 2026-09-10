@@ -10,6 +10,13 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- DAX syntax highlighting now extends beyond `get` and `ls`: `validate` shows the offending
+  expression line under each finding, `set` previews DAX edits with `Before:`/`After:` lines,
+  and `format` colors inline `-e` and `--path` output. Text output only — JSON/CSV, CI
+  annotations, and TRX stay plain, and piped or redirected output degrades to plain text (#202).
+
 ### Changed
 
 - `format` formats DAX offline with the bundled formatter engine instead of calling the

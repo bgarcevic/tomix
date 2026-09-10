@@ -20,4 +20,10 @@ public sealed record SetModelPropertyResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyList<string>? FixedReferences = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? DryRun = null);
+    bool? DryRun = null,
+    // Render-only: the current value of a DAX property before the edit, for the text preview.
+    [property: JsonIgnore]
+    string? OldValue = null,
+    // Render-only: whether the edited property carries DAX (see SetModelPropertyHandler).
+    [property: JsonIgnore]
+    bool IsDaxProperty = false);

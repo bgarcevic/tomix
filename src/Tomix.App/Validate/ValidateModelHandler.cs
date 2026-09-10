@@ -28,7 +28,7 @@ public sealed class ValidateModelHandler
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
                 var issues = request.ServerOnly
-                    ? new LocalIssues([], [])
+                    ? new LocalIssues([], [], null)
                     : ValidateLocal(snapshot);
                 return Complete(request, stopwatch, issues, snapshot.Name);
             }, noProviderMessage: null, noProviderHint: null, cancellationToken);
@@ -40,7 +40,8 @@ public sealed class ValidateModelHandler
             // stay diagnostics: they describe the connection, not the model.
             var issues = new LocalIssues(
                 [new ValidationIssue("TOMIX_MODEL_LOAD_FAILED", ex.Message, request.Model.Value, Expression: null)],
-                []);
+                [],
+                MeasureNames: null);
             return Complete(request, stopwatch, issues, request.Model.Value);
         }
     }
@@ -58,14 +59,16 @@ public sealed class ValidateModelHandler
             Valid: issues.Errors.Count == 0,
             DurationMs: Math.Max(0, stopwatch.ElapsedMilliseconds),
             Errors: issues.Errors,
-            Warnings: request.NoWarnings ? [] : issues.Warnings);
+            Warnings: request.NoWarnings ? [] : issues.Warnings,
+            MeasureNames: issues.MeasureNames);
 
         return TomixResult<ValidateModelResult>.Ok(result, exitCode: result.Valid ? 0 : 1);
     }
 
     private sealed record LocalIssues(
         IReadOnlyList<ValidationIssue> Errors,
-        IReadOnlyList<ValidationIssue> Warnings);
+        IReadOnlyList<ValidationIssue> Warnings,
+        IReadOnlySet<string>? MeasureNames);
 
     /// <summary>
     /// Offline analysis over the snapshot: every DAX-bearing property (via
@@ -90,7 +93,7 @@ public sealed class ValidateModelHandler
             CheckStructure(obj, index, errors);
         }
 
-        return new LocalIssues(Distinct(errors), Distinct(warnings));
+        return new LocalIssues(Distinct(errors), Distinct(warnings), index.MeasureNames);
     }
 
     private static void CheckDaxSite(
@@ -110,7 +113,8 @@ public sealed class ValidateModelHandler
                     SyntaxCode(issue.Kind),
                     issue.Message,
                     obj.Path,
-                    Line(site.Expression, issue.Start)));
+                    Line(site.Expression, issue.Start),
+                    LineText(site.Expression, issue.Start)));
             return;
         }
 
@@ -124,14 +128,16 @@ public sealed class ValidateModelHandler
                             "DAX0001",
                             $"Table '{reference.Table}' cannot be found.",
                             obj.Path,
-                            Line(site.Expression, reference.Start)));
+                            Line(site.Expression, reference.Start),
+                            LineText(site.Expression, reference.Start)));
                     else if (!columns.Contains(reference.Object!)
                         && !index.MeasureNames.Contains(reference.Object!))
                         errors.Add(new ValidationIssue(
                             "DAX0002",
                             $"Column [{reference.Object}] cannot be found on table '{reference.Table}'.",
                             obj.Path,
-                            Line(site.Expression, reference.Start)));
+                            Line(site.Expression, reference.Start),
+                            LineText(site.Expression, reference.Start)));
                     break;
 
                 case DaxReferenceShape.Table:
@@ -140,7 +146,8 @@ public sealed class ValidateModelHandler
                             "DAX0001",
                             $"Table '{reference.Table}' cannot be found.",
                             obj.Path,
-                            Line(site.Expression, reference.Start)));
+                            Line(site.Expression, reference.Start),
+                            LineText(site.Expression, reference.Start)));
                     break;
 
                 // A lone [X] that resolves nowhere may still be a query-scoped extension column
@@ -152,7 +159,8 @@ public sealed class ValidateModelHandler
                             "DAX0003",
                             $"Measure or column [{reference.Object}] cannot be found in the model.",
                             obj.Path,
-                            Line(site.Expression, reference.Start)));
+                            Line(site.Expression, reference.Start),
+                            LineText(site.Expression, reference.Start)));
                     break;
 
                 // A bare word only counts as a table when the model has one by that name.
@@ -225,17 +233,40 @@ public sealed class ValidateModelHandler
     private static List<ValidationIssue> Distinct(List<ValidationIssue> issues)
         => issues.DistinctBy(issue => (issue.Code, issue.Message, issue.ObjectName)).ToList();
 
+    /// <summary>Very long offending lines are truncated so one expression cannot dominate the table.</summary>
+    private const int MaxExpressionLine = 120;
+
     /// <summary>The 1-based line of <paramref name="offset"/> in <paramref name="expression"/>.</summary>
     private static string Line(string expression, int offset)
+        => (LineIndex(expression, offset) + 1).ToString();
+
+    /// <summary>
+    /// The offending line's text for human output: trailing whitespace trimmed and very long
+    /// lines truncated with an ellipsis (the <c>ls</c> preview precedent). The line is found
+    /// with the same newline accounting as <see cref="Line"/>, so the number and the text agree.
+    /// </summary>
+    private static string? LineText(string expression, int offset)
     {
-        var line = 1;
+        if (expression.Length == 0)
+            return null;
+
+        var lines = expression.Split('\n');
+        var line = Math.Min(LineIndex(expression, offset), lines.Length - 1);
+        var text = lines[line].TrimEnd();
+        return text.Length > MaxExpressionLine ? text[..(MaxExpressionLine - 3)] + "..." : text;
+    }
+
+    /// <summary>The 0-based index of the line containing <paramref name="offset"/>.</summary>
+    private static int LineIndex(string expression, int offset)
+    {
+        var line = 0;
         for (var i = 0; i < offset && i < expression.Length; i++)
         {
             if (expression[i] == '\n')
                 line++;
         }
 
-        return line.ToString();
+        return line;
     }
 
     private static string OwningTable(string path)

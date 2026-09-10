@@ -127,6 +127,40 @@ public sealed class ValidateModelHandlerTests
 
         var issue = Assert.Single(result.Data!.Errors);
         Assert.Equal("2", issue.Expression);
+        Assert.Equal("+ SUM(Sales[Missing])", issue.ExpressionLine);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TruncatesVeryLongOffendingLine()
+    {
+        var name = new string('x', 200);
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", $"SUM(Sales[{name}])")));
+
+        var issue = Assert.Single(result.Data!.Errors);
+        Assert.NotNull(issue.ExpressionLine);
+        Assert.EndsWith("...", issue.ExpressionLine);
+        Assert.Equal(120, issue.ExpressionLine!.Length);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CarriesMeasureNames_ForHighlighting()
+    {
+        var result = await ValidateAsync(SnapshotWithMeasureReference());
+
+        Assert.True(result.Data!.Valid);
+        Assert.NotNull(result.Data.MeasureNames);
+        Assert.Contains("Total Revenue", result.Data.MeasureNames!);
+    }
+
+    [Fact]
+    public async Task HandleAsync_LoadFailure_LeavesMeasureNamesNull()
+    {
+        var handler = new ValidateModelHandler([new ThrowingModelProvider()]);
+        var result = await handler.HandleAsync(
+            new ValidateModelRequest(new ModelReference("any"), ErrorsOnly: false, NoWarnings: false, ServerOnly: false),
+            CancellationToken.None);
+
+        Assert.Null(result.Data!.MeasureNames);
     }
 
     [Fact]

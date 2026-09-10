@@ -7,6 +7,7 @@ public abstract record FormatModelResult;
 public sealed record InlineFormatResult(
     bool Success,
     string Formatted,
+    string Language,
     IReadOnlyList<string> Errors) : FormatModelResult;
 
 public sealed record ObjectFormatResult(

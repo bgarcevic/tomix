@@ -24,6 +24,19 @@ public sealed class DaxExpressionsTests
     public void IsDaxExpression_MatchesSitesContract(ModelObjectKind kind, string? detail, bool expected)
         => Assert.Equal(expected, DaxExpressions.IsDaxExpression(kind, detail));
 
+    [Theory]
+    [InlineData("expression", true)]
+    [InlineData("  Expression  ", true)]
+    [InlineData("detailRowsExpression", true)]
+    [InlineData("formatStringExpression", true)]
+    [InlineData("defaultDetailRowsExpression", true)]
+    [InlineData("rlsExpression", true)]
+    [InlineData("description", false)]
+    [InlineData("formatString", false)]
+    [InlineData("filterExpression", false)] // table permissions expose no DaxSite yet
+    public void MayBeDaxProperty_MatchesTheSiteKeys(string property, bool expected)
+        => Assert.Equal(expected, DaxExpressions.MayBeDaxProperty(property));
+
     [Fact]
     public void IsDaxValue_MatchesByExactText()
     {

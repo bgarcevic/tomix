@@ -1,9 +1,16 @@
 namespace Tomix.App.Format;
 
-internal static class FormatterLanguages
+public static class FormatterLanguages
 {
     public const string Dax = "dax";
     public const string PowerQuery = "powerquery";
+
+    /// <summary>
+    /// Whether <paramref name="language"/> names DAX. Accepts the canonical name and the
+    /// display name (<see cref="DisplayName"/>), so renderers can gate without a string literal.
+    /// </summary>
+    public static bool IsDax(string language)
+        => string.Equals(language, Dax, StringComparison.OrdinalIgnoreCase);
 
     public static bool TryNormalize(string? value, out string language)
     {

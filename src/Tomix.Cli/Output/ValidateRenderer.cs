@@ -30,18 +30,12 @@ internal static class ValidateRenderer
         var allRows = new List<(string Kind, string Message, string Object, string Line)>();
 
         foreach (var error in result.Errors)
-        {
-            var message = noMultiline ? error.Message.ReplaceLineEndings(" ") : error.Message;
-            allRows.Add(("Error", message, error.ObjectName, error.Expression ?? ""));
-        }
+            allRows.Add(("Error", MessageCell(error, noMultiline, result.MeasureNames), error.ObjectName, error.Expression ?? ""));
 
         if (!errorsOnly)
         {
             foreach (var warning in result.Warnings)
-            {
-                var message = noMultiline ? warning.Message.ReplaceLineEndings(" ") : warning.Message;
-                allRows.Add(("Warning", message, warning.ObjectName, warning.Expression ?? ""));
-            }
+                allRows.Add(("Warning", MessageCell(warning, noMultiline, result.MeasureNames), warning.ObjectName, warning.Expression ?? ""));
         }
 
         if (result.Errors.Count > 0)
@@ -106,6 +100,25 @@ internal static class ValidateRenderer
             ? issue.Message
             : $"{issue.Message}{Environment.NewLine}{issue.Expression}";
 
+    /// <summary>
+    /// The Message cell: escaped plain text, plus — unless <paramref name="noMultiline"/> — the
+    /// offending expression line on a second line behind a muted gutter, syntax-highlighted when
+    /// the line came from a DAX site (every <c>ExpressionLine</c> is DAX today). The value is
+    /// markup for <see cref="RenderTable"/>, which must not escape it again.
+    /// </summary>
+    private static string MessageCell(
+        ValidationIssue issue,
+        bool noMultiline,
+        IReadOnlySet<string>? measureNames)
+    {
+        var message = Styling.MarkupEscape(noMultiline ? issue.Message.ReplaceLineEndings(" ") : issue.Message);
+        if (noMultiline || string.IsNullOrEmpty(issue.ExpressionLine))
+            return message;
+
+        var line = Styling.ExpressionMarkup(isDax: true, issue.ExpressionLine, measureNames);
+        return $"{message}\n  {Styling.Muted("│ ")}{line}";
+    }
+
     private static void RenderTable(IReadOnlyList<(string Kind, string Message, string Object, string Line)> rows)
     {
         if (rows.Count == 0)
@@ -115,7 +128,7 @@ internal static class ValidateRenderer
 
         foreach (var row in rows)
             table.AddRow(
-                Styling.MarkupEscape(row.Message),
+                row.Message,
                 Styling.MarkupEscape(row.Object),
                 Styling.MarkupEscape(row.Line));
 

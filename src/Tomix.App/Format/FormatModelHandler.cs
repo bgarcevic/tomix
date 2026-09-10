@@ -166,7 +166,11 @@ public sealed class FormatModelHandler
         }
 
         return TomixResult<FormatModelResult>.Ok(
-            new InlineFormatResult(formatted.Success, formatted.Formatted, formatted.Errors),
+            new InlineFormatResult(
+                formatted.Success,
+                formatted.Formatted,
+                FormatterLanguages.DisplayName(language),
+                formatted.Errors),
             exitCode: 0);
     }
 

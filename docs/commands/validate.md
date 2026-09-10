@@ -106,6 +106,11 @@ reference checks are skipped, since a never-closed bracket makes everything
 after it read wrong. Syntactically valid expressions then get the offline
 reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).
 
+In text output each finding shows the offending expression line under its
+message, syntax-highlighted when it came from DAX; `--no-multiline` collapses
+the cell back to one line. `--output-format json`, CI annotations, and TRX
+output stay plain.
+
 | Option | Description |
 |--------|-------------|
 | `--ci <github\|vsts>` | Emit CI logging commands to stderr so findings annotate the PR. |
