@@ -1,4 +1,5 @@
-using System.Net.Http.Json;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 namespace Tomix.App.Format;
@@ -39,7 +40,13 @@ public sealed class PowerQueryFormatterApiClient : IExpressionFormatterClient
 
         try
         {
-            using var response = await _httpClient.PostAsJsonAsync(_endpoint, payload, cancellationToken);
+            // The service matches the Content-Type exactly and rejects the "charset=utf-8"
+            // suffix that PostAsJsonAsync appends with HTTP 415.
+            using var content = new StringContent(
+                JsonSerializer.Serialize(payload),
+                new MediaTypeHeaderValue("application/json"));
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = content };
+            using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (!response.IsSuccessStatusCode)

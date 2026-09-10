@@ -304,7 +304,9 @@ result air-gapped. DAX output uses the bundled formatter's style: a 65-column pr
 layout with keywords and known function names upper-cased, so results differ from the
 daxformatter.com style previous releases produced (and from Power BI's format button). Power
 Query (M) formatting still uses a network API. With no target, formats every expression in
-the model.
+the model. Objects that fail to format are counted in `Failed: N` and the formatter's error
+is reported per object on stderr (deduplicated with a `(+N more)` count when objects share
+the same failure); `--output-format json` carries it in each result row's `error` field.
 
 | Option | Description |
 |--------|-------------|

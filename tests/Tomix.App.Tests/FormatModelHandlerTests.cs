@@ -169,6 +169,65 @@ public sealed class FormatModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WholeModelSweepFailure_CarriesErrorDetailAndExitsZero()
+    {
+        // Issue #200: sweep failures reported only "Failed: N" and dropped the formatter's error
+        // text, so users had to re-run inline to learn why. The detail now rides on each failed
+        // row; the sweep still succeeds with exit 0 by design.
+        var handler = new FormatModelHandler(
+            [new StubProvider(new StubSession(Snapshot()))],
+            new FailingFormatter(["Formatter service returned HTTP 415: unsupported media type"]),
+            TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, result.ExitCode);
+        var model = Assert.IsType<ModelFormatResult>(result.Data);
+        Assert.Equal(1, model.Failed);
+        var row = Assert.Single(model.Results);
+        Assert.Equal("failed", row.Status);
+        Assert.Contains("HTTP 415", row.Error);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ObjectPathFormatFailure_IncludesFormatterDetail()
+    {
+        var handler = new FormatModelHandler(
+            [new StubProvider(new StubSession(Snapshot()))],
+            new FailingFormatter(["Syntax error near 'this'."]),
+            TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: "Sales/Total Sales",
+                Language: "dax",
+                Type: ModelObjectKind.Measure,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        var diagnostic = result.Diagnostics.First();
+        Assert.Equal("TOMIX_MUTATION_FAILED", diagnostic.Code);
+        Assert.Contains("Sales/Total Sales", diagnostic.Message);
+        Assert.Contains("Syntax error near 'this'.", diagnostic.Message);
+    }
+
+    [Fact]
     public async Task HandleAsync_TypeExpression_DefaultsToPowerQuery()
     {
         // Shared expressions are M, so --type expression without --lang must pick the

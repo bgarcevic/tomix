@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text.Json;
 using Tomix.App.Format;
 using Tomix.Cli.Commands;
 using Tomix.Core.Models;
@@ -53,6 +54,50 @@ public sealed partial class FormatFlagBindingTests
         Assert.DoesNotContain("Nothing is staged", StripAnsi(captured.Stderr));
     }
 
+    [Fact]
+    public void SweepFailure_TextOutput_PrintsErrorDetailToStderr()
+    {
+        // Issue #200: a uniform sweep failure printed only "Failed: 4" and hid the formatter's
+        // HTTP error; the detail now goes to stderr, deduplicated with the affected-object count.
+        var captured = ConsoleCapture.Invoke(
+            BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--dry-run"]),
+            captureAnsiConsole: true);
+
+        Assert.Equal(0, captured.ExitCode);
+        Assert.Contains("Failed: 4", StripAnsi(captured.Stdout));
+        var stderr = StripAnsi(captured.Stderr);
+        Assert.Contains("HTTP 415", stderr);
+        Assert.Contains("(+3 more)", stderr);
+        Assert.Equal(1, stderr.Split("HTTP 415").Length - 1);
+    }
+
+    [Fact]
+    public void SweepFailure_JsonOutput_CarriesErrorPerFailedResult()
+    {
+        var captured = ConsoleCapture.Invoke(
+            BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--dry-run", "--output-format", "json"]),
+            captureAnsiConsole: true);
+
+        Assert.Equal(0, captured.ExitCode);
+        using var document = JsonDocument.Parse(captured.Stdout);
+        var failed = document.RootElement
+            .GetProperty("data")
+            .GetProperty("results")
+            .EnumerateArray()
+            .Where(r => r.GetProperty("status").GetString() == "failed")
+            .ToList();
+
+        Assert.Equal(4, failed.Count);
+        Assert.All(failed, r => Assert.Contains("HTTP 415", r.GetProperty("error").GetString()));
+    }
+
+    private static RootCommand BuildFailingRoot()
+    {
+        var services = TestServices.Create();
+        return TestRoot.With(new FormatCommand(
+            Providers, new FailingStubFormatter(), services.State, services.Mutations).Build());
+    }
+
     [System.Text.RegularExpressions.GeneratedRegex("\x1b\\[[0-9;]*m")]
     private static partial System.Text.RegularExpressions.Regex AnsiRegex();
 
@@ -72,5 +117,18 @@ public sealed partial class FormatFlagBindingTests
             CancellationToken cancellationToken)
             => Task.FromResult(new ExpressionFormatResponse(
                 true, request.Expression + " ", []));
+    }
+
+    private sealed class FailingStubFormatter : IExpressionFormatterClient
+    {
+        public bool CanFormat(string language) => true;
+
+        public Task<ExpressionFormatResponse> FormatAsync(
+            ExpressionFormatRequest request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new ExpressionFormatResponse(
+                false,
+                request.Expression,
+                ["Formatter service returned HTTP 415: unsupported media type"]));
     }
 }

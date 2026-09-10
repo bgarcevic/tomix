@@ -51,4 +51,6 @@ public sealed record ModelFormatObjectResult(
     string Table,
     string Status,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? Partition);
+    string? Partition,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Error = null);

@@ -146,6 +146,27 @@ internal sealed class FormatCommand : ICommandModule
         return command;
     }
 
+    // A sweep failure must not be silent: otherwise an HTTP error from the M formatter reports
+    // only "Failed: N" and the user has to re-run inline to learn why. A uniform failure prints
+    // once with the affected-object count; distinct failures print once per object.
+    private static void WriteFailureDetails(IReadOnlyList<ModelFormatObjectResult> results)
+    {
+        var failures = results
+            .Where(r => r.Status == "failed" && !string.IsNullOrWhiteSpace(r.Error))
+            .ToList();
+
+        foreach (var group in failures.GroupBy(r => r.Error))
+        {
+            var first = group.First();
+            var label = first.Measure is null
+                ? $"{first.Table}/{first.Partition}"
+                : $"{first.Table}/{first.Measure}";
+            var more = group.Count() - 1;
+            var suffix = more > 0 ? $" (+{more} more)" : "";
+            Console.Error.WriteLine($"{label}{suffix}: {group.Key}");
+        }
+    }
+
     private static void Render(FormatModelResult result)
     {
         switch (result)
@@ -170,6 +191,7 @@ internal sealed class FormatCommand : ICommandModule
                 AnsiConsole.MarkupLine(Styling.Success($"Formatted: {model.Formatted}"));
                 AnsiConsole.MarkupLine(Styling.Warning($"Unchanged: {model.Unchanged}"));
                 AnsiConsole.MarkupLine(Styling.Error($"Failed: {model.Failed}"));
+                WriteFailureDetails(model.Results);
 
                 if (model.Saved is true or string)
                     AnsiConsole.MarkupLine(Styling.Success("Model saved."));
