@@ -30,7 +30,7 @@ internal sealed class RmCommand : ICommandModule
         };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var forceOption = new Option<bool>("--force")
@@ -41,17 +41,17 @@ internal sealed class RmCommand : ICommandModule
         var overwriteOption = LifecycleOptions.Overwrite();
         var dryRunOption = new Option<bool>("--dry-run")
         {
-            Description = "Show what would be removed without saving"
+            Description = "Preview the removal without saving"
         };
         var ifExistsOption = new Option<bool>("--if-exists")
         {
-            Description = "Succeed silently if the object does not exist"
+            Description = "Exit 0 when the object is already gone"
         };
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate when the path matches multiple table-children."
+            Description = "Type to pick when the path matches several objects under a table."
         };
         typeOption.Aliases.Add("-t");
         var saveOption = LifecycleOptions.Save();
@@ -59,7 +59,7 @@ internal sealed class RmCommand : ICommandModule
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var command = new Command("rm", "Remove an object from the model")
+        var command = new Command("rm", "Delete an object from the model")
         {
             pathArgument,
             modelArgument,
@@ -170,7 +170,7 @@ internal sealed class RmCommand : ICommandModule
                 + $"{string.Join(", ", broken)}. Update them with 'tx replace' or inspect with 'tx deps'."));
 
         if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist."));
+            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist."));
         else if (result.Saved is not null)
             AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
 

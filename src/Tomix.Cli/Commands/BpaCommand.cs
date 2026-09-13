@@ -36,7 +36,7 @@ internal sealed class BpaCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("bpa", "Best Practice Analyzer: run rules and manage rule collections");
+        var command = new Command("bpa", "Run best-practice rules against a model and manage rule collections");
         command.Subcommands.Add(BuildRulesCommand());
         command.Subcommands.Add(BuildRunCommand());
         return command;
@@ -46,13 +46,13 @@ internal sealed class BpaCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var rulesOption = new Option<string[]>("--rules", "-r")
         {
-            Description = "Path(s) or URL(s) to BPA rule file(s) in JSON format",
+            Description = "BPA rule files or URLs, as JSON",
             AllowMultipleArgumentsPerToken = true
         };
 
@@ -63,7 +63,7 @@ internal sealed class BpaCommand : ICommandModule
 
         var noModelRulesOption = new Option<bool>("--no-model-rules")
         {
-            Description = "Exclude BPA rules embedded in the model's annotations"
+            Description = "Skip rules embedded in the model's annotations"
         };
 
         var noDefaultsOption = new Option<bool>("--no-defaults")
@@ -78,7 +78,7 @@ internal sealed class BpaCommand : ICommandModule
 
         var fixOption = new Option<bool>("--fix")
         {
-            Description = "Apply fix expressions to auto-fix violations where possible"
+            Description = "Fix violations whose rules provide a fix expression"
         };
 
         var allowDeleteOption = new Option<bool>("--allow-delete")
@@ -109,17 +109,17 @@ internal sealed class BpaCommand : ICommandModule
 
         var ciOption = new Option<string?>("--ci")
         {
-            Description = "Emit CI logging commands to stderr: vsts or github"
+            Description = "Print CI log-group commands to stderr for the given system: vsts or github"
         };
 
         var trxOption = new Option<string?>("--trx")
         {
-            Description = "Write results as a VSTEST .trx file to the specified path"
+            Description = "Write results to a .trx test-run file at this path"
         };
 
         var allowExternalRulesOption = new Option<bool>("--allow-external-rules")
         {
-            Description = "Allow fetching BPA rule files from URLs embedded in model annotations"
+            Description = "Allow rule URLs found in model annotations to be fetched"
         };
 
         var pathOption = new Option<string?>("--path")
@@ -129,7 +129,7 @@ internal sealed class BpaCommand : ICommandModule
 
         var noMultilineOption = new Option<bool>("--no-multiline")
         {
-            Description = "Collapse each rule's guidance to a single line"
+            Description = "Show each rule's guidance on one line"
         };
 
         var detailsOption = new Option<bool>("--details")
@@ -157,7 +157,7 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Show only info-severity rules (combinable with --errors/--warnings)"
         };
 
-        var runCommand = new Command("run", "Run BPA rules against a model (--fix to auto-fix)")
+        var runCommand = new Command("run", "Run best-practice rules against a model")
         {
             modelArgument,
             rulesOption,
@@ -296,22 +296,22 @@ internal sealed class BpaCommand : ICommandModule
 
         var noDefaultsOption = new Option<bool>("--no-defaults")
         {
-            Description = "Suppress built-in rules from output"
+            Description = "Leave the built-in ruleset out of the listing"
         };
 
         var ignoredOption = new Option<bool>("--ignored")
         {
-            Description = "Show only ignored rules"
+            Description = "List only rules on the model's ignore list"
         };
 
         var disabledOption = new Option<bool>("--disabled")
         {
-            Description = "Show only disabled rules"
+            Description = "List only rules disabled for this user"
         };
 
         var allOption = new Option<bool>("--all")
         {
-            Description = "Show all rules including disabled and ignored"
+            Description = "Include disabled and ignored rules in the listing"
         };
 
         var modelArgument = new Argument<string>("model")
@@ -325,7 +325,7 @@ internal sealed class BpaCommand : ICommandModule
             rulesFileOption
         };
 
-        var listCommand = new Command("list", "List BPA rules from all sources with status")
+        var listCommand = new Command("list", "List rules from every source, with each rule's status")
         {
             modelArgument,
             rulesetOption,
@@ -376,11 +376,11 @@ internal sealed class BpaCommand : ICommandModule
                 BpaRulesRenderer.ToListJson);
         });
 
-        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("disable", "Disable a built-in BPA rule for the current user"));
-        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("enable", "Re-enable a previously disabled built-in BPA rule"));
-        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("ignore", "Add a rule to the model's ignore list", ignore: true));
+        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("disable", "Turn off a built-in rule for this user"));
+        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("enable", "Turn a disabled built-in rule back on"));
+        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("ignore", "Put a rule on the model's ignore list", ignore: true));
         rulesCommand.Subcommands.Add(listCommand);
-        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("unignore", "Remove a rule from the model's ignore list", ignore: false));
+        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("unignore", "Take a rule off the model's ignore list", ignore: false));
         return rulesCommand;
     }
 

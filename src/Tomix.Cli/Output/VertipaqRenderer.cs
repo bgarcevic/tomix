@@ -81,7 +81,7 @@ internal static class VertipaqRenderer
         if (annotate.Saved is false or null)
         {
             AnsiConsole.MarkupLine(Styling.Warning(
-                $"Annotated {annotate.AnnotatedObjects} objects in memory{skipped} — pass --save to persist."));
+                $"Annotated {annotate.AnnotatedObjects} objects in memory{skipped} — pass --save to write them to the model."));
             return;
         }
 

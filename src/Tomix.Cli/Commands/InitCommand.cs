@@ -11,7 +11,7 @@ internal sealed class InitCommand : ICommandModule
     {
         var outputPathArgument = new Argument<string>("output-path")
         {
-            Description = "Directory to create the model in (omit to use the global --model path)",
+            Description = "Where to create the model; defaults to the global --model path",
             Arity = ArgumentArity.ZeroOrOne
         };
 
@@ -28,21 +28,21 @@ internal sealed class InitCommand : ICommandModule
 
         var nameOption = new Option<string?>("--name")
         {
-            Description = "Model/database name (default: directory name)"
+            Description = "Name of the new model (default: the directory's name)"
         };
 
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim, pbip (default: tmdl)"
+            Description = "How the new model is written: tmdl, bim, or pbip (default: tmdl)"
         };
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "pbip");
 
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Replace any existing file or directory at the target path"
+            Description = "Clear anything already at the target path"
         };
 
-        var command = new Command("init", "Create a new empty semantic model")
+        var command = new Command("init", "Start a new empty semantic model")
         {
             outputPathArgument,
             compatibilityLevelOption,

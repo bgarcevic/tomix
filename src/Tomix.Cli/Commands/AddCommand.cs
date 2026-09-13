@@ -27,16 +27,16 @@ internal sealed class AddCommand : ICommandModule
     {
         var pathArgument = new Argument<string>("path")
         {
-            Description = "Object path of the new object. Slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX forms also accepted: \"'Sales'[Revenue]\". Pair with -t. Relationships use 'Sales[Key]->Product[Key]' (many side -> one side)."
+            Description = "Where to create the object, slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX form also accepted: \"'Sales'[Revenue]\". Combine with -t. For relationships, use 'Sales[Key]->Product[Key]' (many side first)."
         };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Object type. Known values: {ModelObjectTypeCatalog.CreationListText}. " +
+            Description = $"Type of object to create. Supported values: {ModelObjectTypeCatalog.CreationListText}. " +
                           "Data sources always require -t (no path keyword infers them)."
         };
         typeOption.Aliases.Add("-t");
@@ -57,7 +57,7 @@ internal sealed class AddCommand : ICommandModule
         expressionOption.Aliases.Add("-e");
         var setOption = new Option<string[]?>("--set")
         {
-            Description = "Set a property on the newly-created object as name=value, e.g. --set formatString=\"#,0\". Repeatable. Names accept dotted paths, bracket indexers, and DisplayName matching.",
+            Description = "Set a property on the new object: name=value, e.g. --set formatString=\"#,0\". Repeatable. Names can use dotted paths, bracket indexers, or a DisplayName.",
             Arity = ArgumentArity.ZeroOrMore
         };
         setOption.Validators.Add(result =>
@@ -68,11 +68,11 @@ internal sealed class AddCommand : ICommandModule
         });
         var fileOption = new Option<string?>("--file")
         {
-            Description = "Read expression from file"
+            Description = "Read the expression from this file"
         };
         var ifNotExistsOption = new Option<bool>("--if-not-exists")
         {
-            Description = "Succeed silently if the object already exists (exit 0)"
+            Description = "Do nothing and exit 0 when the object already exists"
         };
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
@@ -86,7 +86,7 @@ internal sealed class AddCommand : ICommandModule
 
         var modeOption = new Option<string?>("--mode")
         {
-            Description = "Partition storage mode: Import, DirectQuery, Dual, DirectLake, Push, Default."
+            Description = "Storage mode for the partition: Import, DirectQuery, Dual, DirectLake, Push, or Default."
         };
         modeOption.AcceptAmongIgnoreCase("Import", "DirectQuery", "Dual", "DirectLake", "Push", "Default");
         var sourceOption = new Option<string?>("--source")
@@ -99,7 +99,7 @@ internal sealed class AddCommand : ICommandModule
         };
         var connectionStringOption = new Option<string?>("--connection-string")
         {
-            Description = "Full connection string for a ProviderDataSource."
+            Description = "The connection string used by a ProviderDataSource."
         };
         var sourceTableOption = new Option<string?>("--source-table")
         {
@@ -115,7 +115,7 @@ internal sealed class AddCommand : ICommandModule
         };
         var partitionExpressionOption = new Option<string?>("--partition-expression")
         {
-            Description = "M/DAX expression for a partition source."
+            Description = "The M or DAX expression defining the partition's source."
         };
         var columnsOption = new Option<string?>("--columns")
         {
@@ -156,7 +156,7 @@ internal sealed class AddCommand : ICommandModule
             rangeGranularityOption
         };
 
-        var command = new Command("add", "Add an object to the model")
+        var command = new Command("add", "Create a new object in the model")
         {
             pathArgument,
             modelArgument,
@@ -299,7 +299,7 @@ internal sealed class AddCommand : ICommandModule
         else if (result.DryRun == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
         else if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
+            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist, or --stage to stage the change."));
         else
             AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
 

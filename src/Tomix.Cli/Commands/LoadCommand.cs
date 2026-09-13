@@ -23,11 +23,11 @@ internal sealed class LoadCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model, Fabric path, or omit for active connection",
+            Description = "Model path, Fabric path, or omit to use the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var command = new Command("load", "Load a semantic model and display summary")
+        var command = new Command("load", "Open a semantic model and print a summary")
         {
             modelArgument
         };

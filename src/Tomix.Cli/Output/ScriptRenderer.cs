@@ -61,7 +61,7 @@ internal static class ScriptRenderer
             $"Done: {result.ScriptsExecuted} script(s) executed."));
         if (result.Saved is bool saved && saved == false)
             AnsiConsole.MarkupLine(Styling.Warning(
-                "Changes not saved. Use --save to persist or --stage to stage."));
+                "Not saved yet. Pass --save to persist, or --stage to stage the change."));
         else if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
 

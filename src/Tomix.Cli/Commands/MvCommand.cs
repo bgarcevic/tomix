@@ -34,14 +34,14 @@ internal sealed class MvCommand : ICommandModule
         };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var overwriteOption = LifecycleOptions.Overwrite();
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate when the path matches multiple table-children."
+            Description = "Type to pick when the path matches several objects under a table."
         };
         typeOption.Aliases.Add("-t");
         var stageOption = LifecycleOptions.Stage();
@@ -173,7 +173,7 @@ internal sealed class MvCommand : ICommandModule
         else if (result.DryRun == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
         else if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
+            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist, or --stage to stage the change."));
         else
             AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Saved: {result.Saved}")));
 

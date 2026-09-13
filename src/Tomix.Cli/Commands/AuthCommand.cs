@@ -26,7 +26,7 @@ internal sealed class AuthCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("auth", "Manage authentication for remote workspaces");
+        var command = new Command("auth", "Sign in, sign out, and check authentication for remote workspaces");
         command.Subcommands.Add(BuildLogin());
         command.Subcommands.Add(BuildLogout());
         command.Subcommands.Add(BuildStatus());
@@ -43,14 +43,14 @@ internal sealed class AuthCommand : ICommandModule
         var tenantOption = new Option<string?>("--tenant") { Description = "Tenant id or domain (required for service principal)" };
         var identityOption = new Option<bool>("--identity") { Description = "Sign in with a managed identity (Azure-hosted; use --username for user-assigned)" };
         identityOption.Aliases.Add("-I");
-        var certificateOption = new Option<string?>("--certificate") { Description = "Path to certificate file (PEM or PKCS12) for service principal auth" };
+        var certificateOption = new Option<string?>("--certificate") { Description = "Certificate file (PEM or PKCS12) for signing in as a service principal" };
         var certificatePasswordOption = new Option<string?>("--certificate-password") { Description = "Certificate password source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --certificate-password-file." };
         AddStdinSentinelValidator(certificatePasswordOption, "--certificate-password", "--certificate-password-file");
         var certificatePasswordFileOption = new Option<string?>("--certificate-password-file") { Description = "Path to a file containing the certificate password (trailing newline ignored)" };
         var deviceCodeOption = new Option<bool>("--device-code") { Description = "Use the device-code flow instead of a local browser" };
         var clientIdOption = new Option<string?>("--client-id") { Description = "Override the Azure AD client id used for interactive/device-code sign-in" };
-        var saveOption = new Option<bool?>("--save") { Description = "Persist service principal credentials for silent reuse (default: true). Use --save false for one-shot login." };
-        var command = new Command("login", "Log in to a Power BI / Fabric / Azure AS account")
+        var saveOption = new Option<bool?>("--save") { Description = "Keep the service principal credentials for future sign-ins (default: true). Pass --save false to use them only for this login." };
+        var command = new Command("login", "Sign in to a Power BI, Fabric, or Analysis Services account")
         {
             usernameOption,
             passwordOption,
@@ -136,7 +136,7 @@ internal sealed class AuthCommand : ICommandModule
             var handler = new AuthHandler(authenticator);
 
             if (method == AuthMethod.Interactive && !OutputFormats.IsJson(format))
-                Console.Error.WriteLine("Opening browser for authentication...");
+                Console.Error.WriteLine("Opening the browser to sign in...");
 
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
@@ -167,7 +167,7 @@ internal sealed class AuthCommand : ICommandModule
 
     private Command BuildLogout()
     {
-        var command = new Command("logout", "Clear cached authentication credentials");
+        var command = new Command("logout", "Sign out and forget the cached credentials");
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
@@ -180,7 +180,7 @@ internal sealed class AuthCommand : ICommandModule
                 parseResult,
                 result,
                 format,
-                data => AnsiConsole.MarkupLine(data.Existed ? Styling.Success("Logged out -- cached credentials cleared.") : Styling.Muted("Not logged in.")));
+                data => AnsiConsole.MarkupLine(data.Existed ? Styling.Success("Signed out. Cached credentials were removed.") : Styling.Muted("Not logged in.")));
         });
         return command;
     }
@@ -246,7 +246,7 @@ internal sealed class AuthCommand : ICommandModule
         if (!result.LoggedIn || result.Identity is null)
         {
             AnsiConsole.MarkupLine(Styling.Warning("Not logged in"));
-            AnsiConsole.MarkupLine(Styling.Guidance("Run 'tx auth login' to authenticate."));
+            AnsiConsole.MarkupLine(Styling.Guidance("Sign in first with 'tx auth login'."));
             return;
         }
 

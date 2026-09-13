@@ -19,6 +19,10 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- Rewrote command help text and user-facing messages in the CLI's own voice across the command
+  surface (`deploy`, `find`, `diff`, `add`, `bpa`, `connect`, `auth`, `config`, `deps`, `get`,
+  `format`, `ls`, `profile`, `refresh`, `replace`, `rm`, `save`, `script`, `session`, `set`,
+  `validate`, `vertipaq`, `incremental-refresh`, and the shared global/lifecycle options).
 - `format` formats DAX offline with the bundled formatter engine instead of calling the
   daxformatter.com API: no network, no rate limits, air-gap safe. The output layout differs —
   a 65-column prettier-style layout with keywords and known function names upper-cased — so

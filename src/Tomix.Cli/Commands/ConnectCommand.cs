@@ -40,7 +40,7 @@ internal sealed class ConnectCommand : ICommandModule
     {
         var serverArgument = new Argument<string>("server")
         {
-            Description = "Workspace name, endpoint, local model path (TMDL/BIM), or omit with --local.",
+            Description = "Workspace name, endpoint, or local model path; combine with --local for Power BI Desktop.",
             Arity = ArgumentArity.ZeroOrOne
         };
         var databaseArgument = new Argument<string>("database")
@@ -56,7 +56,7 @@ internal sealed class ConnectCommand : ICommandModule
         workspaceOption.Aliases.Add("-w");
         var localOption = new Option<bool>("--local")
         {
-            Description = "Connect to a locally running Power BI Desktop instance (Windows only)"
+            Description = "Attach to a Power BI Desktop instance running on this machine (Windows only)"
         };
         var remoteOption = new Option<bool>("--remote")
         {
@@ -64,24 +64,24 @@ internal sealed class ConnectCommand : ICommandModule
         };
         var profileOption = new Option<string?>("--profile")
         {
-            Description = "Activate a saved connection profile (see: tx profile list)"
+            Description = "Connect through this saved profile (list them with 'tx profile list')"
         };
         profileOption.Aliases.Add("-p");
         var clearOption = new Option<bool>("--clear")
         {
-            Description = "Clear the active connection from CLI config"
+            Description = "Forget the active connection"
         };
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Overwrite a non-empty workspace target when initializing workspace mode."
+            Description = "Allow workspace mode to initialize over a folder that already has content."
         };
         var workspaceFormatOption = new Option<string?>("--workspace-format")
         {
-            Description = "On-disk format for a local workspace (tmdl, bim, te-folder). Defaults to path-detected."
+            Description = "How a local workspace is stored on disk (tmdl or bim); detected from the path when omitted."
         };
         var workspaceAuthOption = new Option<string?>("--workspace-auth")
         {
-            Description = "Auth method for a remote workspace (local primary). Defaults to --auth if set, else auto."
+            Description = "How to authenticate the remote side of workspace mode. Defaults to --auth when set, otherwise auto."
         };
 
         var command = new Command("connect", "Set active connection (workspace, local path, or PBI Desktop). No args = show current. --recent = reconnect to a recently used model.")
@@ -262,11 +262,11 @@ internal sealed class ConnectCommand : ICommandModule
 
                     case ConnectNeedKind.DesktopDiscovery:
                         {
-                            AnsiConsole.MarkupLine(Styling.Value("Discovering Power BI Desktop instances..."));
+                            AnsiConsole.MarkupLine(Styling.Value("Looking for running Power BI Desktop instances..."));
                             var instances = PowerBiDesktopDiscovery.DiscoverInstances();
                             if (instances.Count == 0)
                             {
-                                ErrConsole().MarkupLine(Styling.Error("No running Power BI Desktop instances found. Start Power BI Desktop and open a report, then retry."));
+                                ErrConsole().MarkupLine(Styling.Error("Power BI Desktop does not appear to be running. Open a report in Power BI Desktop, then try again."));
                                 return 1;
                             }
 
@@ -372,7 +372,7 @@ internal sealed class ConnectCommand : ICommandModule
                             [.. probe.Diagnostics.Select(d => new TomixDiagnostic(
                                 "TOMIX_WORKSPACE_UNREACHABLE",
                                 DiagnosticSeverity.Error,
-                                $"Could not reach workspace server: {ConnectRenderer.WorkspaceConnectMessage(workspace!, d.Message)}",
+                                $"The workspace server is unreachable: {ConnectRenderer.WorkspaceConnectMessage(workspace!, d.Message)}",
                                 "Check the workspace endpoint and your access, or re-run without -w."))],
                             errorFormat);
                         return probe.ExitCode == 0 ? 1 : probe.ExitCode;
@@ -717,7 +717,7 @@ internal sealed class ConnectCommand : ICommandModule
     private static void RenderInteractiveError(Exception ex, string? errorFormat)
     {
         var (code, hint) = ex is AuthenticationRequiredException
-            ? ("TOMIX_AUTH_REQUIRED", "Run 'tx auth login', then retry.")
+            ? ("TOMIX_AUTH_REQUIRED", "Sign in with 'tx auth login', then try again.")
             : ("TOMIX_REMOTE_LIST_FAILED", (string?)null);
         ErrorOutput.Write(
             new[] { new TomixDiagnostic(code, DiagnosticSeverity.Error, ex.Message, Hint: hint) },

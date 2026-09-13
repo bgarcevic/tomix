@@ -14,7 +14,7 @@ internal sealed class ProfileCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("profile", "Manage named connection profiles for quick environment switching");
+        var command = new Command("profile", "Manage named connection profiles for switching between environments");
         command.Subcommands.Add(BuildList());
         command.Subcommands.Add(BuildRemove());
         command.Subcommands.Add(BuildSet());
@@ -24,7 +24,7 @@ internal sealed class ProfileCommand : ICommandModule
 
     private Command BuildList()
     {
-        var command = new Command("list", "List all saved connection profiles");
+        var command = new Command("list", "Show the profiles you've saved");
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
@@ -38,8 +38,8 @@ internal sealed class ProfileCommand : ICommandModule
 
     private Command BuildShow()
     {
-        var nameArgument = new Argument<string>("name") { Description = "Profile name to show" };
-        var command = new Command("show", "Show details of a saved connection profile")
+        var nameArgument = new Argument<string>("name") { Description = "Profile to show" };
+        var command = new Command("show", "Print a saved profile's details")
         {
             nameArgument
         };
@@ -61,8 +61,8 @@ internal sealed class ProfileCommand : ICommandModule
 
     private Command BuildRemove()
     {
-        var nameArgument = new Argument<string>("name") { Description = "Profile name to remove" };
-        var command = new Command("remove", "Delete a saved connection profile")
+        var nameArgument = new Argument<string>("name") { Description = "Profile to delete" };
+        var command = new Command("remove", "Delete a saved profile")
         {
             nameArgument
         };
@@ -85,11 +85,11 @@ internal sealed class ProfileCommand : ICommandModule
     private Command BuildSet()
     {
         var nameArgument = new Argument<string>("name") { Description = "Profile name" };
-        var descriptionOption = new Option<string?>("--description") { Description = "Human-readable description of this profile" };
+        var descriptionOption = new Option<string?>("--description") { Description = "Free-form description of this profile" };
         descriptionOption.Aliases.Add("--desc");
-        var fromActiveOption = new Option<bool>("--from-active") { Description = "Save the current active connection as this profile" };
+        var fromActiveOption = new Option<bool>("--from-active") { Description = "Fill the profile from the current active connection" };
 
-        var command = new Command("set", "Create or update a named connection profile")
+        var command = new Command("set", "Create or update a saved profile")
         {
             nameArgument,
             descriptionOption,

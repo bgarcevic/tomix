@@ -31,8 +31,8 @@ relationships use `Sales[Key]->Product[Key]` (many side → one side).
 | `-i <value>` / `-q <property>` | Compatibility form of `--expression`/`--set`: an unpaired `-i` is the object's value; pair each `-q` with a following `-i` to set a property. |
 | `--file <file>` | Read the expression from a file. |
 | `--columns <names>` | Comma-separated columns to create on a new table (Table type only). |
-| `--if-not-exists` | Succeed silently if the object already exists (exit 0). |
-| `--mode <mode>` | Partition storage mode: `Import`, `DirectQuery`, `Dual`, `DirectLake`, `Push`, `Default`. |
+| `--if-not-exists` | Do nothing and exit 0 when the object already exists. |
+| `--mode <mode>` | Storage mode for the partition: `Import`, `DirectQuery`, `Dual`, `DirectLake`, `Push`, `Default`. |
 
 ??? note "Data-source and partition options"
 
@@ -41,11 +41,11 @@ relationships use `Sales[Key]->Product[Key]` (many side → one side).
     | `--source <provider>` | Provider name for a ProviderDataSource (e.g. `System.Data.SqlClient`). |
     | `--source-type <type>` | Connection protocol for a StructuredDataSource (e.g. `tds`). |
     | `--endpoint <address>` | Server/endpoint address for a data source connection. |
-    | `--connection-string <cs>` | Full connection string for a ProviderDataSource. |
+    | `--connection-string <cs>` | The connection string used by a ProviderDataSource. |
     | `--source-database <db>` | Source database for a data source connection. |
     | `--source-table <table>` | Source entity/table name for an EntityPartition. |
     | `--source-schema <schema>` | Source schema for an EntityPartition. |
-    | `--partition-expression <expr>` | M/DAX expression for a partition source. |
+    | `--partition-expression <expr>` | The M or DAX expression defining the partition's source. |
     | `--range-start / --range-end <yyyy-MM-dd>` | Refresh-policy range for a PolicyRangePartition. |
     | `--range-granularity <g>` | `Day` (default), `Month`, `Quarter`, `Year`. |
 
@@ -244,8 +244,8 @@ tx rm <path> [model] [options]
 |--------|-------------|
 | `--dry-run` | Show what would be removed without saving. |
 | `--force` | Remove even if the object has DAX dependents (reports the now-broken references). |
-| `--if-exists` | Succeed silently if the object does not exist. |
-| `-t, --type <type>` | Disambiguate when the path matches multiple table-children. |
+| `--if-exists` | Exit 0 when the object is already gone. |
+| `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
 
 Removal is blocked while DAX still references the object; structural
 references (relationships, sort-by, hierarchy levels, perspectives, role
@@ -364,9 +364,9 @@ tx incremental-refresh <show|set|rm|apply> <table> [options]
 
 | Subcommand | Description |
 |------------|-------------|
-| `incremental-refresh show <table>` | Show the incremental refresh policy. |
-| `incremental-refresh set <table>` | Create or edit the policy on a table. |
-| `incremental-refresh rm <table>` | Remove the policy from a table. |
+| `incremental-refresh show <table>` | Display a table's incremental refresh policy. |
+| `incremental-refresh set <table>` | Define or update a table's policy. |
+| `incremental-refresh rm <table>` | Drop a table's policy. |
 | `incremental-refresh apply <table>` | Apply the policy on a deployed model (generates partitions server-side). |
 
 `incremental-refresh set` policy options:
@@ -379,7 +379,7 @@ tx incremental-refresh <show|set|rm|apply> <table> [options]
 | `--incremental-offset <n>` | Periods to shift the window head from today (e.g. for future-dated data). |
 | `--polling-expression <m>` / `--polling-expression-file <file>` | M expression polled per partition to detect data changes (`-` reads from stdin / read from a file). |
 | `--source-expression <m>` / `--source-expression-file <file>` | M source query filtering on `RangeStart`/`RangeEnd` (`-` reads from stdin / read from a file). |
-| `--force` (`-f`) | Save despite validation errors. |
+| `--force` (`-f`) | Write the model even though validation reports errors. |
 | `--overwrite` | Let `--save-to` overwrite an existing target. |
 
 ```sh

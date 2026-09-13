@@ -61,14 +61,13 @@ unavailable they warn and the query still returns its rows.
 
 Flags that matter in pipelines:
 
-- `--non-interactive` — disable all prompts; fail with an actionable error
-  instead of hanging.
+- `--non-interactive` — never prompts; fails with an error saying what to
+  provide instead of hanging.
 - `--quiet` — suppress spinners, progress, and hints.
-- `--ci github` / `--ci vsts` on `validate`, `test`, and `deploy` — emit
-  GitHub Actions / Azure DevOps logging commands to stderr, so findings
-  annotate the PR.
-- `--trx <path>` on `validate`, `test`, and `bpa run` — write results as a
-  VSTEST `.trx` file.
+- `--ci github` / `--ci vsts` on `validate`, `test`, and `deploy` — print
+  CI log-group commands to stderr, so findings annotate the PR.
+- `--trx <path>` on `validate`, `test`, and `bpa run` — write results to a
+  `.trx` test-run file.
 - Color is stripped automatically when output is not a TTY, and the
   [`NO_COLOR`](https://no-color.org/) convention is honored.
 

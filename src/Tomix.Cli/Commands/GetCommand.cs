@@ -22,28 +22,28 @@ internal sealed class GetCommand : ICommandModule
     {
         var pathArgument = new Argument<string>("path")
         {
-            Description = "Object path. Slash-separated: 'Sales', 'Sales/Amount'. DAX forms also accepted."
+            Description = "The object to read, slash-separated: 'Sales', 'Sales/Amount'. DAX form works too."
         };
 
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var queryOption = new Option<string?>("--query")
         {
-            Description = "Query a specific property (e.g., --query expression, --query formatString)"
+            Description = "Read just one property (for example --query expression)"
         };
 
 
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate when the path matches multiple table-children."
+            Description = "Type to pick when the path matches several objects under a table."
         };
         typeOption.Aliases.Add("-t");
 
-        var command = new Command("get", "Get properties of a model object")
+        var command = new Command("get", "Read a model object's properties")
         {
             pathArgument,
             modelArgument,

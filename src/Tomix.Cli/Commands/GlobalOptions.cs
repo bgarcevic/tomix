@@ -9,43 +9,43 @@ internal static class GlobalOptions
     private static string _defaultOutputFormat = OutputFormats.Text;
     public static readonly Option<string?> Model = new("--model")
     {
-        Description = "Path to semantic model (TMDL folder, .bim file, or TE folder)",
+        Description = "Path to the semantic model: a TMDL folder, a .bim file, or a model folder",
         Recursive = true
     };
 
     public static readonly Option<string> OutputFormat = new("--output-format")
     {
-        Description = "Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command.",
+        Description = "Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.",
         DefaultValueFactory = _ => _defaultOutputFormat
     };
 
     public static readonly Option<string?> ErrorFormat = new("--error-format")
     {
-        Description = "Stderr format for errors/warnings/hints: text (default) or json. Other values fall back to text.",
+        Description = "Format for messages written to stderr: text (default) or json. Unrecognized values fall back to text.",
         Recursive = true
     };
 
     public static readonly Option<string?> Server = new("--server")
     {
-        Description = "Workspace name or endpoint (e.g., MyWorkspace, powerbi://..., asazure://..., localhost)",
+        Description = "Workspace to connect to: a name, a powerbi:// or asazure:// endpoint, or a local address",
         Recursive = true
     };
 
     public static readonly Option<string?> Database = new("--database")
     {
-        Description = "Semantic model name on the workspace",
+        Description = "Name of the semantic model to use on the workspace",
         Recursive = true
     };
 
     public static readonly Option<string?> Auth = new("--auth")
     {
-        Description = "Auth method: auto, interactive, spn, managed-identity (default: auto)",
+        Description = "How to authenticate: auto, interactive, spn, or managed-identity (default: auto)",
         Recursive = true
     };
 
     public static readonly Option<string?> Recent = new("--recent")
     {
-        Description = "Use a recently used model. No value = interactive picker, N = Nth most recent (1 = last used).",
+        Description = "Pick a model from the recently used list: no value opens a picker, a number picks that entry (1 is the most recent).",
         Arity = ArgumentArity.ZeroOrOne,
         Recursive = true
     };
@@ -58,7 +58,7 @@ internal static class GlobalOptions
 
     public static readonly Option<bool> NonInteractive = new("--non-interactive")
     {
-        Description = "Disable all interactive prompts. Fail with an actionable error if required input is missing.",
+        Description = "Never prompt for input. When required input is missing, fail with an error saying what to provide.",
         Recursive = true
     };
 

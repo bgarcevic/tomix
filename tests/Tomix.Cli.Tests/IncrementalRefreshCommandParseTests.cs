@@ -82,7 +82,7 @@ public sealed class IncrementalRefreshCommandParseTests
     [Fact]
     public void Set_InvalidSerialization_FailsAtParseTime()
     {
-        var result = Parse("incremental-refresh", "set", "Sales", "--serialization", "te-folder");
+        var result = Parse("incremental-refresh", "set", "Sales", "--serialization", "database.json");
         Assert.Contains(result.Errors, e => e.Message.Contains("Unknown value for --serialization"));
     }
 

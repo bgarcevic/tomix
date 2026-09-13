@@ -23,37 +23,37 @@ internal sealed class DepsCommand : ICommandModule
     {
         var pathArgument = new Argument<string>("path")
         {
-            Description = "Object path to analyze. Slash-separated: 'Sales/Revenue'. DAX forms also accepted.",
+            Description = "The object to trace, slash-separated: 'Sales/Revenue'. DAX form works too.",
             Arity = ArgumentArity.ZeroOrOne
         };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var upstreamOption = new Option<bool>("--upstream")
         {
-            Description = "Show only upstream dependencies (what this object uses)"
+            Description = "Trace only what this object uses"
         };
         var downstreamOption = new Option<bool>("--downstream")
         {
-            Description = "Show only downstream dependents (what uses this object)"
+            Description = "Trace only what uses this object"
         };
         var deepOption = new Option<bool>("--deep")
         {
-            Description = "Show recursive dependency tree"
+            Description = "Walk the dependency chain recursively"
         };
         var unusedOption = new Option<bool>("--unused")
         {
-            Description = "Find unreferenced measures and columns"
+            Description = "List measures and columns that nothing depends on"
         };
         var hiddenOption = new Option<bool>("--hidden")
         {
-            Description = "With --unused: only list unused objects whose IsHidden is true"
+            Description = "With --unused: restrict the list to unused objects that are hidden"
         };
         var maxDepthOption = new Option<int>("--max-depth")
         {
-            Description = "Maximum depth for --deep traversal (default: 10)",
+            Description = "How deep --deep walks (default: 10)",
             DefaultValueFactory = _ => 10
         };
         maxDepthOption.Validators.Add(result =>
@@ -63,11 +63,11 @@ internal sealed class DepsCommand : ICommandModule
         });
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate when the path matches multiple table-children."
+            Description = "Type to pick when the path matches several objects under a table."
         };
         typeOption.Aliases.Add("-t");
 
-        var command = new Command("deps", "Analyze object dependencies (upstream/downstream)")
+        var command = new Command("deps", "Trace what an object uses and what uses it")
         {
             pathArgument,
             modelArgument,

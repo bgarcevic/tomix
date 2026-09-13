@@ -14,7 +14,7 @@ internal sealed class SessionCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("session", "Show or manage the current terminal session");
+        var command = new Command("session", "Inspect this terminal's CLI session");
         command.SetAction(parseResult => RenderShow(parseResult));
         command.Subcommands.Add(BuildClear());
         command.Subcommands.Add(BuildList());
@@ -25,14 +25,14 @@ internal sealed class SessionCommand : ICommandModule
 
     private Command BuildShow()
     {
-        var command = new Command("show", "Show current session details (ID, file path, active state)");
+        var command = new Command("show", "Print this session's details (ID, file path, active state)");
         command.SetAction(parseResult => RenderShow(parseResult));
         return command;
     }
 
     private Command BuildList()
     {
-        var command = new Command("list", "List all session files");
+        var command = new Command("list", "List saved session files");
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
@@ -46,7 +46,7 @@ internal sealed class SessionCommand : ICommandModule
 
     private Command BuildClear()
     {
-        var command = new Command("clear", "Clear active state for the current session");
+        var command = new Command("clear", "Clear this session's active marker");
         command.SetAction(parseResult =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
@@ -76,9 +76,9 @@ internal sealed class SessionCommand : ICommandModule
         };
         var dryRunOption = new Option<bool>("--dry-run")
         {
-            Description = "Show what would be removed without doing it"
+            Description = "Preview what prune would remove"
         };
-        var command = new Command("prune", "Delete session files whose shell process is no longer running")
+        var command = new Command("prune", "Remove session files whose shell has exited")
         {
             allOption,
             dryRunOption

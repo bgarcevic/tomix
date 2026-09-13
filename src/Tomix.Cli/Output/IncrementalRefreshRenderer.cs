@@ -58,7 +58,7 @@ internal static class IncrementalRefreshRenderer
         if (result.Staged == true)
             AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
         else if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist or --stage to stage."));
+            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist, or --stage to stage the change."));
         else
             AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
 
@@ -92,7 +92,7 @@ internal static class IncrementalRefreshRenderer
                 + "Remove them with 'tx rm' or leave them as regular partitions."));
 
         if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Changes not saved. Use --save to persist."));
+            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist."));
         else if (result.Saved is not null)
             AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
 

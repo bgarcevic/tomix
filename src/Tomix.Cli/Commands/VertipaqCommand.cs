@@ -41,10 +41,10 @@ internal sealed class VertipaqCommand : ICommandModule
         var columnsOption = new Option<bool>("--columns") { Description = "Show the columns view (default)" };
         var relationshipsOption = new Option<bool>("--relationships") { Description = "Show the relationships view" };
         var partitionsOption = new Option<bool>("--partitions") { Description = "Show the partitions view" };
-        var allOption = new Option<bool>("--all") { Description = "Show tables, columns, relationships, and partitions" };
+        var allOption = new Option<bool>("--all") { Description = "Include the tables, columns, relationships, and partitions views" };
         var detailOption = new Option<bool>("--detail")
         {
-            Description = "Expanded columns: data/dictionary/hierarchy size breakdown, encoding, segments"
+            Description = "Extra columns: data/dictionary/hierarchy size breakdown, encoding, segments"
         };
         var fieldsOption = new Option<string?>("--fields")
         {
@@ -74,10 +74,10 @@ internal sealed class VertipaqCommand : ICommandModule
         };
         var obfuscateOption = new Option<bool>("--obfuscate")
         {
-            Description = "Obfuscate names and expressions in the exported .vpax; writes a private .dict dictionary"
+            Description = "Mask names and expressions in the exported .vpax; a matching .dict dictionary keeps the mapping private"
         };
 
-        var command = new Command("vertipaq", "Analyze VertiPaq storage statistics for a semantic model")
+        var command = new Command("vertipaq", "Report VertiPaq storage statistics for a semantic model")
         {
             tableArgument,
             tablesOption,

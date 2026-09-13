@@ -20,7 +20,7 @@ internal static class LifecycleOptions
     {
         var option = new Option<bool>("--force")
         {
-            Description = description ?? "Save despite validation errors"
+            Description = description ?? "Write the model even though validation reports errors"
         };
         option.Aliases.Add("-f");
         return option;
@@ -44,19 +44,19 @@ internal static class LifecycleOptions
     public static Option<bool> Save(string? description = null) => new("--save")
     {
         Description = description ??
-            "Persist this command's mutation to the source location. Mutually exclusive with --revert and --stage."
+            "Write this command's change back to the model's source. Cannot be combined with --revert or --stage."
     };
 
     public static Option<string?> SaveTo(string? description = null) => new("--save-to")
     {
-        Description = description ?? "Save to a different path (implies --save)"
+        Description = description ?? "Write the saved model to this path instead of its source (implies --save)"
     };
 
     public static Option<string?> Serialization()
     {
         var option = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted)"
+            Description = "How the model is written: tmdl or bim (tmsl and auto also accepted)"
         };
         option.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         return option;

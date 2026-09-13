@@ -26,7 +26,7 @@ internal sealed class ReplaceCommand : ICommandModule
     {
         var patternArgument = new Argument<string>("pattern")
         {
-            Description = "Text or regex pattern to search for",
+            Description = "The text or regex to look for",
             Arity = ArgumentArity.ZeroOrOne
         };
         var replacementArgument = new Argument<string>("replacement")
@@ -36,7 +36,7 @@ internal sealed class ReplaceCommand : ICommandModule
         };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var inOption = new Option<string?>("--in")
@@ -50,11 +50,11 @@ internal sealed class ReplaceCommand : ICommandModule
         typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")
         {
-            Description = "Treat pattern as a regular expression"
+            Description = "Interpret the pattern as a regular expression"
         };
         var caseSensitiveOption = new Option<bool>("--case-sensitive")
         {
-            Description = "Enable case-sensitive matching"
+            Description = "Match text exactly, including letter case"
         };
         var dryRunOption = new Option<bool>("--dry-run")
         {
@@ -69,7 +69,7 @@ internal sealed class ReplaceCommand : ICommandModule
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
 
-        var command = new Command("replace", "Find and replace text across model objects")
+        var command = new Command("replace", "Replace text across model objects")
         {
             patternArgument,
             replacementArgument,

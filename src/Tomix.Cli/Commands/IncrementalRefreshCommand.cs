@@ -29,7 +29,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("incremental-refresh", "Configure incremental refresh policy on a table");
+        var command = new Command("incremental-refresh", "Work with a table's incremental refresh policy");
         command.Subcommands.Add(BuildApply());
         command.Subcommands.Add(BuildRm());
         command.Subcommands.Add(BuildSet());
@@ -42,11 +42,11 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         var tableArgument = new Argument<string>("table") { Description = "Table name." };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var show = new Command("show", "Show incremental refresh policy")
+        var show = new Command("show", "Display a table's incremental refresh policy")
         {
             tableArgument,
             modelArgument
@@ -85,7 +85,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         var tableArgument = new Argument<string>("table") { Description = "Table name." };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var modeOption = new Option<string?>("--mode")
@@ -99,7 +99,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         };
         var rollingWindowGranularityOption = new Option<string?>("--rolling-window-granularity")
         {
-            Description = "Granularity of the archive window: day, month, quarter, year"
+            Description = "Time unit for the archive window: day, month, quarter, or year"
         };
         rollingWindowGranularityOption.AcceptAmongIgnoreCase("day", "month", "quarter", "year");
         var incrementalPeriodsOption = new Option<int?>("--incremental-periods")
@@ -108,7 +108,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         };
         var incrementalGranularityOption = new Option<string?>("--incremental-granularity")
         {
-            Description = "Granularity of the incremental window: day, month, quarter, year"
+            Description = "Time unit for the incremental window: day, month, quarter, or year"
         };
         incrementalGranularityOption.AcceptAmongIgnoreCase("day", "month", "quarter", "year");
         var incrementalOffsetOption = new Option<int?>("--incremental-offset")
@@ -121,7 +121,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         };
         var pollingExpressionFileOption = new Option<string?>("--polling-expression-file")
         {
-            Description = "Read the polling expression from a file"
+            Description = "Read the polling expression from this file"
         };
         var sourceExpressionOption = new Option<string?>("--source-expression")
         {
@@ -129,7 +129,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         };
         var sourceExpressionFileOption = new Option<string?>("--source-expression-file")
         {
-            Description = "Read the source expression from a file"
+            Description = "Read the source expression from this file"
         };
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
@@ -140,7 +140,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var set = new Command("set", "Create or edit the incremental refresh policy on a table")
+        var set = new Command("set", "Define or update a table's incremental refresh policy")
         {
             tableArgument,
             modelArgument,
@@ -224,12 +224,12 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         var tableArgument = new Argument<string>("table") { Description = "Table name." };
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var ifExistsOption = new Option<bool>("--if-exists")
         {
-            Description = "Succeed silently if the table has no policy"
+            Description = "Exit 0 when the table has no policy"
         };
         var overwriteOption = LifecycleOptions.Overwrite();
         var saveOption = LifecycleOptions.Save();
@@ -239,7 +239,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var rm = new Command("rm", "Remove the incremental refresh policy from a table")
+        var rm = new Command("rm", "Drop a table's incremental refresh policy")
         {
             tableArgument,
             modelArgument,

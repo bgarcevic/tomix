@@ -11,9 +11,9 @@ tx config <show|set|init|paths>
 
 | Subcommand | Description |
 |------------|-------------|
-| `config show` | Show current CLI configuration. |
-| `config set <key> <value>` | Set a configuration value. |
-| `config init` | Create a default `config.json`. |
+| `config show` | Print the current CLI configuration. |
+| `config set <key> <value>` | Change a configuration value. |
+| `config init` | Write a default `config.json`. |
 | `config paths` | Show resolved paths for local CLI files. |
 
 ```sh
@@ -41,8 +41,8 @@ tx profile <list|show|set|remove>
 
 | Subcommand | Description |
 |------------|-------------|
-| `profile list` | List all saved connection profiles. |
-| `profile show <name>` | Show details of a profile. |
+| `profile list` | Show the profiles you've saved. |
+| `profile show <name>` | Print a profile's details. |
 | `profile set <name>` | Create or update a profile. `--from-active` seeds it from the active connection (explicit `-s`/`-d`/`--model`/`--auth` still win). |
 | `profile remove <name>` | Delete a profile. |
 
@@ -50,8 +50,8 @@ tx profile <list|show|set|remove>
 
 | Option | Description |
 |--------|-------------|
-| `--desc, --description <text>` | Human-readable description of this profile. |
-| `--from-active` | Save the current active connection as this profile. |
+| `--desc, --description <text>` | Free-form description of this profile. |
+| `--from-active` | Fill the profile from the current active connection. |
 
 ```sh
 tx profile set dev -s DevWorkspace -d Sales
@@ -74,7 +74,7 @@ tx init [output-path] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--name <name>` | Model/database name (default: directory name). |
+| `--name <name>` | Name of the new model (default: the directory's name). |
 | `--serialization <tmdl\|bim\|pbip>` | On-disk format (default: `tmdl`). |
 | `--compatibility-mode <mode>` | `PowerBI` (default) or `AnalysisServices`. |
 | `--compat <level>` | Compatibility level (default: 1702 for PowerBI, 1500 otherwise). |

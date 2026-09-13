@@ -23,16 +23,16 @@ internal sealed class ValidateCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var ciOption = new Option<string?>("--ci")
         {
-            Description = "Emit CI logging commands to stderr: vsts or github"
+            Description = "Print CI log-group commands to stderr for the given system: vsts or github"
         };
         var trxOption = new Option<string?>("--trx")
         {
-            Description = "Write results as a VSTEST .trx file to the specified path"
+            Description = "Write results to a .trx test-run file at this path"
         };
         var errorsOnlyOption = new Option<bool>("--errors-only")
         {
@@ -40,18 +40,18 @@ internal sealed class ValidateCommand : ICommandModule
         };
         var noWarningsOption = new Option<bool>("--no-warnings")
         {
-            Description = "Hide warnings from the semantic analyzer"
+            Description = "Leave out analyzer warnings"
         };
         var noMultilineOption = new Option<bool>("--no-multiline")
         {
-            Description = "Collapse multi-line cell content to a single line. Text output only."
+            Description = "Show multi-line cell content on one line. Applies to text output."
         };
         var serverOnlyOption = new Option<bool>("--server-only")
         {
             Description = "Only show errors reported by the connected server"
         };
 
-        var command = new Command("validate", "Validate DAX expressions and relationship integrity (--ci for CI output, --trx for VSTEST)")
+        var command = new Command("validate", "Check a model's DAX expressions and relationship integrity (--ci for CI output, --trx for test results)")
         {
             modelArgument,
             ciOption,

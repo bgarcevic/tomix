@@ -16,8 +16,8 @@ tx ls [path-filter] [model] [options]
 | Option | Description |
 |--------|-------------|
 | `-t, --type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `level`, `partition`, `calculationitem`, `member`, `relationship`, `role`, `perspective`, `culture`, `datasource`, `kpi`, `tablepermission`, `calendar`, `expression`, `function`. `column` matches data and calculated columns; `calculatedcolumn` narrows to calculated ones. |
-| `--paths-only` | One object path per line, suitable for piping. |
-| `--no-multiline` | Collapse multi-line cell content (e.g. measure expressions) to a single line. Text output only. |
+| `--paths-only` | One object path per line, ready for piping. |
+| `--no-multiline` | Show multi-line cell content (e.g. measure expressions) on one line. Text output only. |
 
 ```sh
 tx ls                                # everything
@@ -37,8 +37,8 @@ tx get <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--query <property>` | Query a specific property (e.g. `--query expression`, `--query formatString`). |
-| `-t, --type <type>` | Disambiguate when the path matches multiple table-children. |
+| `--query <property>` | Read just one property (e.g. `--query expression`). |
+| `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
 
 Each object kind has its own property set: measures include `expression`,
 `formatString`, `detailRowsExpression`, and the KPI expressions; relationships
@@ -69,12 +69,12 @@ tx find <pattern> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--in <scope>` | `names`, `expressions`, `descriptions`, `displayFolders`, `formatStrings`, `annotations`, `all` (default; annotations only when requested explicitly). |
+| `--in <scope>` | Where to look: `names`, `expressions`, `descriptions`, `displayFolders`, `formatStrings`, `annotations`, `all` (default; annotations only when requested explicitly). |
 | `-t, --type <type>` | Only search objects of this kind (same vocabulary as `ls --type`). |
-| `--regex` | Treat the pattern as a regular expression. |
-| `--case-sensitive` | Case-sensitive matching. |
-| `--paths-only` | One matching object path per line, suitable for piping. |
-| `--no-multiline` | Collapse multi-line match context to a single line. Text output only. |
+| `--regex` | Interpret the pattern as a regular expression. |
+| `--case-sensitive` | Match text exactly, including letter case. |
+| `--paths-only` | One matching object path per line, ready for piping. |
+| `--no-multiline` | Show multi-line match context on one line. Text output only. |
 
 Searches every scope site `tx replace` can rewrite — including partition
 expressions, KPI expressions, detail-rows and format-string definitions,
@@ -98,13 +98,13 @@ tx deps [path] [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--upstream` | Only upstream dependencies (what this object uses). |
-| `--downstream` | Only downstream dependents (what uses this object). |
-| `--deep` | Recursive dependency tree. |
-| `--max-depth <n>` | Maximum depth for `--deep` traversal (default: 10). |
-| `--unused` | Find unreferenced measures and columns. |
-| `--hidden` | With `--unused`: only list unused objects that are hidden. |
-| `-t, --type <type>` | Disambiguate when the path matches multiple table-children. |
+| `--upstream` | Trace only what this object uses. |
+| `--downstream` | Trace only what uses this object. |
+| `--deep` | Walk the dependency chain recursively. |
+| `--max-depth <n>` | How deep `--deep` walks (default: 10). |
+| `--unused` | List measures and columns that nothing depends on. |
+| `--hidden` | With `--unused`: restrict the list to unused objects that are hidden. |
+| `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
 
 ```sh
 tx deps "Sales/Total Sales" --upstream

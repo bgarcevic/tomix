@@ -41,21 +41,21 @@ tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i "" --save
 
 | Option | Description |
 |--------|-------------|
-| `-r, --rules <file>` | Path(s) or URL(s) to BPA rule file(s) in JSON format. |
+| `-r, --rules <file>` | BPA rule files or URLs, as JSON. |
 | `--ruleset <name>` | Standard ruleset: `standard` (curated default), `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
 | `--rule <id>` | Run only specific rule(s) by ID. |
 | `--path <path>` | Limit analysis to matched objects (literal names, wildcards, or paths). |
 | `--errors` / `--warnings` / `--info` | Show only rules of that severity (combinable). |
 | `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. |
-| `--fix` | Apply fix expressions to auto-fix violations where possible. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
+| `--fix` | Fix violations whose rules provide a fix expression. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
 | `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. |
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
-| `--no-multiline` | Collapse each rule's guidance to a single line. Text output only. |
-| `--no-model-rules` / `--no-defaults` | Exclude rules embedded in the model / the selected standard ruleset. |
+| `--no-multiline` | Show each rule's guidance on one line. Text output only. |
+| `--no-model-rules` / `--no-defaults` | Skip rules embedded in the model / leave the selected standard ruleset out. |
 | `--allow-external-rules` | Also load remote (URL) rule files referenced by the model's rule annotations. Skipped by default so a model file cannot make `tx` fetch arbitrary URLs. |
-| `--ci <github\|vsts>` | Emit CI logging commands to stderr. |
-| `--trx <path>` | Write results as a VSTEST `.trx` file. |
+| `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
+| `--trx <path>` | Write results to a `.trx` test-run file. |
 
 ```sh
 tx bpa run
@@ -71,8 +71,8 @@ the prompt in scripts.
 
 | Subcommand | Description |
 |------------|-------------|
-| `bpa rules list` | List BPA rules from all sources with status. With a model, also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. |
-| `bpa rules enable` / `bpa rules disable` | Re-enable or disable a built-in rule for the current user. |
+| `bpa rules list` | List rules from every source, with each rule's status. With a model, also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. |
+| `bpa rules enable` / `bpa rules disable` | Turn a built-in rule back on, or off, for this user. |
 | `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
 
 `bpa rules --rules-file <file>` points the subcommands at a BPA rules JSON
@@ -81,9 +81,9 @@ file. `bpa rules list` narrows what is listed:
 | Option | Description |
 |--------|-------------|
 | `--ruleset <name>` | Standard BPA ruleset to list: `standard`, `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
-| `--no-defaults` | Suppress built-in rules from the output. |
-| `--ignored` / `--disabled` | Show only ignored / only disabled rules. |
-| `--all` | Show all rules including disabled and ignored. |
+| `--no-defaults` | Leave the built-in ruleset out of the listing. |
+| `--ignored` / `--disabled` | List only ignored / only disabled rules. |
+| `--all` | Include disabled and ignored rules in the listing. |
 
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
 `--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files).
@@ -113,12 +113,12 @@ output stay plain.
 
 | Option | Description |
 |--------|-------------|
-| `--ci <github\|vsts>` | Emit CI logging commands to stderr so findings annotate the PR. |
-| `--trx <path>` | Write results as a VSTEST `.trx` file. |
+| `--ci <github\|vsts>` | Print CI log-group commands to stderr so findings annotate the PR. |
+| `--trx <path>` | Write results to a `.trx` test-run file. |
 | `--errors-only` | Only show errors. |
-| `--no-warnings` | Hide semantic-analyzer warnings. |
+| `--no-warnings` | Leave out analyzer warnings. |
 | `--server-only` | Only show errors reported by the connected server. |
-| `--no-multiline` | Collapse multi-line cell content to a single line. Text output only. |
+| `--no-multiline` | Show multi-line cell content on one line. Text output only. |
 
 ```sh
 tx validate
@@ -157,8 +157,8 @@ single test file or a directory searched recursively for `.dax` files
 | `--filter <pattern>` | Run only tests whose name matches a `*` wildcard pattern (case-insensitive). |
 | `--param <name=value>` | Query parameter applied to every test, referenced as `@name` in DAX. Repeatable. |
 | `--max-rows <n>` | Per-query row cap; a query exceeding it fails as an error (default: `10000`). |
-| `--ci <github\|vsts>` | Emit CI logging commands to stderr so failures annotate the PR. |
-| `--trx <path>` | Write results as a VSTEST `.trx` file. |
+| `--ci <github\|vsts>` | Print CI log-group commands to stderr so failures annotate the PR. |
+| `--trx <path>` | Write results to a `.trx` test-run file. |
 
 Like `query`, tests execute on a **deployed model** (XMLA) or a local
 instance — never on TMDL/BIM files. Target the model with `-s <workspace>
@@ -218,13 +218,13 @@ export/import for offline analysis.
 | Option | Description |
 |--------|-------------|
 | `--tables` / `--columns` / `--relationships` / `--partitions` / `--all` | Which view(s) to show (`--columns` is the default). |
-| `--detail` | Expanded columns: data/dictionary/hierarchy size breakdown, encoding, segments. |
+| `--detail` | Extra columns: data/dictionary/hierarchy size breakdown, encoding, segments. |
 | `--stats` | Model-level storage summary. |
 | `--top <n>` | Limit each view to the N largest rows. |
 | `--fields <list>` | Comma-separated fields to display (single view; text/csv only). |
 | `--export <file.vpax>` | Export statistics to a `.vpax` file. |
 | `--import <file.vpax>` | Analyze a previously exported `.vpax` offline (no connection needed). |
-| `--obfuscate` | Obfuscate names and expressions in the export; writes a private `.dict` dictionary. |
+| `--obfuscate` | Mask names and expressions in the export; a private `.dict` dictionary keeps the mapping. |
 | `--annotate` | Write statistics into the model as `Vertipaq_*` annotations (preview unless `--save`). |
 
 ```sh

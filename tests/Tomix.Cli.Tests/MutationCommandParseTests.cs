@@ -19,7 +19,7 @@ public sealed class MutationCommandParseTests
     public void Rm_InvalidSerialization_FailsAtParseTime()
     {
         var services = TestServices.Create();
-        var result = Parse(new RmCommand([], services.State, services.Mutations).Build(), "rm", "Sales/M", "--serialization", "te-folder");
+        var result = Parse(new RmCommand([], services.State, services.Mutations).Build(), "rm", "Sales/M", "--serialization", "database.json");
 
         Assert.Contains(result.Errors, e => e.Message.Contains("Unknown value for --serialization"));
     }

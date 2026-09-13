@@ -26,13 +26,13 @@ internal sealed class ScriptCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model, Fabric path, or omit for active connection",
+            Description = "Model path, Fabric path, or omit to use the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var scriptOption = new Option<string[]>("--file", "--script")
         {
-            Description = "Path(s) to .cs or .csx script file(s). Can be repeated.",
+            Description = "Script files to run (.cs or .csx). Repeatable.",
             Arity = ArgumentArity.ZeroOrMore,
             AllowMultipleArgumentsPerToken = true,
             CustomParser = result => result.Tokens.Select(token => token.Value).ToArray()
@@ -40,22 +40,22 @@ internal sealed class ScriptCommand : ICommandModule
 
         var expressionOption = new Option<string[]>("--expression", "-e")
         {
-            Description = "Inline C# expression(s) to execute. Use '-' to read from stdin.",
+            Description = "C# expressions to run inline. Pass '-' to read from stdin.",
             Arity = ArgumentArity.ZeroOrMore,
             AllowMultipleArgumentsPerToken = true,
             CustomParser = result => result.Tokens.Select(token => token.Value).ToArray()
         };
 
-        var saveToOption = LifecycleOptions.SaveTo("Save model to a different path after all scripts execute");
+        var saveToOption = LifecycleOptions.SaveTo("Write the model to this path after the scripts run (implies --save)");
 
         var serializationOption = LifecycleOptions.Serialization();
 
         var dryRunOption = new Option<bool>("--dry-run")
         {
-            Description = "Compile script and report errors without executing"
+            Description = "Compile the scripts and report errors without running them"
         };
 
-        var forceOption = LifecycleOptions.Force("Save even if this mutation introduces DAX validation errors");
+        var forceOption = LifecycleOptions.Force("Write the model even though the scripts introduce DAX validation errors");
         var overwriteOption = LifecycleOptions.Overwrite();
 
         var saveOption = LifecycleOptions.Save();
@@ -66,7 +66,7 @@ internal sealed class ScriptCommand : ICommandModule
 
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var command = new Command("script", "Execute C# script(s) against a semantic model")
+        var command = new Command("script", "Run C# scripts against a semantic model")
         {
             modelArgument,
             scriptOption,

@@ -15,14 +15,14 @@ workspace name, an endpoint, or a local model path.
 
 | Option | Description |
 |--------|-------------|
-| `--local` | Connect to a locally running Power BI Desktop instance (Windows only). |
+| `--local` | Attach to a Power BI Desktop instance running on this machine (Windows only). |
 | `--remote` | Pick a workspace and model interactively from your tenant (requires a TTY; sign in first with `tx auth login`). |
-| `-p, --profile <name>` | Activate a saved connection profile. |
-| `--clear` | Clear the active connection. |
+| `-p, --profile <name>` | Connect through a saved profile. |
+| `--clear` | Forget the active connection. |
 | `-w, --workspace [target]` | Enable workspace mode: mirror saves between the primary source and a secondary target. No value = pick interactively. |
-| `--workspace-format <fmt>` | On-disk format for a local workspace target (`tmdl`, `bim`, `te-folder`). |
-| `--workspace-auth <auth>` | Auth method for a remote workspace target. |
-| `--force` | Overwrite a non-empty workspace target when initializing workspace mode. |
+| `--workspace-format <fmt>` | How a local workspace is stored on disk (`tmdl` or `bim`); detected from the path when omitted. |
+| `--workspace-auth <auth>` | How to authenticate the remote side of workspace mode. |
+| `--force` | Allow workspace mode to initialize over a folder that already has content. |
 
 ```sh
 tx connect                          # show current
@@ -39,7 +39,7 @@ tx connect ./model.tmdl -w MyWorkspace Sales
 tx deploy [model] [options]
 ```
 
-Runs the BPA gate before deploying (configured via `.te-bpa.json`).
+Runs the BPA gate before deploying.
 
 Without `-s/--server`, the target comes from the active connection: a remote connection
 deploys to itself, and a local connection with a workspace-mode mirror deploys to the
@@ -48,12 +48,12 @@ mirror.
 | Option | Description |
 |--------|-------------|
 | `--dry-run` | Preview what the deploy would change on the target (`+` = added to the target, `-` = removed from it). Compares the target against the exact model this deploy would leave behind, so anything [granular deployment](#granular-deployment) preserves is not reported as a change. A target that does not exist yet is reported as "will be created". |
-| `--xmla <file>` | Generate the XMLA/TMSL script to a file instead of deploying (`-` for stdout). |
-| `--create-only` | Only create a new model; fail if it already exists. |
-| `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or auto-fix violations before deploying. |
-| `--bpa-rules <file>` | BPA rule file(s) for this deploy. |
+| `--xmla <file>` | Write the deployment as a TMSL script to a file instead of deploying (`-` for stdout). |
+| `--create-only` | Create the target model only if it does not exist; fail when it does. |
+| `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or apply rule fixes before deploying. |
+| `--bpa-rules <file>` | Additional BPA rule files for this deploy. |
 | `-p, --profile <name>` | Use a saved profile for this deploy only. |
-| `--ci <github\|vsts>` | Emit CI logging commands to stderr. |
+| `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
 | `--force` | Bypass validation checks. |
 
 ```sh
@@ -128,12 +128,12 @@ tx refresh [options]
 | `--refresh-type <type>` | `full`, `dataonly`, `automatic` (default), `calculate`, `clearvalues`, `defragment`, `add`. Named `--refresh-type` (not `--type`): `--type` means an object kind on every other command. |
 | `--table <name>` | Refresh specific table(s). Repeatable. |
 | `--partition <Table.Partition>` | Refresh specific partition(s). Repeatable. |
-| `--apply-refresh-policy [true\|false]` / `--skip-refresh-policy` | Apply incremental refresh policy (default: `true`); `--skip-refresh-policy` is shorthand for `--apply-refresh-policy false`. |
-| `--effective-date <yyyy-MM-dd>` | Override the current date for refresh-policy evaluation. |
+| `--apply-refresh-policy [true\|false]` / `--skip-refresh-policy` | Let an incremental refresh policy choose the partitions (default: `true`); `--skip-refresh-policy` is shorthand for `--apply-refresh-policy false`. |
+| `--effective-date <yyyy-MM-dd>` | Evaluate refresh policies as if today were this date. |
 | `--max-parallelism <n>` | Maximum parallel refresh operations. |
-| `--dry-run` | Output the TMSL script without executing it. |
-| `--no-progress` | Disable live progress tracking (for CI/piping). |
-| `--trace [path]` | Dump raw XMLA trace events (stderr, or a log file). |
+| `--dry-run` | Print the TMSL script instead of running it. |
+| `--no-progress` | Turn off live progress tracking (useful in CI and when piping). |
+| `--trace [path]` | Write raw XMLA trace events (stderr, or a log file). |
 
 ```sh
 tx refresh --refresh-type full
@@ -165,9 +165,9 @@ tx save [model] [options]
 |--------|-------------|
 | `-o, --output-file <path>` | Where to write. Omit to save back to the source. |
 | `--serialization <tmdl\|bim>` | Output format (defaults to the loaded model's). |
-| `--supporting-files` | Wrap output in a `{modelName}.SemanticModel/` folder with `.platform` and `definition.pbism`. |
-| `--fix-bpa` / `--bpa-rules <file>` | Auto-fix BPA violations before saving, optionally with specific rule files. |
-| `--overwrite` | Overwrite an existing output file or directory. |
+| `--supporting-files` | Write a `{modelName}.SemanticModel/` folder (with `.platform` and `definition.pbism`) around the output. |
+| `--fix-bpa` / `--bpa-rules <file>` | Apply BPA rule fixes before saving, optionally with specific rule files. |
+| `--overwrite` | Replace an existing output file or directory. |
 
 ```sh
 tx save -s MyWorkspace -d Sales -o ./sales.tmdl          # download a deployed model
@@ -193,7 +193,7 @@ tx auth <login|logout|status>
 | `-I, --identity` | Sign in with a managed identity (Azure-hosted; use `--username` for user-assigned). |
 | `--device-code` | Use the device-code flow instead of a local browser. |
 | `--client-id <id>` | Override the Azure AD client id used for interactive/device-code sign-in. |
-| `--save` | Persist service-principal credentials for silent reuse (default: true). `--save false` for one-shot login. |
+| `--save` | Keep the service principal credentials for future sign-ins (default: true). `--save false` uses them for this login only. |
 
 ```sh
 tx auth login                          # interactive browser login
@@ -215,17 +215,17 @@ tx session [show|clear|list|prune]
 
 | Subcommand | Description |
 |------------|-------------|
-| `session show` | Show current session details (ID, file path, active state). |
-| `session clear` | Clear active state for the current session. |
-| `session list` | List all session files. |
-| `session prune` | Delete session files whose shell process is no longer running. |
+| `session show` | Print this session's details (ID, file path, active state). |
+| `session clear` | Clear this session's active marker. |
+| `session list` | List saved session files. |
+| `session prune` | Remove session files whose shell has exited. |
 
 `session prune` options:
 
 | Option | Description |
 |--------|-------------|
 | `--all` | Also remove named and live process sessions. The current session is kept. |
-| `--dry-run` | Show what would be removed without doing it. |
+| `--dry-run` | Preview what prune would remove. |
 
 `session clear` and `session prune` ask for confirmation (`--dry-run` never
 does); pass `--yes` in scripts.

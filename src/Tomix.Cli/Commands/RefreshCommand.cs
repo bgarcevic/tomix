@@ -32,24 +32,24 @@ internal sealed class RefreshCommand : ICommandModule
         // this option selects the refresh operation instead (docs/cli-ux-guidelines.md).
         var typeOption = new Option<string?>("--refresh-type")
         {
-            Description = "Refresh type: full, dataonly, automatic, calculate, clearvalues, defragment, add (default: automatic)"
+            Description = "Kind of refresh to run: full, dataonly, automatic, calculate, clearvalues, defragment, or add (default: automatic)"
         };
 
         var tableOption = new Option<string[]>("--table")
         {
-            Description = "Specific table(s) to refresh. If omitted, refreshes the entire model. Repeatable.",
+            Description = "Refresh only these tables; the whole model is refreshed when omitted. Repeatable.",
             Arity = ArgumentArity.ZeroOrMore
         };
 
         var partitionOption = new Option<string[]>("--partition")
         {
-            Description = "Specific partition(s) to refresh as TableName.PartitionName. Requires --table to be omitted. Repeatable.",
+            Description = "Refresh only these partitions, written as TableName.PartitionName; leave --table unset. Repeatable.",
             Arity = ArgumentArity.ZeroOrMore
         };
 
         var applyRefreshPolicyOption = new Option<bool?>("--apply-refresh-policy")
         {
-            Description = "Apply incremental refresh policy (default: true). Set to false to skip policy-based partitioning.",
+            Description = "Let an incremental refresh policy choose the partitions (default: true). Pass false to refresh without it.",
             Arity = ArgumentArity.ZeroOrOne
         };
 
@@ -60,7 +60,7 @@ internal sealed class RefreshCommand : ICommandModule
 
         var effectiveDateOption = new Option<DateOnly?>("--effective-date")
         {
-            Description = "Override the current date for incremental refresh policy evaluation (format: yyyy-MM-dd)."
+            Description = "Evaluate incremental refresh policies as if today were this date (yyyy-MM-dd)."
         };
 
         var maxParallelismOption = new Option<int?>("--max-parallelism")
@@ -70,21 +70,21 @@ internal sealed class RefreshCommand : ICommandModule
 
         var dryRunOption = new Option<bool>("--dry-run")
         {
-            Description = "Output the TMSL script without executing it."
+            Description = "Print the TMSL script instead of running it."
         };
 
         var noProgressOption = new Option<bool>("--no-progress")
         {
-            Description = "Disable live progress tracking (for CI/piping)."
+            Description = "Turn off live progress tracking (useful in CI and when piping)."
         };
 
         var traceOption = new Option<string?>("--trace")
         {
-            Description = "Dump raw XMLA trace events. No value = stderr, path = write to log file.",
+            Description = "Write raw XMLA trace events: with no value to stderr, with a value to that log file.",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var command = new Command("refresh", "Trigger a data refresh on a deployed model (--refresh-type full|auto|calculate|...)")
+        var command = new Command("refresh", "Refresh data on a deployed model (--refresh-type full|auto|calculate|...)")
         {
             typeOption,
             tableOption,

@@ -62,12 +62,12 @@ internal sealed class TestCommand : ICommandModule
 
         var ciOption = new Option<string?>("--ci")
         {
-            Description = "Emit CI logging commands to stderr: vsts or github"
+            Description = "Print CI log-group commands to stderr for the given system: vsts or github"
         };
 
         var trxOption = new Option<string?>("--trx")
         {
-            Description = "Write results as a VSTEST .trx file to the specified path"
+            Description = "Write results to a .trx test-run file at this path"
         };
 
         var command = new Command("test", "Run DAX regression tests against a live model (--update records snapshots, --trx/--ci for pipelines)")

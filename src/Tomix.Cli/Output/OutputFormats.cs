@@ -20,7 +20,7 @@ internal static class OutputFormats
     {
         var option = new Option<string>("--output-format")
         {
-            Description = "Stdout format: text (default), json, csv, tmsl (alias: bim), tmdl. Not all formats are supported by every command.",
+            Description = "Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.",
             DefaultValueFactory = _ => defaultValue
         };
 

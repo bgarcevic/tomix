@@ -32,12 +32,12 @@ internal sealed class FormatCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var expressionOption = new Option<string?>("--expression")
         {
-            Description = "Format an inline expression"
+            Description = "The expression to format, given inline"
         };
         expressionOption.Aliases.Add("-e");
         var pathOption = new Option<string?>("--path")
@@ -66,7 +66,7 @@ internal sealed class FormatCommand : ICommandModule
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var command = new Command("format", "Format DAX or M/Power Query expressions (--expression inline, --path object path, or all)")
+        var command = new Command("format", "Pretty-print DAX and M expressions (--expression, --path, or every expression in the model)")
         {
             modelArgument,
             expressionOption,

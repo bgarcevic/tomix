@@ -23,18 +23,18 @@ internal sealed class FindCommand : ICommandModule
     {
         var patternArgument = new Argument<string>("pattern")
         {
-            Description = "Text or regex pattern to search for"
+            Description = "The text or regex to look for"
         };
 
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var inOption = new Option<string?>("--in")
         {
-            Description = "Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all " +
+            Description = "Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all " +
                           "(default: all; annotations are only searched when requested explicitly)"
         };
         inOption.AcceptAmongIgnoreCase(
@@ -46,22 +46,22 @@ internal sealed class FindCommand : ICommandModule
         typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")
         {
-            Description = "Treat pattern as a regular expression"
+            Description = "Interpret the pattern as a regular expression"
         };
         var caseSensitiveOption = new Option<bool>("--case-sensitive")
         {
-            Description = "Enable case-sensitive matching"
+            Description = "Match text exactly, including letter case"
         };
         var pathsOnlyOption = new Option<bool>("--paths-only")
         {
-            Description = "Output one matching object path per line, suitable for piping"
+            Description = "Print one matching object path per line for piping"
         };
         var noMultilineOption = new Option<bool>("--no-multiline")
         {
-            Description = "Collapse multi-line match context to a single line. Text output only."
+            Description = "Show multi-line match context on one line. Applies to text output."
         };
 
-        var command = new Command("find", "Search for text across model objects")
+        var command = new Command("find", "Search model objects for matching text")
         {
             patternArgument,
             modelArgument,

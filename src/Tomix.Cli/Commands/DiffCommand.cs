@@ -16,17 +16,17 @@ internal sealed class DiffCommand : ICommandModule
     {
         var leftArgument = new Argument<string>("left")
         {
-            Description = "Path to first model (TMDL folder, .bim file)"
+            Description = "Path to the first model: a TMDL folder or .bim file"
         };
 
         var rightArgument = new Argument<string>("right")
         {
-            Description = "Path to second model (TMDL folder, .bim file)"
+            Description = "Path to the second model: a TMDL folder or .bim file"
         };
 
         var command = new Command(
             "diff",
-            "Compare two semantic models and show structural differences. Exit codes: 0 = identical, 1 = differences found, 2 = error")
+            "Show the structural differences between two semantic models. Exit codes: 0 = identical, 1 = differences found, 2 = error")
         {
             leftArgument,
             rightArgument

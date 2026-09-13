@@ -28,40 +28,40 @@ internal sealed class SaveCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model, Fabric path, or omit for active connection",
+            Description = "Model path, Fabric path, or omit to use the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
         var outputPathOption = new Option<string?>("--output-file")
         {
-            Description = "File system path to write the model to. Omit to save the loaded model back to its source."
+            Description = "Where to write the model. Omit to write it back to where it was loaded from."
         };
         outputPathOption.Aliases.Add("-o");
 
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "Model serialization: tmdl, bim (tmsl and auto also accepted). Defaults to the loaded model's format."
+            Description = "How the model is written: tmdl or bim (tmsl and auto also accepted). Defaults to the loaded model's format."
         };
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
-        var overwriteOption = LifecycleOptions.Overwrite("Overwrite an existing output file or directory");
+        var overwriteOption = LifecycleOptions.Overwrite("Replace an existing output file or directory");
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
-            Description = "Auto-fix BPA violations before saving (applies FixExpressions where available)"
+            Description = "Apply BPA rule fixes before saving, where a rule provides one"
         };
         var bpaRulesOption = new Option<string[]>("--bpa-rules")
         {
-            Description = "Path(s) to BPA rule file(s) for this save. Overrides bpa.rules in CLI config.",
+            Description = "Additional BPA rule files to enforce for this save, alongside the built-in ruleset.",
             Arity = ArgumentArity.ZeroOrMore
         };
         var supportingFilesOption = new Option<bool>("--supporting-files")
         {
-            Description = "Wrap output in a {modelName}.SemanticModel/ folder with .platform and definition.pbism. Only for tmdl/bim on bare targets."
+            Description = "Write a {modelName}.SemanticModel/ folder (with .platform and definition.pbism) around the output. Only applies to tmdl/bim written to a bare target."
         };
         var noSyncOption = new Option<bool>("--no-sync")
         {
             Description = "Skip workspace sync when workspace mode is active."
         };
 
-        var command = new Command("save", "Save a model to disk in a specified format (like fab export)")
+        var command = new Command("save", "Write a model to disk in a chosen format")
         {
             modelArgument,
             outputPathOption,

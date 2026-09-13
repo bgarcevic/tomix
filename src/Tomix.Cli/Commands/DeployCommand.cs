@@ -29,35 +29,35 @@ internal sealed class DeployCommand : ICommandModule
     {
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model to deploy; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var profileOption = new Option<string?>("--profile")
         {
-            Description = "Use a saved connection profile for this deploy (one-shot, does not persist as active connection)"
+            Description = "Deploy through this saved connection profile for this run only; the active connection is left unchanged"
         };
         profileOption.Aliases.Add("-p");
 
         var createOnlyOption = new Option<bool>("--create-only")
         {
-            Description = "Only create new model; fail if it already exists"
+            Description = "Create the target model only if it does not exist yet; fail when it does"
         };
         var xmlaOption = new Option<string?>("--xmla")
         {
-            Description = "Generate XMLA/TMSL script to file instead of deploying. Use '-' for stdout."
+            Description = "Write the deployment as a TMSL script to this file instead of deploying. Pass '-' to write to stdout."
         };
         var skipBpaOption = new Option<bool>("--skip-bpa")
         {
-            Description = "Skip BPA gate check (configured via .te-bpa.json)"
+            Description = "Skip the BPA gate check for this deploy."
         };
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
-            Description = "Auto-fix BPA violations before deploying (applies FixExpressions where available)"
+            Description = "Apply BPA rule fixes to the model before deploying, where a rule provides one"
         };
         var bpaRulesOption = new Option<string[]>("--bpa-rules")
         {
-            Description = "Path(s) to BPA rule file(s) for this deploy. Overrides bpa.rules in CLI config.",
+            Description = "Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset.",
             Arity = ArgumentArity.ZeroOrMore
         };
         var forceOption = new Option<bool>("--force")
@@ -66,7 +66,7 @@ internal sealed class DeployCommand : ICommandModule
         };
         var ciOption = new Option<string?>("--ci")
         {
-            Description = "Emit CI logging commands to stderr: vsts (Azure DevOps), github (GitHub Actions)"
+            Description = "Print CI log-group commands to stderr for the given system: vsts or github"
         };
         var dryRunOption = new Option<bool>("--dry-run")
         {
@@ -101,7 +101,7 @@ internal sealed class DeployCommand : ICommandModule
             Description = "Overwrite everything, including incremental-refresh partitions (cannot be combined with other --deploy-* flags)"
         };
 
-        var command = new Command("deploy", "Deploy a semantic model to a workspace (--xmla for script-only, --skip-bpa to bypass)")
+        var command = new Command("deploy", "Deploy a semantic model to a workspace")
         {
             modelArgument,
             profileOption,

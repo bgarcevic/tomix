@@ -193,7 +193,7 @@ internal static class Program
         string? configLoadError = null)
     {
         analyzer ??= new VpaxVertipaqAnalyzer(tokenProvider: null, version);
-        var root = new RootCommand("tx - CLI for semantic models");
+        var root = new RootCommand("tx - inspect, validate, query, test, and deploy tabular semantic models");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
 

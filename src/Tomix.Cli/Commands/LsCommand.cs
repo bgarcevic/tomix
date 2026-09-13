@@ -34,7 +34,7 @@ internal sealed class LsCommand : ICommandModule
 
         var modelArgument = new Argument<string>("model")
         {
-            Description = "Path to model (if not using --model)",
+            Description = "Optional path to the model; defaults to the active connection",
             Arity = ArgumentArity.ZeroOrOne
         };
 
@@ -46,13 +46,13 @@ internal sealed class LsCommand : ICommandModule
 
         var pathsOnlyOption = new Option<bool>("--paths-only")
         {
-            Description = "Output one object path per line, suitable for piping to other commands."
+            Description = "Print one object path per line, ready for piping."
         };
 
         var noMultilineOption = new Option<bool>("--no-multiline")
         {
-            Description = "Collapse multi-line cell content (e.g. measure expressions) to a single " +
-                          "line and truncate. Text output only."
+            Description = "Show multi-line cell content (e.g. measure expressions) on one line, " +
+                          "truncated. Applies to text output."
         };
 
         var command = new Command("ls", "List model objects")

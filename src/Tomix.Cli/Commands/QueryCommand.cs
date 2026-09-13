@@ -90,7 +90,7 @@ internal sealed class QueryCommand : ICommandModule
                 result.AddError("--runs must be at least 1.");
         });
 
-        var command = new Command("query", "Execute a DAX or DMV query against a live model (--query inline, --file, or stdin)")
+        var command = new Command("query", "Run a DAX or DMV query against a live model (--query inline, --file, or stdin)")
         {
             queryOption,
             fileOption,
