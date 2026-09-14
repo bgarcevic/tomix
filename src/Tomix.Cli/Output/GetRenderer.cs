@@ -87,7 +87,11 @@ internal static class GetRenderer
                 RenderChildTmdl(result.Object, RenderMeasureTmdl);
                 return;
             case ModelObjectKind.Column:
-                RenderChildTmdl(result.Object, RenderColumnTmdl);
+            case ModelObjectKind.CalculatedColumn:
+                RenderChildTmdl(result.Object,
+                    result.Object.Kind == ModelObjectKind.CalculatedColumn
+                        ? RenderCalculatedColumnTmdl
+                        : RenderColumnTmdl);
                 return;
             case ModelObjectKind.Partition:
                 RenderChildTmdl(result.Object, RenderPartitionTmdl);
@@ -106,8 +110,14 @@ internal static class GetRenderer
         foreach (var measure in table.Children.Where(child => child.Kind == ModelObjectKind.Measure))
             RenderMeasureTmdl(measure);
 
-        foreach (var column in table.Children.Where(child => child.Kind == ModelObjectKind.Column))
-            RenderColumnTmdl(column);
+        foreach (var column in table.Children.Where(child =>
+                     child.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn))
+        {
+            if (column.Kind == ModelObjectKind.CalculatedColumn)
+                RenderCalculatedColumnTmdl(column);
+            else
+                RenderColumnTmdl(column);
+        }
 
         foreach (var partition in table.Children.Where(child => child.Kind == ModelObjectKind.Partition))
             RenderPartitionTmdl(partition);
@@ -136,6 +146,12 @@ internal static class GetRenderer
         Console.WriteLine();
     }
 
+    private static void RenderCalculatedColumnTmdl(ModelObject column)
+    {
+        Console.WriteLine($"\tcolumn {TmdlIdentifier(column.Name)} = {column.Expression ?? ""}");
+        Console.WriteLine();
+    }
+
     private static void RenderPartitionTmdl(ModelObject partition)
     {
         Console.WriteLine($"\tpartition {TmdlIdentifier(partition.Name)} = m");
@@ -157,7 +173,11 @@ internal static class GetRenderer
                 RenderMeasureBim(result.Object);
                 return;
             case ModelObjectKind.Column:
-                RenderColumnBim(result.Object);
+            case ModelObjectKind.CalculatedColumn:
+                if (result.Object.Kind == ModelObjectKind.CalculatedColumn)
+                    RenderCalculatedColumnBim(result.Object);
+                else
+                    RenderColumnBim(result.Object);
                 return;
             case ModelObjectKind.Partition:
                 RenderPartitionBim(result.Object);
@@ -174,13 +194,20 @@ internal static class GetRenderer
         {
             name = table.Name,
             columns = table.Children
-                .Where(child => child.Kind == ModelObjectKind.Column)
-                .Select(column => new
-                {
-                    name = column.Name,
-                    dataType = column.Detail ?? "",
-                    sourceColumn = column.SourceColumn ?? ""
-                }),
+                .Where(child => child.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn)
+                .Select(column => column.Kind == ModelObjectKind.CalculatedColumn
+                    ? (object)new
+                    {
+                        name = column.Name,
+                        dataType = column.Detail ?? "",
+                        expression = column.Expression ?? ""
+                    }
+                    : new
+                    {
+                        name = column.Name,
+                        dataType = column.Detail ?? "",
+                        sourceColumn = column.SourceColumn ?? ""
+                    }),
             partitions = table.Children
                 .Where(child => child.Kind == ModelObjectKind.Partition)
                 .Select(partition => new
@@ -219,6 +246,16 @@ internal static class GetRenderer
             name = column.Name,
             dataType = column.Detail ?? "",
             sourceColumn = column.SourceColumn ?? ""
+        });
+    }
+
+    private static void RenderCalculatedColumnBim(ModelObject column)
+    {
+        JsonOutput.Write(new
+        {
+            name = column.Name,
+            dataType = column.Detail ?? "",
+            expression = column.Expression ?? ""
         });
     }
 

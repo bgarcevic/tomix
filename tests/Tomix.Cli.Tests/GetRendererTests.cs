@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Tomix.App.Get;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
@@ -78,5 +79,80 @@ public sealed class GetRendererTests
             () => { GetRenderer.Render(result, "text"); return 0; },
             captureAnsiConsole: true,
             forceAnsi: true).Stdout;
+    }
+
+    [Fact]
+    public void CalculatedColumn_Tmdl_ShowsInlineExpression()
+    {
+        var output = RenderFragment(CalculatedColumn(), OutputFormats.Tmdl);
+
+        Assert.Contains("ref table Product", output);
+        Assert.Contains("\tcolumn Sorting = RELATED('Category'[Sorting])", output);
+        Assert.DoesNotContain("sourceColumn", output);
+        // Not Assert.DoesNotContain: xUnit strips control characters from the needle, so a bare
+        // ESC matches everything. An ordinal IndexOf is the honest markup-freedom check.
+        Assert.Equal(-1, output.IndexOf(((char)27).ToString(), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CalculatedColumn_Bim_ShowsExpressionFragment()
+    {
+        var output = RenderFragment(CalculatedColumn(), OutputFormats.Bim);
+
+        var fragment = JsonDocument.Parse(output).RootElement;
+        Assert.Equal("Sorting", fragment.GetProperty("name").GetString());
+        Assert.Equal("RELATED('Category'[Sorting])", fragment.GetProperty("expression").GetString());
+        Assert.False(fragment.TryGetProperty("sourceColumn", out _));
+        Assert.Equal(-1, output.IndexOf(((char)27).ToString(), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TableTmdl_IncludesCalculatedColumns()
+    {
+        var output = RenderFragment(ProductTable(), OutputFormats.Tmdl);
+
+        Assert.Contains("\tcolumn Amount", output);
+        Assert.Contains("\t\tsourceColumn: Amount", output);
+        Assert.Contains("\tcolumn Sorting = RELATED('Category'[Sorting])", output);
+    }
+
+    [Fact]
+    public void TableBim_IncludesCalculatedColumns()
+    {
+        var output = RenderFragment(ProductTable(), OutputFormats.Bim);
+
+        var columns = JsonDocument.Parse(output).RootElement.GetProperty("columns");
+        Assert.Equal(2, columns.GetArrayLength());
+        var amount = columns.EnumerateArray().Single(c => c.GetProperty("name").GetString() == "Amount");
+        Assert.False(amount.TryGetProperty("expression", out _));
+        var sorting = columns.EnumerateArray().Single(c => c.GetProperty("name").GetString() == "Sorting");
+        Assert.Equal("RELATED('Category'[Sorting])", sorting.GetProperty("expression").GetString());
+        Assert.False(sorting.TryGetProperty("sourceColumn", out _));
+    }
+
+    private static ModelObject CalculatedColumn()
+        => new("Sorting", ModelObjectKind.CalculatedColumn, "Product/Sorting",
+            Detail: "Int64", Expression: "RELATED('Category'[Sorting])", Description: null,
+            Hidden: false, SourceColumn: null, Children: []);
+
+    private static ModelObject ProductTable()
+        => new("Product", ModelObjectKind.Table, "Product",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
+            Children:
+            [
+                new ModelObject("Amount", ModelObjectKind.Column, "Product/Amount",
+                    Detail: "Double", Expression: null, Description: null, Hidden: false,
+                    SourceColumn: "Amount", Children: []),
+                CalculatedColumn(),
+            ]);
+
+    /// <summary>Fragment formats receive the raw object with no property dictionary — the
+    /// renderer decides the shape from the kind alone.</summary>
+    private static string RenderFragment(ModelObject obj, string format)
+    {
+        var result = new GetModelResult(obj.Kind.ToString(), obj.Path, new Dictionary<string, object?>(), obj, null);
+
+        return ConsoleCapture.Run(
+            () => { GetRenderer.Render(result, format); return 0; }).Stdout;
     }
 }

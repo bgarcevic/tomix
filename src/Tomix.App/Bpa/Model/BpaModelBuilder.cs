@@ -57,6 +57,7 @@ public static class BpaModelBuilder
                 switch (child.Kind)
                 {
                     case ModelObjectKind.Column:
+                    case ModelObjectKind.CalculatedColumn:
                         var column = BuildColumn(child, table, model);
                         tableColumns.Add(column);
                         columns.Add(column);

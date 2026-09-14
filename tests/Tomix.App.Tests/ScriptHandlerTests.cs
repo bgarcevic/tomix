@@ -242,10 +242,11 @@ public sealed class ScriptHandlerTests : IDisposable
     [InlineData("Model.Roles.Count", "0")]
     [InlineData("Model.Tables[0].Name", "Sales")]
     [InlineData("Model.Tables[1].Name", "Customers")]
-    [InlineData("Model.Tables[0].Columns.Count", "2")]
+    [InlineData("Model.Tables[0].Columns.Count", "3")]
     [InlineData("Model.Tables[0].Measures.Count", "1")]
     [InlineData("Model.Tables[0].Measures[0].Name", "Total")]
     [InlineData("Model.Tables[0].Columns[1].Name", "Amount")]
+    [InlineData("Model.Tables[0].Columns[2].Name", "RegionAmount")]
     [InlineData("2 + 3", "5")]
     [InlineData("6 / 4", "1.5")]
     [InlineData("6 / 3", "2")]
@@ -355,6 +356,7 @@ public sealed class ScriptHandlerTests : IDisposable
             Table("Sales",
                 Child("SaleID", ModelObjectKind.Column),
                 Child("Amount", ModelObjectKind.Column),
+                Child("RegionAmount", ModelObjectKind.CalculatedColumn),
                 Child("Total", ModelObjectKind.Measure),
                 Child("Sales-partition", ModelObjectKind.Partition)),
             Table("Customers",

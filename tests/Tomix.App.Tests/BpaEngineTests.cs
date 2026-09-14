@@ -173,6 +173,36 @@ public sealed class BpaEngineTests
     }
 
     [Fact]
+    public void Evaluate_CalculatedColumnKindChildrenReachEngine()
+    {
+        // Real snapshots emit calculated columns as ModelObjectKind.CalculatedColumn (not Column
+        // with an ObjectType property) — the builder must route that kind into the BPA model too.
+        var dataCol = new ModelObject("DataCol", ModelObjectKind.Column, "T/DataCol",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: "DataCol",
+            Children: [],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "DataColumn" });
+        var calcCol = new ModelObject("CalcCol", ModelObjectKind.CalculatedColumn, "T/CalcCol",
+            Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "CalculatedColumn" });
+        var table = new ModelObject("T", ModelObjectKind.Table, "T",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
+            Children: [dataCol, calcCol],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "Table" });
+        var snapshot = new ModelSnapshot("M", 1601, [table]);
+
+        var rules = new List<BpaRule>
+        {
+            new("CALC_ONLY", "Calc only", "Test", BpaSeverity.Info, ["CalculatedColumn"], Expression: "not IsHidden")
+        };
+
+        var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
+
+        var violation = Assert.Single(result.Violations);
+        Assert.Equal("T/CalcCol", violation.ObjectPath);
+    }
+
+    [Fact]
     public void Evaluate_TableScope_ExcludesCalculatedAndCalculationGroupTables()
     {
         var normal = new ModelObject("Normal", ModelObjectKind.Table, "Normal",

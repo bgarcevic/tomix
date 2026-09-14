@@ -43,6 +43,11 @@ and the API surface that major versions protect.
   column references), `validate` checks those expressions and no longer reports references to
   calculated columns or a `sortByColumn` bound to one as broken, and renames/removals rewrite
   or guard DAX inside calculated columns.
+- Calculated columns are visible to the remaining column-scoped surfaces: `get` renders them in
+  `--output-format tmdl` and `--output-format bim` fragments (`column X = <expr>` with an
+  `expression` field) instead of silently dropping them from tables and ignoring the requested
+  format for a calculated column, `bpa run` evaluates column rules against them, and `script`'s
+  `Columns.Count` / `Columns[i]` now match TOM's `Table.Columns` (calculated columns included).
 - `format --type calculatedcolumn` and `set` can write the `expression` property on calculated
   columns; the TOM provider rejected it as unsupported for columns.
 

@@ -76,7 +76,41 @@ public sealed class BpaRuleCoverageTests
         Assert.Equal(["T/c"], Flagged(rule, snapshot));
     }
 
+    [Fact]
+    public void RelatedFunctionRule_FlagsCalculatedColumnKind()
+    {
+        // The child kind must be CalculatedColumn (not Column + ObjectType): before the builder
+        // routed that kind into the BPA model, this rule silently saw no calculated columns.
+        var sorting = CalculatedColumn("Sorting", "T", "RELATED('Category'[Sorting])");
+        var dataSibling = Column("Amount", "T");
+        var snapshot = new ModelSnapshot("M", 1601, [Table("T", sorting, dataSibling)]);
+
+        Assert.Equal(["T/Sorting"], Flagged(BundledRule("REDUCE_USAGE_OF_CALCULATED_COLUMNS_THAT_USE_THE_RELATED_FUNCTION"), snapshot));
+    }
+
+    [Fact]
+    public void CalculatedColumnCountRule_SeesCalculatedColumnKind()
+    {
+        var columns = Enumerable.Range(1, 6)
+            .Select(i => CalculatedColumn($"Calc{i}", "T", "1"))
+            .ToArray();
+        var snapshot = new ModelSnapshot("M", 1601, [Table("T", columns)]);
+
+        Assert.Equal(["Model"], Flagged(BundledRule("REDUCE_NUMBER_OF_CALCULATED_COLUMNS"), snapshot));
+    }
+
     // --- snapshot builders -------------------------------------------------
+
+    private static ModelObject CalculatedColumn(string name, string table, string expression)
+        => new(name, ModelObjectKind.CalculatedColumn, $"{table}/{name}",
+            Detail: null, Expression: expression, Description: "desc", Hidden: false, SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string>
+            {
+                ["DataType"] = "Int64",
+                ["ObjectType"] = "CalculatedColumn",
+                ["ColumnType"] = "Calculated",
+            });
 
     private static ModelObject Table(string name, params ModelObject[] children)
         => new(name, ModelObjectKind.Table, name,

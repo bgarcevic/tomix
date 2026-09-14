@@ -61,6 +61,28 @@ public sealed class VertipaqAnnotationBuilderTests
     }
 
     [Fact]
+    public void Build_EmitsAnnotations_ForCalculatedColumnStats()
+    {
+        // VPAX metrics include calculated columns (they are materialized in the engine). The
+        // target keeps the umbrella Column kind on purpose: resolution goes through TOM's
+        // table.Columns, which holds the snapshot's CalculatedColumn object.
+        var stats = NewStats() with
+        {
+            Columns =
+            [
+                NewColumn("Sales", "Amount", 900, "VALUE"),
+                NewColumn("Sales", "Sorting", 12, "HASH")
+            ]
+        };
+
+        var targets = VertipaqAnnotationBuilder.Build(stats);
+
+        var sorting = Assert.Single(targets, t => t.Path == "'Sales'/'Sorting'");
+        Assert.Equal(ModelObjectKind.Column, sorting.Type);
+        Assert.Contains(sorting.Assignments, a => a is { Property: "Annotation:Vertipaq_Cardinality", Value: "12" });
+    }
+
+    [Fact]
     public void Build_AlwaysQuotesSegments_SoKeywordNamesStayLiteral()
     {
         var stats = NewStats() with

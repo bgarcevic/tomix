@@ -428,8 +428,11 @@ internal static partial class ScriptExpressionEvaluator
             _ => throw new ScriptRuntimeException($"Unsupported table collection: {childKind}")
         };
 
+        // Matches, not equality: Columns must include calculated columns (TOM's Table.Columns
+        // does), so counts and indices agree with the engine's collection. Matches is identity
+        // for Measures/Partitions, which have no sub-kinds.
         var child = GetByIndex(
-            table.Children.Where(child => child.Kind == kind).ToList(),
+            table.Children.Where(child => child.Kind.Matches(kind)).ToList(),
             int.Parse(childIndex, CultureInfo.InvariantCulture));
 
         return property switch
@@ -460,7 +463,7 @@ internal static partial class ScriptExpressionEvaluator
         => snapshot.Objects.Where(obj => obj.Kind == ModelObjectKind.Table).ToList();
 
     private static int CountChildren(ModelObject table, ModelObjectKind kind)
-        => table.Children.Count(child => child.Kind == kind);
+        => table.Children.Count(child => child.Kind.Matches(kind));
 
     private static ModelObject GetByIndex(IReadOnlyList<ModelObject> objects, int index)
     {
