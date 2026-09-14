@@ -114,34 +114,83 @@ public sealed class PropertyFlagTests
             System.Text.Json.JsonDocument.Parse(captured.Stderr).RootElement.GetProperty("code").GetString());
     }
 
-    // ── -q freedom on get/query ─────────────────────────────────────────────
+    // ── -q collision on get/query (#218) ────────────────────────────────────
 
     [Fact]
-    public void Get_LongQuery_Parses_ShortQIsQuiet()
+    public void Get_LongQuery_ParsesClean()
     {
-        // get/query keep only the long --query form; -q is the global quiet alias, so a bare
-        // property word after it lands in the [model] positional and fails at resolve time.
         var services = TestServices.Create();
         var root = TestRoot.With(new GetCommand([], services.State).Build());
 
         Assert.Empty(root.Parse(["get", "Sales", "--query", "expression"]).Errors);
-
-        var shortQ = root.Parse(["get", "Sales", "-q", "expression"]);
-        Assert.True(shortQ.GetValue(GlobalOptions.Quiet));
     }
 
     [Fact]
-    public void Query_LongQuery_Parses_ShortQIsQuiet()
+    public void Get_ShortQProperty_FailsNamingQuietCollision()
+    {
+        // -q is the global quiet alias and never consumes a value, so the property word lands in
+        // the optional [model] positional; the guard rejects that shape instead of failing later
+        // with an unrelated model-resolution error.
+        var services = TestServices.Create();
+        var root = TestRoot.With(new GetCommand([], services.State).Build());
+
+        var shortQ = root.Parse(["get", "Sales", "-q", "expression"]);
+
+        Assert.Empty(shortQ.Errors);
+        Assert.True(shortQ.GetValue(GlobalOptions.Quiet));
+        var collision = QuietCollisionGuard.FindCollision(shortQ);
+        Assert.NotNull(collision);
+        Assert.Equal("TOMIX_QUIET_COLLISION", collision.Code);
+        Assert.Contains("expression", collision.Message);
+        Assert.Contains("--query", collision.Hint);
+    }
+
+    [Fact]
+    public void Query_PositionalText_ParsesCleanWithoutQuiet()
     {
         var services = TestServices.Create();
         var root = TestRoot.With(new QueryCommand([], () => null).Build());
 
-        Assert.Empty(root.Parse(["query", "--query", "EVALUATE Sales"]).Errors);
+        var result = root.Parse(["query", "EVALUATE ROW(1)"]);
 
-        // query has no positional arguments, so inline text still needs --query; -q itself is quiet.
+        Assert.Empty(result.Errors);
+        Assert.False(result.GetValue(GlobalOptions.Quiet));
+        var queryArgument = Assert.Single(result.CommandResult.Command.Arguments, a => a.Name == "query");
+        var bound = result.GetResult(queryArgument);
+        Assert.NotNull(bound);
+        Assert.Equal("EVALUATE ROW(1)", Assert.Single(bound.Tokens).Value);
+    }
+
+    [Fact]
+    public void Query_ShortQText_FailsNamingQuietCollision()
+    {
+        var services = TestServices.Create();
+        var root = TestRoot.With(new QueryCommand([], () => null).Build());
+
         var shortQ = root.Parse(["query", "-q", "EVALUATE Sales"]);
+
+        // -q still means quiet; the text binds to the new positional, and the guard names the
+        // collision instead of letting the query run with a quiet flag the user never meant.
         Assert.True(shortQ.GetValue(GlobalOptions.Quiet));
-        Assert.NotEmpty(shortQ.Errors);
+        var collision = QuietCollisionGuard.FindCollision(shortQ);
+        Assert.NotNull(collision);
+        Assert.Equal("TOMIX_QUIET_COLLISION", collision.Code);
+        Assert.Contains("--query", collision.Hint);
+        Assert.Contains("positionally", collision.Hint);
+    }
+
+    [Fact]
+    public void Get_QueryCollision_CarriesCodeInJson()
+    {
+        var services = TestServices.Create();
+        var root = TestRoot.With(new GetCommand([], services.State).Build());
+        var parsed = root.Parse(["get", "Sales", "-q", "expression", "--error-format", "json"]);
+
+        var captured = ConsoleCapture.Invoke(parsed);
+
+        Assert.Equal(2, captured.ExitCode);
+        Assert.Equal("TOMIX_QUIET_COLLISION",
+            System.Text.Json.JsonDocument.Parse(captured.Stderr).RootElement.GetProperty("code").GetString());
     }
 
     private static RootCommand BuildAddRoot()

@@ -128,8 +128,8 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_QUERY_REQUIRED` | 2 | `query` called without `-q`, `--file`, or piped stdin. |
-| `TOMIX_QUERY_INPUT_CONFLICT` | 2 | `--query` and `--file` were passed together; choose one. |
+| `TOMIX_QUERY_REQUIRED` | 2 | `query` called without query text: pass it positionally, via `--query`, `--file`, or piped stdin. |
+| `TOMIX_QUERY_INPUT_CONFLICT` | 2 | More than one query source was passed: the positional text, `--query`, and `--file` are mutually exclusive; choose one. |
 | `TOMIX_SET_INPUT_CONFLICT` | 2 | `--set` and the compatibility `-q`/`-i` pair were passed together; choose one. |
 | `TOMIX_QUERY_FILE_NOT_FOUND` | 2 | The `--file` path does not exist. |
 | `TOMIX_QUERY_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
@@ -269,6 +269,7 @@ come from structural integrity checks.
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
 | `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |
 | `TOMIX_UNKNOWN_OPTION` | 2 | An unrecognized `--option` would have been bound to a positional argument (e.g. a typo'd flag). Put `--` before positional values that must start with `-`. |
+| `TOMIX_QUIET_COLLISION` | 2 | Text was passed right after `-q`, but `-q` means `--quiet` and never consumes a value: on `query` the text would run as the positional query with quiet on, and on `get` it was read as the optional `[model]` path. Pass query text positionally or via `--query`. |
 | `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` across tables called with an unsupported path shape; a cross-table move needs a `Table/Measure` source and destination. Moving a non-measure across tables surfaces as `TOMIX_MUTATION_UNSUPPORTED` from the provider. |
 | `TOMIX_MOVE_INVALID_PATH` | 2 | `mv` source or destination is missing an object name (empty path, trailing `/`). |
 | `TOMIX_MOVE_NOOP` | 1 | `mv` source and destination are identical; nothing to rename. |

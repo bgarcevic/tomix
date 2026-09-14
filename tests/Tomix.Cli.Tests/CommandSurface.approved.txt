@@ -371,7 +371,8 @@ Print a saved profile's details
   arg <name>  Profile to show
 
 # tx query
-Run a DAX or DMV query against a live model (--query inline, --file, or stdin)
+Run a DAX or DMV query against a live model (inline text, --query, --file, or stdin)
+  arg [query]  The DAX or DMV query text ('-' = read from stdin).
   opt --query <query>  Inline query text ('-' = read from stdin).
   opt --file <file>  Read the query from a file ('-' = read from stdin).
   opt --param <param>  Query parameter as name=value, referenced as @name in DAX. Repeatable.

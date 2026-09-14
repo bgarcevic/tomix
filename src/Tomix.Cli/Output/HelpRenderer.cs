@@ -45,6 +45,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx deps tables/Sales --downstream",
         ],
         ["query"] = [
+            "tx query \"EVALUATE Sales\"",
             "tx query --query \"EVALUATE Sales\"",
             "tx query --file query.dax --limit 10",
             "tx query --query \"EVALUATE VALUES(Sales[Region])\" --output-format json",

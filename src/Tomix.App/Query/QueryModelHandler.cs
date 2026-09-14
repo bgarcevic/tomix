@@ -38,7 +38,7 @@ public sealed class QueryModelHandler
                 "TOMIX_QUERY_REQUIRED",
                 "No query to execute.",
                 exitCode: 2,
-                hint: "Pass -q \"EVALUATE ...\" or --file query.dax, or pipe a query on stdin.");
+                hint: "Pass the query positionally: tx query \"EVALUATE ...\", or use --query, --file query.dax, or pipe it on stdin.");
 
         if (!request.NoValidate)
         {

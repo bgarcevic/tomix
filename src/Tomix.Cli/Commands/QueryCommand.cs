@@ -10,7 +10,9 @@ namespace Tomix.Cli.Commands;
 /// <summary>
 /// Executes a DAX (<c>EVALUATE</c>) or DMV (<c>SELECT ... FROM $SYSTEM....</c>) query against
 /// a live model and renders the rowset. Thin CLI shell over <see cref="QueryModelHandler"/>;
-/// query text comes from <c>-q</c>, <c>--file</c>, or stdin (<c>-</c> sentinel or implicit pipe).
+/// query text comes from the positional argument, <c>--query</c>, <c>--file</c>, or stdin
+/// (<c>-</c> sentinel or implicit pipe). <c>-q</c> is the global <c>--quiet</c> flag and is
+/// never query text — <see cref="QuietCollisionGuard"/> rejects that mistake by name.
 /// </summary>
 internal sealed class QueryCommand : ICommandModule
 {
@@ -26,6 +28,12 @@ internal sealed class QueryCommand : ICommandModule
 
     public Command Build()
     {
+        var queryArgument = new Argument<string?>("query")
+        {
+            Description = "The DAX or DMV query text ('-' = read from stdin).",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
         var queryOption = new Option<string?>("--query")
         {
             Description = "Inline query text ('-' = read from stdin)."
@@ -90,8 +98,9 @@ internal sealed class QueryCommand : ICommandModule
                 result.AddError("--runs must be at least 1.");
         });
 
-        var command = new Command("query", "Run a DAX or DMV query against a live model (--query inline, --file, or stdin)")
+        var command = new Command("query", "Run a DAX or DMV query against a live model (inline text, --query, --file, or stdin)")
         {
+            queryArgument,
             queryOption,
             fileOption,
             paramOption,
@@ -109,10 +118,13 @@ internal sealed class QueryCommand : ICommandModule
             var format = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+            if (QuietCollisionGuard.TryReject(parseResult))
+                return 2;
             if (!CommandOutput.TryValidateFormat(parseResult, format, "query", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
                 return 2;
 
             var (query, inputError) = ResolveQueryInput(
+                parseResult.GetValue(queryArgument),
                 parseResult.GetValue(queryOption),
                 parseResult.GetValue(fileOption));
             if (inputError is not null)
@@ -246,19 +258,22 @@ internal sealed class QueryCommand : ICommandModule
     }
 
     /// <summary>
-    /// Resolves the query text from <c>-q</c>, <c>--file</c>, or stdin (explicit <c>-</c> sentinel
-    /// on either option, or an implicit pipe when both are absent). Returns a diagnostic instead
-    /// of text when the flags conflict or the file is missing; a missing query is not an error
-    /// here — the handler reports TOMIX_QUERY_REQUIRED.
+    /// Resolves the query text from the positional argument, <c>--query</c>, <c>--file</c>, or
+    /// stdin (explicit <c>-</c> sentinel on any of them, or an implicit pipe when none is given).
+    /// Returns a diagnostic instead of text when more than one source is supplied or the file is
+    /// missing; a missing query is not an error here — the handler reports TOMIX_QUERY_REQUIRED.
     /// </summary>
-    internal static (string? Query, TomixDiagnostic? Error) ResolveQueryInput(string? query, string? file)
+    internal static (string? Query, TomixDiagnostic? Error) ResolveQueryInput(string? positional, string? query, string? file)
     {
-        if (!string.IsNullOrWhiteSpace(query) && !string.IsNullOrWhiteSpace(file))
+        var sources = new[] { (Name: "the query text", Value: positional), (Name: "--query", Value: query), (Name: "--file", Value: file) }
+            .Where(source => !string.IsNullOrWhiteSpace(source.Value))
+            .ToList();
+        if (sources.Count > 1)
             return (null, new TomixDiagnostic(
                 "TOMIX_QUERY_INPUT_CONFLICT",
                 DiagnosticSeverity.Error,
-                "Pass either --query or --file, not both.",
-                Hint: "Use --query \"EVALUATE ...\" for inline text or --file query.dax for a file."));
+                "Pass the query once — positionally, via --query, or via --file — not several.",
+                Hint: $"Given: {string.Join(", ", sources.Select(source => source.Name))}."));
 
         if (!string.IsNullOrWhiteSpace(file) && file != "-" && !File.Exists(file))
             return (null, new TomixDiagnostic(
@@ -266,7 +281,7 @@ internal sealed class QueryCommand : ICommandModule
                 DiagnosticSeverity.Error,
                 $"Query file not found: {file}"));
 
-        return (file == "-" ? InputValueResolver.Resolve("-") : InputValueResolver.Resolve(query, file), null);
+        return (file == "-" ? InputValueResolver.Resolve("-") : InputValueResolver.Resolve(query ?? positional, file), null);
     }
 
     /// <summary>

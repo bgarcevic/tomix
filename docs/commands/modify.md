@@ -168,7 +168,7 @@ surface back:
 
 ```sh
 tx set . -q culture -i en-US --save
-tx get . -q defaultMode
+tx get . --query defaultMode
 ```
 
 Calculation-group tables accept `precedence` — a plain table rejects

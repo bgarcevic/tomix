@@ -56,10 +56,13 @@ tx get "Sales/Total Sales"
 tx get "Sales/Total Sales" --query expression
 tx get "Sales/Total Sales" --query annotation:PBI_FormatHint
 tx get "Relationships/rel-customers"
-tx get "Expressions/Environment" -q expression   # a shared M parameter's value
+tx get "Expressions/Environment" --query expression   # a shared M parameter's value
 tx get . --query culture                         # a model-level scalar
 tx get Sales --output-format tmdl    # the object as TMDL
 ```
+
+`-q` is the global `--quiet` flag, not a property shortcut — always pass the
+property through `--query`.
 
 ## `find` — search across the model
 
@@ -115,12 +118,17 @@ tx deps --unused --hidden
 ## `query` — run DAX or DMV
 
 ```
-tx query [options]
+tx query [query] [options]
 ```
 
 Executes against a live model (the active remote connection, or
 `-s`/`-d`). See [Output & scripting](../guides/scripting.md#querying-live-models)
 for the performance-analysis workflow.
+
+The query text can be passed positionally, via `--query`, `--file` (or
+piped on stdin) — exactly one of the three. `-q` is the global `--quiet`
+flag and is never query text; `query -q "EVALUATE …"` fails with
+`TOMIX_QUIET_COLLISION` naming the mix-up.
 
 | Option | Description |
 |--------|-------------|
@@ -136,6 +144,6 @@ for the performance-analysis workflow.
 | `--no-validate` | Skip the EVALUATE/DEFINE/SELECT keyword pre-check. |
 
 ```sh
-tx query --query 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
+tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
 tx query --file heavy.dax --cold --runs 5
 ```

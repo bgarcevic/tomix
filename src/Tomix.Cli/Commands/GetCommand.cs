@@ -56,6 +56,8 @@ internal sealed class GetCommand : ICommandModule
             var path = parseResult.GetValue(pathArgument) ?? "";
             var formatValue = GlobalOptions.OutputFormatValue(parseResult);
             var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
+            if (QuietCollisionGuard.TryReject(parseResult))
+                return 2;
             var query = parseResult.GetValue(queryOption);
             var typeValue = parseResult.GetValue(typeOption);
 

@@ -37,7 +37,7 @@ they are folded into the result document instead.
 
 ```sh
 # Server timings + query plan for a measure (needs workspace/server admin)
-tx query -q 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
+tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
 
 # Benchmark a heavy query cold, five runs
 tx query --file heavy.dax --cold --runs 5

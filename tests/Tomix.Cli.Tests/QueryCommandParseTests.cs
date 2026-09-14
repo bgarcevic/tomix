@@ -7,8 +7,9 @@ namespace Tomix.Cli.Tests;
 
 /// <summary>
 /// Parse-time and input-resolution validation for <c>tx query</c>: bad --limit values fail
-/// before any connection is opened, -q/--file conflicts and missing files produce their
-/// dedicated diagnostics, and --param tokens split on the first '='.
+/// before any connection is opened, the positional query text binds like --query (only one
+/// source may be given), -q/--file conflicts and missing files produce their dedicated
+/// diagnostics, and --param tokens split on the first '='.
 /// </summary>
 public sealed class QueryCommandParseTests
 {
@@ -39,9 +40,64 @@ public sealed class QueryCommandParseTests
     }
 
     [Fact]
+    public void Query_PositionalQueryText_ParsesClean()
+    {
+        var result = Parse("query", "EVALUATE ROW(1)");
+
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void Query_NoInputAtAll_ParsesClean()
+    {
+        // A missing query is not a parse error; the handler reports TOMIX_QUERY_REQUIRED.
+        Assert.Empty(Parse("query").Errors);
+    }
+
+    [Fact]
+    public void Query_ShortQAlone_IsQuietWithNoErrors()
+    {
+        var result = Parse("query", "-q");
+
+        Assert.Empty(result.Errors);
+        Assert.True(result.GetValue(GlobalOptions.Quiet));
+    }
+
+    [Fact]
+    public void ResolveQueryInput_PositionalAlone_PassesThrough()
+    {
+        var (query, error) = QueryCommand.ResolveQueryInput("EVALUATE 'Sales'", null, null);
+
+        Assert.Null(error);
+        Assert.Equal("EVALUATE 'Sales'", query);
+    }
+
+    [Fact]
+    public void ResolveQueryInput_QueryOptionAlone_PassesThrough()
+    {
+        var (query, error) = QueryCommand.ResolveQueryInput(null, "EVALUATE 'Sales'", null);
+
+        Assert.Null(error);
+        Assert.Equal("EVALUATE 'Sales'", query);
+    }
+
+    [Theory]
+    [InlineData("EVALUATE a", "EVALUATE b", null)]
+    [InlineData("EVALUATE a", null, "query.dax")]
+    [InlineData(null, "EVALUATE b", "query.dax")]
+    [InlineData("EVALUATE a", "EVALUATE b", "query.dax")]
+    public void ResolveQueryInput_MoreThanOneSource_Conflicts(string? positional, string? query, string? file)
+    {
+        var (text, error) = QueryCommand.ResolveQueryInput(positional, query, file);
+
+        Assert.Null(text);
+        Assert.Equal("TOMIX_QUERY_INPUT_CONFLICT", error!.Code);
+    }
+
+    [Fact]
     public void ResolveQueryInput_BothQueryAndFile_ReturnsConflict()
     {
-        var (query, error) = QueryCommand.ResolveQueryInput("EVALUATE x", "query.dax");
+        var (query, error) = QueryCommand.ResolveQueryInput(null, "EVALUATE x", "query.dax");
 
         Assert.Null(query);
         Assert.Equal("TOMIX_QUERY_INPUT_CONFLICT", error!.Code);
@@ -50,7 +106,7 @@ public sealed class QueryCommandParseTests
     [Fact]
     public void ResolveQueryInput_MissingFile_ReturnsFileNotFound()
     {
-        var (query, error) = QueryCommand.ResolveQueryInput(null, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.dax"));
+        var (query, error) = QueryCommand.ResolveQueryInput(null, null, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.dax"));
 
         Assert.Null(query);
         Assert.Equal("TOMIX_QUERY_FILE_NOT_FOUND", error!.Code);
@@ -63,21 +119,12 @@ public sealed class QueryCommandParseTests
         File.WriteAllText(path, "EVALUATE 'Sales'");
         try
         {
-            var (query, error) = QueryCommand.ResolveQueryInput(null, path);
+            var (query, error) = QueryCommand.ResolveQueryInput(null, null, path);
 
             Assert.Null(error);
             Assert.Equal("EVALUATE 'Sales'", query);
         }
         finally { File.Delete(path); }
-    }
-
-    [Fact]
-    public void ResolveQueryInput_InlineQuery_PassesThrough()
-    {
-        var (query, error) = QueryCommand.ResolveQueryInput("EVALUATE 'Sales'", null);
-
-        Assert.Null(error);
-        Assert.Equal("EVALUATE 'Sales'", query);
     }
 
     [Fact]

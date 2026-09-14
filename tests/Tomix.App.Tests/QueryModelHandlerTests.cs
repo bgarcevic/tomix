@@ -70,6 +70,8 @@ public sealed class QueryModelHandlerTests
         Assert.False(result.Success);
         Assert.Equal("TOMIX_QUERY_REQUIRED", result.Diagnostics[0].Code);
         Assert.Equal(2, result.ExitCode);
+        // The hint must not send users to -q: that alias belongs to the global --quiet flag (#218).
+        Assert.Contains("tx query", result.Diagnostics[0].Hint);
     }
 
     [Theory]
