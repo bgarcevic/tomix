@@ -77,7 +77,7 @@ internal static class RenameFixup
     /// </summary>
     private static bool IsFixable(ModelObjectKind kind)
         => kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
-            or ModelObjectKind.CalculationItem or ModelObjectKind.Partition;
+            or ModelObjectKind.CalculatedColumn or ModelObjectKind.CalculationItem or ModelObjectKind.Partition;
 
     /// <summary>
     /// Plans the rewrites a rename — and, when <paramref name="newTable"/> is given, a move to
@@ -100,7 +100,8 @@ internal static class RenameFixup
         // uniqueness test: a partition sharing its table's name (the Desktop default) would
         // otherwise make every measure path look ambiguous and silently skip the check.
         var matches = ModelObjectLookup.Find(snapshot, DaxObjectForm.Normalize(path), type)
-            .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column)
+            .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
+                or ModelObjectKind.CalculatedColumn)
             .ToList();
         if (matches.Count != 1)
             return RenameFixupPlan.Empty; // not-found/ambiguous is the mutator's error to raise

@@ -38,6 +38,11 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- Calculated columns count as DAX hosts again. `deps` reports the upstream/downstream edges of
+  calculated-column expressions (so `--unused` no longer flags a column that only a calculated
+  column references), `validate` checks those expressions and no longer reports references to
+  calculated columns or a `sortByColumn` bound to one as broken, and renames/removals rewrite
+  or guard DAX inside calculated columns.
 - `format --type calculatedcolumn` and `set` can write the `expression` property on calculated
   columns; the TOM provider rejected it as unsupported for columns.
 

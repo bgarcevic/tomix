@@ -186,6 +186,7 @@ public sealed class ValidateModelHandler
                 break;
 
             case ModelObjectKind.Column:
+            case ModelObjectKind.CalculatedColumn:
                 var sortBy = obj.Property("SortByColumn");
                 if (!string.IsNullOrWhiteSpace(sortBy)
                     && index.TableColumns.TryGetValue(OwningTable(obj.Path), out var siblings)
@@ -290,7 +291,7 @@ public sealed class ValidateModelHandler
             foreach (var table in objects.Where(o => o.Kind == ModelObjectKind.Table))
             {
                 var columns = table.Children
-                    .Where(c => c.Kind == ModelObjectKind.Column)
+                    .Where(c => c.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn)
                     .Select(c => c.Name)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 tableColumns.TryAdd(table.Name, columns);

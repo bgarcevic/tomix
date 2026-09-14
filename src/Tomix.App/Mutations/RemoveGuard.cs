@@ -38,7 +38,8 @@ internal static class RemoveGuard
         // Only DAX-named kinds leave text references behind, so filter to them BEFORE the
         // uniqueness test (same partition-shares-path guard as the rename fixup).
         var matches = ModelObjectLookup.Find(snapshot, DaxObjectForm.Normalize(path), type)
-            .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column)
+            .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
+                or ModelObjectKind.CalculatedColumn)
             .ToList();
         if (matches.Count != 1)
             return []; // not-found/ambiguous is the mutator's error to raise
@@ -51,7 +52,7 @@ internal static class RemoveGuard
         var targets = new List<ModelObject> { target };
         if (target.Kind == ModelObjectKind.Table)
             targets.AddRange(flattened.Where(o =>
-                o.Kind is ModelObjectKind.Measure or ModelObjectKind.Column
+                o.Kind is ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
                 && IsWithin(o.Path, target.Path)));
 
         var paths = new List<string>();

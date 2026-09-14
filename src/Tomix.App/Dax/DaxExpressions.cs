@@ -47,6 +47,7 @@ public static class DaxExpressions
     public static bool IsDaxExpression(ModelObjectKind kind, string? detail)
         => kind is ModelObjectKind.Measure
             or ModelObjectKind.Column
+            or ModelObjectKind.CalculatedColumn
             or ModelObjectKind.CalculationItem
             or ModelObjectKind.Function
             || (kind is ModelObjectKind.Partition
@@ -97,6 +98,7 @@ public static class DaxExpressions
             // their DAX directly on Expression. Shared expressions (ModelObjectKind.Expression)
             // are M and must never be scanned as DAX.
             case ModelObjectKind.Column:
+            case ModelObjectKind.CalculatedColumn:
             case ModelObjectKind.CalculationItem:
             case ModelObjectKind.Function:
                 if (!string.IsNullOrWhiteSpace(obj.Expression))

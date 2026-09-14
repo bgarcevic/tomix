@@ -13,6 +13,7 @@ public sealed class DaxExpressionsTests
     [Theory]
     [InlineData(ModelObjectKind.Measure, null, true)]
     [InlineData(ModelObjectKind.Column, null, true)]
+    [InlineData(ModelObjectKind.CalculatedColumn, null, true)]
     [InlineData(ModelObjectKind.CalculationItem, null, true)]
     [InlineData(ModelObjectKind.Function, null, true)]
     [InlineData(ModelObjectKind.Partition, "calculated", true)]
@@ -36,6 +37,19 @@ public sealed class DaxExpressionsTests
     [InlineData("filterExpression", false)] // table permissions expose no DaxSite yet
     public void MayBeDaxProperty_MatchesTheSiteKeys(string property, bool expected)
         => Assert.Equal(expected, DaxExpressions.MayBeDaxProperty(property));
+
+    [Fact]
+    public void Sites_YieldsCalculatedColumnExpression()
+    {
+        var calculated = new ModelObject(
+            "Sorting", ModelObjectKind.CalculatedColumn, "Product/Sorting",
+            Detail: null, Expression: "RELATED('Category'[Sorting])", Description: null,
+            Hidden: false, SourceColumn: null, Children: []);
+
+        var site = Assert.Single(DaxExpressions.Sites(calculated));
+        Assert.Equal("Expression", site.Property);
+        Assert.Equal("RELATED('Category'[Sorting])", site.Expression);
+    }
 
     [Fact]
     public void IsDaxValue_MatchesByExactText()

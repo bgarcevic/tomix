@@ -1,5 +1,6 @@
 using Tomix.App.Validate;
 using Tomix.Core.Models;
+using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
 
@@ -264,6 +265,37 @@ public sealed class ValidateModelHandlerTests
         Assert.Contains(result.Data.Errors, e => e.Code == "DAX0002" && e.Message.Contains("Missing"));
     }
 
+    [Theory]
+    [InlineData("SUM(Sales[Missing])", "DAX0002")]
+    [InlineData("SUM(Sales[Amount]", "DAX0004")]
+    public async Task HandleAsync_ScansCalculatedColumnExpressions(string expression, string expectedCode)
+    {
+        var column = new ModelObject("Calc", ModelObjectKind.CalculatedColumn, "Sales/Calc",
+            Detail: "decimal", Expression: expression, Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var result = await ValidateAsync(SalesSnapshot(column));
+
+        Assert.False(result.Data!.Valid);
+        Assert.Contains(result.Data.Errors, e => e.Code == expectedCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AdventureWorksSample_ReportsNoErrors()
+    {
+        // End-to-end guard for the enum-split regressions: the sample's Product/Sorting and
+        // Date/Year calculated columns are referenced by a sort-by and by another expression,
+        // so a clean run requires the name index and the DAX scanner to see them both.
+        var handler = new ValidateModelHandler([new TmdlModelProvider()]);
+        var result = await handler.HandleAsync(
+            new ValidateModelRequest(
+                new ModelReference(SampleModel.Locate("AdventureWorks Sales.SemanticModel")),
+                ErrorsOnly: false, NoWarnings: false, ServerOnly: false),
+            CancellationToken.None);
+
+        Assert.True(result.Data!.Valid);
+        Assert.Empty(result.Data.Errors);
+    }
+
     [Fact]
     public async Task HandleAsync_DetectsBrokenRelationshipEndpoint()
     {
@@ -282,11 +314,28 @@ public sealed class ValidateModelHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DetectsBrokenSortByColumn()
+    public async Task HandleAsync_AcceptsReferencesToCalculatedColumns()
     {
-        var column = new ModelObject("Month", ModelObjectKind.Column, "Sales/Month",
-            Detail: "string", Expression: null, Description: null, Hidden: false,
-            SourceColumn: "Month", Children: [],
+        // Sales/Year is a calculated column; a measure referencing it must not report DAX0002.
+        var year = new ModelObject("Year", ModelObjectKind.CalculatedColumn, "Sales/Year",
+            Detail: "int64", Expression: "Sales[Amount] * 1", Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var result = await ValidateAsync(SalesSnapshot(year, Measure("Latest", "MAX(Sales[Year])")));
+
+        Assert.True(result.Data!.Valid);
+        Assert.Empty(result.Data.Errors);
+        Assert.Empty(result.Data.Warnings);
+    }
+
+    [Theory]
+    [InlineData(ModelObjectKind.Column)]
+    [InlineData(ModelObjectKind.CalculatedColumn)]
+    public async Task HandleAsync_DetectsBrokenSortByColumn(ModelObjectKind kind)
+    {
+        var column = new ModelObject("Month", kind, "Sales/Month",
+            Detail: "string", Expression: kind == ModelObjectKind.CalculatedColumn ? "1" : null,
+            Description: null, Hidden: false,
+            SourceColumn: kind == ModelObjectKind.Column ? "Month" : null, Children: [],
             Properties: new Dictionary<string, string> { ["SortByColumn"] = "MonthNo" });
         var result = await ValidateAsync(SalesSnapshot(column));
 

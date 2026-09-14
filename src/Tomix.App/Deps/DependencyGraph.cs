@@ -276,7 +276,7 @@ internal sealed class DependencyGraph
     private static string ToDaxReference(ModelObject obj)
     {
         var parts = obj.Path.Split('/', 2);
-        if (parts.Length == 2 && obj.Kind is ModelObjectKind.Column or ModelObjectKind.Measure)
+        if (parts.Length == 2 && obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn or ModelObjectKind.Measure)
             return $"'{parts[0]}'[{parts[1]}]";
 
         return obj.Name;

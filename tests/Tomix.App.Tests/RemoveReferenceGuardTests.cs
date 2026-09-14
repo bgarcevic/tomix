@@ -85,6 +85,31 @@ public sealed class RemoveReferenceGuardTests
     }
 
     [Fact]
+    public async Task RemoveReferencedCalculatedColumn_Blocks()
+    {
+        var session = NewSession();
+        var result = await Handle(session, "Sales/Calc", force: false);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_RM_BREAKS_REFS", result.Diagnostics[0].Code);
+        Assert.Contains("Region/OutsideCalc", result.Diagnostics[0].Message);
+        Assert.False(session.RemoveCalled);
+    }
+
+    [Fact]
+    public async Task RemoveTable_LoneReferenceToItsCalculatedColumn_Blocks()
+    {
+        // The unqualified [Calc] only matches through the removed table's calculated-column
+        // child, so removing Sales must expand the target set to include it.
+        var session = NewSessionWithoutOtherCrossTableReferences();
+        var result = await Handle(session, "Sales", force: false);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_RM_BREAKS_REFS", result.Diagnostics[0].Code);
+        Assert.Contains("Region/OutsideCalc", result.Diagnostics[0].Message);
+    }
+
+    [Fact]
     public async Task CascadeRemoved_FlowsThroughToTheResult()
     {
         var session = NewSession(cascadeRemoved: ["relationship 'Sales'[Key] -> 'Region'[Key]"]);
@@ -119,13 +144,32 @@ public sealed class RemoveReferenceGuardTests
                 Detail: null, Expression: "[Base] * 2", Description: null, Hidden: false, SourceColumn: null, Children: []),
             new ModelObject("Lonely", ModelObjectKind.Measure, "Sales/Lonely",
                 Detail: null, Expression: "2", Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Calc", ModelObjectKind.CalculatedColumn, "Sales/Calc",
+                Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null, Children: []),
             new ModelObject("Amount", ModelObjectKind.Column, "Sales/Amount",
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
             new ModelObject("Region", ModelObjectKind.Table, "Region",
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
             new ModelObject("Outside", ModelObjectKind.Measure, "Region/Outside",
-                Detail: null, Expression: "SUM('Sales'[Amount])", Description: null, Hidden: false, SourceColumn: null, Children: [])
+                Detail: null, Expression: "SUM('Sales'[Amount])", Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("OutsideCalc", ModelObjectKind.Measure, "Region/OutsideCalc",
+                Detail: null, Expression: "[Calc] + 1", Description: null, Hidden: false, SourceColumn: null, Children: [])
         ]), cascadeRemoved);
+
+    /// <summary>A Sales table whose only external reference is the unqualified [Calc], plus a
+    /// Region table to point at it — isolates target-set expansion from other cross-table refs.</summary>
+    private static StubSnapshotSession NewSessionWithoutOtherCrossTableReferences()
+        => new(new ModelSnapshot("M", 1601,
+        [
+            new ModelObject("Sales", ModelObjectKind.Table, "Sales",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Calc", ModelObjectKind.CalculatedColumn, "Sales/Calc",
+                Detail: null, Expression: "1", Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("Region", ModelObjectKind.Table, "Region",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
+            new ModelObject("OutsideCalc", ModelObjectKind.Measure, "Region/OutsideCalc",
+                Detail: null, Expression: "[Calc] + 1", Description: null, Hidden: false, SourceColumn: null, Children: [])
+        ]), cascadeRemoved: null);
 
     private sealed class StubProvider : IModelProvider
     {

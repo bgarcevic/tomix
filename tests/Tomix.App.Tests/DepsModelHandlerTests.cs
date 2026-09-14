@@ -126,6 +126,28 @@ public sealed class DepsModelHandlerTests
     }
 
     [Fact]
+    public async Task Upstream_ScansCalculatedColumnExpressions()
+    {
+        // RegionAmount = "RELATED('Region'[Amount])" — the reference lives on a calculated
+        // column, so it only resolves when calculated columns are treated as DAX hosts.
+        var result = await Run(Request("Sales/RegionAmount"));
+
+        var dep = Assert.Single(result.Data!.Upstream);
+        Assert.Equal("Region/Amount", dep.Path);
+        Assert.Equal("Column", dep.Type);
+    }
+
+    [Fact]
+    public async Task Downstream_IncludesCalculatedColumnReferencingTheObject()
+    {
+        var result = await Run(Request("Region/Amount", downstreamOnly: true));
+
+        var calc = result.Data!.Downstream.Single(d => d.Path == "Sales/RegionAmount");
+        Assert.Equal("CalculatedColumn", calc.Type);
+        Assert.Equal("'Sales'[RegionAmount]", calc.Reference);
+    }
+
+    [Fact]
     public async Task Unused_ListsUnreferencedMeasuresButNotUsedObjects()
     {
         var result = await Run(Request(path: null, unused: true));
@@ -136,6 +158,8 @@ public sealed class DepsModelHandlerTests
         Assert.DoesNotContain("Sales/Total", unused);   // referenced by Net/Margin
         Assert.DoesNotContain("Sales/Amount", unused);  // referenced by Total/Tax/relationship
         Assert.DoesNotContain("Region/RegionKey", unused); // used by relationship
+        Assert.DoesNotContain("Region/Amount", unused); // referenced only by Sales/RegionAmount
+        Assert.Contains("Sales/UnusedCalc", unused);
     }
 
     [Fact]
@@ -202,6 +226,9 @@ public sealed class DepsModelHandlerTests
         IReadOnlyDictionary<string, string>? props = null)
         => new(name, ModelObjectKind.Column, $"{table}/{name}", null, expression, null, false, null, [], props);
 
+    private static ModelObject CalculatedColumn(string table, string name, string expression)
+        => new(name, ModelObjectKind.CalculatedColumn, $"{table}/{name}", null, expression, null, false, null, []);
+
     private sealed class StubModelProvider : IModelProvider
     {
         public bool CanOpen(ModelReference _) => true;
@@ -224,6 +251,8 @@ public sealed class DepsModelHandlerTests
                 [
                     Column("Sales", "Amount"),
                     Column("Sales", "Tax", "Sales[Amount] * 0.1"),
+                    CalculatedColumn("Sales", "RegionAmount", "RELATED('Region'[Amount])"),
+                    CalculatedColumn("Sales", "UnusedCalc", "1"),
                     Measure("Sales", "Total", "SUM(Sales[Amount])"),
                     Measure("Sales", "Net", "[Total] - SUM(Sales[Tax])"),
                     Measure("Sales", "Margin", "DIVIDE([Net], [Total])"),

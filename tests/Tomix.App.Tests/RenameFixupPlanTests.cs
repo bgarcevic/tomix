@@ -121,6 +121,39 @@ public sealed class RenameFixupPlanTests
     }
 
     [Fact]
+    public async Task MeasureRename_RewritesCalculatedColumnExpression()
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                Measure("Base", "Sales/Base", "1"),
+                CalculatedColumn("Calc", "Sales/Calc", "[Base] + 1"),
+            ],
+            "Sales/Base", "New");
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("Sales/Calc", edit.Path);
+        Assert.Equal("[New] + 1", edit.Value);
+        Assert.Empty(plan.UnfixablePaths);
+    }
+
+    [Fact]
+    public async Task CalculatedColumnRename_RewritesReferencingMeasure()
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                CalculatedColumn("Sorting", "Sales/Sorting", "1"),
+                Measure("A", "Sales/A", "MAX(Sales[Sorting])"),
+            ],
+            "Sales/Sorting", "SortKey");
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("MAX('Sales'[SortKey])", edit.Value);
+        Assert.Empty(plan.UnfixablePaths);
+    }
+
+    [Fact]
     public async Task CaseOnlyRename_PlansNothing()
     {
         var plan = await Plan(
@@ -149,6 +182,10 @@ public sealed class RenameFixupPlanTests
     private static ModelObject Column(string name, string path)
         => new(name, ModelObjectKind.Column, path,
             Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []);
+
+    private static ModelObject CalculatedColumn(string name, string path, string expression)
+        => new(name, ModelObjectKind.CalculatedColumn, path,
+            Detail: null, Expression: expression, Description: null, Hidden: false, SourceColumn: null, Children: []);
 
     private static ModelObject Measure(
         string name, string path, string expression, IReadOnlyDictionary<string, string>? properties = null)
