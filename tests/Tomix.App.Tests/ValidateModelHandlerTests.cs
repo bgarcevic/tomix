@@ -218,6 +218,21 @@ public sealed class ValidateModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_CarriesSeverity_OnEveryIssue()
+    {
+        var result = await ValidateAsync(SalesSnapshot(
+            Measure("Total", "SUM(Sales[Missing])"),
+            Measure("Loose", "[No Such Measure] + 1")));
+
+        // Every error issue declares Error severity; warnings declare Warning (and only
+        // warnings keep the model "valid").
+        Assert.All(result.Data!.Errors, e => Assert.Equal(ValidationSeverity.Error, e.Severity));
+        var warning = Assert.Single(result.Data.Warnings);
+        Assert.Equal("DAX0003", warning.Code);
+        Assert.Equal(ValidationSeverity.Warning, warning.Severity);
+    }
+
+    [Fact]
     public async Task HandleAsync_SuppressesWarnings_WhenNoWarnings()
     {
         var result = await ValidateAsync(
@@ -294,6 +309,23 @@ public sealed class ValidateModelHandlerTests
 
         Assert.True(result.Data!.Valid);
         Assert.Empty(result.Data.Errors);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BasicTmdlSample_ResolvesBannerNameFromFolder()
+    {
+        // Banner-name pin: the sample's database carries no TOM name and no .platform file, so
+        // the display name resolves through the folder branch of ModelDisplayName — never
+        // "(unnamed)".
+        var handler = new ValidateModelHandler([new TmdlModelProvider()]);
+        var result = await handler.HandleAsync(
+            new ValidateModelRequest(
+                new ModelReference(SampleModel.Locate()),
+                ErrorsOnly: false, NoWarnings: false, ServerOnly: false),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("basic-tmdl", result.Data!.ModelName);
     }
 
     [Fact]

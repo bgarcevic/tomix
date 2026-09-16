@@ -64,7 +64,9 @@ public static class MutationStubs
         /// </summary>
         public bool RewriteCameBeforeSetProperty { get; private set; }
 
-        public bool SnapshotRequested { get; private set; }
+        public bool SnapshotRequested => SnapshotCount > 0;
+
+        public int SnapshotCount { get; private set; }
 
         public string SourcePath => "";
 
@@ -73,7 +75,7 @@ public static class MutationStubs
 
         public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
         {
-            SnapshotRequested = true;
+            SnapshotCount++;
             return Task.FromResult(snapshot);
         }
 

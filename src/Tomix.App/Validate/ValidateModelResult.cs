@@ -12,7 +12,16 @@ public sealed record ValidateModelResult(
     // JSON keeps its pinned shape (ValidateJsonContractTests).
     [property: JsonIgnore] IReadOnlySet<string>? MeasureNames = null);
 
+/// <summary>How serious one validation issue is; serialized as a string in JSON.</summary>
+public enum ValidationSeverity
+{
+    Error,
+    Warning,
+    Info,
+}
+
 public sealed record ValidationIssue(
+    ValidationSeverity Severity,
     string Code,
     string Message,
     string ObjectName,

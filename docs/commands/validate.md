@@ -108,8 +108,11 @@ reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).
 
 In text output each finding shows the offending expression line under its
 message, syntax-highlighted when it came from DAX; `--no-multiline` collapses
-the cell back to one line. `--output-format json`, CI annotations, and TRX
-output stay plain.
+the cell back to one line. Every issue carries a severity: `--output-format
+json` includes it as a string (`"severity": "Error"` / `"Warning"`) on each
+issue, CI annotations emit errors as errors and warnings as warnings (the run
+still exits `1` only for errors), and the TRX projection maps each issue's
+severity to its test outcome.
 
 | Option | Description |
 |--------|-------------|

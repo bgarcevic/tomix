@@ -7,7 +7,11 @@ public sealed record SetModelPropertyResult(
     string Property,
     string Value,
     object Saved,
-    int ValidationErrors,
+    // Post-mutation error count from the shared offline analyzer (the measurement the save
+    // gate reuses for delta semantics). Null when never measured: --revert discards the
+    // staged copy without opening the model.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? ValidationErrors,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     bool? Staged = null,
     bool Synced = false,

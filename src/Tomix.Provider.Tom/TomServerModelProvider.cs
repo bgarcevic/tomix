@@ -266,6 +266,8 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
             traceWriter,
             cancellationToken);
 
+    // Same resolution chain as the local sessions, so server-backed banners (test/query) name
+    // the database, fall back to its ID, and never yield the unnamed sentinel.
     private string ModelName()
-        => string.IsNullOrWhiteSpace(_database.Name) ? _database.ID : _database.Name;
+        => ModelDisplayName.Resolve(_database.Name, sourcePath: null, fallback: _database.ID);
 }

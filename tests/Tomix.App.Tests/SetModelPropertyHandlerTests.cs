@@ -125,6 +125,41 @@ public sealed class SetModelPropertyHandlerTests
         Assert.Null(result.Data.OldValue);
     }
 
+    [Fact]
+    public async Task HandleAsync_ReportsPostMutationErrorCount()
+    {
+        // Setting the expression to reference a missing column: the result must carry the true
+        // post-mutation error count (the measurement the save gate will gate on), not a 0.
+        var handler = new SetModelPropertyHandler(
+            [new StubProvider(new StubSession(Snapshot(), postMutation: BrokenSnapshot()))], TestStores);
+
+        var result = await handler.HandleAsync(
+            NewRequest(
+                [new ModelPropertyAssignment("expression", "SUM(Sales[Missing])")],
+                revert: false,
+                path: "Sales/Total Sales"),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, result.Data!.ValidationErrors);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsZeroErrors_WhenPostMutationModelIsClean()
+    {
+        var handler = new SetModelPropertyHandler([new StubProvider(new StubSession(Snapshot()))], TestStores);
+
+        var result = await handler.HandleAsync(
+            NewRequest(
+                [new ModelPropertyAssignment("expression", "SUM(Sales[Amount]) + 1")],
+                revert: false,
+                path: "Sales/Total Sales"),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, result.Data!.ValidationErrors);
+    }
+
     private static SetModelPropertyRequest NewRequest(
         IReadOnlyList<ModelPropertyAssignment> properties,
         bool revert,
@@ -177,6 +212,25 @@ public sealed class SetModelPropertyHandlerTests
         return new ModelSnapshot("stub", 1601, [sales]);
     }
 
+    /// <summary>The post-mutation model when the new expression references a missing column.</summary>
+    private static ModelSnapshot BrokenSnapshot()
+    {
+        var totalSales = new ModelObject(
+            "Total Sales", ModelObjectKind.Measure, "Sales/Total Sales",
+            Detail: null, Expression: "SUM(Sales[Missing])", Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var amount = new ModelObject(
+            "Amount", ModelObjectKind.Column, "Sales/Amount",
+            Detail: "decimal", Expression: null, Description: null, Hidden: false,
+            SourceColumn: "Amount", Children: []);
+        var sales = new ModelObject(
+            "Sales", ModelObjectKind.Table, "Sales",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [amount, totalSales]);
+
+        return new ModelSnapshot("stub", 1601, [sales]);
+    }
+
     private sealed class StubProvider : IModelProvider
     {
         private readonly StubSession _session;
@@ -192,8 +246,14 @@ public sealed class SetModelPropertyHandlerTests
     private sealed class StubSession : IModelSession, IModelMutationSession
     {
         private readonly ModelSnapshot _snapshot;
+        private readonly ModelSnapshot _postMutationSnapshot;
+        private bool _mutated;
 
-        public StubSession(ModelSnapshot snapshot) => _snapshot = snapshot;
+        public StubSession(ModelSnapshot snapshot, ModelSnapshot? postMutation = null)
+        {
+            _snapshot = snapshot;
+            _postMutationSnapshot = postMutation ?? snapshot;
+        }
 
         public string SourcePath => "";
 
@@ -201,7 +261,7 @@ public sealed class SetModelPropertyHandlerTests
             => Task.FromResult(new ModelSummary("stub", 1601, 1, 1, 1, 0, 0));
 
         public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
-            => Task.FromResult(_snapshot);
+            => Task.FromResult(_mutated ? _postMutationSnapshot : _snapshot);
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -209,11 +269,14 @@ public sealed class SetModelPropertyHandlerTests
             => throw new NotSupportedException();
 
         public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request)
-            => new(
+        {
+            _mutated = true;
+            return new(
                 request.Path,
                 Changed: true,
                 Property: request.Properties[^1].Property,
                 Value: request.Properties[^1].Value);
+        }
 
         public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
             => throw new NotSupportedException();

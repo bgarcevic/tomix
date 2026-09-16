@@ -1,6 +1,7 @@
 using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Mutations;
+using Tomix.App.Validate;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -69,6 +70,14 @@ public sealed class SetModelPropertyHandler
                     request.Properties,
                     request.Type));
 
+                // The in-memory model is already post-mutation in every lifecycle mode (save,
+                // stage, dry-run), so the shared offline analyzer measures what the save gate
+                // will gate on. The result builder is synchronous, so the count rides into it
+                // through this closure.
+                var validationErrors = ModelValidation
+                    .Analyze(await session.GetSnapshotAsync(cancellationToken).ConfigureAwait(false))
+                    .Issues.Count(issue => issue.Severity == ValidationSeverity.Error);
+
                 var property = mutation.Property ?? request.Properties[^1].Property;
                 return (mutation.Changed, $"set {mutation.Path}.{property}",
                     outcome => new SetModelPropertyResult(
@@ -76,7 +85,7 @@ public sealed class SetModelPropertyHandler
                         property,
                         mutation.Value ?? request.Properties[^1].Value,
                         outcome.Saved,
-                        ValidationErrors: 0,
+                        ValidationErrors: validationErrors,
                         outcome.Staged == true ? true : null,
                         Synced: outcome.Synced,
                         SyncTarget: outcome.SyncTarget,
@@ -87,7 +96,7 @@ public sealed class SetModelPropertyHandler
                         OldValue: oldValue,
                         IsDaxProperty: isDaxProperty));
             },
-            new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: 0),
+            new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: null),
             cancellationToken);
     }
 

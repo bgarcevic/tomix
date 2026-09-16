@@ -1,6 +1,7 @@
 using Spectre.Console;
 using Tomix.App.Deploy;
 using Tomix.App.Diff;
+using Tomix.Provider.Tom;
 
 namespace Tomix.Cli.Output;
 
@@ -15,10 +16,13 @@ internal static class DeployRenderer
             return;
         }
 
+        // The banner names the source model the way its TMDL does (.platform displayName or
+        // folder name), not as a raw path; the target database is already shown after the server.
+        var modelName = ModelDisplayName.Resolve(tomName: null, sourcePath: source, fallback: result.Database);
+
         if (result.Status == "dry-run")
         {
-            var name = string.IsNullOrWhiteSpace(result.Database) ? source : result.Database;
-            AnsiConsole.MarkupLine(Styling.Value($"Dry run: {name} to {result.Server} / {result.Database}"));
+            AnsiConsole.MarkupLine(Styling.Value($"Dry run: {modelName} to {result.Server} / {result.Database}"));
 
             if (result.CreatesDatabase == true)
             {
@@ -56,9 +60,8 @@ internal static class DeployRenderer
             return;
         }
 
-        var deployName = string.IsNullOrWhiteSpace(result.Database) ? source : result.Database;
         AnsiConsole.MarkupLine(Styling.Value(
-            $"Deploying {deployName} to {result.Server} / {result.Database}..."));
+            $"Deploying {modelName} to {result.Server} / {result.Database}..."));
         AnsiConsole.MarkupLine(Styling.Success(
             $"Deployed: {result.Status} ({result.DurationMs}ms)"));
     }

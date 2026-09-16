@@ -151,11 +151,24 @@ public sealed class MutationResultContractTests
     [Fact]
     public void SetModelPropertyResult_WithSaveAndStage_SerializesCorrectly()
     {
-        var result = new SetModelPropertyResult("Sales[Name]", "description", "updated", Saved: true, 0, Staged: true);
+        var result = new SetModelPropertyResult("Sales[Name]", "description", "updated", Saved: true, 2, Staged: true);
         var json = JsonDocument.Parse(Serialize(result));
 
         Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("saved").ValueKind);
         Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("staged").ValueKind);
+        // The real post-mutation error count, measured by the shared offline analyzer.
+        Assert.Equal(2, json.RootElement.GetProperty("validationErrors").GetInt32());
+    }
+
+    [Fact]
+    public void SetModelPropertyResult_Revert_OmitsValidationErrors()
+    {
+        // --revert never opens the model, so there is no measurement: the field is omitted
+        // rather than lying with a 0.
+        var result = new SetModelPropertyResult("Sales", Property: "", Value: "", Saved: false, ValidationErrors: null);
+        var json = Serialize(result);
+
+        Assert.DoesNotContain("\"validationErrors\"", json);
     }
 
     // ── Move: MoveModelObjectResult ─────────────────────────────────────────

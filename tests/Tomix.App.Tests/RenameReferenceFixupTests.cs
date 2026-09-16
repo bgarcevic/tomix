@@ -155,7 +155,8 @@ public sealed class RenameReferenceFixupTests
 
         Assert.True(result.Success);
         Assert.Null(result.Data!.BrokenReferences);
-        Assert.False(session.SnapshotRequested);
+        // No rename fixup snapshot — the only read is the post-mutation error count.
+        Assert.Equal(1, session.SnapshotCount);
     }
 
     [Fact]

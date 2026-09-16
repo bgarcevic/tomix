@@ -105,8 +105,14 @@ public sealed class TrxWriterTests : IDisposable
             ModelName: "Sales Model",
             Valid: false,
             DurationMs: 1,
-            Errors: [new ValidationIssue("TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", "SUM('X'[Y])")],
-            Warnings: [new ValidationIssue("TOMIX_DAX_WARNING", "Deprecated function", "Sales[N]", null)]);
+            Errors:
+            [
+                new ValidationIssue(ValidationSeverity.Error, "TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", "SUM('X'[Y])")
+            ],
+            Warnings:
+            [
+                new ValidationIssue(ValidationSeverity.Warning, "TOMIX_DAX_WARNING", "Deprecated function", "Sales[N]", null)
+            ]);
 
         var tests = ValidateRenderer.ToTrxTests(result);
 
@@ -117,6 +123,30 @@ public sealed class TrxWriterTests : IDisposable
         Assert.Contains("SUM('X'[Y])", tests[0].Message);
         Assert.Equal(TrxWriter.TrxOutcome.Warning, tests[1].Outcome);
         Assert.Equal("Deprecated function", tests[1].Message);
+    }
+
+    [Fact]
+    public void ValidateProjection_OutcomeComesFromSeverity_NotTheList()
+    {
+        // The outcome is derived from each issue's severity (TRX has no Info outcome, so Info
+        // rides with Warning), independent of which list carried it.
+        var result = new ValidateModelResult(
+            ModelName: "Sales Model",
+            Valid: false,
+            DurationMs: 1,
+            Errors:
+            [
+                new ValidationIssue(ValidationSeverity.Error, "TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", null)
+            ],
+            Warnings:
+            [
+                new ValidationIssue(ValidationSeverity.Info, "TOMIX_DAX_INFO", "Consider a variable", "Sales[N]", null)
+            ]);
+
+        var tests = ValidateRenderer.ToTrxTests(result);
+
+        Assert.Equal(TrxWriter.TrxOutcome.Failed, tests[0].Outcome);
+        Assert.Equal(TrxWriter.TrxOutcome.Warning, tests[1].Outcome);
     }
 
     [Fact]

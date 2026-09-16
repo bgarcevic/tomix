@@ -15,8 +15,20 @@ public sealed class ValidateJsonContractTests
         ModelName: "basic-tmdl",
         Valid: false,
         DurationMs: 7,
-        Errors: [new ValidationIssue("DAX0001", "Table 'X' cannot be found.", "Sales[Total]", "SUM('X'[Y])")],
-        Warnings: [new ValidationIssue("DAX0003", "Measure or column [Y] cannot be found.", "Sales[N]", null)]);
+        Errors:
+        [
+            new ValidationIssue(
+                ValidationSeverity.Error, "DAX0001", "Table 'X' cannot be found.", "Sales[Total]", "SUM('X'[Y])")
+        ],
+        Warnings:
+        [
+            new ValidationIssue(
+                ValidationSeverity.Warning,
+                "DAX0003",
+                "Measure or column [Y] cannot be found.",
+                "Sales[N]",
+                null)
+        ]);
 
     [Fact]
     public void Json_PutsModelNameAtTheTopOfData()
@@ -36,9 +48,15 @@ public sealed class ValidateJsonContractTests
             new CommandEnvelope<ValidateModelResult>(SampleResult(), []))).RootElement;
 
         var error = root.GetProperty("data").GetProperty("errors")[0];
+        Assert.Equal("Error", error.GetProperty("severity").GetString());
         Assert.Equal("DAX0001", error.GetProperty("code").GetString());
         Assert.Equal("Table 'X' cannot be found.", error.GetProperty("message").GetString());
         Assert.Equal("Sales[Total]", error.GetProperty("objectName").GetString());
         Assert.Equal("SUM('X'[Y])", error.GetProperty("expression").GetString());
+
+        // The severity is additive; warnings serialize their own level as a string too.
+        var warning = root.GetProperty("data").GetProperty("warnings")[0];
+        Assert.Equal("Warning", warning.GetProperty("severity").GetString());
+        Assert.Equal("DAX0003", warning.GetProperty("code").GetString());
     }
 }

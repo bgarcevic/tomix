@@ -12,6 +12,10 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `validate` issues carry a severity: `--output-format json` includes a `"severity"` string on
+  each issue, `--ci` annotations emit warnings as warnings (github `::warning::` / vsts
+  `type=warning`) instead of dropping them, and the TRX projection maps each issue's severity
+  to its test outcome. The run still exits `1` only for error-severity issues (#220).
 - DAX syntax highlighting now extends beyond `get` and `ls`: `validate` shows the offending
   expression line under each finding, `set` previews DAX edits with `Before:`/`After:` lines,
   and `format` colors inline `-e` and `--path` output. Text output only — JSON/CSV, CI
@@ -19,6 +23,13 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- `set` reports the real post-mutation error count in `validationErrors` (measured with the
+  same offline analysis `validate` runs) instead of a hardcoded `0`. `--revert` omits the field
+  from JSON rather than reporting a count it never measured (#220).
+- Command banners name the model through one resolution chain (TOM name → `.platform`
+  displayName → folder name): the `deploy` banner shows the resolved display name instead of
+  the raw source path, and `test`/`query` database names use the same fallback as `validate`
+  (#220).
 - Rewrote command help text and user-facing messages in the CLI's own voice across the command
   surface (`deploy`, `find`, `diff`, `add`, `bpa`, `connect`, `auth`, `config`, `deps`, `get`,
   `format`, `ls`, `profile`, `refresh`, `replace`, `rm`, `save`, `script`, `session`, `set`,
