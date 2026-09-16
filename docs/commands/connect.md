@@ -39,7 +39,8 @@ tx connect ./model.tmdl -w MyWorkspace Sales
 tx deploy [model] [options]
 ```
 
-Runs the BPA gate before deploying.
+Runs the BPA gate before deploying. The gate blocks only on findings at or above the
+severity threshold: error-severity by default, or warnings too with `--bpa-fail-on warning`.
 
 Without `-s/--server`, the target comes from the active connection: a remote connection
 deploys to itself, and a local connection with a workspace-mode mirror deploys to the
@@ -51,7 +52,8 @@ mirror.
 | `--xmla <file>` | Write the deployment as a TMSL script to a file instead of deploying (`-` for stdout). |
 | `--create-only` | Create the target model only if it does not exist; fail when it does. |
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or apply rule fixes before deploying. |
-| `--bpa-rules <file>` | Additional BPA rule files for this deploy. |
+| `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset. |
+| `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. |
 | `-p, --profile <name>` | Use a saved profile for this deploy only. |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
 | `--force` | Bypass validation checks. |
@@ -60,6 +62,7 @@ mirror.
 tx deploy ./model.tmdl --dry-run
 tx deploy --server MyWorkspace --database Sales
 tx deploy ./model.bim --xmla deploy.xmla
+tx deploy ./model.tmdl --bpa-fail-on warning
 ```
 
 ### Granular deployment

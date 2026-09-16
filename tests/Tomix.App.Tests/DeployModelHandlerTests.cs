@@ -1,5 +1,6 @@
 using Tomix.App.Deploy;
 using Tomix.Core.Models;
+using Tomix.Core.Results;
 
 namespace Tomix.App.Tests;
 
@@ -391,6 +392,129 @@ public sealed class DeployModelHandlerTests
         Assert.Equal("TOMIX_DEPLOY_FIX_UNSUPPORTED", result.Diagnostics[0].Code);
         Assert.Equal(2, result.ExitCode);
         Assert.False(session.DeployCalled);
+    }
+
+    [Theory]
+    [InlineData("fatal")]
+    [InlineData("info")]
+    [InlineData("errors")]
+    public async Task HandleAsync_ReturnsFail_WhenBpaFailOnIsInvalid(string failOn)
+    {
+        // The threshold is validated at entry even when --skip-bpa makes it unused, so a typo
+        // fails fast as a usage error instead of being silently ignored.
+        var session = new StubDeployOnlySession();
+        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: true,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null,
+                BpaFailOn: failOn),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_INVALID_FAIL_ON", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("--bpa-fail-on", result.Diagnostics[0].Message);
+        Assert.False(session.DeployCalled);
+    }
+
+    /// <summary>
+    /// The #221 behavior change at the handler level: warning-severity BPA findings block under
+    /// --bpa-fail-on warning but no longer block the default (error) gate. The stub snapshot also
+    /// trips the bundled MODEL_SHOULD_HAVE_A_DATE_TABLE warning, so the warning-threshold count
+    /// is deliberately not asserted — it moves with the bundled ruleset.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_BpaGate_WarningFinding_BlocksOnlyUnderWarningThreshold()
+    {
+        using var rulesDir = new TempDir();
+        var rulesPath = WriteRuleFile(rulesDir, "TEAM_WARNING_RULE", severity: 2);
+
+        var proceeded = await DeployThroughGate(rulesPath, bpaFailOn: null);
+        var blocked = await DeployThroughGate(rulesPath, bpaFailOn: "warning");
+
+        Assert.True(proceeded.Success);
+        Assert.False(blocked.Success);
+        Assert.Equal("TOMIX_BPA_VIOLATIONS", blocked.Diagnostics[0].Code);
+        Assert.Equal(1, blocked.ExitCode);
+        Assert.Contains("warning-severity or higher violation(s)", blocked.Diagnostics[0].Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BpaGate_ErrorFinding_BlocksUnderDefaultThreshold()
+    {
+        using var rulesDir = new TempDir();
+        var rulesPath = WriteRuleFile(rulesDir, "TEAM_ERROR_RULE", severity: 3);
+
+        var result = await DeployThroughGate(rulesPath, bpaFailOn: null);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_VIOLATIONS", result.Diagnostics[0].Code);
+        Assert.Equal(1, result.ExitCode);
+        // Only the error crosses the default threshold; the bundled warning rides along uncounted.
+        Assert.Contains("1 error-severity violation(s)", result.Diagnostics[0].Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BpaGate_InfoFinding_ProceedsUnderDefaultThreshold()
+    {
+        // Info sits below every threshold, so even next to the bundled warning the deploy goes through.
+        using var rulesDir = new TempDir();
+        var rulesPath = WriteRuleFile(rulesDir, "TEAM_INFO_RULE", severity: 1);
+
+        var result = await DeployThroughGate(rulesPath, bpaFailOn: null);
+
+        Assert.True(result.Success);
+    }
+
+    /// <summary>
+    /// Runs the deploy gate against a session whose snapshot carries an empty role, so the
+    /// custom rule (scoped to ModelRole, same expression as the bundled empty-role rule) fires
+    /// with the severity the test chose.
+    /// </summary>
+    private async Task<TomixResult<DeployModelResult>> DeployThroughGate(string rulesPath, string? bpaFailOn)
+    {
+        var session = new StubDeployOnlySession();
+        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)], TestState);
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: false,
+                FixBpa: false,
+                BpaRules: [rulesPath],
+                XmlaOutput: null,
+                Force: false,
+                Ci: null,
+                BpaFailOn: bpaFailOn),
+            CancellationToken.None);
+
+        if (result.Success)
+            Assert.True(session.DeployCalled);
+        else
+            Assert.False(session.DeployCalled);
+
+        return result;
+    }
+
+    private static string WriteRuleFile(TempDir dir, string id, int severity)
+    {
+        var path = dir.Combine($"{id.ToLowerInvariant()}.json");
+        File.WriteAllText(path,
+            $"[{{\"ID\":\"{id}\",\"Name\":\"{id.ToLowerInvariant()}\",\"Category\":\"test\",\"Severity\":{severity},\"Scope\":\"ModelRole\",\"Expression\":\"Members.Count() == 0\",\"CompatibilityLevel\":1200}}]");
+        return path;
     }
 
     [Fact]

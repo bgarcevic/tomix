@@ -194,6 +194,7 @@ Deploy a semantic model to a workspace
   opt --skip-bpa  Skip the BPA gate check for this deploy.
   opt --fix-bpa  Apply BPA rule fixes to the model before deploying, where a rule provides one
   opt --bpa-rules <bpa-rules>  Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset.
+  opt --bpa-fail-on <bpa-fail-on>  Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after --fix-bpa fixes.
   opt --force  Force deployment, bypassing validation checks
   opt --ci <ci>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --dry-run  Preview what would change on the remote target without deploying

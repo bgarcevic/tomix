@@ -74,10 +74,10 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` value (expected: error, warning). |
+| `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` or `--bpa-fail-on` value (expected: error, warning). |
 | `TOMIX_BPA_RULE_ID_REQUIRED` | 2 | `bpa rules ignore/unignore` called without a rule id. |
 | `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog. |
-| `TOMIX_BPA_VIOLATIONS` | 1 | BPA gate blocked the operation: violations found (or, under `--fix-bpa`, error-severity violations remained after auto-fix). Use `--skip-bpa` to bypass. |
+| `TOMIX_BPA_VIOLATIONS` | 1 | BPA gate blocked the operation: violations at or above the configured threshold were found (with `deploy --fix-bpa`, they remained after auto-fix). Use `--skip-bpa` to bypass. |
 
 ## Staging Codes (`TOMIX_STAGE_*`)
 

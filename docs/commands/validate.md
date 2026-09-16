@@ -86,7 +86,8 @@ file. `bpa rules list` narrows what is listed:
 | `--all` | Include disabled and ignored rules in the listing. |
 
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
-`--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files).
+`--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files,
+`--bpa-fail-on` to lower the blocking threshold to warnings — errors block by default).
 On `save`, BPA runs only when `--fix-bpa` is passed. The gate never applies
 destructive `Delete()` fixes — those are only available via
 `bpa run --fix --allow-delete`.

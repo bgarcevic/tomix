@@ -23,6 +23,11 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- `deploy` accepts `--bpa-fail-on error|warning` (default `error`) and applies that threshold
+  consistently to both BPA gate phases — the pre-deploy check and the re-check after `--fix-bpa`
+  fixes. The default path previously failed on any violation (info included) while the fix path
+  failed only on error-severity violations, so warning-only findings could pass one phase and
+  fail the other (#221). `bpa run --fail-on` shares the same threshold semantics.
 - `set` reports the real post-mutation error count in `validationErrors` (measured with the
   same offline analysis `validate` runs) instead of a hardcoded `0`. `--revert` omits the field
   from JSON rather than reporting a count it never measured (#220).

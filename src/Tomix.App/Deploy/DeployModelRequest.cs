@@ -15,4 +15,5 @@ public sealed record DeployModelRequest(
     bool Force,
     string? Ci,
     bool DryRun = false,
-    ModelDeployOptions? DeployOptions = null);
+    ModelDeployOptions? DeployOptions = null,
+    string? BpaFailOn = null);

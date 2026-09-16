@@ -104,6 +104,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx deploy ./model.tmdl",
             "tx deploy ./model.tmdl --dry-run",
             "tx deploy ./model.bim --skip-bpa",
+            "tx deploy ./model.tmdl --bpa-fail-on warning",
         ],
         ["refresh"] = [
             "tx refresh",

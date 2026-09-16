@@ -45,6 +45,14 @@ public sealed class DeployModelHandler
                 "--deploy-policy-partitions requires --deploy-partitions.",
                 exitCode: 2);
 
+        // Validated even when --skip-bpa makes the threshold unused, so a typo fails as a usage
+        // error instead of being silently ignored.
+        if (!BpaFailOn.TryParse(request.BpaFailOn, "--bpa-fail-on", out var bpaFailOn, out var bpaFailOnError))
+            return TomixResult<DeployModelResult>.Fail(
+                "TOMIX_BPA_INVALID_FAIL_ON",
+                bpaFailOnError!,
+                exitCode: 2);
+
         if (request.Model.Value.Length == 0)
             return TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_MODEL",
@@ -64,7 +72,7 @@ public sealed class DeployModelHandler
 
         if (!request.SkipBpa)
         {
-            var bpaResult = await RunBpaGate(session, request, cancellationToken);
+            var bpaResult = await RunBpaGate(session, request, bpaFailOn, cancellationToken);
             if (bpaResult is not null)
                 return bpaResult;
         }
@@ -201,6 +209,7 @@ public sealed class DeployModelHandler
     private async Task<TomixResult<DeployModelResult>?> RunBpaGate(
         IModelSession session,
         DeployModelRequest request,
+        BpaSeverity failOn,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<BpaRule> rules;
@@ -258,41 +267,39 @@ public sealed class DeployModelHandler
             postFixResult = engine.Evaluate(postFixSnapshot, options);
         }
 
-        return EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa);
+        return EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa, failOn);
     }
 
     /// <summary>
     /// Pure decision logic for the BPA deploy gate, extracted for branch-complete testing.
-    /// Without <paramref name="fixBpa"/>: fail on any violation. With <paramref name="fixBpa"/>:
-    /// fail only if any error-severity violation remains after fixes (warnings/info are tolerated).
-    /// Returns <c>null</c> when the deploy may proceed.
+    /// Both phases apply the same severity threshold: the deploy is blocked only when a
+    /// violation at or above <paramref name="failOn"/> remains — among the pre-fix violations
+    /// when <paramref name="fixBpa"/> is false, otherwise among the post-fix re-evaluation
+    /// (findings below the threshold are tolerated). Returns <c>null</c> when the deploy may
+    /// proceed.
     /// </summary>
     internal static TomixResult<DeployModelResult>? EvaluateBpaGate(
         IReadOnlyList<BpaViolation> violations,
         IReadOnlyList<BpaViolation>? postFixViolations,
-        bool fixBpa)
+        bool fixBpa,
+        BpaSeverity failOn)
     {
         if (violations.Count == 0)
             return null;
 
-        if (fixBpa)
-        {
-            var remainingErrors = (postFixViolations ?? [])
-                .Where(v => v.Severity == BpaSeverity.Error)
-                .ToList();
+        var blocking = BpaFailOn.Blocking(fixBpa ? postFixViolations ?? [] : violations, failOn);
+        if (blocking.Count == 0)
+            return null;
 
-            if (remainingErrors.Count == 0)
-                return null;
-
-            return TomixResult<DeployModelResult>.Fail(
-                "TOMIX_BPA_VIOLATIONS",
-                $"BPA check found {remainingErrors.Count} error-severity violation(s) remaining after auto-fix. Use --skip-bpa to bypass.",
-                exitCode: 1);
-        }
+        var severityLabel = failOn == BpaSeverity.Warning ? "warning-severity or higher" : "error-severity";
+        var phase = fixBpa ? " remaining after auto-fix" : string.Empty;
+        var hint = fixBpa
+            ? "Use --skip-bpa to bypass."
+            : "Use --fix-bpa to auto-fix or --skip-bpa to bypass.";
 
         return TomixResult<DeployModelResult>.Fail(
             "TOMIX_BPA_VIOLATIONS",
-            $"BPA check found {violations.Count} violation(s). Use --fix-bpa to auto-fix or --skip-bpa to bypass.",
+            $"BPA check found {blocking.Count} {severityLabel} violation(s){phase}. {hint}",
             exitCode: 1);
     }
 

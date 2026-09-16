@@ -60,6 +60,10 @@ internal sealed class DeployCommand : ICommandModule
             Description = "Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset.",
             Arity = ArgumentArity.ZeroOrMore
         };
+        var bpaFailOnOption = new Option<string?>("--bpa-fail-on")
+        {
+            Description = "Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after --fix-bpa fixes."
+        };
         var forceOption = new Option<bool>("--force")
         {
             Description = "Force deployment, bypassing validation checks"
@@ -110,6 +114,7 @@ internal sealed class DeployCommand : ICommandModule
             skipBpaOption,
             fixBpaOption,
             bpaRulesOption,
+            bpaFailOnOption,
             forceOption,
             ciOption,
             dryRunOption,
@@ -220,7 +225,8 @@ internal sealed class DeployCommand : ICommandModule
                         parseResult.GetValue(forceOption),
                         parseResult.GetValue(ciOption),
                         dryRun,
-                        deployOptions),
+                        deployOptions,
+                        parseResult.GetValue(bpaFailOnOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 

@@ -35,7 +35,7 @@ public sealed class BpaRunHandler
         BpaRunRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryParseFailOn(request.FailOn, out var failOnSeverity, out var failOnError))
+        if (!BpaFailOn.TryParse(request.FailOn, "--fail-on", out var failOnSeverity, out var failOnError))
             return TomixResult<BpaRunResult>.Fail(
                 "TOMIX_BPA_INVALID_FAIL_ON",
                 failOnError!,
@@ -156,7 +156,7 @@ public sealed class BpaRunHandler
                 }
             }
 
-            return TomixResult<BpaRunResult>.Ok(runResult, exitCode: ShouldFail(runResult, failOnSeverity) ? 1 : 0);
+            return TomixResult<BpaRunResult>.Ok(runResult, exitCode: BpaFailOn.Blocking(runResult.Violations, failOnSeverity).Count > 0 ? 1 : 0);
         });
     }
 
@@ -251,36 +251,4 @@ public sealed class BpaRunHandler
 
         return (BpaRuleResolver.Resolve(collections), diagnostics);
     }
-
-    private static bool TryParseFailOn(
-        string? value,
-        out BpaSeverity severity,
-        out string? error)
-    {
-        if (string.IsNullOrWhiteSpace(value) || value.Equals("error", StringComparison.OrdinalIgnoreCase))
-        {
-            severity = BpaSeverity.Error;
-            error = null;
-            return true;
-        }
-
-        if (value.Equals("warning", StringComparison.OrdinalIgnoreCase))
-        {
-            severity = BpaSeverity.Warning;
-            error = null;
-            return true;
-        }
-
-        severity = BpaSeverity.Error;
-        error = $"Invalid --fail-on value '{value}'. Expected: error or warning.";
-        return false;
-    }
-
-    private static bool ShouldFail(BpaRunResult result, BpaSeverity threshold)
-        => threshold switch
-        {
-            BpaSeverity.Error => result.Violations.Any(v => v.Severity == BpaSeverity.Error),
-            BpaSeverity.Warning => result.Violations.Any(v => v.Severity is BpaSeverity.Warning or BpaSeverity.Error),
-            _ => result.Violations.Count > 0
-        };
 }
