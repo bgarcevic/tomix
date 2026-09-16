@@ -1,0 +1,4 @@
+// Deterministic: two rows, ordered by CustomerID. Expected on a freshly deployed fixture.
+EVALUATE
+Customer
+ORDER BY Customer[CustomerID]

@@ -35,6 +35,7 @@ nav = [
     { "How to contribute" = "contributing.md" },
     { "CLI UX guidelines" = "cli-ux-guidelines.md" },
     { "Color strategy" = "cli-color-strategy.md" },
+    { "Live QA checklist" = "qa-live-checklist.md" },
   ] },
 ]
 

@@ -1,0 +1,49 @@
+/// Two manual partitions, so whole-collection vs single-partition behavior is observable in list, get, and refresh QA.
+table Metrics
+
+	/// Unused and hidden on purpose: deps unused-object QA and hidden-measure QA.
+	measure 'Unused Hidden Measure' = COUNTROWS ( Metrics )
+		isHidden
+		formatString: #,0
+
+	column MetricName
+		dataType: string
+		sourceColumn: MetricName
+
+	column MetricValue
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: MetricValue
+
+	column PeriodHalf
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: PeriodHalf
+
+	partition Metrics-H1 = m
+		mode: import
+		source =
+				let
+				    Source = #table(
+				        type table [MetricName = text, MetricValue = Int64.Type, PeriodHalf = Int64.Type],
+				        {
+				            {"Plan Sales", 900, 1},
+				            {"Actual Sales", 940, 1}
+				        }
+				    )
+				in
+				    Source
+
+	partition Metrics-H2 = m
+		mode: import
+		source =
+				let
+				    Source = #table(
+				        type table [MetricName = text, MetricValue = Int64.Type, PeriodHalf = Int64.Type],
+				        {
+				            {"Plan Sales", 1100, 2},
+				            {"Actual Sales", 1050, 2}
+				        }
+				    )
+				in
+				    Source

@@ -1,0 +1,5 @@
+/// Least-privilege persona: RLS limited to Danish customers. Safe filter, no dynamic references.
+role 'QA Reader'
+	modelPermission: read
+
+	tablePermission Customer = Customer[Country] = "DK"

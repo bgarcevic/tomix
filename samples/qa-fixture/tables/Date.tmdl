@@ -1,0 +1,67 @@
+/// Marked date table (dataCategory Time plus isKey date column) covering every Sales date, including 2024-02-29 for leap-day QA.
+table Date
+	dataCategory: Time
+
+	column Date
+		isKey
+		dataType: dateTime
+		summarizeBy: none
+		sourceColumn: Date
+
+	column Year
+		isAvailableInMdx: true
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: Year
+
+	column MonthNumber
+		isAvailableInMdx: true
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: MonthNumber
+
+	/// Sort-by configuration: month names order by MonthNumber, not alphabetically.
+	column MonthName
+		isAvailableInMdx: true
+		dataType: string
+		summarizeBy: none
+		sortByColumn: MonthNumber
+		sourceColumn: MonthName
+
+	column Quarter
+		dataType: string
+		sourceColumn: Quarter
+
+	hierarchy Calendar
+
+		level Year
+			column: Year
+
+		level Month
+			column: MonthName
+
+	partition Date = m
+		mode: import
+		source =
+				let
+				    Source = #table(
+				        type table [Date = datetime, Year = Int64.Type, MonthNumber = Int64.Type, MonthName = text, Quarter = text],
+				        {
+				            {#datetime(2024, 1, 1, 0, 0, 0),  2024, 1,  "January",   "Q1"},
+				            {#datetime(2024, 1, 15, 0, 0, 0), 2024, 1,  "January",   "Q1"},
+				            {#datetime(2024, 2, 29, 0, 0, 0), 2024, 2,  "February",  "Q1"},
+				            {#datetime(2024, 3, 1, 0, 0, 0),  2024, 3,  "March",     "Q1"},
+				            {#datetime(2024, 3, 10, 0, 0, 0), 2024, 3,  "March",     "Q1"},
+				            {#datetime(2024, 6, 1, 0, 0, 0),  2024, 6,  "June",      "Q2"},
+				            {#datetime(2024, 6, 15, 0, 0, 0), 2024, 6,  "June",      "Q2"},
+				            {#datetime(2024, 7, 1, 0, 0, 0),  2024, 7,  "July",      "Q3"},
+				            {#datetime(2024, 9, 1, 0, 0, 0),  2024, 9,  "September", "Q3"},
+				            {#datetime(2024, 9, 5, 0, 0, 0),  2024, 9,  "September", "Q3"},
+				            {#datetime(2024, 12, 1, 0, 0, 0), 2024, 12, "December",  "Q4"},
+				            {#datetime(2024, 12, 15, 0, 0, 0),2024, 12, "December",  "Q4"},
+				            {#datetime(2024, 12, 20, 0, 0, 0),2024, 12, "December",  "Q4"},
+				            {#datetime(2024, 12, 24, 0, 0, 0),2024, 12, "December",  "Q4"}
+				        }
+				    )
+				in
+				    Source

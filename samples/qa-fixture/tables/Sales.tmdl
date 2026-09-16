@@ -1,0 +1,64 @@
+/// Fact table. Amount is deliberately a floating-point column: the model's one warning-level BPA finding (AVOID_FLOATING_POINT_DATA_TYPES). Dates are drawn from the Date table rows so both relationships resolve.
+table Sales
+
+	measure 'Total Sales' = SUM ( Sales[Amount] )
+		formatString: #,0.00
+
+	/// Depends on a measure on another table, so dependency traversal must cross the table boundary.
+	measure 'Sales Per Customer' = DIVIDE ( [Total Sales], [Customer Count] )
+		formatString: #,0.00
+
+	/// Total Sales measured against the fixed QA target. Multiline DAX, display folder, format string, annotation, and KPI on purpose: one object covering the whole property surface.
+	measure 'Sales vs Target' =
+				VAR MonthlyTotal = SUM ( Sales[Amount] )
+				RETURN MonthlyTotal
+		formatString: #,0.00
+		displayFolder: QA\Targets
+		kpi
+			targetExpression = 1000
+			statusExpression = IF ( SUM ( Sales[Amount] ) >= 1000, 1, IF ( SUM ( Sales[Amount] ) >= 500, 0, -1 ) )
+			statusGraphic: Three Symbols Circled Colored
+		annotation TomixQaNote = kpi-measure
+
+	column OrderDate
+		dataType: dateTime
+		sourceColumn: OrderDate
+
+	column ShipDate
+		dataType: dateTime
+		sourceColumn: ShipDate
+
+	column CustomerID
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: CustomerID
+
+	column Amount
+		dataType: double
+		summarizeBy: none
+		sourceColumn: Amount
+
+	column Quantity
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: Quantity
+
+	partition Sales = m
+		mode: import
+		source =
+				let
+				    Source = #table(
+				        type table [OrderDate = datetime, ShipDate = datetime, CustomerID = Int64.Type, Amount = number, Quantity = Int64.Type],
+				        {
+				            {#datetime(2024, 1, 1, 0, 0, 0),  #datetime(2024, 1, 15, 0, 0, 0), 1, 100.5,  2},
+				            {#datetime(2024, 2, 29, 0, 0, 0), #datetime(2024, 3, 1, 0, 0, 0),  2, 250,    1},
+				            {#datetime(2024, 3, 1, 0, 0, 0),  #datetime(2024, 3, 10, 0, 0, 0), 1, 40.25,  5},
+				            {#datetime(2024, 6, 1, 0, 0, 0),  #datetime(2024, 6, 15, 0, 0, 0), 3, -20,    1},
+				            {#datetime(2024, 6, 15, 0, 0, 0), #datetime(2024, 7, 1, 0, 0, 0),  2, 0,      0},
+				            {#datetime(2024, 9, 1, 0, 0, 0),  #datetime(2024, 9, 5, 0, 0, 0),  4, 300,    3},
+				            {#datetime(2024, 12, 1, 0, 0, 0), #datetime(2024, 12, 24, 0, 0, 0),1, 99.99,  1},
+				            {#datetime(2024, 12, 15, 0, 0, 0),#datetime(2024, 12, 20, 0, 0, 0),5, 125.75, 2}
+				        }
+				    )
+				in
+				    Source

@@ -1,0 +1,50 @@
+/// Customer dimension: hidden column, calculated column, and the RLS filter target for the QA Reader role.
+table Customer
+
+	measure 'Customer Count' = COUNTROWS ( Customer )
+		formatString: #,0
+
+	column CustomerID
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: CustomerID
+
+	column CustomerName
+		dataType: string
+		sourceColumn: CustomerName
+
+	column Country
+		dataType: string
+		sourceColumn: Country
+
+	column SignedUpDate
+		dataType: dateTime
+		sourceColumn: SignedUpDate
+
+	/// Hidden on purpose: unused-object and hidden-object QA.
+	column InternalCode
+		isHidden
+		dataType: string
+		sourceColumn: InternalCode
+
+	/// Calculated column, so DAX hosting and reference fixup have a target.
+	column NameLength = LEN ( Customer[CustomerName] )
+		dataType: int64
+		summarizeBy: none
+
+	partition Customer = m
+		mode: import
+		source =
+				let
+				    Source = #table(
+				        type table [CustomerID = Int64.Type, CustomerName = text, Country = text, SignedUpDate = datetime, InternalCode = text],
+				        {
+				            {1, "Anna",   "DK", #datetime(2023, 3, 1, 0, 0, 0),  "C-001"},
+				            {2, "Bjorn",  "SE", #datetime(2023, 4, 15, 0, 0, 0), "C-002"},
+				            {3, "Carla",  "DE", #datetime(2023, 5, 20, 0, 0, 0), "C-003"},
+				            {4, "Dmitri", "US", #datetime(2023, 6, 30, 0, 0, 0), "C-004"},
+				            {5, "Eva",    "DK", #datetime(2024, 1, 5, 0, 0, 0),  "C-005"}
+				        }
+				    )
+				in
+				    Source

@@ -1,0 +1,16 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+
+ref table Sales
+ref table Customer
+ref table Date
+ref table Metrics
+ref table Events
+
+ref culture en-US
+ref perspective SalesOnly
+ref role 'QA Reader'
+ref role 'QA Admin'
+
+annotation TomixQaFixture = v1

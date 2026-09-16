@@ -1,0 +1,4 @@
+// Deterministic: one row per date with sales, ordered by date. Sum over the fixture rows is 896.49.
+EVALUATE
+SUMMARIZECOLUMNS ( 'Date'[Date], "Total Sales", [Total Sales] )
+ORDER BY 'Date'[Date]

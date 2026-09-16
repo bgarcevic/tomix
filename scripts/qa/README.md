@@ -3,7 +3,10 @@
 Offline gate for `tx deploy`'s granular deployment. `deploy --xmla` emits the exact TMSL a
 real deploy would execute, so most edge cases can be hunted by inspecting payloads instead
 of spending live deploys. Nothing here executes a deploy — script generation is read-only
-against the target, so the whole harness is safe to run against a real workspace.
+against the target, so the whole harness is safe to run against a real workspace. This
+harness is the pattern for anything automatable; what genuinely needs a live endpoint is
+deliberately small and lives in [docs/qa-live-checklist.md](../../docs/qa-live-checklist.md),
+which runs against [`samples/qa-fixture`](../../samples/qa-fixture).
 
 **The output is not safe to publish.** A generated script carries the full structure of
 whatever model you pointed at — every table, column and measure name, the DAX and M behind

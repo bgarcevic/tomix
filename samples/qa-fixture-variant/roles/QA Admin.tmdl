@@ -1,0 +1,3 @@
+/// Second persona with no table permissions, so role listing and selection are visibly per-role.
+role 'QA Admin'
+	modelPermission: read

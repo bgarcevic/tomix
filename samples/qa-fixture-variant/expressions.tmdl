@@ -1,0 +1,8 @@
+/// Lower bound required by the refresh policy on Events. Deterministic so every environment builds the same partitions.
+expression RangeStart = #datetime(2024, 1, 1, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]
+
+/// Upper bound required by the refresh policy on Events.
+expression RangeEnd = #datetime(2025, 1, 1, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]
+
+/// Plain shared expression (not a parameter): a stable target for find, replace, get, and set QA.
+expression QaVersion = "qa-fixture v1"

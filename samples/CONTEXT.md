@@ -16,6 +16,13 @@ Small sample models used by tests and documentation.
   expressions, roles with table permissions, plain and multi-partition tables, a refresh-policy
   table, and a calculated table. Deployed to a sandbox it becomes the target that makes granular
   deployment QA conclusive. See `/scripts/qa/README.md`.
+- `qa-fixture/` — deterministic QA fixture realizing the fixture spec from issue #106: marked
+  date table with hierarchy and sort-by, hidden and calculated columns, cross-table dependent
+  measures, a KPI measure with multiline DAX, an inactive relationship, a perspective, RLS and
+  no-filter roles, an en-US culture, an incremental-refresh table, deliberate BPA findings, and
+  `dax-tests/` for live `tx test` recording. `README.md` records the expected manifest.
+- `qa-fixture-variant/` — the same model with exactly one structural difference (an added
+  measure), so `diff` QA has a known target.
 
 ## Responsibilities
 

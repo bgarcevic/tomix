@@ -1,0 +1,4 @@
+// Deterministic: one row per country, ordered by country. Exercises the measure-to-measure dependency across tables.
+EVALUATE
+SUMMARIZECOLUMNS ( Customer[Country], "Sales Per Customer", [Sales Per Customer] )
+ORDER BY Customer[Country]

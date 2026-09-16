@@ -1,0 +1,49 @@
+/// Dedicated incremental-refresh table: basic policy with a rolling window and a source expression bounded by RangeStart/RangeEnd.
+table Events
+
+	refreshPolicy
+		policyType: basic
+		rollingWindowGranularity: year
+		rollingWindowPeriods: 3
+		incrementalGranularity: month
+		incrementalPeriods: 2
+		sourceExpression =
+				let
+				    Source = #table(
+				        type table [EventDate = datetime, EventType = text, EventCount = Int64.Type],
+				        {
+				            {#datetime(2024, 5, 1, 0, 0, 0), "login",  10},
+				            {#datetime(2024, 8, 1, 0, 0, 0), "export", 3}
+				        }
+				    ),
+				    Filtered = Table.SelectRows(Source, each [EventDate] >= RangeStart and [EventDate] < RangeEnd)
+				in
+				    Source
+
+	column EventDate
+		dataType: dateTime
+		sourceColumn: EventDate
+
+	column EventType
+		dataType: string
+		sourceColumn: EventType
+
+	column EventCount
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: EventCount
+
+	partition Events = m
+		mode: import
+		source =
+				let
+				    Source = #table(
+				        type table [EventDate = datetime, EventType = text, EventCount = Int64.Type],
+				        {
+				            {#datetime(2024, 5, 1, 0, 0, 0), "login",  10},
+				            {#datetime(2024, 8, 1, 0, 0, 0), "export", 3}
+				        }
+				    ),
+				    Filtered = Table.SelectRows(Source, each [EventDate] >= RangeStart and [EventDate] < RangeEnd)
+				in
+				    Source

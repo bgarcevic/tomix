@@ -1,0 +1,12 @@
+/// Perspective limited to the sales path, so perspective visibility rules have a target.
+perspective SalesOnly
+
+	perspectiveTable Sales
+
+		perspectiveMeasure 'Total Sales'
+
+		perspectiveColumn Amount
+
+	perspectiveTable Date
+
+		perspectiveColumn Year

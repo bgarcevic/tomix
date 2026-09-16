@@ -1,0 +1,12 @@
+relationship Sales_Customer
+	fromColumn: Sales.CustomerID
+	toColumn: Customer.CustomerID
+
+relationship Sales_Date_Order
+	fromColumn: Sales.OrderDate
+	toColumn: Date.Date
+
+relationship Sales_Date_Ship
+	isActive: false
+	fromColumn: Sales.ShipDate
+	toColumn: Date.Date

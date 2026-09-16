@@ -1,0 +1,3 @@
+database qa-fixture
+	compatibilityLevel: 1601
+	compatibilityMode: powerBI
