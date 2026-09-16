@@ -49,6 +49,19 @@ public sealed class LsModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ChildCounts_CarryCalculatedColumnsSeparately()
+    {
+        var handler = new LsModelHandler([new StubModelProvider()]);
+        var result = await handler.HandleAsync(
+            new LsModelRequest(new ModelReference("any"), PathFilter: null, Type: null),
+            CancellationToken.None);
+
+        var table = Assert.Single(result.Data!.Objects);
+        Assert.Equal(1, table.ChildCounts.GetValueOrDefault(ModelObjectKind.CalculatedColumn));
+        Assert.Equal(0, table.ChildCounts.GetValueOrDefault(ModelObjectKind.Column));
+    }
+
+    [Fact]
     public async Task HandleAsync_ReturnsFail_WhenNoProviderMatches()
     {
         var handler = new LsModelHandler([]);
@@ -81,10 +94,14 @@ public sealed class LsModelHandlerTests
                 "Total Sales", ModelObjectKind.Measure, "Sales/Total Sales",
                 Detail: null, Expression: "SUM(Sales[Amount])", Description: null, Hidden: false,
                 SourceColumn: null, Children: []);
+            var margin = new ModelObject(
+                "Margin", ModelObjectKind.CalculatedColumn, "Sales/Margin",
+                Detail: null, Expression: "SUM(Sales[Amount]) - SUM(Sales[Cost])", Description: null,
+                Hidden: false, SourceColumn: null, Children: []);
             var sales = new ModelObject(
                 "Sales", ModelObjectKind.Table, "Sales",
                 Detail: "regular", Expression: null, Description: "Sales fact table", Hidden: false,
-                SourceColumn: null, Children: [measure]);
+                SourceColumn: null, Children: [measure, margin]);
 
             return Task.FromResult(new ModelSnapshot("stub", 1601, [sales]));
         }

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Tomix.App.Ls;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
@@ -47,6 +48,16 @@ public sealed class LsRendererTests
 
         Assert.Contains(Slate + "Secret", RowLine(output, "Secret"));
         Assert.DoesNotContain(Slate + "Open", RowLine(output, "Open"));
+    }
+
+    [Fact]
+    public void ColumnCount_SumsDataAndCalculatedColumns()
+    {
+        var output = RenderTables(Table("Date", hidden: false, calculatedColumns: 3));
+
+        var cells = TableRowCells(output, "Date");
+        Assert.Equal("Date", cells[1]);
+        Assert.Equal("10", cells[2]);
     }
 
     [Fact]
@@ -139,7 +150,7 @@ public sealed class LsRendererTests
         return captured.Stdout;
     }
 
-    private static LsObject Table(string name, bool hidden) => new(
+    private static LsObject Table(string name, bool hidden, int calculatedColumns = 0) => new(
         Path: $"Tables/{name}",
         Name: name,
         Kind: ModelObjectKind.Table,
@@ -151,6 +162,7 @@ public sealed class LsRendererTests
         ChildCounts: new Dictionary<ModelObjectKind, int>
         {
             [ModelObjectKind.Column] = 7,
+            [ModelObjectKind.CalculatedColumn] = calculatedColumns,
             [ModelObjectKind.Measure] = 0,
             [ModelObjectKind.Partition] = 1
         },
@@ -194,4 +206,18 @@ public sealed class LsRendererTests
 
     private static string RowLine(string output, string name)
         => output.Split('\n').Single(line => line.Contains(name));
+
+    /// <summary>
+    /// The row matching <paramref name="name"/> split into cell texts: border color codes and
+    /// the rounded-border glyphs are stripped, remaining cells trimmed. Index 0 is the empty
+    /// leading segment; cell 1 is the row's first column.
+    /// </summary>
+    private static string[] TableRowCells(string output, string name)
+        => AnsiCodes
+            .Replace(RowLine(output, name), "")
+            .Split('│')
+            .Select(cell => cell.Trim())
+            .ToArray();
+
+    private static readonly Regex AnsiCodes = new(@"\x1b\[[0-9;]*m", RegexOptions.Compiled);
 }

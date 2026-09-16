@@ -53,7 +53,7 @@ internal sealed partial class LsRenderer
         {
             table.AddRow(RowCells(o,
                 o.Name,
-                Count(o, ModelObjectKind.Column),
+                Count(o, ModelObjectKind.Column, ModelObjectKind.CalculatedColumn),
                 Count(o, ModelObjectKind.Measure),
                 Count(o, ModelObjectKind.Partition),
                 BoolText(o.Hidden),
@@ -302,8 +302,8 @@ internal sealed partial class LsRenderer
     private static Table NewTable(params string[] headers)
         => Styling.NewTable(headers);
 
-    private static string Count(LsObject obj, ModelObjectKind kind)
-        => obj.ChildCounts.GetValueOrDefault(kind).ToString();
+    private static string Count(LsObject obj, params ModelObjectKind[] kinds)
+        => kinds.Sum(kind => obj.ChildCounts.GetValueOrDefault(kind)).ToString();
 
     /// <summary>Plain "True"/"False" for <see cref="RowCells"/>; the row style provides the grey.</summary>
     private static string BoolText(bool value)

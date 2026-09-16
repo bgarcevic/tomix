@@ -80,9 +80,11 @@ internal static partial class ModelObjectLookup
 
     public static string NotFoundMessage(string path)
         =>
-        $"Object '{path}' not found. Expected: table name, '.', or container " +
-        "(Tables, Measures, Columns, Hierarchies, Relationships, Roles, Perspectives, " +
-        "Cultures, DataSources, CalculationGroups, Expressions, Functions, Annotations)";
+        $"Object '{path}' not found. Expected an object path or name, e.g. 'Sales', " +
+        "'Sales/Total Sales', 'Sales/Measures/<name>', 'Relationships/<name>', or '.' " +
+        "for the model root. Container keywords (" +
+        string.Join(", ", PathSegment.KeywordNames) +
+        ") select within a path and cannot stand alone; use 'tx ls' to list objects.";
 
     private static bool TryParseLoneBracket(string path, out string name)
     {

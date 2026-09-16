@@ -90,24 +90,35 @@ public static class ObjectPath
 /// </summary>
 public sealed record PathSegment(string Text, bool IsQuoted)
 {
+    /// <summary>
+    /// Container keywords paired with the kind each pivots to, in canonical order. The single
+    /// source for path parsing (<see cref="Keywords"/>) and for messages that name the
+    /// containers (<see cref="KeywordNames"/>), so the two cannot drift apart.
+    /// </summary>
+    private static readonly (string Name, ModelObjectKind Kind)[] KeywordEntries =
+    [
+        ("Tables", ModelObjectKind.Table),
+        ("Measures", ModelObjectKind.Measure),
+        ("Columns", ModelObjectKind.Column),
+        ("Hierarchies", ModelObjectKind.Hierarchy),
+        ("Partitions", ModelObjectKind.Partition),
+        ("Relationships", ModelObjectKind.Relationship),
+        ("Roles", ModelObjectKind.Role),
+        ("Perspectives", ModelObjectKind.Perspective),
+        ("Cultures", ModelObjectKind.Culture),
+        ("Levels", ModelObjectKind.Level),
+        ("Members", ModelObjectKind.RoleMember),
+        ("DataSources", ModelObjectKind.DataSource),
+        ("Expressions", ModelObjectKind.Expression),
+        ("Functions", ModelObjectKind.Function)
+    ];
+
     private static readonly IReadOnlyDictionary<string, ModelObjectKind> Keywords =
-        new Dictionary<string, ModelObjectKind>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Tables"] = ModelObjectKind.Table,
-            ["Measures"] = ModelObjectKind.Measure,
-            ["Columns"] = ModelObjectKind.Column,
-            ["Hierarchies"] = ModelObjectKind.Hierarchy,
-            ["Partitions"] = ModelObjectKind.Partition,
-            ["Relationships"] = ModelObjectKind.Relationship,
-            ["Roles"] = ModelObjectKind.Role,
-            ["Perspectives"] = ModelObjectKind.Perspective,
-            ["Cultures"] = ModelObjectKind.Culture,
-            ["Levels"] = ModelObjectKind.Level,
-            ["Members"] = ModelObjectKind.RoleMember,
-            ["DataSources"] = ModelObjectKind.DataSource,
-            ["Expressions"] = ModelObjectKind.Expression,
-            ["Functions"] = ModelObjectKind.Function
-        };
+        KeywordEntries.ToDictionary(e => e.Name, e => e.Kind, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Container keyword names in canonical order, for user-facing messages.</summary>
+    public static IReadOnlyList<string> KeywordNames { get; } =
+        KeywordEntries.Select(e => e.Name).ToArray();
 
     /// <summary>True when the segment is an unquoted name containing <c>*</c> or <c>?</c>.</summary>
     public bool IsWildcard => !IsQuoted && (Text.Contains('*') || Text.Contains('?'));

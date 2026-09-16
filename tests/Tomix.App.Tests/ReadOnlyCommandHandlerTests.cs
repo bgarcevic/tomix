@@ -35,6 +35,22 @@ public sealed class ReadOnlyCommandHandlerTests
     }
 
     [Fact]
+    public async Task Get_BareContainerKeyword_FailsWithAccurateMessage()
+    {
+        var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(
+            new GetModelRequest(new ModelReference("any"), "measures", Query: null, Type: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        var diagnostic = result.Diagnostics[0];
+        Assert.Equal("TOMIX_OBJECT_NOT_FOUND", diagnostic.Code);
+        // Containers advertised standalone (e.g. "CalculationGroups", "Annotations") are never
+        // resolvable paths, so the message must not suggest them.
+        Assert.DoesNotContain("CalculationGroups", diagnostic.Message);
+        Assert.DoesNotContain("Annotations", diagnostic.Message);
+    }
+
+    [Fact]
     public async Task Find_SearchesPartitionsButOmitsRelationships()
     {
         var result = await new FindModelHandler([new StubModelProvider()]).HandleAsync(
