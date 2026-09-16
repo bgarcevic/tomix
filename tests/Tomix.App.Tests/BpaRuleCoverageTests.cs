@@ -99,6 +99,33 @@ public sealed class BpaRuleCoverageTests
         Assert.Equal(["Model"], Flagged(BundledRule("REDUCE_NUMBER_OF_CALCULATED_COLUMNS"), snapshot));
     }
 
+    [Fact]
+    public void SetIsAvailableInMdxToTrueOnNecessaryColumns_RespectsTheColumnsActualValue()
+    {
+        // The adapter used to read the bag with the wrong key casing ("IsAvailableInMdx" vs the
+        // summarizer's "IsAvailableInMDX"), so every column evaluated as false and this rule
+        // flagged necessary columns no matter what the model actually said.
+        var enabled = Column("Enabled", "T", usedInHierarchies: "H", isAvailableInMdx: true);
+        var disabled = Column("Disabled", "T", usedInHierarchies: "H", isAvailableInMdx: false);
+        var snapshot = new ModelSnapshot("M", 1601, [Table("T", enabled, disabled)]);
+
+        Assert.Equal(
+            ["T/Disabled"],
+            Flagged(BundledRule("SET_ISAVAILABLEINMDX_TO_TRUE_ON_NECESSARY_COLUMNS"), snapshot));
+    }
+
+    [Fact]
+    public void IsAvailableInMdxFalseOnNonAttributeColumns_FlagsHiddenColumnsLeftEnabled()
+    {
+        var leftOn = Column("Code", "T", hidden: true, isAvailableInMdx: true);
+        var turnedOff = Column("NotInMdx", "T", hidden: true, isAvailableInMdx: false);
+        var snapshot = new ModelSnapshot("M", 1601, [Table("T", leftOn, turnedOff)]);
+
+        Assert.Equal(
+            ["T/Code"],
+            Flagged(BundledRule("ISAVAILABLEINMDX_FALSE_NONATTRIBUTE_COLUMNS"), snapshot));
+    }
+
     // --- snapshot builders -------------------------------------------------
 
     private static ModelObject CalculatedColumn(string name, string table, string expression)
@@ -131,13 +158,18 @@ public sealed class BpaRuleCoverageTests
             Properties: new Dictionary<string, string> { ["ObjectType"] = "CalculationItem" });
 
     private static ModelObject Column(
-        string name, string table, string dataType = "Int64", bool hidden = false, string? usedInHierarchies = null)
+        string name, string table, string dataType = "Int64", bool hidden = false,
+        string? usedInHierarchies = null, bool isAvailableInMdx = false)
     {
         var props = new Dictionary<string, string>
         {
             ["DataType"] = dataType,
             ["ObjectType"] = "DataColumn",
             ["SourceColumn"] = name,
+            // The TOM summarizer always writes this key (lowercased bool), so the adapter sees it
+            // on every real column; defaulting to "false" here matches what a column opted out of
+            // MDX looks like in the bag.
+            ["IsAvailableInMDX"] = isAvailableInMdx ? "true" : "false",
         };
         if (usedInHierarchies is not null)
             props["UsedInHierarchies"] = usedInHierarchies;

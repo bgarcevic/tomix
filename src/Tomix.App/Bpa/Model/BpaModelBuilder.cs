@@ -1,5 +1,6 @@
 using Tomix.App.Dax;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 
 namespace Tomix.App.Bpa.Model;
 
@@ -170,7 +171,7 @@ public static class BpaModelBuilder
             IsHidden = obj.Hidden,
             DataType = obj.Property("DataType") ?? "",
             IsKey = IsTrue(obj.Property("IsKey")),
-            IsAvailableInMDX = IsTrue(obj.Property("IsAvailableInMdx")),
+            IsAvailableInMDX = IsTrue(obj.Property(PropertyBagKeys.IsAvailableInMDX)),
             FormatString = obj.Property("FormatString") ?? "",
             DataCategory = obj.Property("DataCategory") ?? "",
             SummarizeBy = obj.Property("SummarizeBy") ?? "",
