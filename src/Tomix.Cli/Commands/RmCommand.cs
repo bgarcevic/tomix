@@ -39,10 +39,7 @@ internal sealed class RmCommand : ICommandModule
         };
         forceOption.Aliases.Add("-f");
         var overwriteOption = LifecycleOptions.Overwrite();
-        var dryRunOption = new Option<bool>("--dry-run")
-        {
-            Description = "Preview the removal without saving"
-        };
+        var dryRunOption = LifecycleOptions.DryRun();
         var ifExistsOption = new Option<bool>("--if-exists")
         {
             Description = "Exit 0 when the object is already gone"
@@ -156,6 +153,27 @@ internal sealed class RmCommand : ICommandModule
             if (result.Reason == "not_found" && result.Path is not null)
                 AnsiConsole.MarkupLine(Styling.Success(
                     $"Not found: {Styling.MarkupEscape(result.Path)} (nothing removed)"));
+            return;
+        }
+
+        if (result.DryRun == true)
+        {
+            AnsiConsole.MarkupLine(Styling.Warning(
+                $"Would remove: {Styling.MarkupEscape(result.Removed.ToString() ?? "")}"));
+            if (result.CascadeRemoved is { Count: > 0 } cascadePreview)
+                foreach (var item in cascadePreview)
+                    AnsiConsole.MarkupLine(Styling.Muted($"Would also remove: {Styling.MarkupEscape(item)}"));
+
+            if (result.BrokenReferences is { Count: > 0 } wouldBreak)
+            {
+                AnsiConsole.MarkupLine(Styling.Warning(
+                    $"Would break {wouldBreak.Count} DAX reference(s) in: "
+                    + $"{string.Join(", ", wouldBreak.Select(Styling.MarkupEscape))}."));
+                if (result.Reason == "would_block")
+                    AnsiConsole.MarkupLine(Styling.Guidance("Re-run with --force to remove anyway."));
+            }
+
+            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
             return;
         }
 

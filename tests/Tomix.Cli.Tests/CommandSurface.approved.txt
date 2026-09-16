@@ -423,7 +423,7 @@ Delete an object from the model
   arg [model]  Optional path to the model; defaults to the active connection
   opt --force, -f  Remove even if the object has DAX dependents (they break; inspect with 'tx deps')
   opt --overwrite  Allow --save-to to overwrite an existing target
-  opt --dry-run  Preview the removal without saving
+  opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --if-exists  Exit 0 when the object is already gone
   opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
   opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)

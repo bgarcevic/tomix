@@ -146,6 +146,29 @@ public sealed class MutationResultContractTests
         Assert.Contains("\"reason\"", json);
     }
 
+    [Fact]
+    public void RemoveModelObjectResult_LiveRemoval_OmitsDryRun()
+    {
+        var result = new RemoveModelObjectResult("Sales/COL", Saved: false, Staged: null, Reason: null, Path: null);
+
+        Assert.DoesNotContain("\"dryRun\"", Serialize(result));
+    }
+
+    [Fact]
+    public void RemoveModelObjectResult_GuardedPreview_SerializesDryRunWithBlockers()
+    {
+        var result = new RemoveModelObjectResult(
+            "Sales/Amount", Saved: null, Staged: null, Reason: "would_block", Path: "Sales/Amount",
+            BrokenReferences: ["Sales/Total Sales"], DryRun: true);
+        var json = Serialize(result);
+
+        Assert.Contains("\"dryRun\": true", json);
+        Assert.Contains("\"would_block\"", json);
+        Assert.Contains("\"brokenReferences\"", json);
+        Assert.DoesNotContain("\"reverted\"", json);
+        Assert.DoesNotContain("\"saved\"", json);
+    }
+
     // ── Set: SetModelPropertyResult ─────────────────────────────────────────
 
     [Fact]

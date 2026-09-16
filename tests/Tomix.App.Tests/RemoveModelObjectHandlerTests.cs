@@ -25,6 +25,19 @@ public sealed class RemoveModelObjectHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_DryRun_IfExistsOnMissingObject_StillReportsNotRemoved()
+    {
+        var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: false))], TestStores);
+
+        var result = await handler.HandleAsync(Request("Sales/Nope", ifExists: true, dryRun: true), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(false, result.Data!.Removed);
+        Assert.Equal("not_found", result.Data.Reason);
+        Assert.True(result.Data.DryRun);
+    }
+
+    [Fact]
     public async Task HandleAsync_Removed_ReportsPath()
     {
         var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))], TestStores);
@@ -54,13 +67,13 @@ public sealed class RemoveModelObjectHandlerTests
         Assert.Equal("TOMIX_STAGE_NOTHING_STAGED", result.Diagnostics[0].Code);
     }
 
-    private static RemoveModelObjectRequest Request(string path, bool ifExists)
+    private static RemoveModelObjectRequest Request(string path, bool ifExists, bool dryRun = false)
         => new(
             new ModelReference("any"),
             path,
             Type: null,
             ifExists,
-            DryRun: false,
+            DryRun: dryRun,
             Save: false,
             SaveTo: null,
             Serialization: "",

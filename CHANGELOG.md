@@ -54,6 +54,12 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `rm --dry-run` previews truthfully in both directions. It now prints `Would remove: <path>`
+  (instead of `Removed:`) and exits 0; when the reference guard would block the removal, the
+  preview lists the dependents (`Would break N DAX reference(s) in: ...`) and hints `--force`
+  instead of failing, so a dry run is how you discover that `--force` is needed. JSON output
+  gains an additive `dryRun` field and the guarded preview reports `reason: "would_block"`.
+  rm's `--dry-run` help text now matches the other mutation commands (#217).
 - Calculated columns count as DAX hosts again. `deps` reports the upstream/downstream edges of
   calculated-column expressions (so `--unused` no longer flags a column that only a calculated
   column references), `validate` checks those expressions and no longer reports references to

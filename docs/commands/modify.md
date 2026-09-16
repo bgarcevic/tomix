@@ -242,10 +242,16 @@ tx rm <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--dry-run` | Show what would be removed without saving. |
+| `--dry-run` | Preview: show the change without saving, staging, or syncing. |
 | `--force` | Remove even if the object has DAX dependents (reports the now-broken references). |
 | `--if-exists` | Exit 0 when the object is already gone. |
 | `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
+
+`--dry-run` previews instead of executing: it prints
+`Would remove: <path>` and exits 0 without touching the model. When the
+guard would block the removal, the preview lists the dependents
+(`Would break N DAX reference(s) in: ...`) and hints `--force`, so a dry
+run is how you discover that `--force` is needed.
 
 Removal is blocked while DAX still references the object; structural
 references (relationships, sort-by, hierarchy levels, perspectives, role

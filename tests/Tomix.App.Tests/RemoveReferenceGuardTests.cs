@@ -119,13 +119,56 @@ public sealed class RemoveReferenceGuardTests
         Assert.Equal(["relationship 'Sales'[Key] -> 'Region'[Key]"], result.Data!.CascadeRemoved);
     }
 
+    [Fact]
+    public async Task RemoveReferencedMeasure_DryRun_PreviewsBlockedRemoval_WithoutMutating()
+    {
+        var session = NewSession();
+        var result = await Handle(session, "Sales/Base", force: false, dryRun: true);
+
+        // A dry run exists precisely to discover that --force is needed, so the guard reports
+        // instead of failing and the mutator is never invoked.
+        Assert.True(result.Success);
+        Assert.True(result.Data!.DryRun);
+        Assert.Equal("Sales/Base", result.Data.Removed);
+        Assert.Equal("would_block", result.Data.Reason);
+        Assert.Equal(["Sales/Derived"], result.Data.BrokenReferences);
+        Assert.False(session.RemoveCalled);
+    }
+
+    [Fact]
+    public async Task RemoveReferencedMeasure_DryRunWithForce_MutatesAndReportsBrokenReferences()
+    {
+        var session = NewSession();
+        var result = await Handle(session, "Sales/Base", force: true, dryRun: true);
+
+        Assert.True(result.Success);
+        Assert.True(result.Data!.DryRun);
+        Assert.Null(result.Data.Reason);
+        Assert.True(session.RemoveCalled);
+        Assert.Equal(["Sales/Derived"], result.Data.BrokenReferences);
+    }
+
+    [Fact]
+    public async Task RemoveUnreferencedMeasure_DryRun_PreviewsRemoval()
+    {
+        var session = NewSession();
+        var result = await Handle(session, "Sales/Lonely", force: false, dryRun: true);
+
+        Assert.True(result.Success);
+        Assert.True(result.Data!.DryRun);
+        Assert.Equal("Sales/Lonely", result.Data.Removed);
+        Assert.Null(result.Data.Reason);
+        Assert.Null(result.Data.BrokenReferences);
+        Assert.True(session.RemoveCalled);
+    }
+
     private static Task<Core.Results.TomixResult<RemoveModelObjectResult>> Handle(
-        StubSnapshotSession session, string path, bool force)
+        StubSnapshotSession session, string path, bool force, bool dryRun = false)
         => new RemoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             new RemoveModelObjectRequest(
                 new ModelReference("model.bim"),
                 path, Type: null,
-                IfExists: false, DryRun: false,
+                IfExists: false, DryRun: dryRun,
                 Save: false, SaveTo: null, Serialization: "", Force: force),
             CancellationToken.None);
 
