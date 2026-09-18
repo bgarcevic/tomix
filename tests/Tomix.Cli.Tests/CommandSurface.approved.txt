@@ -126,7 +126,7 @@ Run best-practice rules against a model
   opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-model-rules  Skip rules embedded in the model's annotations
   opt --no-defaults  Exclude the selected standard BPA ruleset
-  opt --fail-on <fail-on>  Failure threshold: error (default) or warning
+  opt --fail-on <fail-on>  Failure threshold: error (default) or warning. Rules that cannot be evaluated count as error-severity findings
   opt --fix  Fix violations whose rules provide a fix expression
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
   opt --force, -f  Save fixes despite validation errors
@@ -194,7 +194,7 @@ Deploy a semantic model to a workspace
   opt --skip-bpa  Skip the BPA gate check for this deploy.
   opt --fix-bpa  Apply BPA rule fixes to the model before deploying, where a rule provides one
   opt --bpa-rules <bpa-rules>  Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset.
-  opt --bpa-fail-on <bpa-fail-on>  Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after --fix-bpa fixes.
+  opt --bpa-fail-on <bpa-fail-on>  Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after --fix-bpa fixes. Rules that cannot be evaluated count as error-severity findings
   opt --force  Force deployment, bypassing validation checks
   opt --ci <ci>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --dry-run  Preview what would change on the remote target without deploying
@@ -439,7 +439,7 @@ Write a model to disk in a chosen format
   opt --output-file, -o <output-file>  Where to write the model. Omit to write it back to where it was loaded from.
   opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted). Defaults to the loaded model's format.
   opt --overwrite  Replace an existing output file or directory
-  opt --fix-bpa  Apply BPA rule fixes before saving, where a rule provides one
+  opt --fix-bpa  Apply BPA rule fixes before saving, where a rule provides one. Rules that cannot be evaluated block the save
   opt --bpa-rules <bpa-rules>  Additional BPA rule files to enforce for this save, alongside the built-in ruleset.
   opt --supporting-files  Write a {modelName}.SemanticModel/ folder (with .platform and definition.pbism) around the output. Only applies to tmdl/bim written to a bare target.
   opt --no-sync  Skip workspace sync when workspace mode is active.

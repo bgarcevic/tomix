@@ -267,7 +267,12 @@ public sealed class DeployModelHandler
             postFixResult = engine.Evaluate(postFixSnapshot, options);
         }
 
-        return EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa, failOn);
+        // postFixResult is always set when FixBpa reaches this line (unsupported providers fail
+        // above), so the active phase — the one the blocking count comes from — supplies the
+        // unevaluable-rule findings named in the block message.
+        var activeResult = request.FixBpa ? postFixResult : result;
+        return EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa, failOn,
+            ruleErrors: activeResult!.RuleErrorViolations);
     }
 
     /// <summary>
@@ -276,13 +281,16 @@ public sealed class DeployModelHandler
     /// violation at or above <paramref name="failOn"/> remains — among the pre-fix violations
     /// when <paramref name="fixBpa"/> is false, otherwise among the post-fix re-evaluation
     /// (findings below the threshold are tolerated). Returns <c>null</c> when the deploy may
-    /// proceed.
+    /// proceed. <paramref name="ruleErrors"/> is the active phase's unevaluable-rule findings
+    /// (already part of <paramref name="violations"/>); naming them in the message makes the
+    /// block actionable instead of an anonymous count.
     /// </summary>
     internal static TomixResult<DeployModelResult>? EvaluateBpaGate(
         IReadOnlyList<BpaViolation> violations,
         IReadOnlyList<BpaViolation>? postFixViolations,
         bool fixBpa,
-        BpaSeverity failOn)
+        BpaSeverity failOn,
+        IReadOnlyList<BpaViolation>? ruleErrors = null)
     {
         if (violations.Count == 0)
             return null;
@@ -296,10 +304,13 @@ public sealed class DeployModelHandler
         var hint = fixBpa
             ? "Use --skip-bpa to bypass."
             : "Use --fix-bpa to auto-fix or --skip-bpa to bypass.";
+        var ruleErrorNotes = ruleErrors is { Count: > 0 }
+            ? " " + string.Join(" ", ruleErrors.Select(e => $"{e.Description} ('{e.RuleName}' [{e.RuleId}])."))
+            : string.Empty;
 
         return TomixResult<DeployModelResult>.Fail(
             "TOMIX_BPA_VIOLATIONS",
-            $"BPA check found {blocking.Count} {severityLabel} violation(s){phase}. {hint}",
+            $"BPA check found {blocking.Count} {severityLabel} violation(s){phase}.{ruleErrorNotes} {hint}",
             exitCode: 1);
     }
 

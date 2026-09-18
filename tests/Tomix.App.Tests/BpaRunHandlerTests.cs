@@ -1,5 +1,7 @@
 using Tomix.App.Bpa;
+using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Results;
 using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
@@ -13,6 +15,70 @@ public sealed class BpaRunHandlerTests
 {
     private const string OneRuleJson =
         "[{\"ID\":\"TEAM_RULE\",\"Name\":\"team rule\",\"Category\":\"c\",\"Severity\":2,\"Scope\":\"Table\",\"Expression\":\"false\",\"CompatibilityLevel\":1200}]";
+
+    // Warning-severity rule on purpose: the finding the broken rule produces must still be an
+    // error-severity violation (issue #253), not inherit the rule's own severity.
+    private const string BrokenRuleJson =
+        "[{\"ID\":\"BROKEN_RULE\",\"Name\":\"broken rule\",\"Category\":\"c\",\"Severity\":2,\"Scope\":\"Table\",\"Expression\":\"ThisIsNotARealMember = 1\",\"CompatibilityLevel\":1200}]";
+
+    [Fact]
+    public async Task HandleAsync_UncompilableRule_ModelEvaluatedButExitCodeIsOne()
+    {
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+        var rulesPath = root.WriteFile("broken-rules.json", BrokenRuleJson);
+
+        var result = await RunAsync(config, model, rules => rules with { RulesFiles = [rulesPath], NoDefaults = true });
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        var finding = Assert.Single(result.Data!.Violations);
+        Assert.Equal("BROKEN_RULE", finding.RuleId);
+        Assert.Equal(BpaSeverity.Error, finding.Severity);
+        Assert.False(finding.CanFix);
+        Assert.Contains("could not be evaluated", finding.Description);
+        Assert.Equal(1, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RuleIdTargetingBrokenRule_ExitsOneRatherThanReportingSuccess()
+    {
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+        var rulesPath = root.WriteFile("broken-rules.json", BrokenRuleJson);
+
+        var result = await RunAsync(config, model, rules => rules with { RulesFiles = [rulesPath], NoDefaults = true, RuleIds = ["BROKEN_RULE"] });
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.Single(result.Data!.Violations);
+        Assert.Equal(1, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_MissingRulesFile_StillFailsWithLoadDiagnostic()
+    {
+        // File-level load failures keep their own contract (exit 2), distinct from rule errors
+        // inside a loaded file (which now flow through the gate as violations).
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+
+        var result = await RunAsync(config, model, rules => rules with { RulesFiles = [root.Combine("missing.json")], NoDefaults = true });
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_RULES_LOAD_FAILED", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+    }
+
+    private static async Task<TomixResult<BpaRunResult>> RunAsync(
+        TempConfigDir config, string model, Func<BpaRunRequest, BpaRunRequest> configure)
+    {
+        var request = configure(new BpaRunRequest(new ModelReference(model)));
+        return await new BpaRunHandler(
+            [new TmdlModelProvider()], config.Stores, new BpaUserRuleState(config.Path), config.Path)
+            .HandleAsync(request, CancellationToken.None);
+    }
 
     [Fact]
     public async Task StagedRun_ProviderThrowsClaimingTheOriginal_StillCompletes()

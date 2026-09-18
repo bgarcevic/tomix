@@ -45,7 +45,7 @@ internal sealed class SaveCommand : ICommandModule
         var overwriteOption = LifecycleOptions.Overwrite("Replace an existing output file or directory");
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
-            Description = "Apply BPA rule fixes before saving, where a rule provides one"
+            Description = "Apply BPA rule fixes before saving, where a rule provides one. Rules that cannot be evaluated block the save"
         };
         var bpaRulesOption = new Option<string[]>("--bpa-rules")
         {

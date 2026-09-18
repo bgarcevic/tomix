@@ -46,7 +46,7 @@ tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i "" --save
 | `--rule <id>` | Run only specific rule(s) by ID. |
 | `--path <path>` | Limit analysis to matched objects (literal names, wildcards, or paths). |
 | `--errors` / `--warnings` / `--info` | Show only rules of that severity (combinable). |
-| `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. |
+| `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. Rules that cannot be evaluated count as error-severity findings and block under either threshold. |
 | `--fix` | Fix violations whose rules provide a fix expression. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
 | `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. |
@@ -88,7 +88,12 @@ file. `bpa rules list` narrows what is listed:
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
 `--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files,
 `--bpa-fail-on` to lower the blocking threshold to warnings — errors block by default).
-On `save`, BPA runs only when `--fix-bpa` is passed. The gate never applies
+A rule that cannot be compiled or evaluated is itself an error-severity finding
+("rule could not be evaluated: \<reason\>"), so a typo in a rule expression fails
+`bpa run` and the gates instead of silently skipping the rule.
+On `save`, BPA runs only when `--fix-bpa` is passed; rules that cannot be
+evaluated block the save even when other fixes were applied.
+The gate never applies
 destructive `Delete()` fixes — those are only available via
 `bpa run --fix --allow-delete`.
 

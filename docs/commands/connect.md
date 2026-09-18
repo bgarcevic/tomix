@@ -41,6 +41,8 @@ tx deploy [model] [options]
 
 Runs the BPA gate before deploying. The gate blocks only on findings at or above the
 severity threshold: error-severity by default, or warnings too with `--bpa-fail-on warning`.
+A rule that cannot be evaluated is itself an error-severity finding — a broken rule
+expression blocks the deploy (named in the message) instead of silently skipping the rule.
 
 Without `-s/--server`, the target comes from the active connection: a remote connection
 deploys to itself, and a local connection with a workspace-mode mirror deploys to the
@@ -53,7 +55,7 @@ mirror.
 | `--create-only` | Create the target model only if it does not exist; fail when it does. |
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or apply rule fixes before deploying. |
 | `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset. |
-| `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. |
+| `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. Rules that cannot be evaluated count as error-severity findings. |
 | `-p, --profile <name>` | Use a saved profile for this deploy only. |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
 | `--force` | Bypass validation checks. |

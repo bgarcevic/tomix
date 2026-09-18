@@ -135,11 +135,20 @@ public sealed class SaveModelHandler
         var fixer = new BpaFixer();
         var fixResult = fixer.ApplyFixes(mutationSession, result.Violations, rules);
 
-        if (fixResult.FixesApplied == 0 && result.Violations.Any(v => v.Severity == BpaSeverity.Error))
+        // Saving never remediates a rule that cannot be evaluated, so remaining rule errors
+        // block regardless of other applied fixes (issue #253). Other error-severity findings
+        // block only when nothing could be auto-fixed.
+        if (result.RuleErrorViolations.Count > 0 ||
+            (fixResult.FixesApplied == 0 && result.Violations.Any(v => v.Severity == BpaSeverity.Error)))
+        {
+            var ruleErrorNotes = result.RuleErrorViolations is { Count: > 0 }
+                ? " " + string.Join(" ", result.RuleErrorViolations.Select(e => $"{e.Description} ('{e.RuleName}' [{e.RuleId}])."))
+                : string.Empty;
             return TomixResult<SaveModelResult>.Fail(
                 "TOMIX_BPA_VIOLATIONS",
-                $"BPA check found {result.Violations.Count} violation(s) that could not be auto-fixed. Fix them manually or save without --fix-bpa.",
+                $"BPA check found {result.Violations.Count} violation(s) that could not be auto-fixed.{ruleErrorNotes} Fix them manually or save without --fix-bpa.",
                 exitCode: 1);
+        }
 
         return null;
     }

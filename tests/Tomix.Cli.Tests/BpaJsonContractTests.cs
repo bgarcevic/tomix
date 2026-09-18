@@ -53,7 +53,9 @@ public sealed class BpaJsonContractTests
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;
 
         Assert.Equal(4, root.GetProperty("rulesEvaluated").GetInt32());
-        Assert.Equal(1, root.GetProperty("violations").GetInt32());
+        // The CompilationError sentinel for BROKEN_RULE is projected as an error-severity finding
+        // (issue #253), so it counts as a violation in addition to AVOID_FLOATS.
+        Assert.Equal(2, root.GetProperty("violations").GetInt32());
         Assert.Equal(1, root.GetProperty("ruleErrors").GetInt32());
         Assert.Equal(1, root.GetProperty("ignoredRules").GetInt32());
         Assert.Equal(1, root.GetProperty("disabledRules").GetInt32());
@@ -74,7 +76,9 @@ public sealed class BpaJsonContractTests
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;
         var results = root.GetProperty("results");
 
-        Assert.Equal(1, results.GetArrayLength());
+        // Real violation first, then the rule-error finding projected from the sentinel.
+        Assert.Equal(2, results.GetArrayLength());
+
         var item = results[0];
         Assert.Equal("AVOID_FLOATS", item.GetProperty("ruleId").GetString());
         Assert.Equal("[Performance] Avoid floats", item.GetProperty("ruleName").GetString());
@@ -84,6 +88,12 @@ public sealed class BpaJsonContractTests
         Assert.Equal("Sales[Amount]", item.GetProperty("objectName").GetString());
         Assert.Equal("Column", item.GetProperty("objectType").GetString());
         Assert.True(item.GetProperty("canFix").GetBoolean());
+
+        var ruleError = results[1];
+        Assert.Equal("BROKEN_RULE", ruleError.GetProperty("ruleId").GetString());
+        Assert.Equal("Error", ruleError.GetProperty("severityLabel").GetString());
+        Assert.Equal(string.Empty, ruleError.GetProperty("objectName").GetString());
+        Assert.False(ruleError.GetProperty("canFix").GetBoolean());
     }
 
     [Fact]

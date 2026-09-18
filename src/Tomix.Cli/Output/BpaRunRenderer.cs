@@ -297,8 +297,8 @@ internal static class BpaRunRenderer
         };
 
     /// <summary>
-    /// TRX projection: one Failed test per violated rule (message lists the violating objects),
-    /// one Error test per compilation/evaluation sentinel, or a single Passed test summarising
+    /// TRX projection: one Failed test per violated rule (message lists the violating objects;
+    /// unevaluable rules surface here with their reason), or a single Passed test summarising
     /// the run when no rule fired, so an all-green run still shows up in CI.
     /// </summary>
     public static IReadOnlyList<TrxWriter.TrxTest> ToTrxTests(BpaRunResult result)
@@ -308,6 +308,7 @@ internal static class BpaRunRenderer
         foreach (var group in result.Violations.GroupBy(v => (v.RuleId, v.RuleName)))
         {
             var objects = group
+                .Where(v => !string.IsNullOrWhiteSpace(v.ObjectPath))
                 .Select(v => $"{v.ObjectType} '{v.ObjectPath}'")
                 .ToList();
             var description = CollapseDescription(group.First().Description);
@@ -321,11 +322,19 @@ internal static class BpaRunRenderer
                 message));
         }
 
-        // The engine emits one sentinel per evaluated object scope, so a rule that fails in
-        // several scopes yields several sentinels — collapse them into one Error test per rule.
+        // One Error test per rule that only produced compile/evaluation sentinels — collapsed
+        // across scopes and already covered by the rule's Failed test (the projected finding
+        // carries the reason), so a broken rule yields a single outcome instead of two tests
+        // with one name. Rules with real objects keep their Error test: their Failed message
+        // lists the objects, not the evaluation failure.
+        var rulesWithRealObjects = result.Violations
+            .Where(v => !string.IsNullOrWhiteSpace(v.ObjectPath))
+            .Select(v => v.RuleId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var group in result.Results
             .Where(r => r.Kind is BpaResultKind.CompilationError or BpaResultKind.EvaluationError)
-            .GroupBy(r => (r.RuleId, r.RuleName)))
+            .GroupBy(r => (r.RuleId, r.RuleName))
+            .Where(g => rulesWithRealObjects.Contains(g.Key.RuleId)))
         {
             var messages = group
                 .Select(s => s.ErrorScope is null ? s.ErrorMessage : $"{s.ErrorScope}: {s.ErrorMessage}")
@@ -350,7 +359,10 @@ internal static class BpaRunRenderer
         var annotations = violations
             .Select(v =>
             {
-                var msg = $"{v.RuleName}: {v.ObjectType} '{v.ObjectName}'";
+                // Rule-error findings have no model object; skip the empty object segment.
+                var msg = string.IsNullOrWhiteSpace(v.ObjectName)
+                    ? v.RuleName
+                    : $"{v.RuleName}: {v.ObjectType} '{v.ObjectName}'";
                 if (!string.IsNullOrWhiteSpace(v.Description))
                     msg += $" - {CollapseDescription(v.Description)}";
                 return new CiAnnotation(v.Severity == BpaSeverity.Error, $"{msg} [{v.RuleId}]");

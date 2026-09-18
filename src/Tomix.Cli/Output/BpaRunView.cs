@@ -59,14 +59,16 @@ internal static class BpaRunView
     /// </summary>
     internal static string FormatObjectList(IReadOnlyList<string> names, bool full, int cap = DefaultObjectCap)
     {
-        if (names.Count == 0)
+        // Rule-error findings carry no object name; they must not leave a dangling separator.
+        var present = names.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+        if (present.Count == 0)
             return "";
 
-        if (full || names.Count <= cap)
-            return string.Join(" · ", names);
+        if (full || present.Count <= cap)
+            return string.Join(" · ", present);
 
-        var remaining = names.Count - cap;
-        return string.Join(" · ", names.Take(cap)) + $" · … +{remaining} more";
+        var remaining = present.Count - cap;
+        return string.Join(" · ", present.Take(cap)) + $" · … +{remaining} more";
     }
 
     /// <summary>

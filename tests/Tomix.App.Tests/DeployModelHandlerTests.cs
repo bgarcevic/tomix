@@ -477,6 +477,33 @@ public sealed class DeployModelHandlerTests
     }
 
     /// <summary>
+    /// Issue #253 at the handler level: a rule that cannot be compiled blocks the deploy and the
+    /// block message names the broken rule — even though the model has zero real violations.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_BpaGate_UncompilableRule_BlocksAndNamesTheRule()
+    {
+        using var rulesDir = new TempDir();
+        var rulesPath = WriteBrokenRuleFile(rulesDir, "TEAM_BROKEN_RULE");
+
+        var result = await DeployThroughGate(rulesPath, bpaFailOn: null);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_VIOLATIONS", result.Diagnostics[0].Code);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("could not be evaluated", result.Diagnostics[0].Message);
+        Assert.Contains("TEAM_BROKEN_RULE", result.Diagnostics[0].Message);
+    }
+
+    private static string WriteBrokenRuleFile(TempDir dir, string id)
+    {
+        var path = dir.Combine($"{id.ToLowerInvariant()}.json");
+        File.WriteAllText(path,
+            $"[{{\"ID\":\"{id}\",\"Name\":\"{id.ToLowerInvariant()}\",\"Category\":\"test\",\"Severity\":2,\"Scope\":\"ModelRole\",\"Expression\":\"ThisIsNotARealMember = 1\",\"CompatibilityLevel\":1200}}]");
+        return path;
+    }
+
+    /// <summary>
     /// Runs the deploy gate against a session whose snapshot carries an empty role, so the
     /// custom rule (scoped to ModelRole, same expression as the bundled empty-role rule) fires
     /// with the severity the test chose.

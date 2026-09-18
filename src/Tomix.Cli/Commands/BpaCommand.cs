@@ -73,7 +73,7 @@ internal sealed class BpaCommand : ICommandModule
 
         var failOnOption = new Option<string?>("--fail-on")
         {
-            Description = "Failure threshold: error (default) or warning"
+            Description = "Failure threshold: error (default) or warning. Rules that cannot be evaluated count as error-severity findings"
         };
 
         var fixOption = new Option<bool>("--fix")

@@ -273,11 +273,18 @@ public sealed class BpaEngineTests
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
 
-        Assert.Empty(result.Violations);
+        // The sentinel stays in the raw stream and is projected as an error-severity finding
+        // (issue #253): a rule that cannot be compiled must not pass the gates silently.
         Assert.Equal(1, result.RuleErrors);
         var sentinel = Assert.Single(result.Results);
         Assert.Equal(BpaResultKind.CompilationError, sentinel.Kind);
         Assert.Equal("Column", sentinel.ErrorScope);
+
+        var finding = Assert.Single(result.Violations);
+        Assert.Equal("BAD_EXPR", finding.RuleId);
+        Assert.Equal(BpaSeverity.Error, finding.Severity);
+        Assert.False(finding.CanFix);
+        Assert.Contains("could not be evaluated", finding.Description);
     }
 
     [Fact]
@@ -306,8 +313,11 @@ public sealed class BpaEngineTests
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
 
-        var violation = Assert.Single(result.Violations);
-        Assert.Equal("T/Good", violation.ObjectPath);
+        // Clean matches survive the partial evaluation, and the rule error is projected as an
+        // error-severity finding alongside them (issue #253).
+        Assert.Equal(2, result.Violations.Count);
+        var cleanMatch = Assert.Single(result.Violations, v => v.ObjectPath == "T/Good");
+        Assert.Equal("NUMERIC_SOURCE", cleanMatch.RuleId);
         Assert.Equal(1, result.RuleErrors);
         Assert.Contains(result.Results, r => r.Kind == BpaResultKind.EvaluationError && r.ErrorScope == "Column");
     }

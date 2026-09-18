@@ -182,17 +182,71 @@ public sealed class TrxWriterTests : IDisposable
         var tests = BpaRunRenderer.ToTrxTests(result);
 
         Assert.Equal(2, tests.Count);
-        var failed = Assert.Single(tests, t => t.Outcome == TrxWriter.TrxOutcome.Failed);
-        Assert.Equal("Avoid floats [R1]", failed.Name);
+        var failed = Assert.Single(tests, t => t.Name == "Avoid floats [R1]");
+        Assert.Equal(TrxWriter.TrxOutcome.Failed, failed.Outcome);
         Assert.Contains("tables/Sales/columns/Amount", failed.Message);
         Assert.Contains("tables/Sales/columns/Qty", failed.Message);
         Assert.DoesNotContain("Ignored", failed.Message); // object-level ignores stay suppressed
 
-        // Per-scope sentinels collapse into one Error test per rule.
-        var error = Assert.Single(tests, t => t.Outcome == TrxWriter.TrxOutcome.Error);
-        Assert.Equal("Broken rule [R2]", error.Name);
-        Assert.Contains("Measure: syntax error", error.Message);
-        Assert.Contains("Column: cast failed", error.Message);
+        // R2 produced only sentinels: the projected error-severity finding becomes a single
+        // Failed test carrying the reason (issue #253) — no second Error test with one name.
+        var broken = Assert.Single(tests, t => t.Name == "Broken rule [R2]");
+        Assert.Equal(TrxWriter.TrxOutcome.Failed, broken.Outcome);
+        Assert.Contains("could not be evaluated", broken.Message);
+        Assert.Contains("Measure: syntax error", broken.Message);
+        Assert.Contains("Column: cast failed", broken.Message);
+        Assert.DoesNotContain("''", broken.Message); // no phantom object entry
+    }
+
+    [Fact]
+    public void BpaProjection_PartialEvaluation_KeepsFailedAndErrorTests()
+    {
+        // A rule with real objects that also fails evaluation mid-run: the Failed test reports
+        // the matched objects, and the separate Error test keeps the per-scope failure reasons.
+        var violation = new BpaViolation("R1", "Avoid floats", "Performance", BpaSeverity.Warning,
+            "Column", "Amount", "tables/Sales/columns/Amount", "Use fixed decimal.");
+        var result = new BpaRunResult(
+            Results:
+            [
+                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", BpaSeverity.Warning, Violation: violation),
+                new BpaResult(BpaResultKind.EvaluationError, "R1", "Avoid floats", "Performance", BpaSeverity.Error,
+                    ErrorMessage: "cast failed", ErrorScope: "Column")
+            ],
+            ModelName: "m",
+            RulesEvaluated: 1);
+
+        var tests = BpaRunRenderer.ToTrxTests(result);
+
+        Assert.Equal(2, tests.Count);
+        Assert.All(tests, t => Assert.Equal("Avoid floats [R1]", t.Name));
+        Assert.Contains(tests, t => t.Outcome == TrxWriter.TrxOutcome.Failed && t.Message!.Contains("tables/Sales/columns/Amount"));
+        Assert.Contains(tests, t => t.Outcome == TrxWriter.TrxOutcome.Error && t.Message!.Contains("Column: cast failed"));
+    }
+
+    [Fact]
+    public void BpaProjection_RuleErrorOnly_YieldsSingleFailedTestWithReason()
+    {
+        // A rule that cannot be evaluated (no real findings) is one Failed test carrying the
+        // reason — not a Passed run, and not two tests (Failed + Error) with the same name.
+        var result = new BpaRunResult(
+            Results:
+            [
+                new BpaResult(BpaResultKind.CompilationError, "R2", "Broken rule", "Meta", BpaSeverity.Error,
+                    ErrorMessage: "syntax error", ErrorScope: "Measure"),
+                new BpaResult(BpaResultKind.EvaluationError, "R2", "Broken rule", "Meta", BpaSeverity.Error,
+                    ErrorMessage: "cast failed", ErrorScope: "Column")
+            ],
+            ModelName: "m",
+            RulesEvaluated: 5);
+
+        var test = Assert.Single(BpaRunRenderer.ToTrxTests(result));
+
+        Assert.Equal("Broken rule [R2]", test.Name);
+        Assert.Equal(TrxWriter.TrxOutcome.Failed, test.Outcome);
+        Assert.Contains("could not be evaluated", test.Message);
+        Assert.Contains("Measure: syntax error", test.Message);
+        Assert.Contains("Column: cast failed", test.Message);
+        Assert.DoesNotContain("''", test.Message); // no phantom object entry
     }
 
     [Fact]

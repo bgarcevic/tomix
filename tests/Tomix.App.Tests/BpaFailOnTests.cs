@@ -60,4 +60,89 @@ public sealed class BpaFailOnTests
         var error = new BpaViolation("e", "e", "cat", BpaSeverity.Error, "Table", "e", "e");
         return [info, warning, error];
     }
+
+    // ----- Issue #253: a rule that cannot be evaluated must not pass silently -----
+    // The gates see BpaRunResult.Violations, so an unevaluable rule has to be projected into that
+    // same visible stream as an error-severity finding to fail bpa run and deploy closed.
+
+    [Fact]
+    public void Violations_CompilationErrorSentinel_ProjectedAsErrorSeverityFinding()
+    {
+        var result = RunResult(BpaResult.Sentinel(
+            BpaResultKind.CompilationError, Rule("BROKEN"), "Unexpected token '='", "Column"));
+
+        var finding = Assert.Single(result.Violations);
+        Assert.Equal("BROKEN", finding.RuleId);
+        Assert.Equal(BpaSeverity.Error, finding.Severity);
+        Assert.False(finding.CanFix);
+        Assert.Contains("could not be evaluated", finding.Description);
+        Assert.Contains("Unexpected token '='", finding.Description);
+    }
+
+    [Fact]
+    public void Violations_RuleErrorAcrossScopes_CollapsesToOneFindingPerRule()
+    {
+        // The engine emits one sentinel per scope; a broken rule is one finding, not one per scope.
+        var result = RunResult(
+            BpaResult.Sentinel(BpaResultKind.CompilationError, Rule("BROKEN"), "Unexpected token '='", "Column"),
+            BpaResult.Sentinel(BpaResultKind.EvaluationError, Rule("BROKEN"), "Sequence contains no elements", "Measure"));
+
+        var finding = Assert.Single(result.Violations);
+        Assert.Equal("BROKEN", finding.RuleId);
+        Assert.Contains("Unexpected token '='", finding.Description);
+        Assert.Contains("Sequence contains no elements", finding.Description);
+    }
+
+    [Fact]
+    public void Violations_RuleErrorFinding_UsesErrorSeverityNotRuleSeverity()
+    {
+        // A warning-severity rule that cannot be evaluated is still an error-severity finding:
+        // the failure of the gate machinery must not inherit the broken rule's own threshold.
+        var warningRule = new BpaRule("BROKEN", "broken", "test", BpaSeverity.Warning, ["Column"]);
+        var result = RunResult(BpaResult.Sentinel(BpaResultKind.CompilationError, warningRule, "boom", "Column"));
+
+        Assert.All(result.Violations, v => Assert.Equal(BpaSeverity.Error, v.Severity));
+    }
+
+    [Fact]
+    public void Blocking_RuleErrorOnly_BlocksAtBothThresholds()
+    {
+        var result = RunResult(BpaResult.Sentinel(
+            BpaResultKind.CompilationError, Rule("BROKEN"), "boom", "Model"));
+
+        Assert.Single(BpaFailOn.Blocking(result.Violations, BpaSeverity.Error));
+        Assert.Single(BpaFailOn.Blocking(result.Violations, BpaSeverity.Warning));
+    }
+
+    [Fact]
+    public void Blocking_PartialEvaluationError_RealViolationsPlusRuleError()
+    {
+        var result = RunResult(
+            BpaResult.ForViolation(Rule("REAL"), new BpaViolation("REAL", "real", "cat", BpaSeverity.Warning, "Table", "t", "t")),
+            BpaResult.Sentinel(BpaResultKind.EvaluationError, Rule("BROKEN"), "threw", "Column"));
+
+        Assert.Equal(2, result.Violations.Count);
+        // Default threshold: only the error-severity rule-error finding crosses it.
+        var blocking = BpaFailOn.Blocking(result.Violations, BpaSeverity.Error);
+        Assert.Equal(["BROKEN"], blocking.Select(v => v.RuleId).ToArray());
+    }
+
+    [Fact]
+    public void Violations_DisabledAndCompatibilitySkips_StayNonBlocking()
+    {
+        // Disabled rules and compatibility-level skips are intentional, not failures —
+        // they must keep riding the diagnostics footer without blocking a gate.
+        var result = RunResult(
+            BpaResult.Sentinel(BpaResultKind.DisabledRule, Rule("OFF")),
+            BpaResult.Sentinel(BpaResultKind.InvalidCompatibilityLevel, Rule("OLD")));
+
+        Assert.Empty(result.Violations);
+        Assert.Empty(BpaFailOn.Blocking(result.Violations, BpaSeverity.Warning));
+    }
+
+    private static BpaRunResult RunResult(params BpaResult[] results)
+        => new(results, "model", RulesEvaluated: 1);
+
+    private static BpaRule Rule(string id)
+        => new(id, id.ToLowerInvariant(), "test", BpaSeverity.Warning, ["Column"]);
 }
