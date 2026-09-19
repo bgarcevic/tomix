@@ -14,7 +14,7 @@ namespace Tomix.Cli.Output;
 /// </summary>
 internal sealed class RefreshLiveDisplay : IDisposable
 {
-    private readonly Dictionary<string, (long Rows, string Phase, bool Completed)> _rows = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (long Rows, string? Phase, bool Completed)> _rows = new(StringComparer.Ordinal);
     private readonly object _rowsLock = new();
     private StatusContext? _ctx;
 
@@ -54,7 +54,7 @@ internal sealed class RefreshLiveDisplay : IDisposable
     {
         if (_ctx is null) return;
 
-        List<(string Name, long Rows, string Phase, bool Completed)> snapshot;
+        List<(string Name, long Rows, string? Phase, bool Completed)> snapshot;
         lock (_rowsLock)
         {
             snapshot = _rows
@@ -63,18 +63,27 @@ internal sealed class RefreshLiveDisplay : IDisposable
                 .ToList();
         }
 
-        var active = snapshot.Where(s => !s.Completed).ToList();
+        var active = snapshot.Where(s => !s.Completed)
+            .Select(s => (s.Name, s.Rows, s.Phase))
+            .ToList();
         if (active.Count == 0) return;
 
-        var parts = active.Select(s =>
+        _ctx.Status = BuildStatus(active);
+    }
+
+    /// <summary>
+    /// Composes the status line from the still-active tables. The status label is parsed as
+    /// Spectre markup, so names are escaped here: a raw <c>Sales [EUR]</c> would throw in the
+    /// <see cref="StatusContext.Status"/> setter and, swallowed by the trace sink's catch-all,
+    /// silently freeze the display. Pure so the escaping is directly unit-testable.
+    /// </summary>
+    internal static string BuildStatus(IReadOnlyList<(string Name, long Rows, string? Phase)> active)
+        => string.Join("  |  ", active.Select(s =>
         {
             var detail = s.Rows > 0 ? $" {s.Rows:N0} rows" : "";
             var phaseStr = s.Phase ?? "processing";
-            return $"{s.Name}{detail} {phaseStr}".Trim();
-        });
-
-        _ctx.Status = string.Join("  |  ", parts);
-    }
+            return Styling.MarkupEscape($"{s.Name}{detail} {phaseStr}".Trim());
+        }));
 
     public async Task<TomixResult<RefreshModelResult>> RunAsync(string label, Func<Task<TomixResult<RefreshModelResult>>> action)
     {

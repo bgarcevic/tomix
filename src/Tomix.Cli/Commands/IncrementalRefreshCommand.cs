@@ -346,7 +346,7 @@ internal sealed class IncrementalRefreshCommand : ICommandModule
                     parseResult.GetValue(GlobalOptions.Database),
                     parseResult.GetValue(GlobalOptions.Server)));
             var result = await CliSpinner.RunAsync(
-                $"Applying refresh policy for {table}...",
+                $"Applying refresh policy for {Styling.MarkupEscape(table)}...",
                 () => new ApplyRefreshPolicyHandler(_providers, _loadCurrentSession).HandleAsync(
                     new ApplyRefreshPolicyRequest(
                         GlobalOptions.ModelValue(parseResult),
