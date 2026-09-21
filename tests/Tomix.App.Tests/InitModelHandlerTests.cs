@@ -212,6 +212,21 @@ public sealed class InitModelHandlerTests : IDisposable
         Assert.Contains("compatibilityLevel", File.ReadAllText(bimPath));
     }
 
+    /// <summary>
+    /// The scaffold .bim is a git artifact, so its bytes must not depend on the OS that ran
+    /// <c>tx init</c>: LF line endings on Windows too (#256).
+    /// </summary>
+    [Fact]
+    public void Handle_Bim_SkeletonUsesLfOnlyNewlines()
+    {
+        var bimPath = OutputPath("lf.bim");
+
+        var result = new InitModelHandler().Handle(NewRequest(bimPath, serialization: "bim"));
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain((byte)'\r', File.ReadAllBytes(bimPath));
+    }
+
     // ---- PBIP scaffolding -----------------------------------------------------------------------
 
     [Fact]

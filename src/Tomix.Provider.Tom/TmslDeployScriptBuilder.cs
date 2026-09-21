@@ -13,6 +13,16 @@ namespace Tomix.Provider.Tom;
 /// </summary>
 internal static class TmslDeployScriptBuilder
 {
+    /// <summary>
+    /// Deploy scripts and the dry-run plans derived from them must be byte-stable across OSes,
+    /// so indent with LF newlines instead of the default <see cref="Environment.NewLine"/>.
+    /// </summary>
+    private static readonly JsonSerializerOptions IndentedLfJsonOptions = new()
+    {
+        WriteIndented = true,
+        NewLine = "\n"
+    };
+
     /// <param name="sourceDatabaseJson">The source database serialized as TMSL JSON.</param>
     /// <param name="targetDatabaseJson">The existing target database serialized as TMSL JSON
     /// (with restricted information), or null when the target does not exist or nothing is
@@ -43,7 +53,7 @@ internal static class TmslDeployScriptBuilder
             }
         };
 
-        return script.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        return script.ToJsonString(IndentedLfJsonOptions);
     }
 
     /// <summary>

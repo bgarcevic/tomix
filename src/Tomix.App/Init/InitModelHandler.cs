@@ -5,6 +5,16 @@ namespace Tomix.App.Init;
 
 public sealed class InitModelHandler
 {
+    /// <summary>
+    /// The scaffold .bim is a git artifact, so it must serialize to the same bytes on every
+    /// OS: pin LF newlines instead of the default <see cref="Environment.NewLine"/>.
+    /// </summary>
+    private static readonly JsonSerializerOptions IndentedLfJsonOptions = new()
+    {
+        WriteIndented = true,
+        NewLine = "\n"
+    };
+
     public TomixResult<InitModelResult> Handle(InitModelRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.OutputPath))
@@ -189,7 +199,7 @@ public sealed class InitModelHandler
             ["model"] = model
         };
 
-        return JsonSerializer.Serialize(database, new JsonSerializerOptions { WriteIndented = true });
+        return JsonSerializer.Serialize(database, IndentedLfJsonOptions);
     }
 
     private static string PbipJson(string projectName)

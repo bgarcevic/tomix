@@ -8,6 +8,17 @@ namespace Tomix.Provider.Tom;
 
 public static class TomModelExporter
 {
+    /// <summary>
+    /// Model files are git artifacts, so the same model must serialize to the same bytes on
+    /// every OS: pin LF newlines instead of the default <see cref="Environment.NewLine"/>
+    /// (CRLF on Windows, LF on Unix), matching the TMDL convention.
+    /// </summary>
+    private static readonly JsonSerializerOptions IndentedLfJsonOptions = new()
+    {
+        WriteIndented = true,
+        NewLine = "\n"
+    };
+
     public static Task<ModelExportResult> ExportAsync(
         Database database,
         ModelExportRequest request,
@@ -186,7 +197,7 @@ public static class TomModelExporter
             return json;
 
         RemoveNullProperties(node);
-        return node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        return node.ToJsonString(IndentedLfJsonOptions);
     }
 
     private static void RemoveNullProperties(JsonNode node)

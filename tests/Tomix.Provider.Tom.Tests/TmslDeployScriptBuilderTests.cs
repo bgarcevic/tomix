@@ -32,6 +32,25 @@ public sealed class TmslDeployScriptBuilderTests
         Assert.Equal(DeployName, Db(script)["id"]!.GetValue<string>());
     }
 
+    /// <summary>
+    /// The script and the dry-run plan derived from it must be byte-stable across OSes:
+    /// LF newlines everywhere, never <see cref="Environment.NewLine"/> (#256).
+    /// </summary>
+    [Fact]
+    public void Build_EmitsLfOnlyNewlines()
+    {
+        var script = TmslDeployScriptBuilder.Build(
+            SourceDb().ToJsonString(),
+            targetDatabaseJson: null,
+            DeployName,
+            targetId: null,
+            ModelDeployOptions.Preserve,
+            stripRoleMemberIds: false);
+
+        Assert.Contains('\n', script);
+        Assert.DoesNotContain('\r', script);
+    }
+
     // -- Roles -------------------------------------------------------------------------------
 
     [Fact]

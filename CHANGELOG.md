@@ -54,6 +54,11 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `save --serialization bim`, `init --serialization bim`, and `deploy`'s TMSL script now write
+  JSON with LF line endings on every OS. The indented writer's default newline was
+  `Environment.NewLine`, so Windows produced CRLF and Linux LF — the same model saved on
+  different machines differed byte-for-byte and fought over line endings in git. Collection
+  order in the exported `.bim` remains TOM model order (tests now pin it) (#256).
 - `rm --dry-run` previews truthfully in both directions. It now prints `Would remove: <path>`
   (instead of `Removed:`) and exits 0; when the reference guard would block the removal, the
   preview lists the dependents (`Would break N DAX reference(s) in: ...`) and hints `--force`
