@@ -11,9 +11,9 @@
     <PackageVersion Include="Dax.Vpax.Obfuscator" Version="1.2.1" />
     <PackageVersion Include="Microsoft.AnalysisServices" Version="19.117.0" />
     <PackageVersion Include="Microsoft.AnalysisServices.AdomdClient" Version="19.117.0" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.89.0" />
-    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.89.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.90.0" />
+    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.90.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="MinVer" Version="8.0.0" />
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
     <PackageVersion Include="Spectre.Console.Testing" Version="0.57.2" />
