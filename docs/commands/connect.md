@@ -115,6 +115,11 @@ tx deploy ./model.tmdl --deploy-full                     # overwrite everything 
     partitions — are therefore absent from the diff, and changing a `--deploy-*` flag changes
     what the preview reports.
 
+    With default flags or `--deploy-roles` alone, a members-only source edit can show "No changes"
+    in `--dry-run` because an existing target's role members are preserved. A real deploy also
+    leaves those members unchanged; use `--deploy-roles --deploy-role-members` (or `--deploy-full`)
+    to preview and deploy member changes.
+
     When the target database does not exist, there is nothing to compare against: the preview
     reports that the deploy creates it with the full source model.
 
