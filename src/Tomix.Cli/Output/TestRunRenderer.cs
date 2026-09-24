@@ -34,7 +34,7 @@ internal static class TestRunRenderer
                 Styling.Muted($"({test.DurationMs} ms)"));
 
             if (!passing && !string.IsNullOrEmpty(test.Message))
-                AnsiConsole.MarkupLine("        {0}", Styling.Muted(Styling.MarkupEscape(test.Message)));
+                AnsiConsole.MarkupLine("        {0}", Styling.Muted(test.Message));
 
             if (test.Differences is { Count: > 0 } differences)
                 RenderDifferences(differences, test.TotalDifferences);

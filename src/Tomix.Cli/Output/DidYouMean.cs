@@ -29,7 +29,7 @@ internal static class DidYouMean
             return;
 
         var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
-        err.MarkupLine(Styling.Guidance($"Did you mean '{Styling.MarkupEscape(suggestion)}'?"));
+        err.MarkupLine(Styling.Guidance($"Did you mean '{suggestion}'?"));
     }
 
     private static int Levenshtein(string a, string b)

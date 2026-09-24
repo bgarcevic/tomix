@@ -43,7 +43,7 @@ internal static class BpaRulesRenderer
             return;
 
         foreach (var diagnostic in diagnostics)
-            AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(diagnostic))}");
+            AnsiConsole.MarkupLine($"  {Styling.Warning(diagnostic)}");
     }
 
     public static void RenderDisable(BpaRulesDisableResult result)
@@ -51,7 +51,7 @@ internal static class BpaRulesRenderer
         if (!result.Changed)
         {
             AnsiConsole.MarkupLine(Styling.Muted(
-                $"Rule '{Styling.MarkupEscape(result.RuleId)}' was already {(result.Disabled ? "disabled" : "enabled")} — no change."));
+                $"Rule '{result.RuleId}' was already {(result.Disabled ? "disabled" : "enabled")} — no change."));
             return;
         }
 
@@ -68,7 +68,7 @@ internal static class BpaRulesRenderer
         if (!result.Changed)
         {
             AnsiConsole.MarkupLine(Styling.Muted(
-                $"Rule '{Styling.MarkupEscape(result.RuleId)}' was already {(result.Ignored ? "ignored" : "not ignored")} — no change."));
+                $"Rule '{result.RuleId}' was already {(result.Ignored ? "ignored" : "not ignored")} — no change."));
             return;
         }
 
@@ -83,9 +83,9 @@ internal static class BpaRulesRenderer
             AnsiConsole.MarkupLine($"  {Styling.Muted("Not saved — re-run with --save to persist or --stage to stage.")}");
 
         if (result.Synced)
-            AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}")}");
+            AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {result.SyncTarget!}")}");
         else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(result.SyncWarning))}");
+            AnsiConsole.MarkupLine($"  {Styling.Warning(result.SyncWarning)}");
     }
 
     /// <summary>

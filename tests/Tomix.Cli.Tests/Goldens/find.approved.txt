@@ -1,0 +1,9 @@
+╭─────────────────────────────────┬───────────┬──────────┬───────┬──────╮
+│ Path                            │ Type      │ Property │ Match │ Line │
+├─────────────────────────────────┼───────────┼──────────┼───────┼──────┤
+│ [Test] [Table]                  │ Table     │ Name     │ Test  │ 1    │
+│ [Test] [Table]/[Test] [Column]  │ Column    │ Name     │ Test  │ 1    │
+│ [Test] [Table]/[Test] [Measure] │ Measure   │ Name     │ Test  │ 1    │
+│ [Test] [Table]/[Test] [Table]   │ Partition │ Name     │ Test  │ 1    │
+╰─────────────────────────────────┴───────────┴──────────┴───────┴──────╯
+4 match(es)

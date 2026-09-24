@@ -48,7 +48,7 @@ internal static class DeployRenderer
             else if (result.DiffError is not null)
             {
                 AnsiConsole.MarkupLine(Styling.Warning(
-                    $"Diff unavailable: {Styling.MarkupEscape(result.DiffError)}"));
+                    $"Diff unavailable: {result.DiffError}"));
                 AnsiConsole.MarkupLine(Styling.Muted("Showing deploy plan only."));
             }
             else

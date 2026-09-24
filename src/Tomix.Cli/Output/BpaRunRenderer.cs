@@ -98,9 +98,9 @@ internal static class BpaRunRenderer
                 AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
 
             if (result.Synced)
-                AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}")}");
+                AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {result.SyncTarget!}")}");
             else if (result.SyncWarning is not null)
-                AnsiConsole.MarkupLine($"  {Styling.Warning(Styling.MarkupEscape(result.SyncWarning))}");
+                AnsiConsole.MarkupLine($"  {Styling.Warning(result.SyncWarning)}");
         }
         else
         {
@@ -192,7 +192,7 @@ internal static class BpaRunRenderer
                 Styling.Muted($"[{label}]"),
                 Styling.MarkupEscape(diag.RuleId),
                 Styling.MarkupEscape(scope),
-                Styling.Muted(Styling.MarkupEscape(detail)));
+                Styling.Muted(detail));
         }
     }
 

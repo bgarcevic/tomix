@@ -1,0 +1,25 @@
+[Test] [Table] (Table)
+name: [Test] [Table]
+description:
+isHidden: False
+dataCategory:
+lineageTag:
+columns: 1
+measures: 1
+hierarchies: 0
+partitions: 1
+refreshPolicy:
+refreshPolicySourceExpression:
+refreshPolicyPollingExpression:
+noSelectionExpression:
+multipleOrEmptySelectionExpression:
+defaultDetailRowsExpression:
+isPrivate: False
+excludeFromModelRefresh: False
+excludeFromAutomaticAggregations: False
+alternateSourcePrecedence: 0
+showAsVariationsOnly: False
+systemManaged: False
+directLakeIndexingBehavior: Default
+sourceLineageTag:
+precedence: 0

@@ -67,9 +67,9 @@ internal static class ScriptRenderer
 
         if (result.Synced)
             AnsiConsole.MarkupLine(Styling.Success(
-                $"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
+                $"Synced: {result.SyncTarget!}"));
         else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+            AnsiConsole.MarkupLine(Styling.Warning(result.SyncWarning));
     }
 
     public static object ToReferenceJson(ScriptRunResult result)

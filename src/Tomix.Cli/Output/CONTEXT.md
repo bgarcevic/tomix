@@ -46,7 +46,9 @@ Key rules:
 
 - Use `Styling` helpers and `Palette` constants. Do not hard-code Spectre markup strings or raw ANSI escape codes.
 - Tables use `Styling.NewTable()` (rounded border, Slate border color).
-- All user-facing text must go through `Styling.MarkupEscape()` to prevent bracket injection.
+- Escape model-derived text exactly once at a Spectre markup boundary. Use `Styling.MarkupEscape()`
+  when inserting raw text into markup; pass raw text to `Styling` helpers, which already escape it.
+  Literal `WriteLine` and JSON/CSV/TMDL/BIM output do not use Spectre escaping.
 - DAX-bearing text goes through `Styling.ExpressionMarkup` (highlighted when `DaxExpressions.IsDaxValue`/`IsDaxExpression` says it is DAX; M and other text escaped plain) so every renderer classifies and highlights expressions the same way.
 - JSON, CSV, TMDL, BIM, and CI annotation output paths must never contain markup.
 - `noColor` config and `NO_COLOR` env var disable color via `AnsiConsole.Profile.Capabilities.ColorSystem`.

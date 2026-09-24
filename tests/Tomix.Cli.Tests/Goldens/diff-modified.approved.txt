@@ -1,0 +1,8 @@
+Comparing models...
+Left: <MODEL_1>
+Right: <MODEL_2>
+0 added, 0 removed, 1 modified
+
+  ~ Measure/Sales/Total Sales Expression
+    - SUM ( Sales[Amount] )
+    + SUM ( Sales[Amount] ) + [Order Count]

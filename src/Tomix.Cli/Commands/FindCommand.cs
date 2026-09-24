@@ -134,7 +134,7 @@ internal sealed class FindCommand : ICommandModule
         {
             if (!pathsOnly)
             {
-                AnsiConsole.MarkupLine(Styling.Muted($"No matches for '{Styling.MarkupEscape(result.Pattern)}'."));
+                AnsiConsole.MarkupLine(Styling.Muted($"No matches for '{result.Pattern}'."));
                 var hint = caseSensitive
                     ? "remove --case-sensitive to match any casing"
                     : "a shorter or broader pattern, or --regex for pattern matching";

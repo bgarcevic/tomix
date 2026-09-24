@@ -1,0 +1,2 @@
+No matches for '[Missing]'.
+  → Try: a shorter or broader pattern, or --regex for pattern matching

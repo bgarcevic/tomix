@@ -1,0 +1,18 @@
+[Test] [Table]/[Test] [Measure] (Measure)
+name: [Test] [Measure]
+description:
+isHidden: False
+expression: SUM(Sales[Amount])
+formatString:
+displayFolder:
+dataType:
+detailRowsExpression:
+formatStringExpression:
+kpi:
+kpiTargetExpression:
+kpiStatusExpression:
+kpiTrendExpression:
+lineageTag:
+dataCategory:
+isSimpleMeasure: False
+sourceLineageTag:

@@ -49,9 +49,10 @@ internal static class ConnectRenderer
         AnsiConsole.MarkupLine(Styling.KeyValue("  CL:", $"{s.CompatibilityLevel}"));
         AnsiConsole.MarkupLine(Styling.Muted($"  tables: {s.Tables}  measures: {s.Measures}  relationships: {s.Relationships}  roles: {s.Roles}"));
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(model is not null
-            ? Styling.Success($"Active: {Styling.MarkupEscape(Path.GetFullPath(model))}")
-            : Styling.Success($"Active: {Styling.MarkupEscape(remoteServer ?? "")}{(string.IsNullOrWhiteSpace(database) ? "" : $" / {Styling.MarkupEscape(database)}")}"));
+        var active = model is not null
+            ? Path.GetFullPath(model)
+            : string.IsNullOrWhiteSpace(database) ? remoteServer ?? "" : $"{remoteServer} / {database}";
+        AnsiConsole.MarkupLine(Styling.Success($"Active: {active}"));
         if (!string.IsNullOrWhiteSpace(workspace))
             AnsiConsole.MarkupLine(Styling.KeyValue("Mirror:",
                 !string.IsNullOrWhiteSpace(database)
@@ -124,7 +125,7 @@ internal static class ConnectRenderer
         if (!string.IsNullOrWhiteSpace(connection.Model))
         {
             AnsiConsole.MarkupLine(Styling.Success("Active: local model"));
-            AnsiConsole.MarkupLine(Styling.KeyValue("Path:", Styling.MarkupEscape(Path.GetFullPath(connection.Model))));
+            AnsiConsole.MarkupLine(Styling.KeyValue("Path:", Path.GetFullPath(connection.Model)));
         }
         else
         {
@@ -132,13 +133,13 @@ internal static class ConnectRenderer
             // open, so lead with the cached report name when it is still valid. ConnectHandler.Show
             // clears it otherwise, so reaching here means it does describe the live instance.
             var target = connection.ReportName is { } report
-                ? $"{Styling.MarkupEscape(report)}  ({Styling.MarkupEscape(connection.Server ?? "")})"
-                : Styling.MarkupEscape(connection.Server ?? "");
+                ? $"{report}  ({connection.Server ?? ""})"
+                : connection.Server ?? "";
 
             AnsiConsole.MarkupLine(Styling.Success(
                 string.IsNullOrWhiteSpace(connection.Database)
                     ? $"Active: {target}"
-                    : $"Active: {target} / {Styling.MarkupEscape(connection.Database)}"));
+                    : $"Active: {target} / {connection.Database}"));
         }
 
         if (!string.IsNullOrWhiteSpace(connection.Workspace))

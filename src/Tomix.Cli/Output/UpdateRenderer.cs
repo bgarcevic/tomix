@@ -27,8 +27,8 @@ internal static class UpdateRenderer
                 header += $" ({published:yyyy-MM-dd})";
 
             AnsiConsole.MarkupLine(release.Breaking
-                ? $"{Styling.Title(Styling.MarkupEscape(header))} {Styling.Warning("[[breaking]]")}"
-                : Styling.Title(Styling.MarkupEscape(header)));
+                ? $"{Styling.Title(header)} {Styling.Warning("[breaking]")}"
+                : Styling.Title(header));
 
             if (!string.IsNullOrWhiteSpace(release.Notes))
             {

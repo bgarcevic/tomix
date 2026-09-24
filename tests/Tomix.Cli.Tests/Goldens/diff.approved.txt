@@ -1,0 +1,10 @@
+Comparing models...
+Left: <SAMPLE>
+Right: <MODEL_1>
+5 added, 0 removed, 0 modified
+
+  + Column [Test] [Table]/[Test] [Column]
+  + Measure [Test] [Table]/[Test] [Measure]
+  + Partition [Test] [Table]/[Test] [Table]
+  + Relationship Relationships/[Test] [Relationship]
+  + Table [Test] [Table]

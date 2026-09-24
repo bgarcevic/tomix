@@ -104,7 +104,7 @@ internal static class VertipaqRenderer
         VertipaqView.FieldKind.Percent => value is double d ? VertipaqView.Percent(d) : "",
         VertipaqView.FieldKind.Ratio => VertipaqView.RatioText(value as double?),
         VertipaqView.FieldKind.Bool => value is true ? Styling.BoolText(true) : Styling.BoolText(false),
-        VertipaqView.FieldKind.Bar => $"[{Palette.Harbor.ToMarkup()}]{value}[/]",
+        VertipaqView.FieldKind.Bar => $"[{Palette.Harbor.ToMarkup()}]{Styling.MarkupEscape(value?.ToString() ?? "")}[/]",
         _ => Styling.MarkupEscape(value?.ToString() ?? "")
     };
 }
