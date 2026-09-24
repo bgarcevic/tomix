@@ -10,8 +10,14 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-25
+
 ### Added
 
+- `query` accepts DAX or DMV text as a positional argument. If query text is supplied through
+  more than one of the positional argument, `--query`, and `--file`, it reports
+  `TOMIX_QUERY_INPUT_CONFLICT`. A mistaken `-q <text>` is diagnosed as
+  `TOMIX_QUIET_COLLISION`; `-q` is the global `--quiet` flag (#218).
 - `validate` issues carry a severity: `--output-format json` includes a `"severity"` string on
   each issue, `--ci` annotations emit warnings as warnings (github `::warning::` / vsts
   `type=warning`) instead of dropping them, and the TRX projection maps each issue's severity
@@ -54,6 +60,20 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- BPA rules that cannot be compiled or evaluated now appear as error-severity findings, so
+  `bpa run`, `save`, and `deploy` fail their BPA gates instead of silently passing. The gate
+  message names the broken rule and its error (#263).
+- `deploy` honors disabled BPA rules in its gate, matching `bpa run` (#272).
+- BPA's `IsAvailableInMDX` rules read the column's actual property value, avoiding false
+  findings on hierarchy and sort-by columns and missed findings on hidden columns (#251).
+- `ls` table column counts include calculated columns, and `get` no longer attempts model
+  resolution for a path it cannot resolve (#262).
+- Model and table names containing markup characters render literally in command output;
+  `refresh` and `incremental-refresh apply` also keep their live status displays working
+  with such table names (#223, #264).
+- Power Query (M) formatting sends the content type accepted by the formatter service.
+  Whole-model `format` runs now report each failed object's error in text and JSON output
+  instead of only a failure count (#200).
 - `deploy --profile` now fails with the profile name and a recovery hint when the profile is missing or has no server, before confirmation or model work (#179). Deploy and profile help now show how to create and use a profile.
 - `diff` and `deploy --dry-run` no longer report engine-derived data type differences
   between calculated-table columns present on both sides of a live comparison. Other
@@ -84,8 +104,8 @@ and the API surface that major versions protect.
 
 ### Removed
 
-- `format --semicolons` and `format --no-space-after-function` — they only fed the retired
-  daxformatter.com API; the offline formatter has no equivalents.
+- Breaking change: `format --semicolons` and `format --no-space-after-function` were removed.
+  They only fed the retired daxformatter.com API; the offline formatter has no equivalents.
 - The `Dax.Formatter` NuGet dependency.
 
 ## [0.2.1] - 2026-09-10
@@ -665,7 +685,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bgarcevic/tomix-cli/releases/tag/v0.1.0

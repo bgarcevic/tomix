@@ -33,7 +33,11 @@ difference (an added measure), so `diff` has a known target.
 
 ## Expected manifest (pristine fixture)
 
-Load summary (`tx load`): 5 tables, 5 measures, 22 columns, 3 relationships.
+Offline load summary (`tx load samples/qa-fixture`): 5 tables, 5 measures, 22
+columns, 3 relationships. After deploying to Fabric, the engine adds one hidden
+`RowNumber-...` column to each table. Remote `tx load` therefore reports 27 raw
+columns, while `tx ls` still lists the 22 model columns (5 Sales, 6 Customer,
+5 Date, 3 Metrics, 3 Events).
 
 - `tx validate` — clean, exit 0.
 - `tx bpa run` (standard ruleset) — exactly 3 rules / 6 findings, 0 errors. Assumes the

@@ -16,7 +16,9 @@ you compare against. A check with no expected value recorded is not a check.
    `TomixQa_<run-id>`; never point mutations, refreshes, or deploys at
    production or a shared model.
 2. Export the pristine model (TMDL and BIM) before testing and keep the
-   checksum in the run record. Restore from it between command families.
+   checksum in the run record. Restore from it between command families, then
+   refresh if needed and rerun a known-value query. A clean metadata diff alone
+   does not prove that processed data survived the restore.
 3. Prefix every object created during the run with `QA_<run-id>_` so cleanup is
    unambiguous. Run destructive commands in preview/dry-run first; persist only
    after reviewing the preview.
