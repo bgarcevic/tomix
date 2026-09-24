@@ -88,6 +88,8 @@ file. `bpa rules list` narrows what is listed:
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
 `--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files,
 `--bpa-fail-on` to lower the blocking threshold to warnings — errors block by default).
+The deploy gate honors `bpa rules disable` for the rules it loads. `bpa run` can
+load additional user and model rules, so the commands may report different findings.
 A rule that cannot be compiled or evaluated is itself an error-severity finding
 ("rule could not be evaluated: \<reason\>"), so a typo in a rule expression fails
 `bpa run` and the gates instead of silently skipping the rule.

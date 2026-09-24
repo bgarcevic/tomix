@@ -1,3 +1,4 @@
+using Tomix.App.Bpa;
 using Tomix.App.Deploy;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -495,6 +496,31 @@ public sealed class DeployModelHandlerTests
         Assert.Contains("TEAM_BROKEN_RULE", result.Diagnostics[0].Message);
     }
 
+    /// <summary>
+    /// Issue #254 at the handler level: the deploy gate honors <c>bpa rules disable</c> state
+    /// exactly like <c>bpa run</c>. The same error-severity rule blocks while enabled and is
+    /// skipped once the user disabled it — the lowercase ID on purpose, since matching is
+    /// case-insensitive end to end.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_BpaGate_UserDisabledRule_IsSkipped()
+    {
+        using var rulesDir = new TempDir();
+        var rulesPath = WriteRuleFile(rulesDir, "TEAM_DISABLED_RULE", severity: 3);
+
+        // Control: with nothing disabled the gate blocks on the error-severity finding.
+        var blocked = await DeployThroughGate(rulesPath, bpaFailOn: null);
+        Assert.False(blocked.Success);
+        Assert.Equal("TOMIX_BPA_VIOLATIONS", blocked.Diagnostics[0].Code);
+
+        using var config = new TempConfigDir();
+        var userRules = new BpaUserRuleState(config.Path);
+        Assert.True(userRules.Disable("team_disabled_rule"));
+
+        var proceeded = await DeployThroughGate(rulesPath, bpaFailOn: null, bpaRules: userRules);
+        Assert.True(proceeded.Success);
+    }
+
     private static string WriteBrokenRuleFile(TempDir dir, string id)
     {
         var path = dir.Combine($"{id.ToLowerInvariant()}.json");
@@ -508,10 +534,11 @@ public sealed class DeployModelHandlerTests
     /// custom rule (scoped to ModelRole, same expression as the bundled empty-role rule) fires
     /// with the severity the test chose.
     /// </summary>
-    private async Task<TomixResult<DeployModelResult>> DeployThroughGate(string rulesPath, string? bpaFailOn)
+    private async Task<TomixResult<DeployModelResult>> DeployThroughGate(
+        string rulesPath, string? bpaFailOn, BpaUserRuleState? bpaRules = null)
     {
         var session = new StubDeployOnlySession();
-        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)], TestState);
+        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)], TestState, bpaRules: bpaRules);
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("samples/basic-tmdl"),

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App.Bpa;
 using Tomix.App.Deploy;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -14,15 +15,18 @@ internal sealed class DeployCommand : ICommandModule
 
     private readonly CliStateStore _state;
     private readonly HttpClient? _httpClient;
+    private readonly BpaUserRuleState? _bpaRules;
 
     public DeployCommand(
         IReadOnlyList<IModelProvider> providers,
         CliStateStore state,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        BpaUserRuleState? bpaRules = null)
     {
         _providers = providers;
         _state = state;
         _httpClient = httpClient;
+        _bpaRules = bpaRules;
     }
 
     public Command Build()
@@ -211,7 +215,7 @@ internal sealed class DeployCommand : ICommandModule
             var spinnerLabel = dryRun ? "Previewing deployment..." : "Deploying model...";
             var result = await CliSpinner.RunAsync(
                 spinnerLabel,
-                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient).HandleAsync(
+                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient, bpaRules: _bpaRules).HandleAsync(
                     new DeployModelRequest(
                         reference,
                         server,

@@ -218,7 +218,7 @@ internal static class Program
                 workspaceCatalog ?? EmptyWorkspaceCatalog.Instance,
                 cachedUsername ?? (() => null),
                 services.State),
-            new DeployCommand(providers, services.State, httpClient),
+            new DeployCommand(providers, services.State, httpClient, services.BpaRules),
             new DepsCommand(providers, services.State),
             new DiffCommand(providers),
             new DoctorCommand(

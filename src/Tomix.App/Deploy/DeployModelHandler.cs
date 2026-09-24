@@ -15,17 +15,20 @@ public sealed class DeployModelHandler
     private readonly CliStateStore _state;
     private readonly Func<CliConnectionState?> _resolveSession;
     private readonly HttpClient? _httpClient;
+    private readonly BpaUserRuleState? _bpaRules;
 
     public DeployModelHandler(
         IEnumerable<IModelProvider> providers,
         CliStateStore state,
         Func<CliConnectionState?>? sessionOverride = null,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        BpaUserRuleState? bpaRules = null)
     {
         _providers = providers.ToList();
         _state = state;
         _resolveSession = sessionOverride ?? state.LoadCurrentSession;
         _httpClient = httpClient;
+        _bpaRules = bpaRules;
     }
 
     public async Task<TomixResult<DeployModelResult>> HandleAsync(
@@ -243,7 +246,11 @@ public sealed class DeployModelHandler
 
         var snapshot = await session.GetSnapshotAsync(cancellationToken);
         var engine = new BpaEngine();
-        var options = new BpaEngineOptions(rules, null, null);
+        // Issue #254: user-level disables (`bpa rules disable`) must reach the gate exactly as
+        // they reach `bpa run`, so the two agree on the same machine. A handler built without
+        // the state disables nothing; the path/rule filters stay empty — a gate evaluates all.
+        var userDisabled = _bpaRules?.GetDisabled().ToList();
+        var options = new BpaEngineOptions(rules, null, null, userDisabled);
         var result = engine.Evaluate(snapshot, options);
 
         if (result.Violations.Count == 0)
