@@ -268,6 +268,19 @@ tx diff ./v1.tmdl ./v2.tmdl
 tx diff ./v1.bim ./v2.bim --output-format json
 ```
 
+In JSON output, each row of `data.changes` has the following fields. The
+`objectType` and `path` meanings depend on the action:
+
+| Action | `objectType` | `path` | `oldValue` / `newValue` |
+|--------|--------------|--------|-------------------------|
+| `added` | Object kind, for example `Measure`. | Object path, for example `Sales/Total Sales`. | Omitted. |
+| `removed` | Object kind. | Object path. | Omitted. |
+| `modified` | Object kind followed by `/` and the object path, for example `Measure/Sales/Total Sales`. | Property name, for example `Description`. | Previous and new property values; each field is omitted individually when its value is null. |
+
+Scripts should use this current shape until a future major release introduces
+`objectPath` and `property` with a deprecation window for the existing fields.
+The replacement schema and release timing will be decided in that later work.
+
 ## `doctor` — environment check
 
 ```
