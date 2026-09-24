@@ -108,6 +108,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_DEPLOY_NO_TARGET` | 2 | `deploy` called without a target server/database. |
+| `TOMIX_DEPLOY_PROFILE_NO_SERVER` | 2 | `deploy --profile` selected an existing profile without a server; deploy requires a remote profile. |
 | `TOMIX_DEPLOY_UNSUPPORTED` | 2 | The source model cannot be deployed (wrong provider/type). |
 | `TOMIX_DEPLOY_FIX_UNSUPPORTED` | 2 | `deploy --fix-bpa` was requested but the provider session does not implement `IModelMutationSession`. |
 | `TOMIX_DEPLOY_INVALID_FLAGS` | 2 | Contradictory deployment scope: `--deploy-full` combined with a granular `--deploy-*` flag, or a dependent flag without the one it refines (`--deploy-policy-partitions` without `--deploy-partitions`, `--deploy-role-members` without `--deploy-roles`). |

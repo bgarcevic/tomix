@@ -1,5 +1,6 @@
 using Tomix.App.Bpa;
 using Tomix.App.Deploy;
+using Tomix.App.State;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
 using Tomix.Core.Results;
@@ -11,6 +12,109 @@ public sealed class DeployModelHandlerTests
 
     private static Tomix.App.State.CliStateStore TestState => new(
         Path.Combine(Path.GetTempPath(), $"tomix-tests-{Guid.NewGuid():N}"));
+
+    [Fact]
+    public async Task HandleAsync_MissingProfile_FailsBeforeOpeningModel_EvenWithExplicitServer()
+    {
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            "active-workspace", "Active", null, null, Local: false, Profile: null));
+        var provider = new StubDeployProvider();
+        var handler = new DeployModelHandler([provider], config.State);
+
+        var result = await handler.HandleAsync(
+            DryRunRequest() with { Profile = "sandbox" }, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("TOMIX_PROFILE_NOT_FOUND", result.Diagnostics[0].Code);
+        Assert.Contains("sandbox", result.Diagnostics[0].Message);
+        Assert.Contains("tx profile list", result.Diagnostics[0].Hint);
+        Assert.Contains("tx profile set", result.Diagnostics[0].Hint);
+        Assert.Equal(0, provider.OpenCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_LocalProfile_FailsBeforeOpeningModel_DespiteActiveRemoteAndMirror()
+    {
+        using var config = new TempConfigDir();
+        config.State.SaveProfiles(new Dictionary<string, CliProfile>
+        {
+            ["local"] = new("local", null, null, "./model", null, null,
+                Local: true, Workspace: "mirror-workspace")
+        });
+        config.State.SaveCurrentSession(new CliConnectionState(
+            "active-workspace", "Active", null, null, Local: false, Profile: null));
+        var provider = new StubDeployProvider();
+        var handler = new DeployModelHandler([provider], config.State);
+
+        var result = await handler.HandleAsync(
+            DryRunRequest() with { Server = null, Database = null, Profile = "local" },
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Equal("TOMIX_DEPLOY_PROFILE_NO_SERVER", result.Diagnostics[0].Code);
+        Assert.Contains("local", result.Diagnostics[0].Message);
+        Assert.Contains("tx profile set", result.Diagnostics[0].Hint);
+        Assert.Equal(0, provider.OpenCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemoteProfile_UsesSavedTarget_InsteadOfActiveSession()
+    {
+        using var config = new TempConfigDir();
+        config.State.SaveProfiles(new Dictionary<string, CliProfile>
+        {
+            ["prod"] = new("prod", "profile-workspace", "ProfileDb", null, null, null)
+        });
+        config.State.SaveCurrentSession(new CliConnectionState(
+            "active-workspace", "Active", null, null, Local: false, Profile: null));
+        var handler = new DeployModelHandler([new StubDeployProvider()], config.State);
+
+        var result = await handler.HandleAsync(
+            DryRunRequest() with { Server = null, Database = null, Profile = "PROD" },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("profile-workspace", result.Data!.Server);
+        Assert.Equal("ProfileDb", result.Data.Database);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemoteProfile_WithExplicitServer_PreservesExplicitTarget()
+    {
+        using var config = new TempConfigDir();
+        config.State.SaveProfiles(new Dictionary<string, CliProfile>
+        {
+            ["prod"] = new("prod", "profile-workspace", "ProfileDb", null, null, null)
+        });
+        var handler = new DeployModelHandler([new StubDeployProvider()], config.State);
+
+        var result = await handler.HandleAsync(
+            DryRunRequest() with { Profile = "prod" }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("my-workspace", result.Data!.Server);
+        Assert.Equal("my-model", result.Data.Database);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoProfile_UsesActiveRemoteSession()
+    {
+        using var config = new TempConfigDir();
+        config.State.SaveCurrentSession(new CliConnectionState(
+            "active-workspace", "Active", null, null, Local: false, Profile: null));
+        var handler = new DeployModelHandler([new StubDeployProvider()], config.State);
+
+        var result = await handler.HandleAsync(
+            DryRunRequest() with { Server = null, Database = null }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("active-workspace", result.Data!.Server);
+        Assert.Equal("Active", result.Data.Database);
+    }
+
     [Fact]
     public async Task HandleAsync_ReturnsFail_WhenNoModelSpecified()
     {
@@ -709,10 +813,15 @@ public sealed class DeployModelHandlerTests
 
     private sealed class StubDeployProvider : IModelProvider
     {
+        public int OpenCount { get; private set; }
+
         public bool CanOpen(ModelReference _) => true;
 
         public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new StubDeploySession());
+        {
+            OpenCount++;
+            return Task.FromResult<IModelSession>(new StubDeploySession());
+        }
     }
 
     private sealed class StubDeploySession : IModelSession, IModelDeploySession

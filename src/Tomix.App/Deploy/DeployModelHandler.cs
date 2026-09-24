@@ -35,6 +35,20 @@ public sealed class DeployModelHandler
         DeployModelRequest request,
         CancellationToken cancellationToken)
     {
+        CliProfile? profile = null;
+        if (request.Profile is not null)
+        {
+            var resolved = DeployProfileResolver.Resolve(_state, request.Profile);
+            if (!resolved.Success)
+            {
+                var diagnostic = resolved.Diagnostics[0];
+                return TomixResult<DeployModelResult>.Fail(
+                    diagnostic.Code, diagnostic.Message, resolved.ExitCode, diagnostic.Hint);
+            }
+
+            profile = resolved.Data!;
+        }
+
         var deployOptions = request.DeployOptions ?? ModelDeployOptions.Preserve;
         if (deployOptions.DeployRoleMembers && !deployOptions.DeployRoles)
             return TomixResult<DeployModelResult>.Fail(
@@ -86,7 +100,7 @@ public sealed class DeployModelHandler
                 $"Provider cannot deploy model: {request.Model.Value}",
                 exitCode: 1);
 
-        var (server, database) = ResolveTarget(request, _state, _resolveSession);
+        var (server, database) = ResolveTarget(request, profile, _resolveSession);
 
         if (string.IsNullOrWhiteSpace(server))
             return TomixResult<DeployModelResult>.Fail(
@@ -322,17 +336,13 @@ public sealed class DeployModelHandler
     }
 
     private static (string? server, string? database) ResolveTarget(
-        DeployModelRequest request, CliStateStore store, Func<CliConnectionState?> resolveSession)
+        DeployModelRequest request, CliProfile? profile, Func<CliConnectionState?> resolveSession)
     {
         if (!string.IsNullOrWhiteSpace(request.Server))
             return (request.Server, request.Database);
 
-        if (!string.IsNullOrWhiteSpace(request.Profile))
-        {
-            var profiles = store.LoadProfiles();
-            if (profiles.TryGetValue(request.Profile, out var profile))
-                return (profile.Server, profile.Database ?? request.Database);
-        }
+        if (profile is not null)
+            return (profile.Server, profile.Database ?? request.Database);
 
         var session = resolveSession();
         if (session is not null)

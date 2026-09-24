@@ -54,6 +54,7 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `deploy --profile` now fails with the profile name and a recovery hint when the profile is missing or has no server, before confirmation or model work (#179). Deploy and profile help now show how to create and use a profile.
 - `diff` and `deploy --dry-run` no longer report engine-derived data type differences
   between calculated-table columns present on both sides of a live comparison. Other
   column property changes and offline source-to-source type differences remain visible (#177).

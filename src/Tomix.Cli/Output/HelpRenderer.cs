@@ -103,6 +103,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["deploy"] = [
             "tx deploy ./model.tmdl",
             "tx deploy ./model.tmdl --dry-run",
+            "tx deploy ./model.tmdl --profile prod --dry-run",
             "tx deploy ./model.bim --skip-bpa",
             "tx deploy ./model.tmdl --bpa-fail-on warning",
         ],
@@ -164,6 +165,10 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx profile list",
             "tx profile set dev -s MyWorkspace -d Sales",
             "tx connect --profile dev",
+        ],
+        ["profile set"] = [
+            "tx profile set dev -s MyWorkspace -d Sales",
+            "tx profile set dev --from-active",
         ],
         ["init"] = [
             "tx init",

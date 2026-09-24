@@ -39,7 +39,7 @@ internal sealed class DeployCommand : ICommandModule
 
         var profileOption = new Option<string?>("--profile")
         {
-            Description = "Deploy through this saved connection profile for this run only; the active connection is left unchanged"
+            Description = "Deploy through a saved profile for this run only; see 'tx profile list' and 'tx profile set'"
         };
         profileOption.Aliases.Add("-p");
 
@@ -139,6 +139,19 @@ internal sealed class DeployCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, format, "deploy", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
+            // Validate before confirmation or model work. Keep the resolved profile for this run
+            // so a later change to the profile store cannot redirect a confirmed deploy.
+            CliProfile? profile = null;
+            var profileName = parseResult.GetValue(profileOption);
+            if (profileName is not null)
+            {
+                var resolved = DeployProfileResolver.Resolve(_state, profileName);
+                if (!resolved.Success)
+                    return CommandOutput.Render(resolved, format, errorFormat, _ => { });
+
+                profile = resolved.Data!;
+            }
+
             var explicitModel = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
             ModelReference reference;
             if (GlobalOptions.RecentSpecified(parseResult))
@@ -175,6 +188,11 @@ internal sealed class DeployCommand : ICommandModule
 
             var server = parseResult.GetValue(GlobalOptions.Server);
             var database = parseResult.GetValue(GlobalOptions.Database);
+            if (profile is not null && string.IsNullOrWhiteSpace(server))
+            {
+                server = profile.Server;
+                database = profile.Database ?? database;
+            }
             var dryRun = parseResult.GetValue(dryRunOption);
 
             var deployFull = parseResult.GetValue(deployFullOption);
@@ -220,7 +238,7 @@ internal sealed class DeployCommand : ICommandModule
                         reference,
                         server,
                         database,
-                        parseResult.GetValue(profileOption),
+                        null,
                         parseResult.GetValue(createOnlyOption),
                         parseResult.GetValue(skipBpaOption),
                         parseResult.GetValue(fixBpaOption),

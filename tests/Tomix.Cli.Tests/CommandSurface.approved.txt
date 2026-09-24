@@ -188,7 +188,7 @@ Set active connection (workspace, local path, or PBI Desktop). No args = show cu
 # tx deploy
 Deploy a semantic model to a workspace
   arg [model]  Optional path to the model to deploy; defaults to the active connection
-  opt --profile, -p <profile>  Deploy through this saved connection profile for this run only; the active connection is left unchanged
+  opt --profile, -p <profile>  Deploy through a saved profile for this run only; see 'tx profile list' and 'tx profile set'
   opt --create-only  Create the target model only if it does not exist yet; fail when it does
   opt --xmla <xmla>  Write the deployment as a TMSL script to this file instead of deploying. Pass '-' to write to stdout.
   opt --skip-bpa  Skip the BPA gate check for this deploy.

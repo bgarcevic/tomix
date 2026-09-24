@@ -59,7 +59,7 @@ mirror.
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or apply rule fixes before deploying. |
 | `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset. |
 | `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. Rules that cannot be evaluated count as error-severity findings. |
-| `-p, --profile <name>` | Use a saved profile for this deploy only. |
+| `-p, --profile <name>` | Use a saved remote profile for this deploy only. List profiles with `tx profile list`; create one with `tx profile set <name> -s <workspace> -d <database>`. |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
 | `--force` | Bypass validation checks. |
 
@@ -69,6 +69,7 @@ model. Other column property changes remain visible.
 
 ```sh
 tx deploy ./model.tmdl --dry-run
+tx deploy ./model.tmdl --profile prod --dry-run
 tx deploy --server MyWorkspace --database Sales
 tx deploy ./model.bim --xmla deploy.xmla
 tx deploy ./model.tmdl --bpa-fail-on warning
