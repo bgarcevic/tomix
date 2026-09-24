@@ -54,6 +54,9 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `diff` and `deploy --dry-run` no longer report engine-derived data type differences
+  between calculated-table columns present on both sides of a live comparison. Other
+  column property changes and offline source-to-source type differences remain visible (#177).
 - `save --serialization bim`, `init --serialization bim`, and `deploy`'s TMSL script now write
   JSON with LF line endings on every OS. The indented writer's default newline was
   `Environment.NewLine`, so Windows produced CRLF and Linux LF — the same model saved on

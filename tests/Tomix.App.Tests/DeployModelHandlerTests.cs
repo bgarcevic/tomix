@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.App.Deploy;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Tests;
@@ -191,6 +192,24 @@ public sealed class DeployModelHandlerTests
         Assert.Empty(result.Data.Diff.Changes);
     }
 
+    [Fact]
+    public async Task HandleAsync_DryRun_IgnoresCalculatedTableColumnDataTypeFromProcessedTarget()
+    {
+        var target = SnapshotWithCalculatedTableColumn("double");
+        var planned = SnapshotWithCalculatedTableColumn("string");
+        var provider = new DirectionalDeployProvider(
+            reference => reference.Value == "local-model" ? planned : target,
+            () => new ModelDeployPlan(TargetExists: true, target, planned));
+
+        var handler = new DeployModelHandler([provider], TestState);
+        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.False(result.Data!.Diff!.HasChanges);
+        Assert.Equal(0, result.Data.Diff.Summary.Modified);
+        Assert.Empty(result.Data.Diff.Changes);
+    }
+
     /// <summary>
     /// A target database that does not exist yet has nothing to diff against: the deploy creates
     /// it with the full source model, and the dry run must say so rather than report every object
@@ -262,6 +281,25 @@ public sealed class DeployModelHandlerTests
             "Sales", ModelObjectKind.Table, "Sales",
             Detail: "regular", Expression: null, Description: null, Hidden: false,
             SourceColumn: null, Children: children);
+
+        return new ModelSnapshot("stub", 1601, [table]);
+    }
+
+    private static ModelSnapshot SnapshotWithCalculatedTableColumn(string dataType)
+    {
+        var column = new ModelObject(
+            "Group", ModelObjectKind.CalculatedColumn, "PnL/Group",
+            Detail: dataType, Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [],
+            Properties: new Dictionary<string, string>
+            {
+                [PropertyBagKeys.ColumnType] = "CalculatedTableColumn",
+                [PropertyBagKeys.DataType] = dataType
+            });
+        var table = new ModelObject(
+            "PnL", ModelObjectKind.Table, "PnL",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [column]);
 
         return new ModelSnapshot("stub", 1601, [table]);
     }

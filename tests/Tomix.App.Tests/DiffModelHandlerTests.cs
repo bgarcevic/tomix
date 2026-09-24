@@ -53,6 +53,18 @@ public sealed class DiffModelHandlerTests
         Assert.Equal("double", change.NewValue);
     }
 
+    [Fact]
+    public async Task HandleAsync_ReportsRegularColumnDataTypeChange_AgainstLiveTarget()
+    {
+        var change = Assert.Single(await DiffAgainstLiveTarget(
+            ColumnSnapshot(dataType: "int64"),
+            ColumnSnapshot(dataType: "double")));
+
+        Assert.Equal("Detail", change.Path);
+        Assert.Equal("int64", change.OldValue);
+        Assert.Equal("double", change.NewValue);
+    }
+
     private static ModelSnapshot ColumnSnapshot(string dataType)
     {
         var column = new ModelObject(
@@ -125,6 +137,24 @@ public sealed class DiffModelHandlerTests
         Assert.Empty(await DiffAgainstLiveTarget(processed, unprocessed));
     }
 
+    [Fact]
+    public async Task HandleAsync_ReportsMeasureDataType_WhenBothSidesCarryValueAgainstLiveTarget()
+    {
+        var left = Snapshot(measureBag: new Dictionary<string, string>
+        {
+            [PropertyBagKeys.DataType] = "Decimal"
+        });
+        var right = Snapshot(measureBag: new Dictionary<string, string>
+        {
+            [PropertyBagKeys.DataType] = "String"
+        });
+
+        var change = Assert.Single(await DiffAgainstLiveTarget(left, right));
+        Assert.Equal("DataType", change.Path);
+        Assert.Equal("Decimal", change.OldValue);
+        Assert.Equal("String", change.NewValue);
+    }
+
     /// <summary>
     /// The suppression is scoped to live targets: between two authored sources, a data type on
     /// only one side is an authored difference, and hiding it would report unequal models as
@@ -173,27 +203,66 @@ public sealed class DiffModelHandlerTests
     [Fact]
     public async Task HandleAsync_ComparesCalculatedTableColumns_PresentOnBothSides()
     {
-        var changes = await Diff(
-            CalcTableSnapshot(withEngineColumns: true, engineColumnHidden: false),
-            CalcTableSnapshot(withEngineColumns: true, engineColumnHidden: true));
+        var changes = await DiffAgainstLiveTarget(
+            CalcTableSnapshot(withEngineColumns: true, engineColumnHidden: false, engineColumnDataType: "string"),
+            CalcTableSnapshot(withEngineColumns: true, engineColumnHidden: true, engineColumnDataType: "double"));
 
-        var change = Assert.Single(changes, c => c.ObjectType == "Column/PnL/Group");
+        var change = Assert.Single(changes);
+        Assert.Equal("Column/PnL/Group", change.ObjectType);
         Assert.Equal("IsHidden", change.Path);
     }
 
-    private static ModelSnapshot CalcTableSnapshot(bool withEngineColumns, bool engineColumnHidden = false)
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HandleAsync_CalculatedTableColumnDataType_IsSuppressedOnlyAgainstLiveTarget(bool liveTarget)
+    {
+        var left = CalcTableSnapshot(withEngineColumns: true, engineColumnDataType: "string");
+        var right = CalcTableSnapshot(withEngineColumns: true, engineColumnDataType: "double");
+
+        var changes = liveTarget
+            ? await DiffAgainstLiveTarget(left, right)
+            : await Diff(left, right);
+
+        if (liveTarget)
+            Assert.Empty(changes);
+        else
+        {
+            var change = Assert.Single(changes);
+            Assert.Equal("Detail", change.Path);
+            Assert.Equal("string", change.OldValue);
+            Assert.Equal("double", change.NewValue);
+        }
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsDataType_WhenOnlyOneColumnIsEngineMaterialized()
+    {
+        var change = Assert.Single(await DiffAgainstLiveTarget(
+            CalcTableSnapshot(withEngineColumns: true, engineColumnDataType: "string"),
+            CalcTableSnapshot(withEngineColumns: true, engineColumnDataType: "double", engineColumnTagged: false)));
+
+        Assert.Equal("Detail", change.Path);
+        Assert.Equal("string", change.OldValue);
+        Assert.Equal("double", change.NewValue);
+    }
+
+    private static ModelSnapshot CalcTableSnapshot(
+        bool withEngineColumns,
+        bool engineColumnHidden = false,
+        string engineColumnDataType = "string",
+        bool engineColumnTagged = true)
     {
         var children = new List<ModelObject>();
         if (withEngineColumns)
         {
             children.Add(new ModelObject(
                 "Group", ModelObjectKind.Column, "PnL/Group",
-                Detail: "string", Expression: null, Description: null, Hidden: engineColumnHidden,
+                Detail: engineColumnDataType, Expression: null, Description: null, Hidden: engineColumnHidden,
                 SourceColumn: null, Children: [],
-                Properties: new Dictionary<string, string>
-                {
-                    [PropertyBagKeys.ColumnType] = "CalculatedTableColumn"
-                }));
+                Properties: engineColumnTagged
+                    ? new Dictionary<string, string> { [PropertyBagKeys.ColumnType] = "CalculatedTableColumn" }
+                    : new Dictionary<string, string>()));
             children.Add(new ModelObject(
                 "Authored", ModelObjectKind.Column, "PnL/Authored",
                 Detail: "string", Expression: null, Description: null, Hidden: false,

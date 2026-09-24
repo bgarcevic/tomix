@@ -63,6 +63,10 @@ mirror.
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
 | `--force` | Bypass validation checks. |
 
+The dry-run diff ignores engine-derived calculated-table column data types, including
+type differences when a column exists on both the processed target and the planned
+model. Other column property changes remain visible.
+
 ```sh
 tx deploy ./model.tmdl --dry-run
 tx deploy --server MyWorkspace --database Sales

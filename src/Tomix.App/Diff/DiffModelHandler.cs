@@ -135,8 +135,9 @@ public sealed class DiffModelHandler
     /// A calculated table's columns are materialized by the engine when the table's expression
     /// is evaluated; source files only carry the expression. Against a live database, one being
     /// absent therefore means "not processed yet", not "will be added/removed" — an authored
-    /// change to the columns surfaces through the table's partition expression instead. Columns
-    /// present on both sides still have their properties compared.
+    /// change to the columns surfaces through the table's partition expression instead. When
+    /// present on both sides, only their engine-derived data type is ignored; authored properties
+    /// are still compared.
     /// </summary>
     private static bool IsEngineMaterialized(ModelObject obj)
         => obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
@@ -166,7 +167,10 @@ public sealed class DiffModelHandler
     {
         yield return ("Name", left.Name, right.Name);
         yield return ("Kind", ModelObjectProjection.KindLabel(left.Kind), ModelObjectProjection.KindLabel(right.Kind));
-        yield return ("Detail", left.Detail, right.Detail);
+        // A column's Detail carries its data type. For calculated-table columns on both sides,
+        // that type comes from evaluating the table expression and is not an authored change.
+        if (!ignoreEngineComputedState || !IsEngineMaterialized(left) || !IsEngineMaterialized(right))
+            yield return ("Detail", left.Detail, right.Detail);
         yield return ("Expression", NormalizeExpression(left.Expression), NormalizeExpression(right.Expression));
         yield return ("Description", left.Description, right.Description);
         yield return ("IsHidden", left.Hidden, right.Hidden);
