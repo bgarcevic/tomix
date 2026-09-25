@@ -156,6 +156,10 @@ internal sealed class RmCommand : ICommandModule
             return;
         }
 
+        if (result.RemainingPolicyPartitions is { Count: > 0 } remaining)
+            AnsiConsole.MarkupLine(Styling.Warning(
+                $"Policy-generated partitions remain on the table: {string.Join(", ", remaining)}."));
+
         if (result.DryRun == true)
         {
             AnsiConsole.MarkupLine(Styling.Warning(

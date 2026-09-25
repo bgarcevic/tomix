@@ -32,6 +32,28 @@ public sealed class TomRefreshPolicyManager
         return table.RefreshPolicy is BasicRefreshPolicy ? BuildInfo(table) : null;
     }
 
+    /// <summary>Applies generic property assignments as one validated policy edit.</summary>
+    public RefreshPolicySetResult SetProperties(string table, IReadOnlyList<ModelPropertyAssignment> assignments, bool force)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        string[] supported = ["Mode", "RollingWindowGranularity", "RollingWindowPeriods",
+            "IncrementalGranularity", "IncrementalPeriods", "IncrementalPeriodsOffset", "SourceExpression", "PollingExpression"];
+        foreach (var assignment in assignments)
+        {
+            var name = assignment.Property.Trim();
+            if (!supported.Contains(name, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException($"Unknown refresh policy property '{name}'. Supported: {string.Join(", ", supported)}.");
+            values[name] = assignment.Value;
+        }
+        string? Value(string name) => values.GetValueOrDefault(name);
+        int? Number(string name) => Value(name) is not { } value ? null
+            : int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var number)
+                ? number : throw new ArgumentException($"{name} must be an integer.");
+        return Set(new RefreshPolicySetRequest(table, Value("Mode"), Value("RollingWindowGranularity"),
+            Number("RollingWindowPeriods"), Value("IncrementalGranularity"), Number("IncrementalPeriods"),
+            Number("IncrementalPeriodsOffset"), Value("PollingExpression"), Value("SourceExpression"), force));
+    }
+
     public RefreshPolicySetResult Set(RefreshPolicySetRequest request)
     {
         var table = RequireTable(request.Table);
@@ -53,11 +75,11 @@ public sealed class TomRefreshPolicyManager
         if (request.Mode is not null)
             policy.Mode = ParseMode(request.Mode);
         if (request.RollingWindowGranularity is not null)
-            policy.RollingWindowGranularity = ParseGranularity(request.RollingWindowGranularity, "--rolling-window-granularity");
+            policy.RollingWindowGranularity = ParseGranularity(request.RollingWindowGranularity, "RollingWindowGranularity");
         if (request.RollingWindowPeriods is not null)
             policy.RollingWindowPeriods = request.RollingWindowPeriods.Value;
         if (request.IncrementalGranularity is not null)
-            policy.IncrementalGranularity = ParseGranularity(request.IncrementalGranularity, "--incremental-granularity");
+            policy.IncrementalGranularity = ParseGranularity(request.IncrementalGranularity, "IncrementalGranularity");
         if (request.IncrementalPeriods is not null)
             policy.IncrementalPeriods = request.IncrementalPeriods.Value;
         if (request.IncrementalOffset is not null)
@@ -126,15 +148,15 @@ public sealed class TomRefreshPolicyManager
     {
         var missing = new List<string>();
         if (request.RollingWindowPeriods is null)
-            missing.Add("--rolling-window-periods");
+            missing.Add("RollingWindowPeriods");
         if (request.RollingWindowGranularity is null)
-            missing.Add("--rolling-window-granularity");
+            missing.Add("RollingWindowGranularity");
         if (request.IncrementalPeriods is null)
-            missing.Add("--incremental-periods");
+            missing.Add("IncrementalPeriods");
         if (request.IncrementalGranularity is null)
-            missing.Add("--incremental-granularity");
+            missing.Add("IncrementalGranularity");
         if (string.IsNullOrWhiteSpace(request.SourceExpression))
-            missing.Add("--source-expression");
+            missing.Add("SourceExpression");
 
         if (missing.Count > 0)
             throw new ArgumentException(

@@ -16,4 +16,5 @@ public sealed record SetModelPropertyRequest(
     bool StrictRefs = false,
     bool FixRefs = true,
     bool Overwrite = false,
-    bool DryRun = false);
+    bool DryRun = false,
+    bool Force = false);

@@ -18,7 +18,7 @@ internal static partial class TomMutationPaths
         => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     internal static string Segment(string name)
-        => name.Contains('/') ? $"'{name}'" : name;
+        => name.Contains('/') ? $"'{name.Replace("'", "''", StringComparison.Ordinal)}'" : name;
 
     internal static string NormalizeType(string? type)
     {

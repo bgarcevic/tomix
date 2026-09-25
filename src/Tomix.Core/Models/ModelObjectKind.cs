@@ -24,5 +24,6 @@ public enum ModelObjectKind
     Calendar,
     Expression,
     Function,
-    Model
+    Model,
+    RefreshPolicy
 }

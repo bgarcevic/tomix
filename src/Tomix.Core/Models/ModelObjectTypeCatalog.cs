@@ -22,6 +22,7 @@ public static class ModelObjectTypeCatalog
         new("hierarchy", ModelObjectKind.Hierarchy, []),
         new("level", ModelObjectKind.Level, []),
         new("partition", ModelObjectKind.Partition, []),
+        new("refreshpolicy", ModelObjectKind.RefreshPolicy, []),
         new("calculationitem", ModelObjectKind.CalculationItem, ["calcitem"]),
         new("member", ModelObjectKind.RoleMember, ["rolemember"]),
         new("relationship", ModelObjectKind.Relationship, []),

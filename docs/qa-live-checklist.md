@@ -76,9 +76,9 @@ you compare against. A check with no expected value recorded is not a check.
 
 - [ ] `refresh --dry-run` script parses and validates independently; a bounded
       full and table refresh completes and updates a timestamp probe.
-- [ ] `incremental-refresh apply` with a fixed `--effective-date` and
-      `--no-refresh`: generated partitions appear on a fresh connection with
-      stable names; repeat apply is idempotent; `rm` restores the baseline.
+- [ ] `refresh --table <table> --policy-only` with a fixed `--effective-date`: generated partitions appear on a fresh connection with
+      stable names; repeat apply is idempotent. Restore the fixture explicitly afterward;
+      removing a policy alone leaves its partitions in place.
 - [ ] Cancel one long refresh; reconnect, classify final server state, and only
       then decide on retry.
 
@@ -118,3 +118,20 @@ auth method + effective permission, pass/fail/blocked counts, artifact path
 Failures become issues with: sanitized command, expected/actual, exit code,
 before/after probes, reproducibility count. A screenshot alone is not
 evidence.
+
+### Refresh-policy bootstrap and data loading
+
+Use a disposable deployed model with a saved policy and a working data source.
+
+- [ ] Capture baseline partitions and row counts; run policy-only with `--dry-run`
+      and a fixed `--effective-date`; verify no partitions or data changed.
+- [ ] Execute `tx refresh --table Sales --policy-only --effective-date 2026-01-01
+      -s <workspace> -d <test-model> --yes`; verify generated partitions exist
+      without loaded data and inspect any removed expired partitions.
+- [ ] Run `tx refresh --table Sales --apply-refresh-policy true
+      --effective-date 2026-01-01 -s <workspace> -d <test-model> --yes`;
+      verify the incremental window loads; historical partitions can remain empty.
+- [ ] Backfill with `--refresh-type full --skip-refresh-policy`; verify all
+      partitions become ready and the full archive row count matches the fixture.
+- [ ] Record target, policy, effective date, operation results, and row counts.
+      Skip live execution when no suitable disposable deployed model is available.

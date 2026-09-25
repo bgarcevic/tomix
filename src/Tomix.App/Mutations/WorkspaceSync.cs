@@ -10,40 +10,18 @@ namespace Tomix.App.Mutations;
 /// </summary>
 internal static class WorkspaceSync
 {
-    /// <summary>The one command that owns refresh policies, and so must deploy them in full.</summary>
-    private const string RefreshPolicyCommand = "incremental-refresh";
-
     /// <summary>
-    /// Deploy options for a synced mutation made by <paramref name="command"/>.
-    ///
-    /// A sync overwrites the mirror, because the session's model came from that same workspace plus
-    /// the user's mutations — preserving target objects would silently revert them. The single
-    /// exemption is incremental-refresh policy partitions: those are generated and processed on the
-    /// service, exist only on the mirror, and a local-primary model cannot recreate their data, so
-    /// deploying them would discard processed history on every synced edit (issue #129).
-    ///
-    /// Invariant: <c>"incremental-refresh"</c> is the ONE command that owns refresh policies. It
-    /// opts back into <see cref="ModelDeployOptions.Full"/> because the preserve path also clones
-    /// the target's <c>refreshPolicy</c> back, which would revert the policy edit the user just
-    /// made. A future command that edits refresh policies under a different command string would
-    /// silently get the exempted options and lose its edit — add it here when that happens.
-    ///
-    /// Accepted residual gap: a generic <c>tx set</c>/<c>tx rm</c> edit to a policy table's
-    /// partitions or refresh policy (not made through <c>incremental-refresh</c>) is preserved over
-    /// on the mirror. <c>tx deploy --deploy-full</c> is the escape hatch.
+    /// Policy mutations must deploy the edited policy; ordinary edits preserve server-generated
+    /// partitions. The legacy marker remains recognized for operations staged before migration.
     /// </summary>
     internal static ModelDeployOptions SyncOptionsFor(string command)
-        => command == RefreshPolicyCommand
+        => command is "refresh-policy" or "incremental-refresh"
             ? ModelDeployOptions.Full
             : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
 
-    /// <summary>
-    /// Deploy options for a batch of staged mutations; see <see cref="SyncOptionsFor(string)"/>.
-    /// Any staged incremental-refresh op makes the whole commit a full deploy, since the policy
-    /// edit must land.
-    /// </summary>
+    /// <summary>Includes policy edits anywhere in a staged batch.</summary>
     internal static ModelDeployOptions SyncOptionsFor(IEnumerable<string> commands)
-        => commands.Contains(RefreshPolicyCommand, StringComparer.Ordinal)
+        => commands.Any(command => command is "refresh-policy" or "incremental-refresh")
             ? ModelDeployOptions.Full
             : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
 

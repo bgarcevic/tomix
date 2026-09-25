@@ -108,6 +108,7 @@ public sealed class StageHandlerTests
     [Theory]
     [InlineData(new[] { "add" }, false)]
     [InlineData(new[] { "add", "set" }, false)]
+    [InlineData(new[] { "refresh-policy" }, true)]
     [InlineData(new[] { "incremental-refresh" }, true)]
     [InlineData(new[] { "add", "incremental-refresh" }, true)]
     public async Task CommitAsync_RemoteSync_PreservesPolicyPartitions_UnlessRefreshPolicyStaged(

@@ -68,9 +68,14 @@ internal sealed class RefreshCommand : ICommandModule
             Description = "Maximum parallel refresh operations."
         };
 
+        var policyOnlyOption = new Option<bool>("--policy-only")
+        {
+            Description = "Apply one table's saved refresh policy without loading data; may remove expired partitions. Requires --table."
+        };
+
         var dryRunOption = new Option<bool>("--dry-run")
         {
-            Description = "Print the TMSL script instead of running it."
+            Description = "Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only."
         };
 
         var noProgressOption = new Option<bool>("--no-progress")
@@ -94,6 +99,7 @@ internal sealed class RefreshCommand : ICommandModule
             effectiveDateOption,
             maxParallelismOption,
             dryRunOption,
+            policyOnlyOption,
             noProgressOption,
             traceOption
         };
@@ -163,7 +169,19 @@ internal sealed class RefreshCommand : ICommandModule
                 MaxParallelism: maxParallelism,
                 DryRun: dryRun,
                 NoProgress: noProgress,
-                TracePath: tracePath);
+                TracePath: tracePath,
+                PolicyOnly: parseResult.GetValue(policyOnlyOption),
+                RefreshTypeExplicit: parseResult.GetResult(typeOption) is not null);
+
+            var policyValidation = request.PolicyOnly && parseResult.GetResult(partitionOption) is not null
+                ? "--policy-only cannot be combined with --partition."
+                : RefreshModelHandler.ValidatePolicyOnly(request);
+            if (policyValidation is { } policyError)
+            {
+                ErrorOutput.Write([new TomixDiagnostic("TOMIX_REFRESH_POLICY_OPTIONS_CONFLICT",
+                    DiagnosticSeverity.Error, policyError)], GlobalOptions.ErrorFormatValue(parseResult, format));
+                return 2;
+            }
 
             // When --recent picked the target, resolve against that entry (not the active session)
             // so the refresh target and its workspace mirror come from the recent connection.
@@ -180,13 +198,14 @@ internal sealed class RefreshCommand : ICommandModule
             var partitionRisky =
                 string.Equals(type, "clearvalues", StringComparison.OrdinalIgnoreCase)
                 || !applyPolicy
-                || effectiveDate is not null;
+                || effectiveDate is not null
+                || request.PolicyOnly;
             if (!dryRun && partitionRisky)
             {
                 var target = RefreshModelHandler.ResolveTarget(
                     request, new ActiveModelResolver(recentSession ?? _loadCurrentSession));
                 if (target is not null && !ConfirmationHelper.ConfirmOrAbort(
-                        "Refresh",
+                        request.PolicyOnly ? "Apply refresh policy without loading data (may remove expired partitions)" : "Refresh",
                         $"{target.Database ?? "model"} on {target.Value} ({type})",
                         parseResult,
                         format))
@@ -199,6 +218,13 @@ internal sealed class RefreshCommand : ICommandModule
             try
             {
                 // --dry-run never executes; no live display, just emit the script.
+                if (request.PolicyOnly)
+                {
+                    var policyResult = await CreateHandler().HandleAsync(request, null, null, cancellationToken).ConfigureAwait(false);
+                    return CommandOutput.Render(policyResult, format, RefreshRenderer.Render, data => data,
+                        RefreshRenderer.RenderCsv, errorFormat: GlobalOptions.ErrorFormatValue(parseResult, format));
+                }
+
                 if (dryRun)
                 {
                     var dryResult = await CreateHandler()

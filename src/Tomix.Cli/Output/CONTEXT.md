@@ -35,7 +35,6 @@ Shared output wiring for all commands.
 - `ConnectRenderer` — connected-model summary (text + JSON projection), show-current and raw-connection views for the `connect` command.
 - `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), `--dry-run` TMSL pretty-print, and the live `AnsiConsole.Status()` progress display fed by XMLA trace events.
 - `UpdateRenderer` — `update` command rendering: `--check` release-notes preview with `[breaking]` badges, and the performed-update summary line.
-- `IncrementalRefreshRenderer` — text rendering for the `incremental-refresh` subcommands (`show`, `set`, `rm`, `apply`).
 - `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions; `ExpressionMarkup`/`DaxMarkup` are the shared DAX highlighting path.
 
 ## Color Strategy

@@ -24,4 +24,6 @@ public sealed record RemoveModelObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     bool Reverted = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? DryRun = null);
+    bool? DryRun = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? RemainingPolicyPartitions = null);

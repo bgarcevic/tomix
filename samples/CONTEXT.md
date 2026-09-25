@@ -24,6 +24,8 @@ Small sample models used by tests and documentation.
 - `qa-fixture-variant/` — the same model with exactly one structural difference (an added
   measure), so `diff` QA has a known target.
 
+- `refresh-policy-qa/` — one-table inline M fixture for policy-only bootstrap and data-loading refresh; fixed effective date and expected row counts are in its README.
+
 ## Responsibilities
 
 - Provide tiny, understandable examples.

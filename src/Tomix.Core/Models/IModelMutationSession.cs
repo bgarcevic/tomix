@@ -40,7 +40,8 @@ public sealed record ModelObjectAddRequest(
 public sealed record ModelObjectSetRequest(
     string Path,
     IReadOnlyList<ModelPropertyAssignment> Properties,
-    ModelObjectKind? Type);
+    ModelObjectKind? Type,
+    bool Force = false);
 
 public sealed record ModelObjectRemoveRequest(
     string Path,
@@ -80,7 +81,10 @@ public sealed record ModelObjectMutationResult(
     string? Property = null,
     string? Value = null,
     string? Reason = null,
-    IReadOnlyList<string>? CascadeRemoved = null);
+    IReadOnlyList<string>? CascadeRemoved = null,
+    IReadOnlyList<string>? RemainingPolicyPartitions = null,
+    RefreshPolicyInfo? Policy = null,
+    IReadOnlyList<string>? CreatedExpressions = null);
 
 public sealed record ModelReplaceResult(
     int ChangeCount,

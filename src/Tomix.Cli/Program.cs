@@ -233,7 +233,6 @@ internal static class Program
             new FindCommand(providers, services.State),
             new FormatCommand(providers, formatter, services.State, mutations),
             new GetCommand(providers, services.State),
-            new IncrementalRefreshCommand(providers, services.State, mutations, loadCurrentSession),
             new InitCommand(),
             new LoadCommand(providers, services.State),
             new LsCommand(providers, services.State),

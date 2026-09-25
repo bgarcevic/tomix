@@ -170,6 +170,11 @@ public static class TomModelSummarizer
         foreach (var partition in table.Partitions)
             children.Add(BuildPartition(partition, path));
 
+        if (table.RefreshPolicy is BasicRefreshPolicy)
+            children.Add(new ModelObject("RefreshPolicy", ModelObjectKind.RefreshPolicy,
+                $"{path}/RefreshPolicy", "incremental refresh policy", null, null, false, null, [],
+                PolicyInfo: new TomRefreshPolicyManager((Database)table.Model.Database).Get(table.Name)));
+
         var tableDetail = table.Partitions.Any(p => p.SourceType == PartitionSourceType.Calculated)
             ? "calculated"
             : "regular";
@@ -759,7 +764,7 @@ public static class TomModelSummarizer
         => string.IsNullOrWhiteSpace(description) ? null : description.Trim();
 
     private static string Segment(string name)
-        => name.Contains('/') ? $"'{name}'" : name;
+        => name.Contains('/') ? $"'{name.Replace("'", "''", StringComparison.Ordinal)}'" : name;
 
     private sealed record RelationshipEntry(
         string FromTable, string FromColumn,

@@ -170,21 +170,119 @@ public sealed class RefreshModelHandlerTests
         Assert.False(session.RefreshCalled);
     }
 
-    [Fact]
-    public async Task HandleAsync_ReturnsUnsupported_WhenSessionIsNotRefreshCapable()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HandleAsync_ReturnsUnsupported_WhenSessionIsNotRefreshCapable(bool policyOnly)
     {
         var handler = new RefreshModelHandler(
             [new StubNonRefreshProvider()],
             () => RemoteSession("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel"));
         var result = await handler.HandleAsync(
-            Request(database: "MyModel"),
+            Request(refreshType: "automatic", database: "MyModel", tables: ["Sales"]) with { PolicyOnly = policyOnly },
             progress: null,
             traceWriter: null,
             CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal("TOMIX_REFRESH_UNSUPPORTED", result.Diagnostics[0].Code);
+        Assert.Equal(policyOnly ? "TOMIX_REFRESH_POLICY_UNSUPPORTED" : "TOMIX_REFRESH_UNSUPPORTED", result.Diagnostics[0].Code);
         Assert.Equal(2, result.ExitCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PolicyOnly_UsesApplyWithoutLoading_AndDryRunNeverExecutes(bool dryRun)
+    {
+        var session = new StubRefreshSession();
+        var request = Request(refreshType: "automatic", tables: ["Sales"], dryRun: dryRun,
+            server: "powerbi://api.powerbi.com/v1.0/myorg/ws", database: "Model") with
+        { PolicyOnly = true, EffectiveDate = new DateOnly(2024, 6, 1), MaxParallelism = 4 };
+        var result = await new RefreshModelHandler([new StubRefreshProvider(session)], () => null)
+            .HandleAsync(request, null, null, CancellationToken.None);
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.False(session.RefreshCalled);
+        Assert.Null(result.Data!.Script);
+        if (dryRun)
+        {
+            Assert.Null(session.Applied);
+            Assert.NotNull(result.Data.PolicyPreview);
+            Assert.Equal(request.EffectiveDate, result.Data.PolicyPreview!.EffectiveDate);
+        }
+        else
+        {
+            Assert.NotNull(session.Applied);
+            Assert.False(session.Applied!.Refresh);
+            Assert.Equal(request.EffectiveDate, session.Applied.EffectiveDate);
+            Assert.Equal(4, session.Applied.MaxParallelism);
+            Assert.Equal(["created partition '2024'"], result.Data.PolicyApplication!.Operations);
+        }
+    }
+
+    [Theory]
+    [InlineData("missing-table")]
+    [InlineData("multiple-tables")]
+    [InlineData("partition")]
+    [InlineData("refresh-type")]
+    [InlineData("skip-policy")]
+    [InlineData("trace")]
+    [InlineData("parallelism")]
+    public async Task PolicyOnly_RejectsConflictsBeforeOpeningProvider(string scenario)
+    {
+        var request = Request(refreshType: "automatic", tables: ["Sales"]) with { PolicyOnly = true };
+        request = scenario switch
+        {
+            "missing-table" => request with { Tables = null },
+            "multiple-tables" => request with { Tables = ["Sales", "Other"] },
+            "partition" => request with { Partitions = [new("Sales", "P")] },
+            "refresh-type" => request with { RefreshTypeExplicit = true },
+            "skip-policy" => request with { ApplyRefreshPolicy = false },
+            "trace" => request with { TracePath = "trace.log" },
+            _ => request with { MaxParallelism = 0 }
+        };
+        var result = await new RefreshModelHandler([], () => null).HandleAsync(request, null, null, CancellationToken.None);
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_REFRESH_POLICY_OPTIONS_CONFLICT", result.Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public async Task PolicyOnly_LocalModelWithoutMirrorFails()
+    {
+        var session = new StubRefreshSession();
+        var result = await new RefreshModelHandler([new StubRefreshProvider(session)], LocalSession)
+            .HandleAsync(Request(refreshType: "automatic", tables: ["Sales"]) with { PolicyOnly = true },
+                null, null, CancellationToken.None);
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_REFRESH_NO_REMOTE_TARGET", result.Diagnostics[0].Code);
+        Assert.Null(session.Applied);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PolicyOnly_MissingPolicyNeverApplies(bool dryRun)
+    {
+        var session = new StubRefreshSession { MissingPolicy = true };
+        var result = await new RefreshModelHandler([new StubRefreshProvider(session)],
+            () => RemoteSession("powerbi://api.powerbi.com/v1.0/myorg/ws", "Model"))
+            .HandleAsync(Request(refreshType: "automatic", tables: ["Sales"], dryRun: dryRun) with { PolicyOnly = true },
+                null, null, CancellationToken.None);
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", result.Diagnostics[0].Code);
+        Assert.Null(session.Applied);
+        Assert.False(session.RefreshCalled);
+    }
+
+    [Fact]
+    public async Task PolicyOnly_UsesRemoteWorkspaceMirror()
+    {
+        var session = new StubRefreshSession();
+        var connection = LocalSession() with { Workspace = "powerbi://api.powerbi.com/v1.0/myorg/ws", Database = "Model" };
+        var result = await new RefreshModelHandler([new StubRefreshProvider(session)], () => connection)
+            .HandleAsync(Request(refreshType: "automatic", tables: ["Sales"]) with { PolicyOnly = true },
+                null, null, CancellationToken.None);
+        Assert.True(result.Success);
+        Assert.NotNull(session.Applied);
     }
 
     private static RefreshModelRequest Request(
@@ -236,8 +334,20 @@ public sealed class RefreshModelHandlerTests
             => Task.FromResult<IModelSession>(_session);
     }
 
-    private sealed class StubRefreshSession : IModelSession, IModelRefreshSession
+    private sealed class StubRefreshSession : IModelSession, IModelRefreshSession, IRefreshPolicyApplySession, IRefreshPolicyMutationSession
     {
+        public RefreshPolicyApplyRequest? Applied { get; private set; }
+        public bool MissingPolicy { get; init; }
+        public RefreshPolicyInfo? GetRefreshPolicy(string table) => MissingPolicy ? null
+            : new(table, "Import", "Year", 10, "Day", 3, 0, "", "RangeStart RangeEnd", [], []);
+        public RefreshPolicySetResult SetRefreshPolicy(RefreshPolicySetRequest request) => throw new NotSupportedException();
+        public ModelObjectMutationResult RemoveRefreshPolicy(string table, bool ifExists = false) => throw new NotSupportedException();
+        public Task<RefreshPolicyApplyResult> ApplyRefreshPolicyAsync(RefreshPolicyApplyRequest request, CancellationToken cancellationToken)
+        {
+            Applied = request;
+            return Task.FromResult(new RefreshPolicyApplyResult("server", "Model", request.Table,
+                request.EffectiveDate!.Value, request.Refresh, ["created partition '2024'"], 1));
+        }
         public bool RefreshCalled { get; private set; }
         public string SourcePath => "";
         public Task<ModelSummary> GetSummaryAsync(CancellationToken _)

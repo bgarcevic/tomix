@@ -12,6 +12,65 @@ public sealed class TomRefreshPolicyManagerTests
         "let Source = Sql.Database(\"srv\", \"db\"), Filtered = Table.SelectRows(Source, each [Date] >= RangeStart and [Date] < RangeEnd) in Filtered";
 
     [Fact]
+    public void GenericRemove_ReportsAndPreservesPolicyPartitions()
+    {
+        var db = BaseModel();
+        new TomRefreshPolicyManager(db).Set(CreateRequest());
+        var table = db.Model.Tables["Sales"];
+        table.Partitions.Add(new Partition { Name = "History", Source = new PolicyRangePartitionSource() });
+        var result = new TomModelMutator(db).RemoveObject(new("Sales/RefreshPolicy", null, false));
+        Assert.Equal(["History"], result.RemainingPolicyPartitions);
+        Assert.NotNull(table.Partitions.Find("History"));
+        Assert.Null(table.RefreshPolicy);
+    }
+
+    [Theory]
+    [InlineData("Sales", "Sales/RefreshPolicy")]
+    [InlineData("Net/Sales", "'Net/Sales'/RefreshPolicy")]
+    [InlineData("KPI'er", "'KPI''er'/RefreshPolicy")]
+    [InlineData("Sales", "Tables/Sales/RefreshPolicy")]
+    [InlineData("KPI'er/Net", "'KPI''er/Net'/RefreshPolicy")]
+    [InlineData("Sales", "'Sales'/'RefreshPolicy'")]
+    public void GenericMutation_CreatesEditsAndRemovesPolicy(string tableName, string path)
+    {
+        var db = BaseModel();
+        db.Model.Tables["Sales"].Name = tableName;
+        var mutator = new TomModelMutator(db);
+        var created = mutator.SetProperty(new ModelObjectSetRequest(path,
+        [
+            new("RollingWindowGranularity", "year"), new("RollingWindowPeriods", "10"),
+            new("IncrementalGranularity", "day"), new("IncrementalPeriods", "3"),
+            new("SourceExpression", ValidSourceExpression)
+        ], null));
+        Assert.NotNull(created.Policy);
+        Assert.Equal(["RangeStart", "RangeEnd"], created.CreatedExpressions);
+        mutator.SetProperty(new ModelObjectSetRequest(path,
+            [new("IncrementalPeriods", "7"), new("IncrementalPeriodsOffset", "-1")], null));
+        var snapshot = TomModelSummarizer.Snapshot(db, "M");
+        var policyObject = Assert.Single(snapshot.Objects.Single(o => o.Kind == ModelObjectKind.Table)
+            .Children, o => o.Kind == ModelObjectKind.RefreshPolicy);
+        Assert.Equal(7, policyObject.PolicyInfo!.IncrementalPeriods);
+        Assert.Equal(-1, policyObject.PolicyInfo.IncrementalOffset);
+        var partitionCount = db.Model.Tables[tableName].Partitions.Count;
+        var removed = mutator.RemoveObject(new ModelObjectRemoveRequest(path, null, false));
+        Assert.True(removed.Changed);
+        Assert.Null(db.Model.Tables[tableName].RefreshPolicy);
+        Assert.Equal(partitionCount, db.Model.Tables[tableName].Partitions.Count);
+        Assert.False(mutator.RemoveObject(new ModelObjectRemoveRequest(path, null, true)).Changed);
+    }
+
+    [Theory]
+    [InlineData("Unknown", "1", "Unknown refresh policy property")]
+    [InlineData("IncrementalPeriods", "oops", "must be an integer")]
+    public void GenericMutation_RejectsBadProperties(string name, string value, string message)
+    {
+        var mutator = new TomModelMutator(BaseModel());
+        var error = Assert.Throws<ArgumentException>(() => mutator.SetProperty(
+            new ModelObjectSetRequest("Sales/RefreshPolicy", [new(name, value)], null)));
+        Assert.Contains(message, error.Message);
+    }
+
+    [Fact]
     public void Set_CreatesPolicy_WithRequiredOptions()
     {
         var db = BaseModel();
@@ -83,8 +142,8 @@ public sealed class TomRefreshPolicyManagerTests
             new RefreshPolicySetRequest(
                 "Sales", null, null, RollingWindowPeriods: 10, null, null, null, null, null, Force: false)));
 
-        Assert.Contains("--rolling-window-granularity", ex.Message);
-        Assert.Contains("--source-expression", ex.Message);
+        Assert.Contains("RollingWindowGranularity", ex.Message);
+        Assert.Contains("SourceExpression", ex.Message);
     }
 
     [Fact]

@@ -7,7 +7,7 @@ authoritative reference for the version you have installed.
 | Group | Commands |
 |-------|----------|
 | [Discover](discover.md) | `ls`, `get`, `find`, `deps`, `query` |
-| [Modify](modify.md) | `add`, `set`, `mv`, `rm`, `replace`, `format`, `script`, `incremental-refresh` |
+| [Modify](modify.md) | `add`, `set`, `mv`, `rm`, `replace`, `format`, `script` |
 | [Connect](connect.md) | `connect`, `deploy`, `refresh`, `load`, `save`, `auth`, `session` |
 | [Validate](validate.md) | `bpa`, `validate`, `test`, `vertipaq`, `diff`, `doctor` |
 | [Manage](manage.md) | `config`, `profile`, `init`, `completion`, `stage`, `update` |

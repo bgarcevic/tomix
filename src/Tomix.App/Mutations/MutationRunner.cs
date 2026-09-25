@@ -109,7 +109,7 @@ public static class MutationRunner
         {
             return TomixResult<TResult>.Fail(
                 "TOMIX_REFRESH_POLICY_NOT_FOUND", ex.Message,
-                hint: "Use --if-exists to ignore, or 'tx incremental-refresh show' to inspect.");
+                hint: "Use --if-exists to ignore, or 'tx get <table>/RefreshPolicy' to inspect.");
         }
         catch (NotSupportedException ex)
         {

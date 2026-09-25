@@ -107,9 +107,11 @@ public static class TomModelRefresher
             sb.Append(",\"objects\":[{\"database\":").Append(J(dbName)).Append("}]");
         }
 
-        // applyRefreshPolicy defaults to true on the server. Only emit when explicitly disabled.
+        // The server defaults to true, but requires an explicit flag when effectiveDate is supplied.
         if (!request.ApplyRefreshPolicy)
             sb.Append(",\"applyRefreshPolicy\":false");
+        else if (request.EffectiveDate is not null)
+            sb.Append(",\"applyRefreshPolicy\":true");
 
         if (request.EffectiveDate is { } ed)
             sb.Append(",\"effectiveDate\":\"").Append(ed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append('"');

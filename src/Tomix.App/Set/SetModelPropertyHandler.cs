@@ -3,6 +3,7 @@ using Tomix.App.ModelObjects;
 using Tomix.App.Mutations;
 using Tomix.App.Validate;
 using Tomix.Core.Models;
+using Tomix.Core.Paths;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Set;
@@ -25,7 +26,7 @@ public sealed class SetModelPropertyHandler
         if (!request.Revert && request.Properties.Count == 0)
             return TomixResult<SetModelPropertyResult>.Fail(
                 "TOMIX_SET_PROPERTY_REQUIRED",
-                "At least one -q/-i property assignment is required.",
+                "At least one -p/--set or -q/-i property assignment is required.",
                 exitCode: 2);
 
         // A -q/-i alongside --revert would be silently discarded with the staged copy; reject it
@@ -33,14 +34,14 @@ public sealed class SetModelPropertyHandler
         if (request.Revert && request.Properties.Count > 0)
             return TomixResult<SetModelPropertyResult>.Fail(
                 "TOMIX_STAGE_OPTIONS_CONFLICT",
-                "--revert discards the staged mutation; it cannot be combined with -q/-i assignments.",
+                "--revert discards the staged mutation; it cannot be combined with property assignments.",
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: false, request.Overwrite, request.NoSync, DryRun: request.DryRun);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: request.Force, request.Overwrite, request.NoSync, DryRun: request.DryRun);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "set", _stores,
+            _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "set", _stores,
             async (mutator, session, _) =>
             {
                 // Capture the pre-edit value of the reported assignment for the text preview.
@@ -68,7 +69,7 @@ public sealed class SetModelPropertyHandler
                 var mutation = mutator.SetProperty(new ModelObjectSetRequest(
                     request.Path,
                     request.Properties,
-                    request.Type));
+                    request.Type, request.Force));
 
                 // The in-memory model is already post-mutation in every lifecycle mode (save,
                 // stage, dry-run), so the shared offline analyzer measures what the save gate
@@ -94,7 +95,8 @@ public sealed class SetModelPropertyHandler
                         FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null,
                         DryRun: request.DryRun,
                         OldValue: oldValue,
-                        IsDaxProperty: isDaxProperty));
+                        IsDaxProperty: isDaxProperty,
+                        Policy: mutation.Policy, CreatedExpressions: mutation.CreatedExpressions));
             },
             new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: null),
             cancellationToken);

@@ -9,7 +9,7 @@ namespace Tomix.Cli.Tests;
 /// and <c>--yes</c> must bypass the prompt for scripts. Confirmation goes through the single
 /// gate-aware <see cref="ConfirmationHelper.ConfirmOrAbort"/> overload, so this covers every
 /// caller: <c>session clear</c>/<c>prune</c>, <c>stage commit</c>/<c>discard</c>, <c>rm</c>,
-/// <c>replace</c>, <c>deploy</c>, <c>incremental-refresh rm</c>, the <c>connect</c> workspace
+/// <c>replace</c>, <c>deploy</c>, <c>refresh --policy-only</c>, the <c>connect</c> workspace
 /// overwrite, the partition-risky <c>refresh</c> variants, <c>script --save</c>/<c>--revert</c>,
 /// <c>mv --save</c>/<c>--revert</c>, and <c>bpa run --fix --allow-delete</c>/<c>--revert</c>.
 /// </summary>
@@ -27,8 +27,6 @@ public sealed class DestructiveConfirmationTests
         root.Subcommands.Add(new RmCommand(noProviders, services.State, services.Mutations).Build());
         root.Subcommands.Add(new ReplaceCommand(noProviders, services.State, services.Mutations).Build());
         root.Subcommands.Add(new DeployCommand(noProviders, services.State).Build());
-        root.Subcommands.Add(new IncrementalRefreshCommand(
-            noProviders, services.State, services.Mutations, services.LoadCurrentSession).Build());
         root.Subcommands.Add(new ConnectCommand(noProviders, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
         root.Subcommands.Add(new RefreshCommand(noProviders, services.State, services.LoadCurrentSession).Build());
         root.Subcommands.Add(new ScriptCommand(noProviders, services.State, services.Mutations).Build());
@@ -60,7 +58,7 @@ public sealed class DestructiveConfirmationTests
     [InlineData("rm", "SomeTable")]
     [InlineData("replace", "foo", "bar")]
     [InlineData("deploy", "model.bim")]
-    [InlineData("incremental-refresh", "rm", "SomeTable")]
+    [InlineData("refresh", "--policy-only", "--table", "Sales", "-s", RemoteEndpoint, "-d", "Sales")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--skip-refresh-policy")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--effective-date", "2026-01-01")]
@@ -88,7 +86,7 @@ public sealed class DestructiveConfirmationTests
     [InlineData("rm", "SomeTable", "--quiet")]
     [InlineData("replace", "foo", "bar", "--quiet")]
     [InlineData("deploy", "model.bim", "--quiet")]
-    [InlineData("incremental-refresh", "rm", "SomeTable", "--quiet")]
+    [InlineData("refresh", "--policy-only", "--table", "Sales", "-s", RemoteEndpoint, "-d", "Sales", "--quiet")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues", "--quiet")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--skip-refresh-policy", "--quiet")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--effective-date", "2026-01-01", "--quiet")]
@@ -105,7 +103,7 @@ public sealed class DestructiveConfirmationTests
     [InlineData("rm", "SomeTable", "--output-format", "json")]
     [InlineData("replace", "foo", "bar", "--output-format", "json")]
     [InlineData("deploy", "model.bim", "--output-format", "json")]
-    [InlineData("incremental-refresh", "rm", "SomeTable", "--output-format", "json")]
+    [InlineData("refresh", "--policy-only", "--table", "Sales", "-s", RemoteEndpoint, "-d", "Sales", "--output-format", "json")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--refresh-type", "clearvalues", "--output-format", "json")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--skip-refresh-policy", "--output-format", "json")]
     [InlineData("refresh", "-s", RemoteEndpoint, "-d", "Sales", "--effective-date", "2026-01-01", "--output-format", "json")]

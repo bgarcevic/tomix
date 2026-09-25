@@ -1,5 +1,6 @@
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
+using Tomix.Core.Paths;
 
 namespace Tomix.Provider.Tom;
 
@@ -32,6 +33,15 @@ public sealed class TomModelMutator
     {
         if (request.Properties.Count == 0)
             throw new ArgumentException("At least one property assignment is required.", nameof(request));
+
+        if (RefreshPolicyPath.Table(request.Path, request.Type) is { } policyTable)
+        {
+            var result = new TomRefreshPolicyManager(_database).SetProperties(policyTable, request.Properties, request.Force);
+            var lastProperty = request.Properties[^1];
+            return new ModelObjectMutationResult($"{TomMutationPaths.Segment(result.Policy.Table)}/RefreshPolicy",
+                true, lastProperty.Property, lastProperty.Value, Policy: result.Policy,
+                CreatedExpressions: result.CreatedExpressions);
+        }
 
         var target = _resolver.TryResolveForMutation(request.Path, request.Type)
                      ?? throw TomMutationTargetResolver.NotFound(request.Path);
@@ -138,6 +148,18 @@ public sealed class TomModelMutator
 
     public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request)
     {
+        if (RefreshPolicyPath.Table(request.Path, request.Type) is { } policyTable)
+        {
+            var manager = new TomRefreshPolicyManager(_database);
+            var remaining = manager.Get(policyTable)?.PolicyPartitions;
+            var result = manager.Remove(policyTable, request.IfExists);
+            return result with
+            {
+                Path = $"{TomMutationPaths.Segment(policyTable)}/RefreshPolicy",
+                RemainingPolicyPartitions = remaining is { Count: > 0 } ? remaining : null
+            };
+        }
+
         var target = _resolver.TryResolveForMutation(request.Path, request.Type);
         if (target is null)
         {

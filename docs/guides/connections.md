@@ -144,8 +144,8 @@ A sync overwrites the mirror with the primary model, because the primary is the
 edited copy and preserving target objects would silently revert the edit. The
 one exception is incremental-refresh policy partitions: they are generated and
 processed on the service, so the mirror keeps them — and their processed data —
-even though the local model has none. `tx incremental-refresh` is exempt from
-the exception: when it edits a refresh policy, the sync replaces the policy and
+even though the local model has none. `tx set <table>/RefreshPolicy` and `tx rm <table>/RefreshPolicy` are exempt from
+the exception: when they edit a refresh policy, the sync replaces the policy and
 its partitions in full, so the change actually lands. To force a complete
 overwrite of everything, deploy explicitly:
 

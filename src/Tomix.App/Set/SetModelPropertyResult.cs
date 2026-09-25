@@ -30,4 +30,8 @@ public sealed record SetModelPropertyResult(
     string? OldValue = null,
     // Render-only: whether the edited property carries DAX (see SetModelPropertyHandler).
     [property: JsonIgnore]
-    bool IsDaxProperty = false);
+    bool IsDaxProperty = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    Tomix.Core.Models.RefreshPolicyInfo? Policy = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? CreatedExpressions = null);

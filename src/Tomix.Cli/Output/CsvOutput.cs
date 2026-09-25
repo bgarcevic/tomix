@@ -28,6 +28,8 @@ internal static class CsvOutput
         {
             null => "",
             bool b => b ? "True" : "False",
+            IReadOnlyList<string> names => JsonOutput.Serialize(names),
+            IReadOnlyList<Tomix.Core.Models.RefreshPolicyIssue> issues => JsonOutput.Serialize(issues),
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? "",
             _ => value.ToString() ?? ""
         };

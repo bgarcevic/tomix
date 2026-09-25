@@ -41,6 +41,7 @@ public sealed class MutationLifecycleSyncTests
     [InlineData("set", false)]
     [InlineData("add", false)]
     [InlineData("rm", false)]
+    [InlineData("refresh-policy", true)]
     [InlineData("incremental-refresh", true)]
     public async Task CompleteAsync_SyncOptions_PreservePolicyPartitionsExceptForRefreshPolicyCommand(
         string command, bool deploysPolicyPartitions)
@@ -61,6 +62,7 @@ public sealed class MutationLifecycleSyncTests
     [InlineData("add", false)]
     [InlineData("rm", false)]
     [InlineData("replace", false)]
+    [InlineData("refresh-policy", true)]
     [InlineData("incremental-refresh", true)]
     public void SyncOptionsFor_Command_DeploysPolicyPartitions_OnlyForRefreshPolicyCommand(
         string command, bool deploysPolicyPartitions)
@@ -77,6 +79,7 @@ public sealed class MutationLifecycleSyncTests
     [Theory]
     [InlineData(new[] { "add" }, false)]
     [InlineData(new[] { "add", "set" }, false)]
+    [InlineData(new[] { "refresh-policy" }, true)]
     [InlineData(new[] { "incremental-refresh" }, true)]
     [InlineData(new[] { "add", "incremental-refresh", "set" }, true)]
     public void SyncOptionsFor_Commands_DeploysPolicyPartitions_WhenAnyOpEditsTheRefreshPolicy(

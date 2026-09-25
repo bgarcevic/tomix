@@ -33,6 +33,9 @@ public sealed class RefreshModelHandler
         TextWriter? traceWriter,
         CancellationToken cancellationToken)
     {
+        if (ValidatePolicyOnly(request) is { } policyError)
+            return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_OPTIONS_CONFLICT", policyError, exitCode: 2);
+
         var typeValidation = ValidateRefreshType(request.RefreshType);
         if (typeValidation is not null)
             return typeValidation;
@@ -71,6 +74,9 @@ public sealed class RefreshModelHandler
                 "TOMIX_NO_PROVIDER",
                 $"No provider can open remote endpoint: {target.Value}",
                 exitCode: 2);
+
+        if (request.PolicyOnly)
+            return await ApplyPolicyOnlyAsync(provider, target, request, cancellationToken).ConfigureAwait(false);
 
         var sessionRequest = new ModelRefreshRequest(
             Database: target.Database,
@@ -146,6 +152,64 @@ public sealed class RefreshModelHandler
                 "TOMIX_REFRESH_FAILED",
                 $"Refresh of '{target.Database ?? target.Value}' failed: {msg}",
                 exitCode: 1);
+        }
+    }
+
+    /// <summary>Validates policy-only flags before confirmation or any connection/trace side effects.</summary>
+    public static string? ValidatePolicyOnly(RefreshModelRequest request)
+    {
+        if (!request.PolicyOnly)
+            return null;
+        if (request.Tables is not { Count: 1 } || string.IsNullOrWhiteSpace(request.Tables[0]))
+            return "--policy-only requires exactly one explicit --table.";
+        if (request.Partitions is { Count: > 0 } || request.RefreshTypeExplicit ||
+            !string.Equals(request.RefreshType, "automatic", StringComparison.OrdinalIgnoreCase) ||
+            !request.ApplyRefreshPolicy || request.TracePath is not null)
+            return "--policy-only cannot be combined with --partition, --refresh-type, --trace, --skip-refresh-policy, or --apply-refresh-policy false.";
+        if (request.MaxParallelism is <= 0)
+            return "--max-parallelism must be positive.";
+        return null;
+    }
+
+    private static async Task<TomixResult<RefreshModelResult>> ApplyPolicyOnlyAsync(
+        IModelProvider provider, ModelReference target, RefreshModelRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
+            if (session is not IRefreshPolicyApplySession applier || session is not IRefreshPolicyMutationSession policies)
+                return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_UNSUPPORTED",
+                    "Provider does not support inspecting and applying refresh policies on deployed models.", exitCode: 2);
+            var table = request.Tables![0];
+            var policy = policies.GetRefreshPolicy(table)
+                ?? throw new RefreshPolicyNotFoundException($"Table '{table}' has no refresh policy. Save a policy on the deployed model first.");
+            var effectiveDate = request.EffectiveDate ?? DateOnly.FromDateTime(DateTime.Today);
+            if (request.DryRun)
+                return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(target.Value, target.Database,
+                    "policyOnly", 0, [], null, null,
+                    PolicyPreview: new PolicyOnlyPreview(policy.Table, effectiveDate, request.MaxParallelism)));
+
+            var result = await applier.ApplyRefreshPolicyAsync(new RefreshPolicyApplyRequest(
+                policy.Table, effectiveDate, Refresh: false, request.MaxParallelism), cancellationToken).ConfigureAwait(false);
+            return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(result.Server, result.Database,
+                "policyOnly", result.DurationMs, [], null, null, PolicyApplication: result));
+        }
+        catch (AuthenticationRequiredException ex)
+        {
+            return AuthFail(ex);
+        }
+        catch (ObjectNotFoundException ex)
+        {
+            return TomixResult<RefreshModelResult>.Fail("TOMIX_OBJECT_NOT_FOUND", ex.Message, hint: ex.Hint);
+        }
+        catch (RefreshPolicyNotFoundException ex)
+        {
+            return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_NOT_FOUND", ex.Message);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_APPLY_FAILED",
+                $"Applying the refresh policy failed: {ex.InnerException?.Message ?? ex.Message}", exitCode: 1);
         }
     }
 

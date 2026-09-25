@@ -60,6 +60,11 @@ internal static class GetRenderer
         {
             if (value is string text && DaxExpressions.IsDaxValue(result.Object, text))
                 AnsiConsole.MarkupLine($"{Styling.MarkupEscape(key)}: {Styling.ExpressionMarkup(isDax: true, text, result.MeasureNames)}");
+            else if (value is IReadOnlyList<RefreshPolicyIssue> issues)
+                foreach (var issue in issues)
+                    Console.WriteLine($"{key}: {issue.Severity} [{issue.Code}]: {issue.Message}");
+            else if (value is IReadOnlyList<string> names)
+                Console.WriteLine($"{key}: {string.Join(", ", names)}");
             else
                 Console.WriteLine($"{key}: {value}");
         }
@@ -71,6 +76,8 @@ internal static class GetRenderer
         {
             null => "",
             bool b => b ? "True" : "False",
+            IReadOnlyList<string> names => string.Join(", ", names),
+            IReadOnlyList<RefreshPolicyIssue> issues => string.Join(Environment.NewLine, issues.Select(i => $"{i.Severity} [{i.Code}]: {i.Message}")),
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
             _ => value.ToString()
         });

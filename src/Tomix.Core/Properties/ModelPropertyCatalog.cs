@@ -50,6 +50,21 @@ public static class ModelPropertyCatalog
         new("precedence", "Precedence", o => IntBag(o, PropertyBagKeys.Precedence), Writable: true, Diffable: true)
     ];
 
+    private static readonly IReadOnlyList<PropertyDescriptor> RefreshPolicy =
+    [
+        Name(writable: false),
+        new("mode", "Mode", o => o.PolicyInfo?.Mode ?? "", Writable: true, Diffable: true),
+        new("rollingWindowGranularity", "RollingWindowGranularity", o => o.PolicyInfo?.RollingWindowGranularity ?? "", Writable: true, Diffable: true),
+        new("rollingWindowPeriods", "RollingWindowPeriods", o => o.PolicyInfo?.RollingWindowPeriods ?? 0, Writable: true, Diffable: true),
+        new("incrementalGranularity", "IncrementalGranularity", o => o.PolicyInfo?.IncrementalGranularity ?? "", Writable: true, Diffable: true),
+        new("incrementalPeriods", "IncrementalPeriods", o => o.PolicyInfo?.IncrementalPeriods ?? 0, Writable: true, Diffable: true),
+        new("incrementalPeriodsOffset", "IncrementalPeriodsOffset", o => o.PolicyInfo?.IncrementalOffset ?? 0, Writable: true, Diffable: true),
+        new("sourceExpression", "SourceExpression", o => o.PolicyInfo?.SourceExpression ?? "", Writable: true, Diffable: true),
+        new("pollingExpression", "PollingExpression", o => o.PolicyInfo?.PollingExpression ?? "", Writable: true, Diffable: true),
+        new("policyPartitions", "PolicyPartitions", o => o.PolicyInfo?.PolicyPartitions ?? []),
+        new("issues", "Issues", o => o.PolicyInfo?.Issues ?? [])
+    ];
+
     private static readonly IReadOnlyList<PropertyDescriptor> Measure =
     [
         Name(writable: true),
@@ -324,6 +339,7 @@ public static class ModelPropertyCatalog
     public static IReadOnlyList<PropertyDescriptor> For(ModelObjectKind kind) => kind switch
     {
         ModelObjectKind.Table => Table,
+        ModelObjectKind.RefreshPolicy => RefreshPolicy,
         ModelObjectKind.Measure => Measure,
         // Calculated columns project the same property surface as data columns.
         ModelObjectKind.Column or ModelObjectKind.CalculatedColumn => Column,

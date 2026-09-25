@@ -41,7 +41,8 @@ public sealed class PropertyCatalogTests
                 var obj = Leaf(kind) with { Properties = bag };
                 foreach (var (key, value) in ModelPropertyCatalog.Project(obj))
                 {
-                    Assert.True(value is "" or false or 0 || key == "name",
+                    Assert.True(value is "" or false or 0 || key == "name" ||
+                        (kind == ModelObjectKind.RefreshPolicy && value is System.Collections.ICollection { Count: 0 }),
                         $"{kind}.{key} projected {value ?? "null"} from an absent bag; expected \"\"/false/0");
                 }
             }
@@ -57,6 +58,8 @@ public sealed class PropertyCatalogTests
     }
 
     [Theory]
+    [InlineData(ModelObjectKind.RefreshPolicy,
+        "name,mode,rollingWindowGranularity,rollingWindowPeriods,incrementalGranularity,incrementalPeriods,incrementalPeriodsOffset,sourceExpression,pollingExpression,policyPartitions,issues")]
     [InlineData(ModelObjectKind.Table,
         "name,description,isHidden,dataCategory,lineageTag,columns,measures,hierarchies,partitions,refreshPolicy,refreshPolicySourceExpression,refreshPolicyPollingExpression,noSelectionExpression,multipleOrEmptySelectionExpression,defaultDetailRowsExpression,isPrivate,excludeFromModelRefresh,excludeFromAutomaticAggregations,alternateSourcePrecedence,showAsVariationsOnly,systemManaged,directLakeIndexingBehavior,sourceLineageTag,precedence")]
     [InlineData(ModelObjectKind.Measure,

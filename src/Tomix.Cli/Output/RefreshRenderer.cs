@@ -13,6 +13,24 @@ internal static class RefreshRenderer
 {
     public static void Render(RefreshModelResult result)
     {
+        if (result.PolicyPreview is { } preview)
+        {
+            AnsiConsole.MarkupLine(Styling.Guidance(
+                $"Would apply refresh policy: {preview.Table} on {result.Database} (effective {preview.EffectiveDate:yyyy-MM-dd}). No data loading. Expired partitions may be removed."));
+            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: no policy was applied. Partition changes are determined on execution."));
+            return;
+        }
+        if (result.PolicyApplication is { } policy)
+        {
+            AnsiConsole.MarkupLine(Styling.Success($"Applied refresh policy: {policy.Table} on {policy.Database} (effective {policy.EffectiveDate:yyyy-MM-dd})"));
+            foreach (var operation in policy.Operations)
+                AnsiConsole.MarkupLine(Styling.Muted(operation));
+            if (policy.Operations.Count == 0)
+                AnsiConsole.MarkupLine(Styling.Muted("Partitions already match the policy; no changes."));
+            AnsiConsole.MarkupLine(Styling.Guidance("No data was loaded. Run 'tx refresh --table <table>' to load data."));
+            return;
+        }
+
         var database = string.IsNullOrWhiteSpace(result.Database) ? "<model>" : result.Database;
         var server = string.IsNullOrWhiteSpace(result.Server) ? "<endpoint>" : result.Server;
         var seconds = Styling.DurationSeconds(result.DurationMs / 1000.0);
@@ -80,6 +98,20 @@ internal static class RefreshRenderer
 
     public static void RenderCsv(RefreshModelResult result)
     {
+        if (result.PolicyApplication is { } policy)
+        {
+            Console.WriteLine("table,effective_date,refreshed,operation");
+            foreach (var operation in policy.Operations.DefaultIfEmpty("no changes"))
+                Console.WriteLine($"{Csv(policy.Table)},{policy.EffectiveDate:yyyy-MM-dd},false,{Csv(operation)}");
+            return;
+        }
+        if (result.PolicyPreview is { } preview)
+        {
+            Console.WriteLine("table,effective_date,loads_data,dry_run");
+            Console.WriteLine($"{Csv(preview.Table)},{preview.EffectiveDate:yyyy-MM-dd},false,true");
+            return;
+        }
+
         Console.WriteLine("table,rows,query_ms,read_ms,total_ms,rows_per_second");
         foreach (var t in result.Tables)
         {

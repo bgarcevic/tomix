@@ -232,7 +232,7 @@ Search model objects for matching text
   arg <pattern>  The text or regex to look for
   arg [model]  Optional path to the model; defaults to the active connection
   opt --in <in>  Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all (default: all; annotations are only searched when requested explicitly)
-  opt --type, -t <type>  Only search objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
+  opt --type, -t <type>  Only search objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --regex  Interpret the pattern as a regular expression
   opt --case-sensitive  Match text exactly, including letter case
   opt --paths-only  Print one matching object path per line for piping
@@ -262,57 +262,6 @@ Read a model object's properties
   opt --query <query>  Read just one property (for example --query expression)
   opt --type, -t <type>  Type to pick when the path matches several objects under a table.
 
-# tx incremental-refresh
-Work with a table's incremental refresh policy
-
-# tx incremental-refresh apply
-Apply the incremental refresh policy on a deployed model (generates partitions server-side)
-  arg <table>  Table name.
-  opt --effective-date <effective-date>  Date the policy is evaluated against (yyyy-MM-dd); defaults to today
-  opt --no-refresh  Bootstrap: create/merge partition definitions without loading data
-  opt --max-parallelism <max-parallelism>  Maximum parallel refresh operations
-
-# tx incremental-refresh rm
-Drop a table's incremental refresh policy
-  arg <table>  Table name.
-  arg [model]  Optional path to the model; defaults to the active connection
-  opt --if-exists  Exit 0 when the table has no policy
-  opt --overwrite  Allow --save-to to overwrite an existing target
-  opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --stage  Stage this command's mutation
-  opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
-
-# tx incremental-refresh set
-Define or update a table's incremental refresh policy
-  arg <table>  Table name.
-  arg [model]  Optional path to the model; defaults to the active connection
-  opt --mode <mode>  Policy mode: import (default) or hybrid (adds a DirectQuery partition for the newest data)
-  opt --rolling-window-periods <rolling-window-periods>  How many periods of history to keep (the archive window)
-  opt --rolling-window-granularity <rolling-window-granularity>  Time unit for the archive window: day, month, quarter, or year
-  opt --incremental-periods <incremental-periods>  How many periods to refresh incrementally
-  opt --incremental-granularity <incremental-granularity>  Time unit for the incremental window: day, month, quarter, or year
-  opt --incremental-offset <incremental-offset>  Periods to shift the window head from today (e.g. for future-dated data)
-  opt --polling-expression <polling-expression>  M expression polled per partition to detect data changes. Use '-' to read from stdin.
-  opt --polling-expression-file <polling-expression-file>  Read the polling expression from this file
-  opt --source-expression <source-expression>  M source query filtering on RangeStart/RangeEnd. Use '-' to read from stdin.
-  opt --source-expression-file <source-expression-file>  Read the source expression from this file
-  opt --force, -f  Write the model even though validation reports errors
-  opt --overwrite  Allow --save-to to overwrite an existing target
-  opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --stage  Stage this command's mutation
-  opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
-
-# tx incremental-refresh show
-Display a table's incremental refresh policy
-  arg <table>  Table name.
-  arg [model]  Optional path to the model; defaults to the active connection
-
 # tx init
 Start a new empty semantic model
   arg [output-path]  Where to create the model; defaults to the global --model path
@@ -330,7 +279,7 @@ Open a semantic model and print a summary
 List model objects
   arg [path-filter]  Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard ('Sa*', '*/Amount'); quote names with spaces ("'Net Sales'/'Sales Amount'"); inside quotes, '' is a literal apostrophe.
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --type, -t <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
+  opt --type, -t <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --paths-only  Print one object path per line, ready for piping.
   opt --no-multiline  Show multi-line cell content (e.g. measure expressions) on one line, truncated. Applies to text output.
 
@@ -394,7 +343,8 @@ Refresh data on a deployed model (--refresh-type full|auto|calculate|...)
   opt --skip-refresh-policy  Shorthand for --apply-refresh-policy false.
   opt --effective-date <effective-date>  Evaluate incremental refresh policies as if today were this date (yyyy-MM-dd).
   opt --max-parallelism <max-parallelism>  Maximum parallel refresh operations.
-  opt --dry-run  Print the TMSL script instead of running it.
+  opt --dry-run  Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only.
+  opt --policy-only  Apply one table's saved refresh policy without loading data; may remove expired partitions. Requires --table.
   opt --no-progress  Turn off live progress tracking (useful in CI and when piping).
   opt --trace <trace>  Write raw XMLA trace events: with no value to stderr, with a value to that log file.
 
@@ -404,7 +354,7 @@ Replace text across model objects
   arg [replacement]  Replacement text
   arg [model]  Optional path to the model; defaults to the active connection
   opt --in <in>  Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all. 'all' covers every scope except annotations (explicit-only: values are often tool-generated JSON).
-  opt --type, -t <type>  Only replace in objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
+  opt --type, -t <type>  Only replace in objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --regex  Interpret the pattern as a regular expression
   opt --case-sensitive  Match text exactly, including letter case
   opt --dry-run  Preview changes without applying
@@ -482,7 +432,8 @@ Change a property on a model object
   arg [model]  Optional path to the model; defaults to the active connection
   opt -q <q>  Compatibility form of --set: the property to set; give its value with -i.
   opt -i <i>  Value for the preceding -q. Pass '-' to read from stdin.
-  opt --set <set>  Property assignment as name=value, e.g. --set expression="SUM(Sales[Amount])". Names accept dotted paths, bracket indexers, and DisplayName matching.
+  opt --set, -p <set>  Property assignment as name=value. Repeat to set multiple properties together.
+  opt --force, -f  Save despite refresh-policy validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).

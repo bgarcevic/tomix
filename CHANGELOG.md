@@ -10,6 +10,20 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** removed `incremental-refresh`. Inspect, configure, and remove policies
+  with `get`/`set`/`rm <table>/RefreshPolicy`. `set` accepts repeatable `-p`/`--set`
+  assignments. Use `refresh --table <table>` to apply the deployed policy and load
+  data, or `refresh --table <table> --policy-only` to manage partitions without
+  loading data. The policy-only mode supports `--dry-run` and effective dates.
+  See the [migration guide](docs/commands/modify.md#migration-from-incremental-refresh).
+
+### Fixed
+
+- Refresh scripts with `--effective-date` now explicitly include `applyRefreshPolicy`,
+  as required by the XMLA endpoint. Verified with the inline refresh-policy QA sample.
+
 ## [0.3.0] - 2026-09-25
 
 ### Added

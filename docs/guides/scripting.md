@@ -106,3 +106,10 @@ failing test. Accept intentional result changes by re-running
 
 Ready-made workflow examples live in the
 [samples folder](https://github.com/bgarcevic/tomix-cli/tree/main/samples).
+
+### Refresh-policy bootstrap
+
+The expression evaluator does not execute `Model.Tables["Sales"].ApplyRefreshPolicy()`.
+Use `tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel` to apply a saved
+policy without loading data. Preview with `--dry-run`; use `--yes` for noninteractive
+execution. A subsequent `tx refresh --table Sales -s MyWorkspace -d MyModel` loads data.

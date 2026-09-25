@@ -108,6 +108,7 @@ public sealed class TomModelRefresherTests
         var script = TomModelRefresher.GenerateRefreshScript(db, request);
 
         Assert.Contains("\"effectiveDate\":\"2026-01-15\"", script);
+        Assert.Contains("\"applyRefreshPolicy\":true", script);
     }
 
     [Fact]

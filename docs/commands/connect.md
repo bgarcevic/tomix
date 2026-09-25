@@ -147,9 +147,10 @@ tx refresh [options]
 | `--table <name>` | Refresh specific table(s). Repeatable. |
 | `--partition <Table.Partition>` | Refresh specific partition(s). Repeatable. |
 | `--apply-refresh-policy [true\|false]` / `--skip-refresh-policy` | Let an incremental refresh policy choose the partitions (default: `true`); `--skip-refresh-policy` is shorthand for `--apply-refresh-policy false`. |
+| `--policy-only` | Apply one table's deployed policy without loading data. Requires exactly one `--table`; may remove expired partitions. |
 | `--effective-date <yyyy-MM-dd>` | Evaluate refresh policies as if today were this date. |
 | `--max-parallelism <n>` | Maximum parallel refresh operations. |
-| `--dry-run` | Print the TMSL script instead of running it. |
+| `--dry-run` | Preview without execution: TMSL for normal refresh, a validated operation summary for `--policy-only`. |
 | `--no-progress` | Turn off live progress tracking (useful in CI and when piping). |
 | `--trace [path]` | Write raw XMLA trace events (stderr, or a log file). |
 
@@ -160,9 +161,34 @@ tx refresh --table Sales --table Customers
 
 Routine refreshes run without prompting. The partition-risky variants —
 `--refresh-type clearvalues` (wipes partition data), `--skip-refresh-policy` /
-`--apply-refresh-policy false` (refreshes all historical partitions), and
+`--apply-refresh-policy false` (refreshes all historical partitions), `--policy-only`, and
 `--effective-date` (shifts policy window boundaries) — ask for confirmation
 first; `--dry-run` never does. Pass `--yes` to skip the prompt in scripts.
+
+Apply a saved policy with data loading, or bootstrap empty partitions:
+
+```sh
+tx refresh --table Sales --apply-refresh-policy true -s MyWorkspace -d MyModel
+tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel --dry-run
+tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel --yes
+```
+
+`--policy-only` uses the deployed policy; it does not deploy local edits. It accepts
+`--effective-date` and positive `--max-parallelism`. It cannot be combined with
+`--partition`, an explicit `--refresh-type`, `--trace`, or disabling policy application.
+Its preview verifies the target table and policy without applying it; exact partition
+changes are determined by the server during execution. JSON execution results include
+`policyApplication` (operations, date, and `refreshed: false`); previews include
+`policyPreview`. Ordinary refresh output remains unchanged.
+
+After an empty policy-only bootstrap, a normal policy refresh loads the incremental
+window; historical partitions can remain empty. To backfill all existing partition
+ranges without moving the policy window, use:
+
+```sh
+tx refresh --table Sales --refresh-type full --skip-refresh-policy -s MyWorkspace -d MyModel --yes
+```
+
 
 ## `load` — load and summarize
 

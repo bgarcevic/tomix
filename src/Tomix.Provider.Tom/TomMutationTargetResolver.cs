@@ -29,7 +29,7 @@ internal sealed class TomMutationTargetResolver
     {
         Table, Measure, Column, Hierarchy, Partition, CalculationItem, Level,
         Role, RoleMember, Relationship, Perspective, Culture, Expression, Function, DataSource,
-        Kpi, TablePermission, Calendar
+        Kpi, TablePermission, Calendar, RefreshPolicy
     }
 
     /// <summary>
@@ -123,6 +123,9 @@ internal sealed class TomMutationTargetResolver
         if (FindTable(_database.Model, parent) is { } table)
         {
             var tablePath = Segment(table.Name);
+            if (Allows(filter, daxForm, MutationTargetKind.RefreshPolicy)
+                && NameEquals(name, "RefreshPolicy") && table.RefreshPolicy is { } policy)
+                candidates.Add((MutationTargetKind.RefreshPolicy, new TomResolvedObject(policy, table, $"{tablePath}/RefreshPolicy")));
 
             if (Allows(filter, daxForm, MutationTargetKind.Measure)
                 && table.Measures.FirstOrDefault(m => NameEquals(m.Name, name)) is { } measure)
@@ -258,6 +261,7 @@ internal sealed class TomMutationTargetResolver
     private static MutationTargetKind? ToTargetKind(ModelObjectKind kind) => kind switch
     {
         ModelObjectKind.Table => MutationTargetKind.Table,
+        ModelObjectKind.RefreshPolicy => MutationTargetKind.RefreshPolicy,
         ModelObjectKind.Measure => MutationTargetKind.Measure,
         ModelObjectKind.Column => MutationTargetKind.Column,
         ModelObjectKind.Hierarchy => MutationTargetKind.Hierarchy,

@@ -63,7 +63,7 @@ tx set <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--set <name=value>` | Property assignment, e.g. `--set expression="SUM(Sales[Amount])"`. Accepts dotted paths, bracket indexers, and DisplayName matching. |
+| `--set <name=value>` / `-p <name=value>` | Property assignment, e.g. `--set expression="SUM(Sales[Amount])"`. Repeatable; all assignments are applied together. |
 | `-q <property>` / `-i <value>` | Compatibility form of `--set`. `-` reads from stdin. |
 | `-t, --type <type>` | Disambiguate when the path matches multiple objects. |
 | `--strict-refs` | Fail when a rename leaves DAX references broken. |
@@ -362,35 +362,61 @@ prompt in scripts. `--revert` (drops staged work) asks too. Plain `script`
 stays in memory, `--save-to` writes a copy, and `--stage` defers the prompt
 to `tx stage commit`.
 
-## `incremental-refresh` — refresh policies
+## Refresh policies
 
-```
-tx incremental-refresh <show|set|rm|apply> <table> [options]
-```
-
-| Subcommand | Description |
-|------------|-------------|
-| `incremental-refresh show <table>` | Display a table's incremental refresh policy. |
-| `incremental-refresh set <table>` | Define or update a table's policy. |
-| `incremental-refresh rm <table>` | Drop a table's policy. |
-| `incremental-refresh apply <table>` | Apply the policy on a deployed model (generates partitions server-side). |
-
-`incremental-refresh set` policy options:
-
-| Option | Description |
-|--------|-------------|
-| `--mode <import\|hybrid>` | Policy mode: `import` (default) or `hybrid` (adds a DirectQuery partition for the newest data). |
-| `--rolling-window-periods <n>` / `--rolling-window-granularity <g>` | How many periods of history to keep (the archive window) and their granularity: `day`, `month`, `quarter`, `year`. |
-| `--incremental-periods <n>` / `--incremental-granularity <g>` | How many periods to refresh incrementally and their granularity. |
-| `--incremental-offset <n>` | Periods to shift the window head from today (e.g. for future-dated data). |
-| `--polling-expression <m>` / `--polling-expression-file <file>` | M expression polled per partition to detect data changes (`-` reads from stdin / read from a file). |
-| `--source-expression <m>` / `--source-expression-file <file>` | M source query filtering on `RangeStart`/`RangeEnd` (`-` reads from stdin / read from a file). |
-| `--force` (`-f`) | Write the model even though validation reports errors. |
-| `--overwrite` | Let `--save-to` overwrite an existing target. |
+Policies are table child objects, inspected and edited with `get`, `set`, and `rm`:
 
 ```sh
-tx incremental-refresh show Sales
-tx incremental-refresh set Sales --rolling-window-periods 10 --rolling-window-granularity year \
-  --incremental-periods 3 --incremental-granularity day --source-expression-file source.m --save
-tx incremental-refresh apply Sales --no-refresh
+tx get 'Sales/RefreshPolicy' --model ./model.tmdl
+tx set 'Sales/RefreshPolicy' -p 'IncrementalPeriods=7' --model ./model.tmdl --save
+tx rm 'Sales/RefreshPolicy' --model ./model.tmdl --save
 ```
+
+`-p` is an alias for `--set`; repeat either option to apply multiple assignments
+as one edit. `-q`/`-i` remain available for a single assignment and cannot be mixed
+with `-p`/`--set`.
+
+| Property | Description |
+|----------|-------------|
+| `Mode` | `Import` (default) or `Hybrid`; hybrid requires a compatible model. |
+| `RollingWindowPeriods`, `RollingWindowGranularity` | Archive window length and unit: day, month, quarter, year. |
+| `IncrementalPeriods`, `IncrementalGranularity` | Incremental refresh window length and unit. |
+| `IncrementalPeriodsOffset` | Offset of the refresh window. |
+| `SourceExpression` | M query referencing `RangeStart` and `RangeEnd`. |
+| `PollingExpression` | Optional change-detection M query; an empty value clears it. |
+
+To create a policy, supply both window lengths and granularities and its source
+expression together. Missing `RangeStart`/`RangeEnd` DateTime parameters are
+created automatically. For example, read the source query from `source.m`:
+
+```sh
+cat source.m | tx set 'Sales/RefreshPolicy' --model ./model.tmdl \
+  -p 'RollingWindowPeriods=10' -p 'RollingWindowGranularity=Year' \
+  -p 'IncrementalPeriods=3' -p 'IncrementalGranularity=Day' \
+  -p 'SourceExpression=-' --save
+```
+
+In PowerShell, use `Get-Content -Raw source.m` to feed the pipeline.
+Policy inspection includes validation findings and generated partition names.
+`--force` permits saving a policy with validation errors but cannot bypass TOM
+compatibility requirements. Save, save-to, stage, revert, dry-run, and no-sync
+follow the standard mutation lifecycle. Removing a policy leaves its generated
+partitions in place and reports them; `--if-exists` permits a missing policy.
+
+### Migration from `incremental-refresh`
+
+The `incremental-refresh` command has been removed.
+
+| Previous workflow | Replacement |
+|-------------------|-------------|
+| `incremental-refresh show Sales` | `get Sales/RefreshPolicy` |
+| `incremental-refresh set Sales ...` | `set Sales/RefreshPolicy -p Property=Value ...` |
+| `incremental-refresh rm Sales` | `rm Sales/RefreshPolicy` |
+| Apply policy and load data | `refresh --table Sales --apply-refresh-policy true` |
+| Apply without loading data (`apply --no-refresh`) | `refresh --table Sales --policy-only` |
+
+Refresh operates on the policy **already saved on the deployed model**. Save or
+deploy local policy edits first. See [refresh](connect.md#refresh-trigger-a-data-refresh)
+for remote targeting, previews, and confirmation. Tomix does not require an
+`--execute` flag and its limited script evaluator does not support TOM's
+`ApplyRefreshPolicy()` method; use `--policy-only` for empty-partition bootstrap.

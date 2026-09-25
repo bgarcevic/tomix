@@ -42,16 +42,19 @@ internal sealed class SetCommand : ICommandModule
         {
             Description = "Value for the preceding -q. Pass '-' to read from stdin."
         };
-        var setOption = new Option<string?>("--set")
+        var setOption = new Option<string[]>("--set", "-p")
         {
-            Description = "Property assignment as name=value, e.g. --set expression=\"SUM(Sales[Amount])\". Names accept dotted paths, bracket indexers, and DisplayName matching."
+            Description = "Property assignment as name=value. Repeat to set multiple properties together.",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false
         };
         setOption.Validators.Add(result =>
         {
-            var value = result.GetValueOrDefault<string?>();
-            if (value is not null && AddCommand.SplitSetName(value).Length == 0)
-                result.AddError($"--set '{value}' must be name=value.");
+            foreach (var value in result.GetValueOrDefault<string[]>() ?? [])
+                if (!value.Contains('=') || AddCommand.SplitSetName(value).Length == 0)
+                    result.AddError($"--set '{value}' must be name=value.");
         });
+        var forceOption = LifecycleOptions.Force("Save despite refresh-policy validation errors");
         var overwriteOption = LifecycleOptions.Overwrite();
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
@@ -81,6 +84,7 @@ internal sealed class SetCommand : ICommandModule
             queryOption,
             valueOption,
             setOption,
+            forceOption,
             overwriteOption,
             dryRunOption,
             typeOption,
@@ -114,8 +118,8 @@ internal sealed class SetCommand : ICommandModule
 
             var query = parseResult.GetValue(queryOption);
             var rawValue = parseResult.GetValue(valueOption);
-            var set = parseResult.GetValue(setOption);
-            if (set is not null && (!string.IsNullOrWhiteSpace(query) || rawValue is not null))
+            var sets = parseResult.GetValue(setOption) ?? [];
+            if (sets.Length > 0 && (!string.IsNullOrWhiteSpace(query) || rawValue is not null))
             {
                 ErrorOutput.Write(
                     [new TomixDiagnostic(
@@ -127,10 +131,10 @@ internal sealed class SetCommand : ICommandModule
                 return 2;
             }
 
-            IReadOnlyList<ModelPropertyAssignment> assignments = set is not null
-                ? [new ModelPropertyAssignment(
+            IReadOnlyList<ModelPropertyAssignment> assignments = sets.Length > 0
+                ? sets.Select(set => new ModelPropertyAssignment(
                     AddCommand.SplitSetName(set),
-                    InputValueResolver.Resolve(set[(set.IndexOf('=') + 1)..]) ?? "")]
+                    InputValueResolver.Resolve(set[(set.IndexOf('=') + 1)..]) ?? "")).ToArray()
                 : string.IsNullOrWhiteSpace(query)
                     ? Array.Empty<ModelPropertyAssignment>()
                     : [new ModelPropertyAssignment(query, InputValueResolver.Resolve(rawValue) ?? "")];
@@ -164,7 +168,8 @@ internal sealed class SetCommand : ICommandModule
                         parseResult.GetValue(strictRefsOption),
                         FixRefs: !parseResult.GetValue(noFixRefsOption),
                         Overwrite: parseResult.GetValue(overwriteOption),
-                        DryRun: parseResult.GetValue(dryRunOption)),
+                        DryRun: parseResult.GetValue(dryRunOption),
+                        Force: parseResult.GetValue(forceOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
@@ -206,6 +211,14 @@ internal sealed class SetCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
         else if (result.SyncWarning is not null)
             AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+
+        if (result.CreatedExpressions is { Count: > 0 })
+            AnsiConsole.MarkupLine(Styling.Guidance($"Created range parameters: {string.Join(", ", result.CreatedExpressions)}"));
+        if (result.Policy is { } policy)
+            foreach (var issue in policy.Issues)
+                AnsiConsole.MarkupLine(issue.IsError
+                    ? Styling.Error($"{issue.Code}: {issue.Message}")
+                    : Styling.Warning($"{issue.Code}: {issue.Message}"));
 
         RenderFixedReferences(result.FixedReferences);
         RenderBrokenReferences(result.BrokenReferences);

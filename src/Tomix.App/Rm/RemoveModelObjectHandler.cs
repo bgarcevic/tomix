@@ -1,5 +1,6 @@
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
+using Tomix.Core.Paths;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Rm;
@@ -30,7 +31,7 @@ public sealed class RemoveModelObjectHandler
             request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "rm", _stores,
+            _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "rm", _stores,
             async (mutator, session, _) =>
             {
                 // A removal cannot be fixed up like a rename — the referenced object is gone.
@@ -72,6 +73,7 @@ public sealed class RemoveModelObjectHandler
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
                         BrokenReferences: mutation.Changed && referencing.Count > 0 ? referencing : null,
                         CascadeRemoved: mutation.CascadeRemoved,
+                        RemainingPolicyPartitions: mutation.RemainingPolicyPartitions,
                         DryRun: request.DryRun));
             },
             new RemoveModelObjectResult(false, null, null, null, null, Reverted: true),

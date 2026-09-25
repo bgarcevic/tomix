@@ -164,17 +164,17 @@ their snapshot) renders the full report and exits `1`, mirroring `bpa run`. `tes
 
 ## Incremental Refresh Codes (`TOMIX_REFRESH_POLICY_*`)
 
-Emitted by `incremental-refresh` (show/set/rm/apply).
+Emitted by policy mutations (`set`/`rm`) and `refresh --policy-only`.
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_REFRESH_POLICY_NOT_FOUND` | 1 | `show`/`rm`/`apply` targeted a table that has no incremental refresh policy. |
-| `TOMIX_REFRESH_POLICY_NO_OPTIONS` | 2 | `set` called without any policy option (and without `--revert`); pass at least one, e.g. `--rolling-window-periods`. |
+| `TOMIX_REFRESH_POLICY_OPTIONS_CONFLICT` | 2 | Invalid policy-only scope, conflicting refresh flags, or nonpositive parallelism. |
+| `TOMIX_REFRESH_POLICY_NOT_FOUND` | 1 | `rm`/`refresh --policy-only` targeted a table that has no incremental refresh policy. |
 | `TOMIX_REFRESH_POLICY_INVALID` | 1 | `set` produced validation errors (missing range parameters, source expression not referencing RangeStart/RangeEnd, incoherent granularity/periods, incompatible compatibility level) and `--force` was not passed. |
 | `TOMIX_REFRESH_POLICY_UNSUPPORTED` | 2 | `apply` targeted a session that is not XMLA-backed (partition generation runs on the server). |
 | `TOMIX_REFRESH_POLICY_APPLY_FAILED` | 1 | The server rejected the `apply` operation. |
 
-`incremental-refresh` also reuses `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFRESH_NO_REMOTE_TARGET` (`apply` with no remote endpoint), `TOMIX_NO_PROVIDER`, `TOMIX_AUTH_REQUIRED`, and the `TOMIX_MUTATION_*` / `TOMIX_STAGE_*` families via the shared mutation runner. Validation findings surfaced in the result payload (e.g. `range_parameter_missing`, `granularity_order`, `no_polling_expression`) are lowercase snake tokens, not `TOMIX_` diagnostic codes.
+Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFRESH_NO_REMOTE_TARGET` (`refresh --policy-only` with no remote endpoint), `TOMIX_NO_PROVIDER`, `TOMIX_AUTH_REQUIRED`, and the `TOMIX_MUTATION_*` / `TOMIX_STAGE_*` families via the shared mutation runner. Validation findings surfaced in the result payload (e.g. `range_parameter_missing`, `granularity_order`, `no_polling_expression`) are lowercase snake tokens, not `TOMIX_` diagnostic codes.
 
 ## VertiPaq Codes (`TOMIX_VERTIPAQ_*` / `TOMIX_VPAX_*`)
 

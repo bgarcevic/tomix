@@ -11,6 +11,13 @@ internal static partial class ModelObjectLookup
         string path,
         ModelObjectKind? type = null)
     {
+        // The singleton policy child is addressed by its owning table, whose quoted name
+        // must not be flattened by the generic legacy path normalization.
+        if (RefreshPolicyPath.Table(path, type) is { } tableName)
+            return snapshot.Objects.Where(o => o.Kind == ModelObjectKind.Table &&
+                    string.Equals(o.Name, tableName, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(o => o.Children).Where(o => o.Kind == ModelObjectKind.RefreshPolicy).ToArray();
+
         var objects = ModelObjectProjection
             .Flatten(snapshot)
             .Where(o => type is null || o.Kind.Matches(type.Value))
