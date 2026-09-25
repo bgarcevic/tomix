@@ -60,13 +60,13 @@ internal static class Program
             messageWriter: Console.Error.WriteLine);
         IReadOnlyList<IModelProvider> providers =
             [new TmdlModelProvider(tokenProvider), new TomFileModelProvider(tokenProvider), new TomServerModelProvider(tokenProvider)];
-        // Explicit timeout so hung formatter/REST endpoints fail predictably instead of
-        // holding the command for HttpClient's 100s default.
+        // Explicit timeout so hung REST endpoints fail predictably instead of holding the
+        // command for HttpClient's 100s default.
         var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var formatter = new CompositeExpressionFormatterClient(
             [
                 new OfflineDaxFormatterClient(),
-                new PowerQueryFormatterApiClient(httpClient)
+                new OfflineMFormatterClient()
             ]);
         var workspaceCatalog = new PowerBiWorkspaceCatalog(httpClient, tokenProvider);
         var releaseSource = new GitHubReleaseSource(httpClient);

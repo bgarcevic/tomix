@@ -319,9 +319,16 @@ tx format [model] [options]
 DAX is formatted offline by the engine bundled with `tx` — no network, no rate limits, same
 result air-gapped. DAX output uses the bundled formatter's style: a 65-column prettier-style
 layout with keywords and known function names upper-cased, so results differ from the
-daxformatter.com style previous releases produced (and from Power BI's format button). Power
-Query (M) formatting still uses a network API. With no target, formats every expression in
-the model. Objects that fail to format are counted in `Failed: N` and the formatter's error
+daxformatter.com style previous releases produced (and from Power BI's format button).
+
+Power Query (M) is formatted offline too, by Microsoft's
+[powerquery-formatter](https://github.com/microsoft/powerquery-formatter) bundled inside `tx`
+and run in-process — no network, no Node.js, nothing else to install. M is wrapped at 40
+columns (120 with `--long`) with four-space indentation, so results can differ from the
+network formatter previous releases used. M that does not parse is left
+unchanged and reported with its line and column (`M syntax error on line 3, column 1: ...`).
+
+With no target, formats every measure (DAX) or every partition (`--lang m`) in the model. Objects that fail to format are counted in `Failed: N` and the formatter's error
 is reported per object on stderr (deduplicated with a `(+N more)` count when objects share
 the same failure); `--output-format json` carries it in each result row's `error` field.
 
@@ -334,7 +341,7 @@ copy back into a model.
 | `-e, --expression <expr>` | Format an inline expression (no model needed). |
 | `--path <path>` | Format the expression on one object. |
 | `--lang <dax\|m>` | Expression language. |
-| `--long` | Prefer long lines when formatting M. |
+| `--long` | Prefer long lines when formatting M (120 columns instead of 40). |
 
 ```sh
 tx format -e "CALCULATE(sum(sales[amt]))"

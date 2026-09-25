@@ -370,6 +370,99 @@ public sealed class FormatModelHandlerTests
         Assert.Empty(session.SetRequests);
     }
 
+    [Theory]
+    [InlineData("let Source = 1 in Source", "formatted")]
+    [InlineData("let\n    Source = 1\nin\n    Source", "unchanged")]
+    public async Task HandleAsync_OfflineMFormatter_FormatsThenReportsUnchanged(string expression, string status)
+    {
+        var session = new StubSession(PartitionSnapshot(expression));
+        var handler = new FormatModelHandler([new StubProvider(session)], new OfflineMFormatterClient(), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        var model = Assert.IsType<ModelFormatResult>(result.Data);
+        Assert.Equal(status, Assert.Single(model.Results).Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_PowerQuerySweep_SkipsCalculatedPartitions()
+    {
+        // A calculated table's partition carries DAX; sending it to the M formatter only fails.
+        var formatter = new RecordingFormatter();
+        var handler = new FormatModelHandler(
+            [new StubProvider(new StubSession(PartitionSnapshot("CALENDARAUTO()", "calculated")))],
+            formatter,
+            TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, Assert.IsType<ModelFormatResult>(result.Data).Total);
+        Assert.Empty(formatter.Requests);
+    }
+
+    [Theory]
+    [InlineData("calculated", "dax")]
+    [InlineData("import", "powerquery")]
+    public async Task HandleAsync_PartitionPath_DefaultsToTheSourceLanguage(string detail, string language)
+    {
+        var formatter = new RecordingFormatter();
+        var handler = new FormatModelHandler(
+            [new StubProvider(new StubSession(PartitionSnapshot("CALENDARAUTO()", detail)))],
+            formatter,
+            TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: "Sales/Sales",
+                Language: "",
+                Type: ModelObjectKind.Partition,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(language, Assert.Single(formatter.Requests).Language);
+    }
+
+    private static ModelSnapshot PartitionSnapshot(string expression, string detail = "import")
+    {
+        var partition = new ModelObject(
+            "Sales", ModelObjectKind.Partition, "Sales/Sales",
+            Detail: detail, Expression: expression, Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var sales = new ModelObject(
+            "Sales", ModelObjectKind.Table, "Sales",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [partition]);
+
+        return new ModelSnapshot("stub", 1601, [sales]);
+    }
+
     private static ModelSnapshot LineEndingsSnapshot()
     {
         var totalSales = new ModelObject(

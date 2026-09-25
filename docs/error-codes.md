@@ -330,7 +330,6 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 | `TOMIX_SESSION` | Session id for persisting the active model connection. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
 | `TOMIX_NO_UPDATE_CHECK` | Set (any value) to disable the throttled update check and notice. |
-| `TOMIX_POWERQUERY_FORMATTER_API` | Custom Power Query Formatter API endpoint URL. |
 
 ## Migration: Unified Mutation Error Codes
 

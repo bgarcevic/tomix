@@ -22,6 +22,17 @@ and the API surface that major versions protect.
   data, or `refresh --table <table> --policy-only` to manage partitions without
   loading data. The policy-only mode supports `--dry-run` and effective dates.
   See the [migration guide](docs/commands/modify.md#migration-from-incremental-refresh).
+- `format --lang m` formats Power Query (M) offline with Microsoft's powerquery-formatter,
+  bundled into `tx` and run in-process, instead of calling the powerqueryformatter.com API:
+  no network, no Node.js, air-gap safe. The layout can differ from the API's, so the first
+  `format --lang m` run over a model formatted with a previous release may rewrite
+  partitions. M that does not parse is left unchanged and reported with its line and column
+  (#196).
+
+### Removed
+
+- The `TOMIX_POWERQUERY_FORMATTER_API` environment variable. M formatting no longer uses a
+  network endpoint, and there is no network fallback (#196).
 
 ### Fixed
 

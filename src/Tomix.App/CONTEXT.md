@@ -35,8 +35,8 @@ Application use cases and command handlers.
     wrapped by `Format/OfflineDaxFormatterClient` — no network, no rate limits. The formatter
     never changes code: when printing would not preserve the expression's tokens, strings, and
     comments, it reports a failure and the original text comes back.
-  - Power Query formatting uses the Power Query Formatter API from https://www.powerqueryformatter.com/api.
-    An offline replacement is being built: `Format/M/powerquery-engine.js` is Microsoft's
+  - Power Query (M) formatting is offline too, through `Format/OfflineMFormatterClient`; there is
+    no network fallback. `Format/M/powerquery-engine.js` is Microsoft's
     powerquery-parser + powerquery-formatter bundled by `/engines/powerquery` and embedded in this
     assembly (`Format/M/PowerQueryEngineBundle`). It is generated; never edit it by hand. Regenerate
     it with `npm ci && npm run build` in `/engines/powerquery` and read that README before changing

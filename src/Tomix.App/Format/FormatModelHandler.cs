@@ -1,3 +1,4 @@
+using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
@@ -52,7 +53,7 @@ public sealed class FormatModelHandler
                     if (string.IsNullOrWhiteSpace(obj.Expression))
                         throw new InvalidOperationException($"Object has no expression to format: {obj.Path}");
 
-                    if (!TryResolveLanguage(request.Language, obj.Kind, out var language, out var error))
+                    if (!TryResolveLanguage(request.Language, obj.Kind, obj.Detail, out var language, out var error))
                         throw new InvalidOperationException(error);
 
                     var formatted = await FormatExpressionAsync(request, obj.Expression!, language, cancellationToken);
@@ -87,7 +88,7 @@ public sealed class FormatModelHandler
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
-                if (!TryResolveLanguage(request.Language, request.Type, out var language, out var error))
+                if (!TryResolveLanguage(request.Language, request.Type, null, out var language, out var error))
                     throw new InvalidOperationException(error);
 
                 var objects = FormatTargets(snapshot, language, request.Type).ToList();
@@ -150,7 +151,7 @@ public sealed class FormatModelHandler
         FormatModelRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryResolveLanguage(request.Language, null, out var language, out var error))
+        if (!TryResolveLanguage(request.Language, null, null, out var language, out var error))
             return TomixResult<FormatModelResult>.Fail("TOMIX_FORMAT_UNSUPPORTED_LANGUAGE", error, exitCode: 2);
 
         var formatted = await _formatter.FormatAsync(
@@ -204,12 +205,17 @@ public sealed class FormatModelHandler
                 ? objects.Where(o => o.Kind == ModelObjectKind.Partition)
                 : objects.Where(o => o.Kind == ModelObjectKind.Measure);
 
+        // Calculated-table partitions carry DAX, not M: an M sweep would only report them failed.
+        if (language == FormatterLanguages.PowerQuery)
+            objects = objects.Where(o => !DaxExpressions.IsDaxExpression(o.Kind, o.Detail));
+
         return objects;
     }
 
     private static bool TryResolveLanguage(
         string? requested,
         ModelObjectKind? type,
+        string? detail,
         out string language,
         out string error)
     {
@@ -220,8 +226,10 @@ public sealed class FormatModelHandler
             return valid;
         }
 
-        // Partitions and shared expressions carry M; everything else defaults to DAX.
-        language = type is ModelObjectKind.Partition or ModelObjectKind.Expression
+        // Partitions and shared expressions carry M, except calculated-table partitions (DAX);
+        // everything else defaults to DAX.
+        language = type is ModelObjectKind.Partition or ModelObjectKind.Expression &&
+                   !DaxExpressions.IsDaxExpression(type.Value, detail)
             ? FormatterLanguages.PowerQuery
             : FormatterLanguages.Dax;
         error = "";
