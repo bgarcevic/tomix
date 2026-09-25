@@ -9,7 +9,8 @@ needed here, to regenerate the bundle.
 |---|---|
 | Output | `src/Tomix.App/Format/M/powerquery-engine.js` (committed, embedded in `Tomix.App`) |
 | Pins | `@microsoft/powerquery-formatter` 1.0.1, `@microsoft/powerquery-parser` 2.0.0 (exact, lockfile) |
-| Host | Jint (pure .NET JavaScript interpreter), in the `tx` process |
+| Host | Jint (pure .NET JavaScript interpreter), in the `tx` process: `src/Tomix.App/Format/M/PowerQueryEngine.cs` |
+| Jint guard | `tests/Tomix.App.Tests/PowerQueryEngineTests.cs` repeats the smoke assertions under Jint in `dotnet test` |
 
 ## Regenerate
 

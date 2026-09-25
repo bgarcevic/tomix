@@ -9,6 +9,7 @@
     <PackageVersion Include="Dax.ViewModel" Version="1.12.1" />
     <PackageVersion Include="Dax.Vpax" Version="1.12.1" />
     <PackageVersion Include="Dax.Vpax.Obfuscator" Version="1.2.1" />
+    <PackageVersion Include="Jint" Version="4.16.4" />
     <PackageVersion Include="Microsoft.AnalysisServices" Version="19.117.0" />
     <PackageVersion Include="Microsoft.AnalysisServices.AdomdClient" Version="19.117.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.90.0" />
