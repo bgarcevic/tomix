@@ -46,6 +46,22 @@ closing-bracket escape in the lexer's bracket scan, and comment rewording). The 
 facade, the offline `DaxSyntaxCheck` analyzer, and the offline DAX formatter that powers
 `tx format` (`DaxCodeFormatter`/`DaxPrinter`/`Doc`) are tomix code built on that engine.
 
+## Bundled Power Query (M) engine
+
+`src/Tomix.App/Format/M/powerquery-engine.js` is generated from `engines/powerquery` and embedded in
+`Tomix.App`. It bundles the npm packages below, each under the MIT License; their notices are
+also appended to the bundle itself.
+
+| Package | Version | License | Copyright / Project |
+|---------|---------|---------|---------------------|
+| @microsoft/powerquery-parser | 2.0.0 | MIT | Copyright (c) Microsoft Corporation — <https://github.com/microsoft/powerquery-parser> |
+| @microsoft/powerquery-formatter | 1.0.1 | MIT | Copyright (c) Microsoft Corporation — <https://github.com/microsoft/powerquery-formatter> |
+
+The parser's other two dependencies, `grapheme-splitter` (MIT, Copyright (c) 2015 Orlin Georgiev)
+and `performance-now` (MIT, Copyright (c) 2013 Braveg1rl), are replaced at build time by small shims
+written for tomix, so no code from either ships. The bundling tool `esbuild` (MIT) is build-time
+only and is not redistributed.
+
 ## NuGet dependencies (redistributed)
 
 | Package | Version | License | Copyright / Project |

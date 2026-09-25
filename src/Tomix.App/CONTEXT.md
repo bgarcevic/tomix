@@ -36,6 +36,11 @@ Application use cases and command handlers.
     never changes code: when printing would not preserve the expression's tokens, strings, and
     comments, it reports a failure and the original text comes back.
   - Power Query formatting uses the Power Query Formatter API from https://www.powerqueryformatter.com/api.
+    An offline replacement is being built: `Format/M/powerquery-engine.js` is Microsoft's
+    powerquery-parser + powerquery-formatter bundled by `/engines/powerquery` and embedded in this
+    assembly (`Format/M/PowerQueryEngineBundle`). It is generated; never edit it by hand. Regenerate
+    it with `npm ci && npm run build` in `/engines/powerquery` and read that README before changing
+    the build: the bundle must stay runnable under Jint (no `minifySyntax`, no Node built-ins).
 - Workspace discovery uses the Power BI REST API (`GET /v1.0/myorg/groups`) via `Connect/PowerBiWorkspaceCatalog`, authenticated with the shared `IAccessTokenProvider` token (same scope as XMLA). Interactive picking lives in the CLI, not here.
 - Release discovery uses the GitHub Releases API via `Update/GitHubReleaseSource` behind `Update/IReleaseSource` (unauthenticated, per-request headers on the shared `HttpClient`). The throttled-check cache lives in `Update/UpdateCheckStore`; install-type detection in `Update/InstallationInspector`.
 - Connect decision logic lives in `Connect/ConnectPlanHandler` (pure plan/resolve loop: the CLI resolves each reported `ConnectNeed` with a prompt and re-plans), with mirror probing/scaffolding in `Connect/ConnectWorkspaceHandler` and Desktop instance discovery in `Connect/PowerBiDesktopDiscovery`. `ConnectHandler` stays the session/recents state facade.

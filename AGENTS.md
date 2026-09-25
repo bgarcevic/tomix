@@ -20,6 +20,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - `/src/Tomix.Provider.*` - Model providers for TOM, TMDL, and VPAX
 - `/src/Tomix.Auth` - Authentication and credential caching
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
+- `/engines/powerquery` - npm project that builds the offline Power Query (M) engine bundle embedded in `Tomix.App` (dev-only; users need no Node)
 - `/samples` - Sample models used by tests and documentation
 - `/docs` - CLI UX guidelines, color strategy, error codes, and detailed contributor context
 
@@ -35,6 +36,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 | Add or change tests | `/tests` | `CONTEXT.md` (`Writing and maintaining tests`) | Prefer fast deterministic tests. Reuse the shared helpers, prefer `[Theory]` for input matrices, and prove a new test can fail before committing it |
 | Add documentation or samples | `/docs`, `/samples` | `CONTEXT.md` in each folder | Keep examples copy-pasteable |
 | Change the docs site (pages, nav, theme) | `/docs`, `zensical.toml` | `docs/contributing.md` | Built with Zensical via uv; verify with `uv run zensical build --clean --strict` |
+| Change the offline M (Power Query) engine | `/engines/powerquery` | `engines/powerquery/README.md` | Generated bundle lives in `src/Tomix.App/Format/M`; regenerate with `npm ci && npm run build`, run `npm run smoke`, and commit the bundle. Keep it Jint-safe (no `minifySyntax`, no Node built-ins) |
 | Change repo automation | `/.github` | `CONTEXT.md` | Keep CI fast for contributors |
 
 ## Local Context Files

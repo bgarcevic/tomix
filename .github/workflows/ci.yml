@@ -55,3 +55,26 @@ jobs:
       - name: QA selftest (deploy-script checker invariants)
         if: matrix.os == 'ubuntu-latest'
         run: bash scripts/qa/selftest-checker.sh
+
+  # The offline M engine bundle (src/Tomix.App/Format/M/powerquery-engine.js) is generated from
+  # engines/powerquery and committed so .NET builds need no npm. Rebuild it from the lockfile, fail
+  # if the committed file drifted, then run it in a bare JS context. A separate job (not a matrix
+  # leg) so the required build checks and branch ruleset stay untouched.
+  m-engine:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engines/powerquery
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: engines/powerquery/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Committed bundle matches a fresh build
+        run: git diff --exit-code -- ../../src/Tomix.App/Format/M/powerquery-engine.js
+      - run: npm run smoke

@@ -1,0 +1,24 @@
+{
+  "name": "tomix-powerquery-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline Power Query (M) formatter/parser engine bundled into tx. Generated output: src/Tomix.App/Format/M/powerquery-engine.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.mjs",
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "@microsoft/powerquery-formatter": "1.0.1",
+    "@microsoft/powerquery-parser": "2.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "overrides": {
+    "@microsoft/powerquery-parser": "2.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
