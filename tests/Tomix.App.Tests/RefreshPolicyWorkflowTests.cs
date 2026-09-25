@@ -1,4 +1,5 @@
 using Tomix.App.Get;
+using Tomix.App.Mutations;
 using Tomix.App.Rm;
 using Tomix.App.Set;
 using Tomix.App.Stage;
@@ -128,7 +129,7 @@ public sealed class RefreshPolicyWorkflowTests
             new RemoveModelObjectRequest(new(model.Path), "Sales/RefreshPolicy", null, ifExists, false, true, null, "", false), CancellationToken.None);
         Assert.Equal(ifExists, result.Success);
         if (ifExists)
-            Assert.Equal(false, result.Data!.Removed);
+            Assert.Equal(MutationStatus.Unchanged, result.Data!.Status);
         else
             Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", result.Diagnostics[0].Code);
     }

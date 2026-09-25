@@ -64,7 +64,7 @@ public sealed class BpaRunHandler
         if (begin.Mode == MutationMode.Revert)
         {
             stagingStore.Discard(request.Model);
-            return TomixResult<BpaRunResult>.Ok(new BpaRunResult([], "", 0));
+            return TomixResult<BpaRunResult>.Ok(new BpaRunResult([], "", 0) { FixOutcome = MutationOutcome.Reverted });
         }
 
         var context = begin.Context!;
@@ -155,15 +155,7 @@ public sealed class BpaRunHandler
                         return SaveValidation.Blocked<BpaRunResult>(ex.Delta);
                     }
 
-                    runResult = runResult with
-                    {
-                        Saved = outcome.Saved,
-                        Staged = outcome.Staged,
-                        Synced = outcome.Synced,
-                        SyncTarget = outcome.SyncTarget,
-                        SyncWarning = outcome.SyncWarning,
-                        NewValidationErrors = outcome.Validation?.NewErrorCount
-                    };
+                    runResult = runResult with { FixOutcome = outcome with { Target = MutationTarget.Merge(MutationTarget.For(request.Model, connection), outcome.Target) } };
                     if (context.Force && outcome.Validation is { NewErrorCount: > 0 } delta)
                         return TomixResult<BpaRunResult>.Ok(
                             runResult,

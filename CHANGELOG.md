@@ -20,6 +20,17 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- **Breaking:** mutation JSON results share one persistence contract (#161). `saved` is
+  always a bool; the path or `server / database` moved to `savedTo`. A new `status`
+  (`saved`, `staged`, `preview`, `dryRun`, `unchanged`, `reverted`) replaces `staged` and
+  `reverted`. `synced`/`syncTarget`/`syncWarning` became a `sync` object whose `status` is
+  `notAttempted`, `notConfigured`, `skipped`, `succeeded`, or `failed`. `dryRun` is always
+  emitted. Previews and dry runs report the object as `wouldAdd`/`wouldMove`/`wouldRemove`/`wouldSet`
+  instead of `added`/`moved`/`removed`/`set`. New `persistence` (`file`, `liveModel`,
+  `service`) and `target` (`server`, `database`, friendly `model`) fields say where a save
+  landed. `format` reports its per-object result as `formatStatus`. A save to Power BI
+  Desktop prints a reminder on stderr to save the report in Desktop. See
+  [JSON result](docs/commands/modify.md#json-result).
 - TMDL saves rewrite only the files whose content changed, so a small edit gives a
   small git diff. Untouched files keep their bytes, line endings, and M partition
   `source =` indentation, and a failed save leaves the model intact. Only stale

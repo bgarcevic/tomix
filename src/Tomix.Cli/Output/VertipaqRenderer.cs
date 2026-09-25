@@ -1,4 +1,5 @@
 using Spectre.Console;
+using Tomix.App.Mutations;
 using Tomix.App.Vertipaq;
 
 namespace Tomix.Cli.Output;
@@ -78,7 +79,7 @@ internal static class VertipaqRenderer
             ? $" ({annotate.SkippedObjects} not present in the model, skipped)"
             : "";
 
-        if (annotate.Saved is false or null)
+        if (!annotate.Saved)
         {
             AnsiConsole.MarkupLine(Styling.Warning(
                 $"Annotated {annotate.AnnotatedObjects} objects in memory{skipped} — pass --save to write them to the model."));
@@ -88,10 +89,11 @@ internal static class VertipaqRenderer
         AnsiConsole.MarkupLine(Styling.Success(
             $"Annotated {annotate.AnnotatedObjects} objects and saved{skipped}."));
 
-        if (annotate.Synced && annotate.SyncTarget is not null)
-            AnsiConsole.MarkupLine(Styling.Muted($"Synced workspace mirror: {annotate.SyncTarget}"));
-        if (annotate.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(annotate.SyncWarning));
+        MutationOutput.RenderLiveModelNotice(annotate.Outcome);
+        if (annotate.Sync is { Status: SyncStatus.Succeeded, Target: { } syncTarget })
+            AnsiConsole.MarkupLine(Styling.Muted($"Synced workspace mirror: {syncTarget}"));
+        if (annotate.Sync.Warning is { } syncWarning)
+            AnsiConsole.MarkupLine(Styling.Warning(syncWarning));
     }
 
     private static bool IsNumeric(VertipaqView.FieldKind kind)

@@ -77,8 +77,10 @@ public sealed partial class RmCommandTests
         var data = document.RootElement.GetProperty("data");
         Assert.True(data.GetProperty("dryRun").GetBoolean());
         Assert.Equal("would_block", data.GetProperty("reason").GetString());
-        Assert.Equal("Sales/Amount", data.GetProperty("removed").GetString());
-        Assert.False(data.TryGetProperty("saved", out _));
+        Assert.Equal("dryRun", data.GetProperty("status").GetString());
+        Assert.Equal("Sales/Amount", data.GetProperty("wouldRemove").GetString());
+        Assert.False(data.TryGetProperty("removed", out _));
+        Assert.False(data.GetProperty("saved").GetBoolean());
     }
 
     [System.Text.RegularExpressions.GeneratedRegex("\x1b\\[[0-9;]*m")]

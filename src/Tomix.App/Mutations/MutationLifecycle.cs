@@ -26,7 +26,9 @@ public sealed record MutationContext(
     bool Force,
     StagingHandle? Staging,
     ModelReference? SyncTarget = null,
-    bool Overwrite = false);
+    bool Overwrite = false,
+    bool DryRun = false,
+    bool SyncSuppressed = false);
 
 /// <summary>A failed pre-flight: the code/message/exit-code the handler should return verbatim.</summary>
 public sealed record MutationError(string Code, string Message, int ExitCode);
@@ -34,21 +36,6 @@ public sealed record MutationError(string Code, string Message, int ExitCode);
 public sealed record MutationBegin(MutationContext? Context, MutationError? Error)
 {
     public MutationMode Mode => Context?.Mode ?? MutationMode.None;
-}
-
-public sealed record MutationOutcome(
-    object Saved,
-    bool? Staged,
-    bool Synced = false,
-    string? SyncTarget = null,
-    string? SyncWarning = null,
-    SaveValidationDelta? Validation = null)
-{
-    /// <summary>
-    /// True when a workspace sync was attempted (or required) and did not happen. The command
-    /// should exit non-zero so CI catches mirror drift, while still rendering the saved result.
-    /// </summary>
-    public bool SyncFailed => SyncWarning is not null;
 }
 
 /// <summary>
@@ -102,13 +89,14 @@ public static class MutationLifecycle
         // same reasoning to the source itself: a model addressed explicitly (path / --server /
         // --database) that is not the session's primary must never be deployed over the session's
         // mirror. Only consumed by the Save branch of CompleteAsync; harmless on other modes.
-        var syncTarget = options.NoSync || !string.IsNullOrWhiteSpace(options.SaveTo)
-            ? null
-            : ActiveModelResolver.ResolveSyncTarget(connection, source);
+        var configuredSync = ActiveModelResolver.ResolveSyncTarget(connection, source);
+        var syncSuppressed = options.NoSync || !string.IsNullOrWhiteSpace(options.SaveTo);
+        var syncTarget = syncSuppressed ? null : configuredSync;
 
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(
-                new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null, syncTarget, options.Overwrite),
+                new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null, syncTarget, options.Overwrite,
+                    options.DryRun, SyncSuppressed: syncSuppressed && configuredSync is not null),
                 null);
 
         if (mode == MutationMode.Revert)
@@ -168,20 +156,43 @@ public static class MutationLifecycle
                         throw new SaveValidationBlockedException(validation);
                 }
                 var export = await mutator.SaveAsync(context.SaveTarget, context.Serialization, context.Overwrite, cancellationToken);
-                var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
-                    mutator, context.SyncTarget, context.Force,
-                    WorkspaceSync.SyncOptionsFor(command), cancellationToken);
-                return new MutationOutcome(export.SavedPath, null, synced, syncTarget, syncWarning, validation);
+                var sync = context.SyncSuppressed
+                    ? new SyncOutcome(SyncStatus.Skipped)
+                    : await WorkspaceSync.SyncAsync(
+                        mutator, context.SyncTarget, context.Force,
+                        WorkspaceSync.SyncOptionsFor(command), cancellationToken);
+                var (savedTo, persistence) = Describe(context.EffectiveModel, context.SaveTarget, export.SavedPath);
+                // A remote save reports the database it wrote to; carry it into the target.
+                var target = persistence is PersistenceKind.File
+                    ? null
+                    : new MutationTarget(context.EffectiveModel.Value, context.EffectiveModel.Database ?? export.SavedPath, null);
+                return new MutationOutcome(MutationStatus.Saved, savedTo, persistence, sync, target, validation);
 
             case MutationMode.Stage:
                 // Flush the in-memory mutation into the working copy on disk, then record the op.
                 await mutator.SaveAsync(null, context.Serialization, overwrite: true, cancellationToken);
                 await context.Staging!.AppendOpAsync(command, summary, cancellationToken);
-                return new MutationOutcome(false, true);
+                return MutationOutcome.Staged;
 
             default:
-                return new MutationOutcome(false, null);
+                return context.DryRun ? MutationOutcome.DryRun : MutationOutcome.Preview;
         }
+    }
+
+    /// <summary>
+    /// Where a save landed. <c>--save-to</c> always writes a file. Otherwise a local path is a
+    /// file save; a <c>localhost</c> endpoint is the model inside Power BI Desktop, which keeps the
+    /// change only in memory until the report is saved; any other endpoint is the service. The
+    /// provider reports a remote save as the database name, so it is qualified with the server.
+    /// </summary>
+    internal static (string SavedTo, PersistenceKind Persistence) Describe(
+        ModelReference model, string? saveTarget, string savedPath)
+    {
+        if (!string.IsNullOrWhiteSpace(saveTarget) || !model.IsRemote)
+            return (savedPath, PersistenceKind.File);
+
+        return ($"{model.Value} / {savedPath}",
+            model.IsLocalInstance ? PersistenceKind.LiveModel : PersistenceKind.Service);
     }
 
 }

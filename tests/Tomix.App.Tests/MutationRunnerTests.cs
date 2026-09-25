@@ -55,6 +55,6 @@ public sealed class MutationRunnerTests
             [new TmdlModelProvider()], model, options, "set", stores,
             (_, _, _) => Task.FromResult<(bool, string, Func<MutationOutcome, string>)>(
                 (true, "test mutation", _ => "mutated")),
-            revertResult: "reverted",
+            revertResult: _ => "reverted",
             CancellationToken.None);
 }

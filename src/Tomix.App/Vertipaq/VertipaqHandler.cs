@@ -181,11 +181,9 @@ public sealed class VertipaqHandler
                 return Task.FromResult<(bool, string, Func<MutationOutcome, VertipaqAnnotateResult>)>((
                     annotated > 0,
                     $"vertipaq annotate {annotated} objects",
-                    outcome => new VertipaqAnnotateResult(
-                        annotated, skipped, outcome.Saved, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                        outcome.Validation?.NewErrorCount)));
+                    outcome => new VertipaqAnnotateResult(annotated, skipped) { Outcome = outcome }));
             },
-            new VertipaqAnnotateResult(0, 0, Saved: false),
+            outcome => new VertipaqAnnotateResult(0, 0) { Outcome = outcome },
             cancellationToken);
     }
 

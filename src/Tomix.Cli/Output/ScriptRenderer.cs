@@ -1,4 +1,5 @@
 using Spectre.Console;
+using Tomix.App.Mutations;
 using Tomix.App.Script;
 
 namespace Tomix.Cli.Output;
@@ -59,17 +60,14 @@ internal static class ScriptRenderer
 
         AnsiConsole.MarkupLine(Styling.Success(
             $"Done: {result.ScriptsExecuted} script(s) executed."));
-        if (result.Saved is bool saved && saved == false)
-            AnsiConsole.MarkupLine(Styling.Warning(
-                "Not saved yet. Pass --save to persist, or --stage to stage the change."));
-        else if (result.Staged == true)
+        if (result.Status == MutationStatus.Preview)
+            AnsiConsole.MarkupLine(Styling.Warning(MutationOutput.NotSavedHint));
+        else if (result.Status == MutationStatus.Staged)
             AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
+        else if (result.Saved)
+            MutationOutput.RenderSaved(result.Outcome);
 
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success(
-                $"Synced: {result.SyncTarget!}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(result.SyncWarning));
+        MutationOutput.RenderSync(result.Outcome);
     }
 
     public static object ToReferenceJson(ScriptRunResult result)
@@ -77,6 +75,7 @@ internal static class ScriptRenderer
         if (result.DryRun)
             return new
             {
+                status = result.Status,
                 dryRun = true,
                 scripts = result.Scripts.Select(script => new
                 {
@@ -90,6 +89,7 @@ internal static class ScriptRenderer
             return new
             {
                 success = false,
+                status = result.Status,
                 durationMs = result.DurationMs,
                 failedScript = result.FailedScript,
                 scriptIndex = result.ScriptIndex,
@@ -98,26 +98,19 @@ internal static class ScriptRenderer
                 messages = result.Messages
             };
 
-        if (result.Staged is null)
-        {
-            return new
-            {
-                success = true,
-                durationMs = result.DurationMs,
-                scriptsExecuted = result.ScriptsExecuted,
-                messages = result.Messages,
-                saved = result.Saved
-            };
-        }
-
         return new
         {
             success = true,
             durationMs = result.DurationMs,
             scriptsExecuted = result.ScriptsExecuted,
             messages = result.Messages,
+            status = result.Status,
             saved = result.Saved,
-            staged = result.Staged
+            savedTo = result.SavedTo,
+            persistence = result.Persistence,
+            target = result.Target,
+            sync = result.Sync,
+            newValidationErrors = result.NewValidationErrors
         };
     }
 }

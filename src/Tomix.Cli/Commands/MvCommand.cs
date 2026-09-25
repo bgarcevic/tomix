@@ -164,26 +164,14 @@ internal sealed class MvCommand : ICommandModule
 
     private static void Render(MoveModelObjectResult result)
     {
-        if (result.Reverted)
+        if (result.Status == MutationStatus.Reverted)
         {
             AnsiConsole.MarkupLine(Styling.Success("Reverted."));
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Moved: {result.Moved} -> {result.To}")));
-        if (result.Staged == true)
-            AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
-        else if (result.DryRun == true)
-            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
-        else if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist, or --stage to stage the change."));
-        else
-            AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Saved: {result.Saved}")));
-
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+        AnsiConsole.MarkupLine(Styling.Success(Styling.MarkupEscape($"Moved: {result.Source} -> {result.To}")));
+        MutationOutput.RenderPersistence(result.Outcome);
 
         SetCommand.RenderFixedReferences(result.FixedReferences);
         SetCommand.RenderBrokenReferences(result.BrokenReferences);

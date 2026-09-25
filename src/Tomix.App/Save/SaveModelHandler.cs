@@ -71,7 +71,7 @@ public sealed class SaveModelHandler
                 new ModelExportRequest(outputPath, serialization, request.Overwrite, request.SupportingFiles),
                 cancellationToken);
 
-            var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
+            var sync = await WorkspaceSync.SyncAsync(
                 session, request.SyncTarget, request.Overwrite,
                 // 'save' never edits a refresh policy, so the mirror's policy partitions (and their
                 // processed data) are preserved — see WorkspaceSync.SyncOptionsFor.
@@ -79,9 +79,11 @@ public sealed class SaveModelHandler
 
             // A failed workspace sync leaves the mirror behind the source; render the saved
             // result but exit non-zero so CI catches the drift.
+            var (savedTo, persistence) = MutationLifecycle.Describe(request.Model, outputPath, export.SavedPath);
+            var outcome = new MutationOutcome(MutationStatus.Saved, savedTo, persistence, sync);
             return TomixResult<SaveModelResult>.Ok(
-                new SaveModelResult(export.SavedPath, export.Format, synced, syncTarget, syncWarning),
-                syncWarning is not null ? 1 : 0);
+                new SaveModelResult(export.Format) { Outcome = outcome },
+                outcome.SyncFailed ? 1 : 0);
         }
         catch (NotSupportedException ex)
         {

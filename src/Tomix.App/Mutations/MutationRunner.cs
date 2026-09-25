@@ -15,7 +15,7 @@ public static class MutationRunner
         string command,
         MutationStores stores,
         Func<IModelMutationSession, IModelSession, MutationContext, Task<(bool Changed, string Summary, Func<MutationOutcome, TResult> BuildResult)>> mutate,
-        TResult revertResult,
+        Func<MutationOutcome, TResult> revertResult,
         CancellationToken cancellationToken)
         => await ProviderConnectionGuard.RunAsync(
             model,
@@ -29,11 +29,12 @@ public static class MutationRunner
         string command,
         MutationStores stores,
         Func<IModelMutationSession, IModelSession, MutationContext, Task<(bool Changed, string Summary, Func<MutationOutcome, TResult> BuildResult)>> mutate,
-        TResult revertResult,
+        Func<MutationOutcome, TResult> revertResult,
         CancellationToken cancellationToken)
     {
         var stagingStore = stores.Staging;
         var connection = stores.ResolveSession();
+        var target = MutationTarget.For(model, connection);
 
         var begin = await MutationLifecycle.BeginAsync(
             providers, model, options, stagingStore, connection, cancellationToken);
@@ -51,7 +52,7 @@ public static class MutationRunner
                     "Nothing is staged for this model.",
                     hint: "Use --stage to stage a mutation first; 'tx stage' lists staged work.");
 
-            return TomixResult<TResult>.Ok(revertResult);
+            return TomixResult<TResult>.Ok(revertResult(MutationOutcome.Reverted with { Target = target }));
         }
 
         var context = begin.Context!;
@@ -76,10 +77,11 @@ public static class MutationRunner
             var (changed, summary, buildResult) = await mutate(mutator, session, context);
 
             if (!changed)
-                return TomixResult<TResult>.Ok(buildResult(new MutationOutcome(false, null)));
+                return TomixResult<TResult>.Ok(buildResult(MutationOutcome.Unchanged with { Target = target, DryRunRequested = context.DryRun }));
 
-            var outcome = await MutationLifecycle.CompleteAsync(
+            var completed = await MutationLifecycle.CompleteAsync(
                 mutator, session, context, validationBaseline, command, summary, cancellationToken);
+            var outcome = completed with { Target = MutationTarget.Merge(target, completed.Target) };
 
             // A failed workspace sync leaves the mirror behind the source; render the saved
             // result but exit non-zero so CI catches the drift.

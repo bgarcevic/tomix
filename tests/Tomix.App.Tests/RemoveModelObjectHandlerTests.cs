@@ -1,3 +1,4 @@
+using Tomix.App.Mutations;
 using Tomix.App.Rm;
 using Tomix.Core.Models;
 
@@ -18,10 +19,10 @@ public sealed class RemoveModelObjectHandlerTests
         var result = await handler.HandleAsync(Request("Sales/Nope", ifExists: true), CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal(false, result.Data!.Removed);
+        Assert.Null(result.Data!.Removed);
+        Assert.Equal(MutationStatus.Unchanged, result.Data.Status);
         Assert.Equal("not_found", result.Data.Reason);
         Assert.Equal("Sales/Nope", result.Data.Path);
-        Assert.False(result.Data.Reverted);
     }
 
     [Fact]
@@ -32,20 +33,22 @@ public sealed class RemoveModelObjectHandlerTests
         var result = await handler.HandleAsync(Request("Sales/Nope", ifExists: true, dryRun: true), CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal(false, result.Data!.Removed);
+        Assert.Null(result.Data!.Removed);
+        Assert.Null(result.Data.WouldRemove);
+        Assert.Equal(MutationStatus.Unchanged, result.Data.Status);
         Assert.Equal("not_found", result.Data.Reason);
         Assert.True(result.Data.DryRun);
     }
 
     [Fact]
-    public async Task HandleAsync_Removed_ReportsPath()
+    public async Task HandleAsync_NotSaved_ReportsPathAsWouldRemove()
     {
         var handler = new RemoveModelObjectHandler([new StubProvider(new StubSession(removeChanged: true))], TestStores);
 
         var result = await handler.HandleAsync(Request("Sales/Old", ifExists: false), CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal("Sales/Old", result.Data!.Removed);
+        Assert.Equal("Sales/Old", result.Data!.WouldRemove);
         Assert.Null(result.Data.Reason);
     }
 

@@ -1,25 +1,26 @@
 using System.Text.Json.Serialization;
+using Tomix.App.Mutations;
 
 namespace Tomix.App.Mv;
 
+/// <summary>
+/// <paramref name="Source"/> serializes as <c>moved</c> once the edit was saved or staged and as
+/// <c>wouldMove</c> for a preview or dry run.
+/// </summary>
 public sealed record MoveModelObjectResult(
-    string Moved,
+    [property: JsonIgnore]
+    string Source,
     string To,
-    object Saved,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    bool Reverted = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyList<string>? BrokenReferences = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? FixedReferences = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? DryRun = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null);
+    IReadOnlyList<string>? FixedReferences = null) : MutationResult
+{
+    [JsonPropertyOrder(-2)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Moved => IfApplied(Source);
+
+    [JsonPropertyOrder(-2)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? WouldMove => IfPreviewed(Source);
+}

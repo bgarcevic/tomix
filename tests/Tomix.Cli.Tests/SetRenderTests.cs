@@ -22,7 +22,6 @@ public sealed partial class SetRenderTests
             "Sales/Total Sales",
             "expression",
             "SUM('Sales'[Amount]) + 1",
-            Saved: false,
             ValidationErrors: 0,
             OldValue: "SUM('Sales'[Amount])",
             IsDaxProperty: true);
@@ -43,7 +42,6 @@ public sealed partial class SetRenderTests
             "Sales/Total Sales",
             "expression",
             "SUM(Sales[Amount])",
-            Saved: false,
             ValidationErrors: 0,
             OldValue: null,
             IsDaxProperty: true);
@@ -61,7 +59,6 @@ public sealed partial class SetRenderTests
             "Sales/Month",
             "formatString",
             "\"$\"#,0",
-            Saved: false,
             ValidationErrors: 0,
             OldValue: "\"#\"",
             IsDaxProperty: false);
@@ -80,7 +77,6 @@ public sealed partial class SetRenderTests
             "Sales/Total Sales",
             "expression",
             "SUM(Sales[Amount])",
-            Saved: false,
             ValidationErrors: 0,
             OldValue: "SUM(Sales[Amount])",
             IsDaxProperty: true);

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tomix.App.Bpa;
+using Tomix.App.Mutations;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 
@@ -43,9 +44,8 @@ public sealed class BpaJsonContractTests
         FixesSkipped: 2,
         DestructiveFixesSkipped: 3,
         FixErrors: ["fix failed"],
-        Saved: true,
-        Staged: null,
-        RuleLoadDiagnostics: ["could not load extra.json"]);
+        RuleLoadDiagnostics: ["could not load extra.json"])
+    { FixOutcome = new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, SyncOutcome.NotConfigured) };
 
     [Fact]
     public void RunJson_UsesDocumentedFieldNames()
@@ -65,8 +65,11 @@ public sealed class BpaJsonContractTests
         Assert.Equal(3, root.GetProperty("destructiveFixesSkipped").GetInt32());
         Assert.Equal("fix failed", root.GetProperty("fixErrors")[0].GetString());
         Assert.Equal("could not load extra.json", root.GetProperty("ruleLoadDiagnostics")[0].GetString());
+        Assert.Equal("saved", root.GetProperty("status").GetString());
         Assert.True(root.GetProperty("saved").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("staged").ValueKind);
+        Assert.Equal("C:/model", root.GetProperty("savedTo").GetString());
+        Assert.Equal("notConfigured", root.GetProperty("sync").GetProperty("status").GetString());
+        Assert.False(root.TryGetProperty("staged", out _));
         Assert.Equal(0, root.GetProperty("errors").GetArrayLength());
     }
 
@@ -183,16 +186,17 @@ public sealed class BpaJsonContractTests
     public void IgnoreJson_UsesDocumentedFieldNames()
     {
         var result = new BpaRulesIgnoreResult(
-            RuleId: "R1", Ignored: true, Changed: true, RuleIds: ["R1"],
-            Saved: true, Staged: null, ModelName: "MyModel");
+            RuleId: "R1", Ignored: true, Changed: true, RuleIds: ["R1"], ModelName: "MyModel")
+        { Outcome = new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, SyncOutcome.NotConfigured) };
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRulesRenderer.ToIgnoreJson(result))).RootElement;
 
         Assert.Equal("R1", root.GetProperty("ruleId").GetString());
         Assert.True(root.GetProperty("ignored").GetBoolean());
         Assert.True(root.GetProperty("changed").GetBoolean());
         Assert.Equal(1, root.GetProperty("ruleIds").GetArrayLength());
+        Assert.Equal("saved", root.GetProperty("status").GetString());
         Assert.True(root.GetProperty("saved").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("staged").ValueKind);
+        Assert.False(root.TryGetProperty("staged", out _));
         Assert.Equal("MyModel", root.GetProperty("model").GetString());
     }
 }

@@ -160,11 +160,6 @@ internal sealed class ReplaceCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(result.Saved is false ? Styling.Warning("Saved: false") : Styling.Success($"Saved: {result.Saved}"));
-
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+        MutationOutput.RenderPersistence(result.Outcome);
     }
 }

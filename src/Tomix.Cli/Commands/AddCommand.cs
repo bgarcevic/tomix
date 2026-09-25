@@ -280,7 +280,7 @@ internal sealed class AddCommand : ICommandModule
 
     private static void Render(AddModelObjectResult result)
     {
-        if (result.Reverted)
+        if (result.Status == MutationStatus.Reverted)
         {
             AnsiConsole.MarkupLine(Styling.Success("Reverted."));
             return;
@@ -293,20 +293,8 @@ internal sealed class AddCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Success($"Added: {result.Added}"));
-        if (result.Staged == true)
-            AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
-        else if (result.DryRun == true)
-            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
-        else if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist, or --stage to stage the change."));
-        else
-            AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
-
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+        AnsiConsole.MarkupLine(Styling.Success($"Added: {result.Path}"));
+        MutationOutput.RenderPersistence(result.Outcome);
     }
 
     /// <summary>Splits a --set value at the first '='; empty name means it was malformed.</summary>

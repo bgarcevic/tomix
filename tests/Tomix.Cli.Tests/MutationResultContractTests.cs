@@ -1,20 +1,25 @@
 using System.Text.Json;
 using Tomix.App.Add;
 using Tomix.App.Format;
+using Tomix.App.Mutations;
 using Tomix.App.Mv;
 using Tomix.App.Replace;
 using Tomix.App.Rm;
+using Tomix.App.Save;
 using Tomix.App.Script;
 using Tomix.App.Set;
+using Tomix.App.Vertipaq;
 using Tomix.Cli.Output;
 
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// JSON contract tests for mutation command result types.
-/// These protect the <c>--output-format json</c> output shape — especially the
-/// <c>saved</c> field (type <c>object</c>: null/true/path) and <c>staged</c> field
-/// (type <c>bool?</c>).
+/// JSON contract tests for mutation command results (issue #161). Every mutation result carries
+/// the same persistence fields from <see cref="MutationResult"/>: <c>status</c>, <c>dryRun</c>
+/// (always a bool), <c>saved</c> (always a bool), <c>savedTo</c>, <c>persistence</c>,
+/// <c>target</c>, <c>sync</c> ({status, target?, warning?}) and <c>newValidationErrors</c>. The
+/// object path uses a past-tense key (<c>added</c>, <c>moved</c>, <c>removed</c>, <c>set</c>) only
+/// when the edit was saved or staged, and a <c>would*</c> key for previews and dry runs.
 /// <para>
 /// Serialization goes through <see cref="JsonOutput"/>, the same code path the commands use,
 /// so that omission driven by <c>[JsonIgnore(WhenWritingNull)]</c> is actually exercised. Do not
@@ -23,164 +28,181 @@ namespace Tomix.Cli.Tests;
 /// attribute is present.
 /// </para>
 /// <para>
-/// The <c>bpa</c> results are deliberately absent: <c>BpaRunResult</c> and
-/// <c>BpaRulesIgnoreResult</c> are never serialized directly — <c>BpaRunRenderer.ToJson</c> and
-/// <c>BpaRulesRenderer.ToIgnoreJson</c> project them onto anonymous objects that emit
-/// <c>saved</c>/<c>staged</c> unconditionally. That contract is pinned in
-/// <see cref="BpaJsonContractTests"/>.
+/// The <c>bpa</c> results are projected onto anonymous objects by their renderers; that contract
+/// is pinned in <see cref="BpaJsonContractTests"/>.
 /// </para>
 /// </summary>
 public sealed class MutationResultContractTests
 {
-    private static string Serialize<T>(T value) => JsonOutput.Serialize(value);
+    private static JsonElement Json<T>(T value) => JsonDocument.Parse(JsonOutput.Serialize(value)).RootElement;
 
-    // ── Format: ObjectFormatResult ──────────────────────────────────────────
+    private static readonly MutationOutcome SavedToFile = new(
+        MutationStatus.Saved, "C:/model/def", PersistenceKind.File, SyncOutcome.NotConfigured);
 
-    [Fact]
-    public void ObjectFormatResult_NotSaved_OmitsSavedAndStaged()
+    private static readonly MutationOutcome SavedToDesktop = new(
+        MutationStatus.Saved, "localhost:51234 / 0f1e2d3c", PersistenceKind.LiveModel, SyncOutcome.NotConfigured,
+        new MutationTarget("localhost:51234", "0f1e2d3c", "Sales Report"));
+
+    public static TheoryData<string, MutationOutcome> Modes => new()
     {
-        var result = new ObjectFormatResult(true, "Sales/Total", "dax", "formatted", "CALCULATE()", null);
+        { "preview", MutationOutcome.Preview },
+        { "dryRun", MutationOutcome.DryRun },
+        { "unchanged", MutationOutcome.Unchanged },
+        { "staged", MutationOutcome.Staged },
+        { "saved", SavedToFile },
+        { "reverted", MutationOutcome.Reverted },
+    };
 
-        Assert.DoesNotContain("\"saved\"", Serialize(result));
-        Assert.DoesNotContain("\"staged\"", Serialize(result));
+    /// <summary>Every mutation result type, built with the given outcome.</summary>
+    private static IEnumerable<(string Name, MutationResult Result)> AllResults(MutationOutcome outcome)
+    {
+        yield return ("add", new AddModelObjectResult("Sales/M") { Outcome = outcome });
+        yield return ("mv", new MoveModelObjectResult("Sales/A", "Sales/B") { Outcome = outcome });
+        yield return ("rm", new RemoveModelObjectResult("Sales/M") { Outcome = outcome });
+        yield return ("set", new SetModelPropertyResult("Sales/M", "description", "x", 0) { Outcome = outcome });
+        yield return ("replace", new ReplaceModelTextResult("a", "b", 1, null) { Outcome = outcome });
+        yield return ("format", new ObjectFormatResult(true, "Sales/M", "DAX", "formatted", "1") { Outcome = outcome });
+        yield return ("format-model", new ModelFormatResult(1, 1, 0, 0, []) { Outcome = outcome });
+        yield return ("save", new SaveModelResult("tmdl") { Outcome = outcome });
+        yield return ("script", ScriptRunResult.Executed("model", 1, [], [], outcome));
+        yield return ("vertipaq", new VertipaqAnnotateResult(1, 0) { Outcome = outcome });
+    }
+
+    [Theory]
+    [MemberData(nameof(Modes))]
+    public void EveryResult_EmitsStableTypesForSharedFields(string status, MutationOutcome outcome)
+    {
+        foreach (var (name, result) in AllResults(outcome))
+        {
+            var json = Json<object>(result);
+
+            Assert.True(json.GetProperty("status").GetString() == status, $"{name}: status");
+            Assert.True(json.GetProperty("saved").ValueKind is JsonValueKind.True or JsonValueKind.False, $"{name}: saved is bool");
+            Assert.True(json.GetProperty("dryRun").ValueKind is JsonValueKind.True or JsonValueKind.False, $"{name}: dryRun is bool");
+            Assert.Equal(JsonValueKind.Object, json.GetProperty("sync").ValueKind);
+            Assert.False(json.TryGetProperty("synced", out _), $"{name}: legacy synced");
+            Assert.False(json.TryGetProperty("staged", out _), $"{name}: legacy staged");
+            Assert.False(json.TryGetProperty("reverted", out _), $"{name}: legacy reverted");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Modes))]
+    public void SavedAndSavedTo_AreSetOnlyWhenSaved(string status, MutationOutcome outcome)
+    {
+        var json = Json(new AddModelObjectResult("Sales/M") { Outcome = outcome });
+
+        Assert.Equal(status == "saved", json.GetProperty("saved").GetBoolean());
+        Assert.Equal(status == "saved", json.TryGetProperty("savedTo", out _));
+        Assert.Equal(status == "saved", json.TryGetProperty("persistence", out _));
+        Assert.Equal(status == "dryRun", json.GetProperty("dryRun").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData("saved", "added", null)]
+    [InlineData("staged", "added", null)]
+    [InlineData("preview", null, "wouldAdd")]
+    [InlineData("dryRun", null, "wouldAdd")]
+    [InlineData("unchanged", null, null)]
+    [InlineData("reverted", null, null)]
+    public void ObjectKey_IsPastTenseOnlyWhenApplied(string status, string? appliedKey, string? previewKey)
+    {
+        var outcome = Modes.Single(row => (string)row[0] == status)[1] as MutationOutcome;
+        var json = Json(new AddModelObjectResult("Sales/M") { Outcome = outcome! });
+
+        Assert.Equal(appliedKey is not null, json.TryGetProperty("added", out _));
+        Assert.Equal(previewKey is not null, json.TryGetProperty("wouldAdd", out _));
     }
 
     [Fact]
-    public void ObjectFormatResult_SavedTrue_SerializesSavedAsBooleanTrue()
+    public void DryRunKeys_NeverUsePastTense()
     {
-        var result = new ObjectFormatResult(true, "Sales/Total", "dax", "formatted", "CALCULATE()", Saved: true);
-        var json = JsonDocument.Parse(Serialize(result));
+        var keys = AllResults(MutationOutcome.DryRun)
+            .SelectMany(r => Json<object>(r.Result).EnumerateObject().Select(p => p.Name))
+            .ToHashSet();
 
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("saved").ValueKind);
+        Assert.DoesNotContain("added", keys);
+        Assert.DoesNotContain("moved", keys);
+        Assert.DoesNotContain("removed", keys);
+        Assert.DoesNotContain("set", keys);
+        Assert.Contains("wouldAdd", keys);
+        Assert.Contains("wouldMove", keys);
+        Assert.Contains("wouldRemove", keys);
+        Assert.Contains("wouldSet", keys);
     }
 
     [Fact]
-    public void ObjectFormatResult_SavedPath_SerializesSavedAsString()
+    public void LiveModelSave_ReportsPersistenceBoundaryAndTarget()
     {
-        var result = new ObjectFormatResult(true, "Sales/Total", "dax", "formatted", "CALCULATE()", Saved: "output/model");
-        var json = JsonDocument.Parse(Serialize(result));
+        var json = Json(new RemoveModelObjectResult("Sales/M") { Outcome = SavedToDesktop });
 
-        Assert.Equal("output/model", json.RootElement.GetProperty("saved").GetString());
+        Assert.Equal("Sales/M", json.GetProperty("removed").GetString());
+        Assert.True(json.GetProperty("saved").GetBoolean());
+        Assert.Equal("localhost:51234 / 0f1e2d3c", json.GetProperty("savedTo").GetString());
+        Assert.Equal("liveModel", json.GetProperty("persistence").GetString());
+        var target = json.GetProperty("target");
+        Assert.Equal("localhost:51234", target.GetProperty("server").GetString());
+        Assert.Equal("0f1e2d3c", target.GetProperty("database").GetString());
+        Assert.Equal("Sales Report", target.GetProperty("model").GetString());
+    }
+
+    [Theory]
+    [InlineData(SyncStatus.NotAttempted, "notAttempted")]
+    [InlineData(SyncStatus.NotConfigured, "notConfigured")]
+    [InlineData(SyncStatus.Skipped, "skipped")]
+    [InlineData(SyncStatus.Succeeded, "succeeded")]
+    [InlineData(SyncStatus.Failed, "failed")]
+    public void Sync_IsAStatusObject(SyncStatus status, string expected)
+    {
+        var sync = new SyncOutcome(status, status == SyncStatus.Succeeded ? "ws / Model" : null);
+        var json = Json(new AddModelObjectResult("Sales/M") { Outcome = SavedToFile with { Sync = sync } });
+
+        var element = json.GetProperty("sync");
+        Assert.Equal(expected, element.GetProperty("status").GetString());
+        Assert.Equal(status == SyncStatus.Succeeded, element.TryGetProperty("target", out _));
+        Assert.False(element.TryGetProperty("warning", out _));
     }
 
     [Fact]
-    public void ObjectFormatResult_StagedTrue_SerializesStagedAsBoolean()
+    public void Sync_DefaultsToNotAttempted_WhenNothingWasSaved()
     {
-        var result = new ObjectFormatResult(true, "Sales/Total", "dax", "formatted", "CALCULATE()", null, Staged: true);
-        var json = JsonDocument.Parse(Serialize(result));
+        var json = Json(new AddModelObjectResult("Sales/M") { Outcome = MutationOutcome.Preview });
 
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("staged").ValueKind);
-    }
-
-    // ── Format: ModelFormatResult ───────────────────────────────────────────
-
-    [Fact]
-    public void ModelFormatResult_WithSavedAndStaged_SerializesBoth()
-    {
-        var result = new ModelFormatResult(3, 2, 1, 0,
-            [new ModelFormatObjectResult("Sales", "Sales", "formatted", null)],
-            Saved: "out/path", Staged: true);
-        var json = JsonDocument.Parse(Serialize(result));
-
-        Assert.Equal("out/path", json.RootElement.GetProperty("saved").GetString());
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("staged").ValueKind);
-    }
-
-    // ── Add: AddModelObjectResult ───────────────────────────────────────────
-
-    [Fact]
-    public void AddModelObjectResult_SavedIsObject_CanBeBooleanOrString()
-    {
-        var boolResult = new AddModelObjectResult(new { }, Saved: true, Staged: null);
-        var boolJson = JsonDocument.Parse(Serialize(boolResult));
-        Assert.Equal(JsonValueKind.True, boolJson.RootElement.GetProperty("saved").ValueKind);
-
-        var strResult = new AddModelObjectResult(new { }, Saved: "custom/path", Staged: null);
-        var strJson = JsonDocument.Parse(Serialize(strResult));
-        Assert.Equal("custom/path", strJson.RootElement.GetProperty("saved").GetString());
+        Assert.Equal("notAttempted", json.GetProperty("sync").GetProperty("status").GetString());
     }
 
     [Fact]
-    public void AddModelObjectResult_Defaults_OmitRevertedAndExistingPath()
+    public void RemoveModelObjectResult_GuardedDryRun_SerializesWouldRemoveWithBlockers()
     {
-        var result = new AddModelObjectResult("Sales/M", Saved: false, Staged: null);
-        var json = Serialize(result);
+        var json = Json(new RemoveModelObjectResult(
+            "Sales/Amount", Reason: "would_block", BrokenReferences: ["Sales/Total Sales"])
+        { Outcome = MutationOutcome.DryRun });
 
-        Assert.DoesNotContain("\"reverted\"", json);
-        Assert.DoesNotContain("\"existingPath\"", json);
+        Assert.True(json.GetProperty("dryRun").GetBoolean());
+        Assert.Equal("Sales/Amount", json.GetProperty("wouldRemove").GetString());
+        Assert.Equal("would_block", json.GetProperty("reason").GetString());
+        Assert.Equal(1, json.GetProperty("brokenReferences").GetArrayLength());
+        Assert.False(json.GetProperty("saved").GetBoolean());
     }
 
     [Fact]
-    public void MoveAndRemoveResults_OmitRevertedAtDefault_IncludeOnRevert()
+    public void RemoveModelObjectResult_UnchangedDryRun_KeepsDryRunTrue()
     {
-        Assert.DoesNotContain("\"reverted\"", Serialize(new MoveModelObjectResult("A", "B", Saved: false, Staged: null)));
-        Assert.DoesNotContain("\"reverted\"", Serialize(new RemoveModelObjectResult(false, null, null, null, null)));
+        var outcome = MutationOutcome.Unchanged with { DryRunRequested = true };
+        var json = Json(new RemoveModelObjectResult("Sales/Nope", Reason: "not_found") { Outcome = outcome });
 
-        Assert.Contains("\"reverted\": true", Serialize(
-            new MoveModelObjectResult("A", "B", Saved: false, Staged: null, Reverted: true)));
-        Assert.Contains("\"reverted\": true", Serialize(
-            new RemoveModelObjectResult(false, null, null, null, null, Reverted: true)));
+        Assert.Equal("unchanged", json.GetProperty("status").GetString());
+        Assert.True(json.GetProperty("dryRun").GetBoolean());
+        Assert.Equal("Sales/Nope", json.GetProperty("path").GetString());
     }
 
     [Fact]
-    public void AddModelObjectResult_RevertAndNoOp_IncludeNewFields()
+    public void AddModelObjectResult_NoOp_ReportsExistingPath()
     {
-        var reverted = Serialize(new AddModelObjectResult(false, Saved: false, Staged: null, Reverted: true));
-        Assert.Contains("\"reverted\": true", reverted);
+        var json = Json(new AddModelObjectResult(null, ExistingPath: "Sales/M") { Outcome = MutationOutcome.Unchanged });
 
-        var noOp = JsonDocument.Parse(Serialize(
-            new AddModelObjectResult(false, Saved: false, Staged: null, ExistingPath: "Sales/M")));
-        Assert.Equal("Sales/M", noOp.RootElement.GetProperty("existingPath").GetString());
-    }
-
-    // ── Remove: RemoveModelObjectResult ─────────────────────────────────────
-
-    [Fact]
-    public void RemoveModelObjectResult_WithoutSave_OmitsSavedAndStaged()
-    {
-        var result = new RemoveModelObjectResult("Sales/COL", Saved: null, Staged: null, Reason: "unused", Path: null);
-        var json = Serialize(result);
-
-        Assert.DoesNotContain("\"saved\"", json);
-        Assert.DoesNotContain("\"staged\"", json);
-        Assert.Contains("\"reason\"", json);
-    }
-
-    [Fact]
-    public void RemoveModelObjectResult_LiveRemoval_OmitsDryRun()
-    {
-        var result = new RemoveModelObjectResult("Sales/COL", Saved: false, Staged: null, Reason: null, Path: null);
-
-        Assert.DoesNotContain("\"dryRun\"", Serialize(result));
-    }
-
-    [Fact]
-    public void RemoveModelObjectResult_GuardedPreview_SerializesDryRunWithBlockers()
-    {
-        var result = new RemoveModelObjectResult(
-            "Sales/Amount", Saved: null, Staged: null, Reason: "would_block", Path: "Sales/Amount",
-            BrokenReferences: ["Sales/Total Sales"], DryRun: true);
-        var json = Serialize(result);
-
-        Assert.Contains("\"dryRun\": true", json);
-        Assert.Contains("\"would_block\"", json);
-        Assert.Contains("\"brokenReferences\"", json);
-        Assert.DoesNotContain("\"reverted\"", json);
-        Assert.DoesNotContain("\"saved\"", json);
-    }
-
-    // ── Set: SetModelPropertyResult ─────────────────────────────────────────
-
-    [Fact]
-    public void SetModelPropertyResult_WithSaveAndStage_SerializesCorrectly()
-    {
-        var result = new SetModelPropertyResult("Sales[Name]", "description", "updated", Saved: true, 2, Staged: true);
-        var json = JsonDocument.Parse(Serialize(result));
-
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("saved").ValueKind);
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("staged").ValueKind);
-        // The real post-mutation error count, measured by the shared offline analyzer.
-        Assert.Equal(2, json.RootElement.GetProperty("validationErrors").GetInt32());
+        Assert.Equal("Sales/M", json.GetProperty("existingPath").GetString());
+        Assert.False(json.TryGetProperty("added", out _));
     }
 
     [Fact]
@@ -188,52 +210,32 @@ public sealed class MutationResultContractTests
     {
         // --revert never opens the model, so there is no measurement: the field is omitted
         // rather than lying with a 0.
-        var result = new SetModelPropertyResult("Sales", Property: "", Value: "", Saved: false, ValidationErrors: null);
-        var json = Serialize(result);
+        var json = Json(new SetModelPropertyResult("Sales", Property: null, Value: null, ValidationErrors: null)
+        { Outcome = MutationOutcome.Reverted });
 
-        Assert.DoesNotContain("\"validationErrors\"", json);
+        Assert.False(json.TryGetProperty("validationErrors", out _));
+        Assert.False(json.TryGetProperty("property", out _));
+        Assert.False(json.TryGetProperty("value", out _));
+        Assert.Equal("Sales", json.GetProperty("path").GetString());
+        Assert.Equal("reverted", json.GetProperty("status").GetString());
     }
 
-    // ── Move: MoveModelObjectResult ─────────────────────────────────────────
-
     [Fact]
-    public void MoveModelObjectResult_SavedAsString_SerializesCorrectly()
+    public void ObjectFormatResult_ReportsFormatStatusSeparatelyFromMutationStatus()
     {
-        var result = new MoveModelObjectResult("OldName", "NewName", Saved: "out/model", Staged: null);
-        var json = JsonDocument.Parse(Serialize(result));
+        var json = Json(new ObjectFormatResult(true, "Sales/M", "DAX", "formatted", "1") { Outcome = MutationOutcome.Staged });
 
-        Assert.Equal("out/model", json.RootElement.GetProperty("saved").GetString());
-        Assert.False(json.RootElement.TryGetProperty("staged", out _));
+        Assert.Equal("formatted", json.GetProperty("formatStatus").GetString());
+        Assert.Equal("staged", json.GetProperty("status").GetString());
     }
 
-    // ── Replace: ReplaceModelTextResult ─────────────────────────────────────
-
     [Fact]
-    public void ReplaceModelTextResult_WithDryRun_OmitsSavedAndStaged()
+    public void ReplaceModelTextResult_Preview_ReportsPreviewsWithoutSaving()
     {
-        var result = new ReplaceModelTextResult("foo", "bar", DryRun: true, 3, null, null, null);
-        var json = Serialize(result);
+        var json = Json(new ReplaceModelTextResult("foo", "bar", 3, []) { Outcome = MutationOutcome.DryRun });
 
-        Assert.Contains("\"dryRun\": true", json);
-        Assert.DoesNotContain("\"saved\"", json);
-        Assert.DoesNotContain("\"staged\"", json);
-    }
-
-    // ── Script: ScriptRunResult ─────────────────────────────────────────────
-
-    [Fact]
-    public void ScriptRunResult_WithSave_SerializesSavedAndStaged()
-    {
-        var result = ScriptRunResult.Executed(
-            modelName: "model",
-            durationMs: 100,
-            inputs: [],
-            messages: [],
-            saved: "out/path",
-            staged: true);
-        var json = JsonDocument.Parse(Serialize(result));
-
-        Assert.Equal("out/path", json.RootElement.GetProperty("saved").GetString());
-        Assert.Equal(JsonValueKind.True, json.RootElement.GetProperty("staged").ValueKind);
+        Assert.True(json.GetProperty("dryRun").GetBoolean());
+        Assert.False(json.GetProperty("saved").GetBoolean());
+        Assert.Equal(JsonValueKind.Array, json.GetProperty("previews").ValueKind);
     }
 }

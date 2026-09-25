@@ -24,16 +24,7 @@ public sealed record BpaRulesIgnoreResult(
     bool Ignored,
     bool Changed,
     IReadOnlyList<string> RuleIds,
-    object Saved,
-    bool? Staged,
-    string ModelName,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null);
+    string ModelName) : MutationResult;
 
 public sealed class BpaRulesIgnoreHandler
 {
@@ -72,10 +63,11 @@ public sealed class BpaRulesIgnoreHandler
                 var changed = setChanged || hadLegacyKey;
 
                 if (!changed)
-                    return (false, "", _ => new BpaRulesIgnoreResult(
+                    return (false, "", outcome => new BpaRulesIgnoreResult(
                         request.RuleId, request.Ignore, false,
                         current.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
-                        false, null, snapshot.Name));
+                        snapshot.Name)
+                    { Outcome = outcome });
 
                 mutator.SetProperty(new ModelObjectSetRequest(
                     ".",
@@ -89,11 +81,10 @@ public sealed class BpaRulesIgnoreHandler
                     outcome => new BpaRulesIgnoreResult(
                         request.RuleId, request.Ignore, true,
                         current.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
-                        outcome.Saved, outcome.Staged, snapshot.Name,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                        outcome.Validation?.NewErrorCount));
+                        snapshot.Name)
+                    { Outcome = outcome });
             },
-            new BpaRulesIgnoreResult("", false, false, [], false, null, ""),
+            outcome => new BpaRulesIgnoreResult("", false, false, [], "") { Outcome = outcome },
             cancellationToken);
     }
 }

@@ -171,7 +171,7 @@ internal sealed class FormatCommand : ICommandModule
     private static ExpressionLanguage HighlightLanguage(string language)
         => FormatterLanguages.IsDax(language) ? ExpressionLanguage.Dax : ExpressionLanguage.M;
 
-    internal static void Render(FormatModelResult result)
+    internal static void Render(IFormatModelResult result)
     {
         switch (result)
         {
@@ -185,12 +185,11 @@ internal sealed class FormatCommand : ICommandModule
             case ObjectFormatResult obj:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
                     HighlightLanguage(obj.Language), obj.Formatted));
-                if (obj.DryRun == true)
+                if (obj.DryRun)
                     AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
-                if (obj.Synced)
-                    AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(obj.SyncTarget!)}"));
-                else if (obj.SyncWarning is not null)
-                    AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(obj.SyncWarning)));
+                else if (obj.Saved)
+                    MutationOutput.RenderSaved(obj.Outcome);
+                MutationOutput.RenderSync(obj.Outcome);
                 break;
 
             case ModelFormatResult model:
@@ -199,19 +198,16 @@ internal sealed class FormatCommand : ICommandModule
                 AnsiConsole.MarkupLine(Styling.Error($"Failed: {model.Failed}"));
                 WriteFailureDetails(model.Results);
 
-                if (model.Saved is true or string)
-                    AnsiConsole.MarkupLine(Styling.Success("Model saved."));
-                else if (model.Staged == true)
+                if (model.Saved)
+                    MutationOutput.RenderSaved(model.Outcome);
+                else if (model.Status == MutationStatus.Staged)
                     AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
-                else if (model.DryRun == true)
+                else if (model.DryRun)
                     AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 else if (model.Formatted > 0)
                     AnsiConsole.MarkupLine(Styling.Muted("Not saved — re-run with --save to persist or --stage to stage."));
 
-                if (model.Synced)
-                    AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(model.SyncTarget!)}"));
-                else if (model.SyncWarning is not null)
-                    AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(model.SyncWarning)));
+                MutationOutput.RenderSync(model.Outcome);
                 break;
         }
     }

@@ -78,14 +78,11 @@ public sealed class MoveModelObjectHandler
                 return (true, $"mv {plan.SourceDisplay} -> {step.DestinationDisplay}",
                     outcome => new MoveModelObjectResult(
                         plan.SourceDisplay, step.DestinationDisplay,
-                        outcome.Saved, outcome.Staged,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
                         BrokenReferences: broken.Count > 0 ? broken : null,
-                        FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null,
-                        DryRun: request.DryRun,
-                        NewValidationErrors: outcome.Validation?.NewErrorCount));
+                        FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null)
+                    { Outcome = outcome });
             },
-            new MoveModelObjectResult(plan.SourceDisplay, plan.DestinationDisplay, false, null, Reverted: true),
+            outcome => new MoveModelObjectResult(plan.SourceDisplay, plan.DestinationDisplay) { Outcome = outcome },
             cancellationToken);
     }
 

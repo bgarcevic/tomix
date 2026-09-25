@@ -1,5 +1,6 @@
 using Spectre.Console;
 using Tomix.App.Bpa;
+using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 
 namespace Tomix.Cli.Output;
@@ -92,15 +93,12 @@ internal static class BpaRunRenderer
             if (result.FixesSkipped > 0)
                 AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes skipped:", result.FixesSkipped.ToString())}");
             RenderDestructiveSkipped(result);
-            if (result.Saved is true or string)
-                AnsiConsole.MarkupLine($"  {Styling.Success("Model saved.")}");
-            else if (result.Staged == true)
+            if (result.FixOutcome.Saved)
+                MutationOutput.RenderSaved(result.FixOutcome, "  ");
+            else if (result.FixOutcome.Status == MutationStatus.Staged)
                 AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
 
-            if (result.Synced)
-                AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {result.SyncTarget!}")}");
-            else if (result.SyncWarning is not null)
-                AnsiConsole.MarkupLine($"  {Styling.Warning(result.SyncWarning)}");
+            MutationOutput.RenderSync(result.FixOutcome, "  ");
         }
         else
         {
@@ -270,9 +268,13 @@ internal static class BpaRunRenderer
             destructiveFixesSkipped = result.DestructiveFixesSkipped,
             fixErrors = result.FixErrors ?? Array.Empty<string>(),
             ruleLoadDiagnostics = result.RuleLoadDiagnostics ?? Array.Empty<string>(),
-            saved = result.Saved,
-            staged = result.Staged,
-            newValidationErrors = result.NewValidationErrors,
+            status = result.FixOutcome.Status,
+            saved = result.FixOutcome.Saved,
+            savedTo = result.FixOutcome.SavedTo,
+            persistence = result.FixOutcome.Persistence,
+            target = result.FixOutcome.Target,
+            sync = result.FixOutcome.Sync ?? SyncOutcome.NotAttempted,
+            newValidationErrors = result.FixOutcome.Validation?.NewErrorCount,
             results = result.Violations.Select(v => new
             {
                 ruleId = v.RuleId,

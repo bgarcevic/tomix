@@ -66,7 +66,7 @@ public sealed class ScriptHandler
         {
             stagingStore.Discard(request.Model);
             return TomixResult<ScriptRunResult>.Ok(
-                ScriptRunResult.Executed("", 0, [], [], false, null));
+                ScriptRunResult.Executed("", 0, [], [], MutationOutcome.Reverted));
         }
 
         var context = begin.Context!;
@@ -136,12 +136,7 @@ public sealed class ScriptHandler
                         (int)stopwatch.ElapsedMilliseconds,
                         inputs,
                         messages,
-                        outcome.Saved,
-                        outcome.Staged,
-                        outcome.Synced,
-                        outcome.SyncTarget,
-                        outcome.SyncWarning,
-                        outcome.Validation?.NewErrorCount),
+                        outcome with { Target = MutationTarget.Merge(MutationTarget.For(request.Model, connection), outcome.Target) }),
                     diagnostics: SaveValidation.ForcedNotice(context.Force ? outcome.Validation : null));
             });
         }
@@ -206,76 +201,53 @@ public sealed record ScriptRunRequest(
 
 public sealed record ScriptRunResult(
     string ModelName,
-    bool DryRun,
     bool Success,
     int DurationMs,
     int ScriptsExecuted,
     IReadOnlyList<ScriptInput> Inputs,
     IReadOnlyList<ScriptMessage> Messages,
-    object Saved,
-    bool? Staged,
     IReadOnlyList<ScriptDryRunResult> Scripts,
     string? FailedScript,
     int? ScriptIndex,
     IReadOnlyList<string> CompileErrors,
-    string? RuntimeError,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null)
+    string? RuntimeError) : MutationResult
 {
     public static ScriptRunResult CreateDryRun(
         string modelName,
         IReadOnlyList<ScriptDryRunResult> scripts)
         => new(
             modelName,
-            DryRun: true,
             Success: scripts.All(script => script.Success),
             DurationMs: 0,
             ScriptsExecuted: 0,
             Inputs: [],
             Messages: [],
-            Saved: false,
-            Staged: false,
             Scripts: scripts,
             FailedScript: null,
             ScriptIndex: null,
             CompileErrors: [],
-            RuntimeError: null);
+            RuntimeError: null)
+        { Outcome = MutationOutcome.DryRun };
 
     public static ScriptRunResult Executed(
         string modelName,
         int durationMs,
         IReadOnlyList<ScriptInput> inputs,
         IReadOnlyList<ScriptMessage> messages,
-        object saved,
-        bool? staged = null,
-        bool synced = false,
-        string? syncTarget = null,
-        string? syncWarning = null,
-        int? newValidationErrors = null)
+        MutationOutcome outcome)
         => new(
             modelName,
-            DryRun: false,
             Success: true,
             DurationMs: durationMs,
             ScriptsExecuted: inputs.Count,
             Inputs: inputs,
             Messages: messages,
-            Saved: saved,
-            Staged: staged,
             Scripts: [],
             FailedScript: null,
             ScriptIndex: null,
             CompileErrors: [],
-            RuntimeError: null,
-            Synced: synced,
-            SyncTarget: syncTarget,
-            SyncWarning: syncWarning,
-            NewValidationErrors: newValidationErrors);
+            RuntimeError: null)
+        { Outcome = outcome };
 
     public static ScriptRunResult Failed(
         string modelName,
@@ -287,19 +259,17 @@ public sealed record ScriptRunResult(
         IReadOnlyList<ScriptMessage> messages)
         => new(
             modelName,
-            DryRun: false,
             Success: false,
             DurationMs: durationMs,
             ScriptsExecuted: scriptIndex - 1,
             Inputs: [],
             Messages: messages,
-            Saved: false,
-            Staged: false,
             Scripts: [],
             FailedScript: failedScript,
             ScriptIndex: scriptIndex,
             CompileErrors: compileErrors,
-            RuntimeError: runtimeError);
+            RuntimeError: runtimeError)
+        { Outcome = MutationOutcome.Unchanged };
 }
 
 public sealed record ScriptInput(string Source, string Code);

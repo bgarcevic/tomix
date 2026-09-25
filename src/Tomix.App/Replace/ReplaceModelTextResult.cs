@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Tomix.App.Mutations;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Replace;
@@ -6,19 +7,6 @@ namespace Tomix.App.Replace;
 public sealed record ReplaceModelTextResult(
     string Pattern,
     string Replacement,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? DryRun,
     int ChangeCount,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<ModelReplacePreview>? Previews,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    object? Saved,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged = null,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null);
+    IReadOnlyList<ModelReplacePreview>? Previews) : MutationResult;

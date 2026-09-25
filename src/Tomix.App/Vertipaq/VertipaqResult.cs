@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+using Tomix.App.Mutations;
 using Tomix.Core.Vertipaq;
 
 namespace Tomix.App.Vertipaq;
@@ -18,10 +18,4 @@ public sealed record VertipaqResult(
 
 public sealed record VertipaqAnnotateResult(
     int AnnotatedObjects,
-    int SkippedObjects,
-    object Saved,
-    bool Synced = false,
-    string? SyncTarget = null,
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null);
+    int SkippedObjects) : MutationResult;

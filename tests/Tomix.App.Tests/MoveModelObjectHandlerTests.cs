@@ -24,7 +24,7 @@ public sealed class MoveModelObjectHandlerTests
 
         Assert.True(result.Success);
         Assert.Equal("Renamed", session.LastSetValue);
-        Assert.Equal("Sales/Base", result.Data!.Moved);
+        Assert.Equal("Sales/Base", result.Data!.WouldMove);
         Assert.Equal("Sales/Renamed", result.Data.To);
     }
 
@@ -36,7 +36,7 @@ public sealed class MoveModelObjectHandlerTests
 
         Assert.True(result.Success);
         Assert.Equal("QA's Name", session.LastSetValue);
-        Assert.Equal("KPI'er/Base", result.Data!.Moved);
+        Assert.Equal("KPI'er/Base", result.Data!.WouldMove);
     }
 
     [Fact]

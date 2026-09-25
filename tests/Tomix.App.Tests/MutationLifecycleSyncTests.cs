@@ -17,9 +17,9 @@ public sealed class MutationLifecycleSyncTests
             new StubMutationSession(deploySucceeds: true),
             null!, context, null, "add", "add X", CancellationToken.None);
 
-        Assert.True(outcome.Synced);
-        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws / MyModel", outcome.SyncTarget);
-        Assert.Null(outcome.SyncWarning);
+        Assert.Equal(SyncStatus.Succeeded, outcome.Sync!.Status);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws / MyModel", outcome.Sync.Target);
+        Assert.Null(outcome.Sync.Warning);
     }
 
     /// <summary>
@@ -106,8 +106,8 @@ public sealed class MutationLifecycleSyncTests
             new StubMutationSession(deploySucceeds: false),
             null!, context, null, "add", "add X", CancellationToken.None);
 
-        Assert.False(outcome.Synced);
-        Assert.Contains("sync failed", outcome.SyncWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SyncStatus.Failed, outcome.Sync!.Status);
+        Assert.Contains("sync failed", outcome.Sync.Warning, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -119,9 +119,9 @@ public sealed class MutationLifecycleSyncTests
             new StubMutationSession(deploySucceeds: true),
             null!, context, null, "add", "add X", CancellationToken.None);
 
-        Assert.False(outcome.Synced);
-        Assert.Null(outcome.SyncTarget);
-        Assert.Null(outcome.SyncWarning);
+        Assert.Equal(SyncStatus.NotConfigured, outcome.Sync!.Status);
+        Assert.Null(outcome.Sync.Target);
+        Assert.Null(outcome.Sync.Warning);
     }
 
     [Fact]
@@ -133,8 +133,8 @@ public sealed class MutationLifecycleSyncTests
             new StubNonDeployMutationSession(),
             null!, context, null, "add", "add X", CancellationToken.None);
 
-        Assert.False(outcome.Synced);
-        Assert.Contains("does not support deploy", outcome.SyncWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SyncStatus.Skipped, outcome.Sync!.Status);
+        Assert.Contains("does not support deploy", outcome.Sync.Warning, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -160,11 +160,12 @@ public sealed class MutationLifecycleSyncTests
         var messages = new List<string>();
         using var _ = MutationProgress.Use(messages.Add);
 
-        var (synced, target, warning) = await WorkspaceSync.SyncAsync(
+        var sync = await WorkspaceSync.SyncAsync(
             new StubMutationSession(deploySucceeds: false),
             SyncTarget, force: false, ModelDeployOptions.Full, CancellationToken.None);
+        var warning = sync.Warning;
 
-        Assert.False(synced);
+        Assert.Equal(SyncStatus.Failed, sync.Status);
         Assert.Contains(messages, m => m.StartsWith("Syncing to powerbi://", StringComparison.Ordinal));
         Assert.Contains("--no-sync", warning);
     }

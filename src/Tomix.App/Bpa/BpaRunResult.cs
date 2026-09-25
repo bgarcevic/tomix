@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 
 namespace Tomix.App.Bpa;
@@ -18,17 +18,14 @@ public sealed record BpaRunResult(
     int FixesSkipped = 0,
     int DestructiveFixesSkipped = 0,
     IReadOnlyList<string>? FixErrors = null,
-    object? Saved = null,
-    bool? Staged = null,
-    IReadOnlyList<string>? RuleLoadDiagnostics = null,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null)
+    IReadOnlyList<string>? RuleLoadDiagnostics = null)
 {
+    /// <summary>
+    /// How <c>--fix</c> edits were persisted: unchanged when nothing was fixed, a preview when
+    /// fixes were applied in memory only, otherwise the saved/staged lifecycle outcome.
+    /// </summary>
+    public MutationOutcome FixOutcome { get; init; } = MutationOutcome.Unchanged;
+
     /// <summary>
     /// Unevaluable rules projected as error-severity findings ("rule could not be evaluated:
     /// reason"). A rule that cannot be compiled or evaluated is itself a finding — otherwise a

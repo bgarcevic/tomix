@@ -1,4 +1,5 @@
 using Tomix.App.Add;
+using Tomix.App.Mutations;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 
@@ -121,9 +122,11 @@ public sealed class AddModelObjectHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal("Sales/Revenue", result.Data!.Added);
-        Assert.Equal(false, result.Data.Saved);
-        Assert.Null(result.Data.Staged);
+        // Not saved: the object is reported under the preview key, never as "added".
+        Assert.Null(result.Data!.Added);
+        Assert.Equal("Sales/Revenue", result.Data.WouldAdd);
+        Assert.False(result.Data.Saved);
+        Assert.Equal(MutationStatus.Preview, result.Data.Status);
     }
 
     [Fact]
@@ -148,8 +151,11 @@ public sealed class AddModelObjectHandlerTests
 
         Assert.True(result.Success);
         Assert.Equal("Sales/Revenue", result.Data!.Added);
-        Assert.Equal("source", result.Data.Saved);
-        Assert.Null(result.Data.Staged);
+        Assert.Null(result.Data.WouldAdd);
+        Assert.True(result.Data.Saved);
+        Assert.Equal("source", result.Data.SavedTo);
+        Assert.Equal(MutationStatus.Saved, result.Data.Status);
+        Assert.Equal(PersistenceKind.File, result.Data.Persistence);
     }
 
     [Fact]
@@ -173,7 +179,8 @@ public sealed class AddModelObjectHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal("output/path", result.Data!.Saved);
+        Assert.True(result.Data!.Saved);
+        Assert.Equal("output/path", result.Data.SavedTo);
         Assert.Equal("output/path", session.SaveOutputPath);
     }
 
@@ -317,9 +324,10 @@ public sealed class AddModelObjectHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal(false, result.Data!.Added);
+        Assert.Null(result.Data!.Added);
+        Assert.Null(result.Data.WouldAdd);
         Assert.Equal("Sales/Revenue", result.Data.ExistingPath);
-        Assert.False(result.Data.Reverted);
+        Assert.Equal(MutationStatus.Unchanged, result.Data.Status);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using Tomix.App.Mutations;
 using Tomix.App.Save;
 using Tomix.Core.Models;
 
@@ -21,9 +22,9 @@ public sealed class SaveModelHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.True(result.Data!.Synced);
-        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws / MyModel", result.Data.SyncTarget);
-        Assert.Null(result.Data.SyncWarning);
+        Assert.Equal(SyncStatus.Succeeded, result.Data!.Sync.Status);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws / MyModel", result.Data.Sync.Target);
+        Assert.Null(result.Data.Sync.Warning);
         Assert.Equal(0, result.ExitCode);
     }
 
@@ -43,9 +44,9 @@ public sealed class SaveModelHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.False(result.Data!.Synced);
-        Assert.NotNull(result.Data.SyncWarning);
-        Assert.Contains("sync failed", result.Data.SyncWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SyncStatus.Failed, result.Data!.Sync.Status);
+        Assert.NotNull(result.Data.Sync.Warning);
+        Assert.Contains("sync failed", result.Data.Sync.Warning, StringComparison.OrdinalIgnoreCase);
         // The result still renders, but the exit code flags the mirror drift for CI.
         Assert.Equal(1, result.ExitCode);
     }
@@ -65,9 +66,9 @@ public sealed class SaveModelHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.False(result.Data!.Synced);
-        Assert.Null(result.Data.SyncTarget);
-        Assert.Null(result.Data.SyncWarning);
+        Assert.Equal(SyncStatus.NotConfigured, result.Data!.Sync.Status);
+        Assert.Null(result.Data.Sync.Target);
+        Assert.Null(result.Data.Sync.Warning);
     }
 
     [Fact]
@@ -86,9 +87,9 @@ public sealed class SaveModelHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.False(result.Data!.Synced);
-        Assert.NotNull(result.Data.SyncWarning);
-        Assert.Contains("does not support deploy", result.Data.SyncWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SyncStatus.Skipped, result.Data!.Sync.Status);
+        Assert.NotNull(result.Data.Sync.Warning);
+        Assert.Contains("does not support deploy", result.Data.Sync.Warning, StringComparison.OrdinalIgnoreCase);
     }
 
     // ----- Issue #253 consistency: an unevaluable rule blocks the save gate -----

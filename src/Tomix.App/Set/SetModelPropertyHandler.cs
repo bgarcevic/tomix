@@ -85,21 +85,15 @@ public sealed class SetModelPropertyHandler
                         mutation.Path,
                         property,
                         mutation.Value ?? request.Properties[^1].Value,
-                        outcome.Saved,
                         ValidationErrors: validationErrors,
-                        outcome.Staged == true ? true : null,
-                        Synced: outcome.Synced,
-                        SyncTarget: outcome.SyncTarget,
-                        SyncWarning: outcome.SyncWarning,
                         BrokenReferences: broken.Count > 0 ? broken : null,
                         FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null,
-                        DryRun: request.DryRun,
                         OldValue: oldValue,
                         IsDaxProperty: isDaxProperty,
-                        Policy: mutation.Policy, CreatedExpressions: mutation.CreatedExpressions,
-                        NewValidationErrors: outcome.Validation?.NewErrorCount));
+                        Policy: mutation.Policy, CreatedExpressions: mutation.CreatedExpressions)
+                    { Outcome = outcome });
             },
-            new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: null),
+            outcome => new SetModelPropertyResult(request.Path, Property: null, Value: null, ValidationErrors: null) { Outcome = outcome },
             cancellationToken);
     }
 

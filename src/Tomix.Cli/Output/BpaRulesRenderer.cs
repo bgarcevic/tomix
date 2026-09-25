@@ -1,5 +1,6 @@
 using Spectre.Console;
 using Tomix.App.Bpa;
+using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 
 namespace Tomix.Cli.Output;
@@ -75,17 +76,14 @@ internal static class BpaRulesRenderer
         AnsiConsole.MarkupLine($"Rule {Styling.Value(result.RuleId)} is now {verb} for {Styling.Value(result.ModelName)}.");
         AnsiConsole.MarkupLine($"  {Styling.KeyValue("Ignored rules:", result.RuleIds.Count.ToString())}");
 
-        if (result.Saved is true or string)
-            AnsiConsole.MarkupLine($"  {Styling.Success("Model saved.")}");
-        else if (result.Staged == true)
+        if (result.Saved)
+            MutationOutput.RenderSaved(result.Outcome, "  ");
+        else if (result.Status == MutationStatus.Staged)
             AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
         else
             AnsiConsole.MarkupLine($"  {Styling.Muted("Not saved — re-run with --save to persist or --stage to stage.")}");
 
-        if (result.Synced)
-            AnsiConsole.MarkupLine($"  {Styling.Success($"Synced: {result.SyncTarget!}")}");
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine($"  {Styling.Warning(result.SyncWarning)}");
+        MutationOutput.RenderSync(result.Outcome, "  ");
     }
 
     /// <summary>
@@ -122,10 +120,14 @@ internal static class BpaRulesRenderer
             ignored = result.Ignored,
             changed = result.Changed,
             ruleIds = result.RuleIds,
+            model = result.ModelName,
+            status = result.Status,
             saved = result.Saved,
-            staged = result.Staged,
-            newValidationErrors = result.NewValidationErrors,
-            model = result.ModelName
+            savedTo = result.SavedTo,
+            persistence = result.Persistence,
+            target = result.Target,
+            sync = result.Sync,
+            newValidationErrors = result.NewValidationErrors
         };
 
     private static Dictionary<string, object?> ProjectRuleInfo(BpaRuleInfo rule)

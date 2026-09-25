@@ -26,6 +26,70 @@ left alone.
 
 Those shared lifecycle options are not repeated in the tables below.
 
+### Saving to Power BI Desktop
+
+When the active connection is a running Power BI Desktop model (`localhost:<port>`),
+`--save` writes the change to the model Desktop has open in memory. The change is live
+straight away (a fresh `tx get` or `tx query` sees it), but Desktop keeps it only until the
+report closes. **Save the report in Power BI Desktop to keep the change.** tx prints this
+reminder on stderr after every save to Desktop, and JSON output reports
+`"persistence": "liveModel"`.
+
+### JSON result
+
+Every mutation command (`add`, `mv`, `set`, `rm`, `replace`, `format`, `script`,
+`save`, `vertipaq --annotate`, `bpa run --fix`, `bpa rules ignore`) reports the same
+persistence fields under `data`:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `status` | string | `saved`, `staged`, `preview` (applied in memory only), `dryRun`, `unchanged` (nothing to change), or `reverted` |
+| `dryRun` | bool | `--dry-run` was passed |
+| `saved` | bool | The change was persisted. Always a bool |
+| `savedTo` | string | Where it was saved: a folder or file path, or `server / database`. Present only when saved |
+| `persistence` | string | `file`, `liveModel` (Power BI Desktop, in memory until the report is saved), or `service`. Present only when saved |
+| `target` | object | `{server, database, model}` for a remote or Desktop model. `model` is the friendly name `tx connect` shows |
+| `sync` | object | Workspace mirror sync: `{status, target?, warning?}`. `status` is `notAttempted`, `notConfigured`, `skipped`, `succeeded`, or `failed` |
+| `newValidationErrors` | int | Errors the change introduced, when the save gate measured them |
+
+The object path uses a past-tense key (`added`, `moved`, `removed`, `set`) only when the
+change was saved or staged. Previews and dry runs use `wouldAdd`, `wouldMove`,
+`wouldRemove`, or `wouldSet`, so a script never reads a preview as done:
+
+```json
+{
+  "data": {
+    "wouldRemove": "Sales/Total Sales",
+    "status": "dryRun",
+    "dryRun": true,
+    "saved": false,
+    "sync": { "status": "notAttempted" }
+  },
+  "diagnostics": []
+}
+```
+
+A save to Power BI Desktop:
+
+```json
+{
+  "data": {
+    "added": "Sales/Margin",
+    "status": "saved",
+    "dryRun": false,
+    "saved": true,
+    "savedTo": "localhost:51234 / 0f1e2d3c-...",
+    "persistence": "liveModel",
+    "target": { "server": "localhost:51234", "database": "0f1e2d3c-...", "model": "Sales Report" },
+    "sync": { "status": "notConfigured" }
+  },
+  "diagnostics": []
+}
+```
+
+A failed or skipped sync includes a `warning`. A failed sync exits 1 even though the save
+succeeded.
+
 ## `add` — add an object
 
 ```

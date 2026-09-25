@@ -28,7 +28,8 @@ public sealed class RemoveModelObjectHandler
             request.Serialization,
             request.Force,
             request.Overwrite,
-            request.NoSync);
+            request.NoSync,
+            DryRun: request.DryRun);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "rm", _stores,
@@ -49,13 +50,9 @@ public sealed class RemoveModelObjectHandler
                     return (true, $"rm {request.Path}",
                         outcome => new RemoveModelObjectResult(
                             request.Path,
-                            request.DryRun ? null : outcome.Saved,
-                            request.DryRun ? null : outcome.Staged,
                             "would_block",
-                            request.Path,
-                            outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                            BrokenReferences: referencing,
-                            DryRun: true));
+                            BrokenReferences: referencing)
+                        { Outcome = outcome });
                 }
 
                 var mutation = mutator.RemoveObject(new ModelObjectRemoveRequest(
@@ -65,19 +62,14 @@ public sealed class RemoveModelObjectHandler
 
                 return (mutation.Changed, $"rm {mutation.Path}",
                     outcome => new RemoveModelObjectResult(
-                        mutation.Changed ? mutation.Path : (object)false,
-                        request.DryRun ? null : outcome.Saved,
-                        request.DryRun ? null : outcome.Staged,
+                        mutation.Path,
                         mutation.Changed ? null : mutation.Reason,
-                        mutation.Changed ? null : mutation.Path,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
                         BrokenReferences: mutation.Changed && referencing.Count > 0 ? referencing : null,
                         CascadeRemoved: mutation.CascadeRemoved,
-                        RemainingPolicyPartitions: mutation.RemainingPolicyPartitions,
-                        DryRun: request.DryRun,
-                        NewValidationErrors: outcome.Validation?.NewErrorCount));
+                        RemainingPolicyPartitions: mutation.RemainingPolicyPartitions)
+                    { Outcome = outcome });
             },
-            new RemoveModelObjectResult(false, null, null, null, null, Reverted: true),
+            outcome => new RemoveModelObjectResult(null) { Outcome = outcome },
             cancellationToken);
     }
 }

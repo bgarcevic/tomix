@@ -336,10 +336,12 @@ internal sealed class VertipaqCommand : ICommandModule
             {
                 ["objects"] = annotate.AnnotatedObjects,
                 ["skipped"] = annotate.SkippedObjects,
+                ["status"] = annotate.Status,
                 ["saved"] = annotate.Saved,
-                ["synced"] = annotate.Synced,
-                ["syncTarget"] = annotate.SyncTarget,
-                ["syncWarning"] = annotate.SyncWarning,
+                ["savedTo"] = annotate.SavedTo,
+                ["persistence"] = annotate.Persistence,
+                ["target"] = annotate.Target,
+                ["sync"] = annotate.Sync,
                 ["newValidationErrors"] = annotate.NewValidationErrors
             };
 

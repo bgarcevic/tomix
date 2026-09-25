@@ -25,7 +25,7 @@ internal static class WorkspaceSync
             ? ModelDeployOptions.Full
             : ModelDeployOptions.Full with { DeployPolicyPartitions = false };
 
-    public static async Task<(bool Synced, string? Target, string? Warning)> SyncAsync(
+    public static async Task<SyncOutcome> SyncAsync(
         object session,
         ModelReference? syncTarget,
         bool force,
@@ -33,10 +33,10 @@ internal static class WorkspaceSync
         CancellationToken cancellationToken)
     {
         if (syncTarget is null)
-            return (false, null, null);
+            return SyncOutcome.NotConfigured;
 
         if (session is not IModelDeploySession deployer)
-            return (false, null, "Workspace sync skipped: provider does not support deploy.");
+            return new SyncOutcome(SyncStatus.Skipped, Warning: "Workspace sync skipped: provider does not support deploy.");
 
         var targetLabel = syncTarget.Database is not null
             ? $"{syncTarget.Value} / {syncTarget.Database}"
@@ -54,11 +54,11 @@ internal static class WorkspaceSync
                     Options: options),
                 cancellationToken);
 
-            return (true, targetLabel, null);
+            return new SyncOutcome(SyncStatus.Succeeded, targetLabel);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (false, targetLabel,
+            return new SyncOutcome(SyncStatus.Failed, targetLabel,
                 $"Workspace sync failed: {ex.Message} "
                 + "The local save succeeded — run 'tx save' after fixing this to push the mirror, or use --no-sync to skip it.");
         }

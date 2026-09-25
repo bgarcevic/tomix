@@ -71,7 +71,7 @@ public sealed partial class FormatRenderTests
     public void ObjectPathDax_IsHighlighted()
     {
         var output = Render(new ObjectFormatResult(
-            true, "Sales/Total Sales", "dax", "formatted", "SUM(Sales[Amount])", Saved: null));
+            true, "Sales/Total Sales", "dax", "formatted", "SUM(Sales[Amount])"));
 
         Assert.Contains(Harbor + "SUM", output);
         Assert.Contains(Moss + "[Amount]", output);
@@ -81,14 +81,14 @@ public sealed partial class FormatRenderTests
     public void ObjectPathM_IsHighlighted()
     {
         var output = Render(new ObjectFormatResult(
-            true, "Sales/Sales", "m", "formatted", "let Source = 1 in Source", Saved: null));
+            true, "Sales/Sales", "m", "formatted", "let Source = 1 in Source"));
 
         Assert.Contains(Lav + "let", output);
         Assert.DoesNotContain(Sage, output);
         Assert.Contains("let Source = 1 in Source", StripAnsi(output));
     }
 
-    private static string Render(FormatModelResult result)
+    private static string Render(IFormatModelResult result)
         => ConsoleCapture.Run(
             () =>
             {

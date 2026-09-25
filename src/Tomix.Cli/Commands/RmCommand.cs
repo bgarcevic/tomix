@@ -140,13 +140,13 @@ internal sealed class RmCommand : ICommandModule
 
     private static void Render(RemoveModelObjectResult result)
     {
-        if (result.Reverted)
+        if (result.Status == MutationStatus.Reverted)
         {
             AnsiConsole.MarkupLine(Styling.Success("Reverted."));
             return;
         }
 
-        if (result.Removed is false)
+        if (result.Status == MutationStatus.Unchanged)
         {
             // The only Changed=false path is --if-exists on a missing object; say so instead of
             // exiting silently.
@@ -160,10 +160,10 @@ internal sealed class RmCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning(
                 $"Policy-generated partitions remain on the table: {string.Join(", ", remaining)}."));
 
-        if (result.DryRun == true)
+        if (result.DryRun)
         {
             AnsiConsole.MarkupLine(Styling.Warning(
-                $"Would remove: {Styling.MarkupEscape(result.Removed.ToString() ?? "")}"));
+                $"Would remove: {Styling.MarkupEscape(result.ObjectPath ?? "")}"));
             if (result.CascadeRemoved is { Count: > 0 } cascadePreview)
                 foreach (var item in cascadePreview)
                     AnsiConsole.MarkupLine(Styling.Muted($"Would also remove: {Styling.MarkupEscape(item)}"));
@@ -181,7 +181,7 @@ internal sealed class RmCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Success($"Removed: {result.Removed}"));
+        AnsiConsole.MarkupLine(Styling.Success($"Removed: {result.ObjectPath}"));
         if (result.CascadeRemoved is { Count: > 0 } cascade)
             foreach (var item in cascade)
                 AnsiConsole.MarkupLine(Styling.Muted($"Also removed: {item}"));
@@ -191,14 +191,6 @@ internal sealed class RmCommand : ICommandModule
                 $"Warning: {broken.Count} DAX reference(s) to the removed object are now broken: "
                 + $"{string.Join(", ", broken)}. Update them with 'tx replace' or inspect with 'tx deps'."));
 
-        if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist."));
-        else if (result.Saved is not null)
-            AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
-
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+        MutationOutput.RenderPersistence(result.Outcome);
     }
 }

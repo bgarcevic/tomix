@@ -181,13 +181,13 @@ internal sealed class SetCommand : ICommandModule
 
     internal static void Render(SetModelPropertyResult result)
     {
-        if (string.IsNullOrEmpty(result.Property))
+        if (result.Status == MutationStatus.Reverted)
         {
-            AnsiConsole.MarkupLine(Styling.Success($"Reverted staged changes for {result.Set}."));
+            AnsiConsole.MarkupLine(Styling.Success($"Reverted staged changes for {result.ObjectPath}."));
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.Success($"Set: {result.Set}.{result.Property}"));
+        AnsiConsole.MarkupLine(Styling.Success($"Set: {result.ObjectPath}.{result.Property}"));
 
         // DAX edits get a Before/After preview so the change can be reviewed before saving.
         // Identical values skip it (the write still went through the lifecycle).
@@ -195,22 +195,10 @@ internal sealed class SetCommand : ICommandModule
             && !string.Equals(result.OldValue, result.Value, StringComparison.Ordinal))
         {
             AnsiConsole.MarkupLine($"{Styling.Bold("Before:")} {Styling.ExpressionMarkup(ExpressionLanguage.Dax, result.OldValue ?? "")}");
-            AnsiConsole.MarkupLine($"{Styling.Bold("After:")} {Styling.ExpressionMarkup(ExpressionLanguage.Dax, result.Value)}");
+            AnsiConsole.MarkupLine($"{Styling.Bold("After:")} {Styling.ExpressionMarkup(ExpressionLanguage.Dax, result.Value ?? "")}");
         }
 
-        if (result.Staged == true)
-            AnsiConsole.MarkupLine(Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
-        else if (result.DryRun == true)
-            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
-        else if (result.Saved is false)
-            AnsiConsole.MarkupLine(Styling.Warning("Not saved yet. Pass --save to persist, or --stage to stage the change."));
-        else
-            AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved}"));
-
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+        MutationOutput.RenderPersistence(result.Outcome);
 
         if (result.CreatedExpressions is { Count: > 0 })
             AnsiConsole.MarkupLine(Styling.Guidance($"Created range parameters: {string.Join(", ", result.CreatedExpressions)}"));

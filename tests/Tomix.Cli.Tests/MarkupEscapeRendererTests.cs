@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Tomix.App.Bpa;
 using Tomix.App.Deploy;
 using Tomix.App.Info;
+using Tomix.App.Mutations;
 using Tomix.App.Script;
 using Tomix.App.Test;
 using Tomix.Cli.Output;
@@ -32,8 +33,8 @@ public sealed partial class MarkupEscapeRendererTests
         {
             BpaRulesRenderer.RenderDisable(new BpaRulesDisableResult("[Rule]", true, false, []));
             BpaRulesRenderer.RenderIgnore(new BpaRulesIgnoreResult(
-                "[Rule]", true, true, ["[Rule]"], false, null, "[Model]",
-                Synced: true, SyncTarget: "[Target]"));
+                "[Rule]", true, true, ["[Rule]"], "[Model]")
+            { Outcome = new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, new SyncOutcome(SyncStatus.Succeeded, "[Target]")) });
         });
 
         AssertLiteral(captured.Stdout,
@@ -51,8 +52,8 @@ public sealed partial class MarkupEscapeRendererTests
         var result = new BpaRunResult(
             [new BpaResult(BpaResultKind.Violation, "[Rule]", "[Rule]", "[Category]",
                 BpaSeverity.Error, Violation: violation)],
-            "[Model]", RulesEvaluated: 1, FixesApplied: 1,
-            Synced: true, SyncTarget: "[Target]");
+            "[Model]", RulesEvaluated: 1, FixesApplied: 1)
+        { FixOutcome = new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, new SyncOutcome(SyncStatus.Succeeded, "[Target]")) };
         var options = new BpaRunView.RunOptions(false, true, true, false, false, false);
 
         var captured = Capture(() => BpaRunRenderer.Render(result, options));
@@ -65,7 +66,7 @@ public sealed partial class MarkupEscapeRendererTests
     public void Script_UsesLiteralModelAndSyncNames()
     {
         var result = ScriptRunResult.Executed(
-            "[Model]", 1, [], [], saved: true, synced: true, syncTarget: "[Target]");
+            "[Model]", 1, [], [], new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, new SyncOutcome(SyncStatus.Succeeded, "[Target]")));
 
         var captured = Capture(() => ScriptRenderer.RenderText(result, "text"));
 

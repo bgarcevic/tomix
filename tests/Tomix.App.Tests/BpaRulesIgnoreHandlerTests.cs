@@ -23,7 +23,7 @@ public sealed class BpaRulesIgnoreHandlerTests
 
         Assert.True(result.Success);
         Assert.True(result.Data!.Changed);
-        Assert.True(result.Data!.Saved is string or true);
+        Assert.True(result.Data!.Saved);
         Assert.Contains("RULE_A", result.Data.RuleIds);
 
         var write = Assert.Single(session.SetRequests);

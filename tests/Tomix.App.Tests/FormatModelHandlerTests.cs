@@ -129,7 +129,7 @@ public sealed class FormatModelHandlerTests
         var obj = Assert.IsType<ObjectFormatResult>(result.Data);
         Assert.Equal("Sales/Total Sales", obj.Path);
         Assert.Equal("dax", obj.Language);
-        Assert.Equal("formatted", obj.Status);
+        Assert.Equal("formatted", obj.FormatStatus);
 
         var mutation = Assert.Single(session.SetRequests);
         Assert.Equal("Sales/Total Sales", mutation.Path);

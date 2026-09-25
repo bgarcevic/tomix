@@ -262,7 +262,7 @@ public sealed class VertipaqHandlerTests
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal(false, result.Data!.Annotate!.Saved);
+        Assert.False(result.Data!.Annotate!.Saved);
         Assert.False(mutator.Saved);
     }
 

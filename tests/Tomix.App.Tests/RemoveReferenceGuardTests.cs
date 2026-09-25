@@ -129,7 +129,7 @@ public sealed class RemoveReferenceGuardTests
         // instead of failing and the mutator is never invoked.
         Assert.True(result.Success);
         Assert.True(result.Data!.DryRun);
-        Assert.Equal("Sales/Base", result.Data.Removed);
+        Assert.Equal("Sales/Base", result.Data.WouldRemove);
         Assert.Equal("would_block", result.Data.Reason);
         Assert.Equal(["Sales/Derived"], result.Data.BrokenReferences);
         Assert.False(session.RemoveCalled);
@@ -156,7 +156,7 @@ public sealed class RemoveReferenceGuardTests
 
         Assert.True(result.Success);
         Assert.True(result.Data!.DryRun);
-        Assert.Equal("Sales/Lonely", result.Data.Removed);
+        Assert.Equal("Sales/Lonely", result.Data.WouldRemove);
         Assert.Null(result.Data.Reason);
         Assert.Null(result.Data.BrokenReferences);
         Assert.True(session.RemoveCalled);

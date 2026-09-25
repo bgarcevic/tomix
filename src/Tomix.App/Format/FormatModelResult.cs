@@ -1,54 +1,30 @@
 using System.Text.Json.Serialization;
+using Tomix.App.Mutations;
 
 namespace Tomix.App.Format;
 
-public abstract record FormatModelResult;
+/// <summary>Marker for the three <c>tx format</c> result shapes.</summary>
+public interface IFormatModelResult;
 
 public sealed record InlineFormatResult(
     bool Success,
     string Formatted,
     string Language,
-    IReadOnlyList<string> Errors) : FormatModelResult;
+    IReadOnlyList<string> Errors) : IFormatModelResult;
 
 public sealed record ObjectFormatResult(
     bool Success,
     string Path,
     string Language,
-    string Status,
-    string Formatted,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    object? Saved,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged = null,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? DryRun = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null) : FormatModelResult;
+    string FormatStatus,
+    string Formatted) : MutationResult, IFormatModelResult;
 
 public sealed record ModelFormatResult(
     int Total,
     int Formatted,
     int Unchanged,
     int Failed,
-    IReadOnlyList<ModelFormatObjectResult> Results,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    object? Saved,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? Staged = null,
-    bool Synced = false,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncTarget = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    bool? DryRun = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? NewValidationErrors = null) : FormatModelResult;
+    IReadOnlyList<ModelFormatObjectResult> Results) : MutationResult, IFormatModelResult;
 
 public sealed record ModelFormatObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

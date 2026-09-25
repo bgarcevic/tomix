@@ -22,7 +22,7 @@ public sealed class FormatModelHandler
         _stores = stores;
     }
 
-    public async Task<TomixResult<FormatModelResult>> HandleAsync(
+    public async Task<TomixResult<IFormatModelResult>> HandleAsync(
         FormatModelRequest request,
         CancellationToken cancellationToken)
     {
@@ -71,14 +71,12 @@ public sealed class FormatModelHandler
                     }
 
                     return (status == "formatted", $"format {obj.Path}",
-                        outcome => (FormatModelResult)new ObjectFormatResult(
+                        outcome => (IFormatModelResult)new ObjectFormatResult(
                             formatted.Success, obj.Path, FormatterLanguages.DisplayName(language),
-                            status, formatted.Formatted, outcome.Saved, outcome.Staged,
-                            outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                            DryRun: request.DryRun,
-                            NewValidationErrors: outcome.Validation?.NewErrorCount));
+                            status, formatted.Formatted)
+                        { Outcome = outcome });
                 },
-                (FormatModelResult)new ObjectFormatResult(false, "", "", "", "", null),
+                outcome => (IFormatModelResult)new ObjectFormatResult(false, "", "", "", "") { Outcome = outcome },
                 cancellationToken);
         }
 
@@ -124,8 +122,9 @@ public sealed class FormatModelHandler
 
                 if (failedCount > 0)
                     return (false, "",
-                        _ => (FormatModelResult)new ModelFormatResult(
-                            objects.Count, formattedCount, unchangedCount, failedCount, results, null, null));
+                        outcome => (IFormatModelResult)new ModelFormatResult(
+                            objects.Count, formattedCount, unchangedCount, failedCount, results)
+                        { Outcome = outcome });
 
                 foreach (var (obj, value) in successful)
                 {
@@ -136,23 +135,21 @@ public sealed class FormatModelHandler
                 }
 
                 return (formattedCount > 0, $"format {formattedCount} expressions",
-                    outcome => (FormatModelResult)new ModelFormatResult(
+                    outcome => (IFormatModelResult)new ModelFormatResult(
                         objects.Count, formattedCount, unchangedCount, failedCount,
-                        results, outcome.Saved, outcome.Staged,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                        DryRun: request.DryRun,
-                        NewValidationErrors: outcome.Validation?.NewErrorCount));
+                        results)
+                    { Outcome = outcome });
             },
-            (FormatModelResult)new ModelFormatResult(0, 0, 0, 0, [], null),
+            outcome => (IFormatModelResult)new ModelFormatResult(0, 0, 0, 0, []) { Outcome = outcome },
             cancellationToken);
     }
 
-    private async Task<TomixResult<FormatModelResult>> FormatInlineAsync(
+    private async Task<TomixResult<IFormatModelResult>> FormatInlineAsync(
         FormatModelRequest request,
         CancellationToken cancellationToken)
     {
         if (!TryResolveLanguage(request.Language, null, null, out var language, out var error))
-            return TomixResult<FormatModelResult>.Fail("TOMIX_FORMAT_UNSUPPORTED_LANGUAGE", error, exitCode: 2);
+            return TomixResult<IFormatModelResult>.Fail("TOMIX_FORMAT_UNSUPPORTED_LANGUAGE", error, exitCode: 2);
 
         var formatted = await _formatter.FormatAsync(
             new ExpressionFormatRequest(
@@ -163,12 +160,12 @@ public sealed class FormatModelHandler
 
         if (!formatted.Success)
         {
-            return TomixResult<FormatModelResult>.Fail(
+            return TomixResult<IFormatModelResult>.Fail(
                 "TOMIX_FORMAT_FAILED",
                 $"Formatting failed: {FailureDetail(formatted)}");
         }
 
-        return TomixResult<FormatModelResult>.Ok(
+        return TomixResult<IFormatModelResult>.Ok(
             new InlineFormatResult(
                 formatted.Success,
                 formatted.Formatted,

@@ -33,7 +33,8 @@ public sealed class ReplaceModelTextHandler
             request.Serialization,
             request.Force,
             request.Overwrite,
-            request.NoSync);
+            request.NoSync,
+            DryRun: request.DryRun);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "replace", _stores,
@@ -50,25 +51,24 @@ public sealed class ReplaceModelTextHandler
                     Apply: persist,
                     Type: request.Type));
 
+                // Without --save/--stage nothing is applied, only previewed. Reporting it as a
+                // change lets the lifecycle label it a preview or dry run; that mode persists nothing.
                 if (!persist)
                 {
-                    return (false, "",
-                        _ => new ReplaceModelTextResult(
-                            request.Pattern, request.Replacement,
-                            DryRun: true, replace.ChangeCount, replace.Previews, Saved: null));
+                    return (true, "",
+                        outcome => new ReplaceModelTextResult(
+                            request.Pattern, request.Replacement, replace.ChangeCount, replace.Previews)
+                        { Outcome = outcome });
                 }
 
                 return (replace.ChangeCount > 0, $"replace {request.Pattern}",
                     outcome => new ReplaceModelTextResult(
-                        request.Pattern, request.Replacement,
-                        DryRun: null, replace.ChangeCount, Previews: null,
-                        outcome.Saved, outcome.Staged,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                        NewValidationErrors: outcome.Validation?.NewErrorCount));
+                        request.Pattern, request.Replacement, replace.ChangeCount, Previews: null)
+                    { Outcome = outcome });
             },
-            new ReplaceModelTextResult(
-                request.Pattern, request.Replacement,
-                DryRun: null, ChangeCount: 0, Previews: null, Saved: false),
+            outcome => new ReplaceModelTextResult(
+                request.Pattern, request.Replacement, ChangeCount: 0, Previews: null)
+            { Outcome = outcome },
             cancellationToken);
     }
 }

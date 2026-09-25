@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App.Mutations;
 using Tomix.App.Save;
 using Tomix.App.State;
 using Tomix.Cli.Output;
@@ -137,19 +138,15 @@ internal sealed class SaveCommand : ICommandModule
     {
         AnsiConsole.MarkupLine(Styling.KeyValue("Source:", source));
         AnsiConsole.MarkupLine(Styling.Value($"Saving ({result.Format})..."));
-        AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.Saved} ({result.Format})"));
-
-        if (result.Synced)
-            AnsiConsole.MarkupLine(Styling.Success($"Synced: {Styling.MarkupEscape(result.SyncTarget!)}"));
-        else if (result.SyncWarning is not null)
-            AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(result.SyncWarning)));
+        AnsiConsole.MarkupLine(Styling.Success($"Saved: {result.SavedTo} ({result.Format})"));
+        MutationOutput.RenderSync(result.Outcome);
     }
 
     private static void RenderCsv(SaveModelResult result)
     {
-        var line = $"Saved: {result.Saved} ({result.Format})";
-        if (result.Synced)
-            line += $", Synced: {result.SyncTarget}";
+        var line = $"Saved: {result.SavedTo} ({result.Format})";
+        if (result.Sync.Status == SyncStatus.Succeeded)
+            line += $", Synced: {result.Sync.Target}";
         Console.WriteLine(line);
     }
 }
