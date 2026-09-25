@@ -18,6 +18,12 @@ bypasses its dependent-reference guard. Set `validateOnSave` to `false` with
 Staged edits are checked when you run `tx stage commit`. The `--force` flags on
 `init`, `connect`, `deploy`, and `config init` retain their command-specific uses.
 
+A TMDL save rewrites only the files whose content changed, so a small edit gives
+a small git diff. Untouched files keep their bytes, line endings (CRLF checkouts
+stay CRLF), and M partition indentation. Stale `.tmdl` files for removed or
+renamed objects are deleted. Other files in the folder, such as a README, are
+left alone.
+
 Those shared lifecycle options are not repeated in the tables below.
 
 ## `add` — add an object

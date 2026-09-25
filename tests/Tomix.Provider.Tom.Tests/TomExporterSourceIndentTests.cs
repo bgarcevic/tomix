@@ -119,6 +119,57 @@ public sealed class TomExporterSourceIndentTests
             TomModelExporter.OutdentSourceBlocks(input));
     }
 
+    private const string SerializerDepth =
+        "\tpartition A = m\n" +
+        "\t\tsource =\n" +
+        "\t\t\t\tlet a = 1 in a\n" +
+        "\tpartition B = m\n" +
+        "\t\tsource =\n" +
+        "\t\t\t\tlet b = 2 in b\n";
+
+    [Fact]
+    public void AlignSourceBlocks_KeepsSerializerDepth_WhereTheExistingFileUsesIt()
+    {
+        // #201: a model written at serializer depth must not be re-indented on save.
+        Assert.Same(SerializerDepth, TomModelExporter.AlignSourceBlocks(SerializerDepth, SerializerDepth));
+    }
+
+    [Theory]
+    [InlineData("\tpartition A = m\n\t\tsource =\n\t\t\tlet old = 0 in old\n")] // A at Desktop depth
+    [InlineData("\tpartition Renamed = m\n\t\tsource =\n\t\t\t\tlet a = 1 in a\n")] // A absent
+    [InlineData("")]
+    public void AlignSourceBlocks_OutdentsToDesktopDepth_WhereTheExistingFileDoesNotKeepSerializerDepth(string existing)
+    {
+        var result = TomModelExporter.AlignSourceBlocks(SerializerDepth, existing);
+
+        Assert.Contains("\t\t\tlet a = 1 in a\n", result);
+        Assert.DoesNotContain("\t\t\t\tlet a", result);
+    }
+
+    [Fact]
+    public void AlignSourceBlocks_MatchesEachPartitionIndependently()
+    {
+        var existing =
+            "\tpartition A = m\n" +
+            "\t\tsource =\n" +
+            "\t\t\tlet a = 1 in a\n" +
+            "\tpartition B = m\n" +
+            "\t\tsource =\n" +
+            "\t\t\t\tlet b = 2 in b\n";
+
+        var result = TomModelExporter.AlignSourceBlocks(SerializerDepth, existing);
+
+        Assert.Equal(existing, result);
+    }
+
+    [Fact]
+    public void AlignSourceBlocks_ReadsCrlfExistingFile()
+    {
+        var existing = SerializerDepth.Replace("\n", "\r\n");
+
+        Assert.Same(SerializerDepth, TomModelExporter.AlignSourceBlocks(SerializerDepth, existing));
+    }
+
     [Fact]
     public async Task ExportTmdl_WritesSourceBlocksAtDesktopDepth_AndRoundTrips()
     {
@@ -148,15 +199,16 @@ public sealed class TomExporterSourceIndentTests
     // TmdlModelSession_SaveAsync_InPlaceClearsStaleFiles despite never constructing a
     // TmdlModelSession — it drives TomModelExporter directly, which is what it pins.
     [Fact]
-    public async Task ExportTmdl_WithForce_ClearsStaleNonTmdlFilesInTarget()
+    public async Task ExportTmdl_WithForce_ClearsStaleTmdl_KeepsOtherFiles()
     {
         using var dir = new TempDir();
         var targetPath = dir.CreateSubdirectory("out");
 
-        // Seed the directory with a non-TMDL junk file that the serializer would NOT overwrite
-        // on its own. A proper in-place save must clear it so stale artifacts don't survive.
-        var junkPath = Path.Combine(targetPath, "stale-artifact.txt");
-        File.WriteAllText(junkPath, "old content");
+        // A stale table file (e.g. a removed table) must not survive, or it would load back in.
+        // Non-TMDL files beside the model (README, DAX tests, a nested .git) are not the
+        // serializer's to delete.
+        var staleTable = dir.WriteFile(Path.Combine("out", "tables", "Gone.tmdl"), "table Gone\n");
+        var readme = dir.WriteFile(Path.Combine("out", "README.md"), "notes");
 
         var db = NewDatabase();
         await TomModelExporter.ExportAsync(
@@ -164,6 +216,8 @@ public sealed class TomExporterSourceIndentTests
             new ModelExportRequest(targetPath, "tmdl", Overwrite: true, SupportingFiles: false),
             CancellationToken.None);
 
-        Assert.False(File.Exists(junkPath), "stale file should be cleared when force=true");
+        Assert.False(File.Exists(staleTable), "stale .tmdl file should be cleared on overwrite");
+        Assert.False(Directory.Exists(Path.GetDirectoryName(staleTable)), "emptied folder should be pruned");
+        Assert.True(File.Exists(readme), "non-TMDL files must be preserved");
     }
 }

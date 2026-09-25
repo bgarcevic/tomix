@@ -52,29 +52,65 @@ public static class TomModelExporter
             target = Path.Combine(semanticModel, "definition");
         }
 
-        PrepareDirectory(target, overwrite);
-        TmdlSerializer.SerializeDatabaseToFolder(database, target);
-        AlignSourceBlocksWithDesktop(target);
+        EnsureWritable(target, overwrite);
+
+        // Serialize into a staging folder, then sync only the files whose content changed into the
+        // target: a small edit produces a small git diff, and a serializer failure leaves the
+        // existing model untouched instead of half-deleted.
+        var staging = Path.Combine(Path.GetTempPath(), $"tomix-tmdl-{Guid.NewGuid():N}");
+        try
+        {
+            TmdlSerializer.SerializeDatabaseToFolder(database, staging);
+            TmdlFolderSync.Apply(staging, target, AlignSourceBlocks);
+        }
+        finally
+        {
+            try { Directory.Delete(staging, recursive: true); } catch { /* best-effort cleanup */ }
+        }
+
         return supportingFiles ? Directory.GetParent(target)!.FullName : target;
     }
 
     /// <summary>
-    /// Power BI Desktop writes partition <c>source =</c> expression blocks one indentation level
-    /// above the property, while <see cref="TmdlSerializer"/> writes them two levels deep (it
-    /// agrees with Desktop on every other expression property, e.g. measures and calc items).
-    /// Outdenting those blocks by one tab makes a tomix save byte-identical to Desktop output,
-    /// so saving a Desktop-authored model doesn't churn every table file in the user's git diff.
+    /// Aligns the partition <c>source =</c> expression blocks of a freshly serialized TMDL file with
+    /// the file it replaces. <see cref="TmdlSerializer"/> writes M source bodies two indentation
+    /// levels below the property; Power BI Desktop writes them one level below (it agrees with the
+    /// serializer on every other expression property, e.g. measures and calc items). Each M block is
+    /// outdented to Desktop depth unless the same partition in <paramref name="existingText"/> sits
+    /// at serializer depth, so a save never re-indents an unchanged block whichever convention the
+    /// model was written with (#201). New partitions get Desktop depth.
     /// Lossless: TMDL strips the common leading whitespace of a delimited expression on parse.
     /// </summary>
-    private static void AlignSourceBlocksWithDesktop(string folder)
+    internal static string AlignSourceBlocks(string text, string? existingText)
     {
-        foreach (var file in Directory.EnumerateFiles(folder, "*.tmdl", SearchOption.AllDirectories))
+        var keepSerializerDepth = new HashSet<string>(StringComparer.Ordinal);
+        if (existingText is not null)
         {
-            var text = File.ReadAllText(file);
-            var normalized = OutdentSourceBlocks(text);
-            if (!string.Equals(normalized, text, StringComparison.Ordinal))
-                File.WriteAllText(file, normalized);
+            foreach (var block in FindMSourceBlocks(existingText.Split('\n')))
+            {
+                if (block.MinContentIndent >= block.PropertyIndent + 2)
+                    keepSerializerDepth.Add(block.Header);
+            }
         }
+
+        var lines = text.Split('\n');
+        var changed = false;
+        foreach (var block in FindMSourceBlocks(lines).ToList())
+        {
+            if (block.MinContentIndent < block.PropertyIndent + 2 || keepSerializerDepth.Contains(block.Header))
+                continue;
+
+            for (var j = block.PropertyLine + 1; j <= block.LastContentLine; j++)
+            {
+                if (CountLeadingTabs(lines[j]) >= block.PropertyIndent + 2)
+                {
+                    lines[j] = lines[j][1..];
+                    changed = true;
+                }
+            }
+        }
+
+        return changed ? string.Join('\n', lines) : text;
     }
 
     /// <summary>
@@ -85,11 +121,18 @@ public static class TomModelExporter
     /// calculated partitions, blocks already at Desktop depth, single-line sources, and fenced
     /// (<c>```</c>) expressions are left untouched, making the transform idempotent.
     /// </summary>
-    internal static string OutdentSourceBlocks(string text)
-    {
-        var lines = text.Split('\n');
-        var changed = false;
+    internal static string OutdentSourceBlocks(string text) => AlignSourceBlocks(text, existingText: null);
 
+    private readonly record struct SourceBlock(
+        string Header, int PropertyLine, int PropertyIndent, int LastContentLine, int MinContentIndent);
+
+    /// <summary>
+    /// Finds each multiline bare <c>source =</c> block under an M partition. The block is the run of
+    /// blank or deeper-indented lines that follows the property; <see cref="SourceBlock.Header"/> is
+    /// the enclosing partition declaration, trimmed, which identifies the block across files.
+    /// </summary>
+    private static IEnumerable<SourceBlock> FindMSourceBlocks(string[] lines)
+    {
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i].TrimEnd('\r');
@@ -97,10 +140,10 @@ public static class TomModelExporter
             if (propertyIndent == 0 || line[propertyIndent..] != "source =")
                 continue;
 
-            if (!IsInsideMPartition(lines, i, propertyIndent))
+            var header = EnclosingMPartition(lines, i, propertyIndent);
+            if (header is null)
                 continue;
 
-            // The block is the run of blank or deeper-indented lines that follows the property.
             var end = i + 1;
             var minContentIndent = int.MaxValue;
             var lastContent = i;
@@ -122,29 +165,18 @@ public static class TomModelExporter
                 end++;
             }
 
-            if (minContentIndent != int.MaxValue && minContentIndent >= propertyIndent + 2)
-            {
-                for (var j = i + 1; j <= lastContent; j++)
-                {
-                    if (CountLeadingTabs(lines[j]) >= propertyIndent + 2)
-                    {
-                        lines[j] = lines[j][1..];
-                        changed = true;
-                    }
-                }
-            }
+            if (minContentIndent != int.MaxValue)
+                yield return new SourceBlock(header, i, propertyIndent, lastContent, minContentIndent);
 
             i = lastContent;
         }
-
-        return changed ? string.Join('\n', lines) : text;
     }
 
     /// <summary>
     /// Walks back from the <c>source =</c> property to the enclosing declaration (the nearest
-    /// shallower-indented line) and requires it to be an M partition.
+    /// shallower-indented line) and returns it, trimmed, when it is an M partition.
     /// </summary>
-    private static bool IsInsideMPartition(string[] lines, int sourceIndex, int propertyIndent)
+    private static string? EnclosingMPartition(string[] lines, int sourceIndex, int propertyIndent)
     {
         for (var i = sourceIndex - 1; i >= 0; i--)
         {
@@ -156,11 +188,14 @@ public static class TomModelExporter
             if (indent >= propertyIndent)
                 continue;
 
-            return line[indent..].StartsWith("partition ", StringComparison.Ordinal)
-                   && line.TrimEnd().EndsWith("= m", StringComparison.Ordinal);
+            var declaration = line.Trim();
+            return declaration.StartsWith("partition ", StringComparison.Ordinal)
+                   && declaration.EndsWith("= m", StringComparison.Ordinal)
+                ? declaration
+                : null;
         }
 
-        return false;
+        return null;
     }
 
     private static int CountLeadingTabs(string line)
@@ -222,39 +257,15 @@ public static class TomModelExporter
         }
     }
 
-    private static void PrepareDirectory(string path, bool overwrite)
+    private static void EnsureWritable(string path, bool overwrite)
     {
-        if (Directory.Exists(path))
-        {
-            if (Directory.EnumerateFileSystemEntries(path).Any())
-            {
-                if (!overwrite)
-                    throw new OutputExistsException($"Output directory already exists: {path}");
-
-                ClearDirectory(path);
-            }
-        }
-        else
-        {
-            Directory.CreateDirectory(path);
-        }
-    }
-
-    private static void ClearDirectory(string path)
-    {
-        foreach (var entry in Directory.EnumerateFileSystemEntries(path))
-        {
-            var full = Path.Combine(path, entry);
-            if (Directory.Exists(full))
-                Directory.Delete(full, recursive: true);
-            else
-                File.Delete(full);
-        }
+        if (!overwrite && Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
+            throw new OutputExistsException($"Output directory already exists: {path}");
     }
 
     private static void WriteSupportingFiles(string semanticModel)
     {
-        File.WriteAllText(Path.Combine(semanticModel, "definition.pbism"), """
+        TmdlFolderSync.WriteIfChanged(Path.Combine(semanticModel, "definition.pbism"), """
             {
               "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/definitionProperties/1.0.0/schema.json",
               "version": "4.2",
@@ -264,7 +275,7 @@ public static class TomModelExporter
             }
             """);
 
-        File.WriteAllText(Path.Combine(semanticModel, ".platform"), """
+        TmdlFolderSync.WriteIfChanged(Path.Combine(semanticModel, ".platform"), """
             {
               "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
               "metadata": {

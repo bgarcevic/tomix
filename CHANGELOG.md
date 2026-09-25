@@ -20,6 +20,11 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- TMDL saves rewrite only the files whose content changed, so a small edit gives a
+  small git diff. Untouched files keep their bytes, line endings, and M partition
+  `source =` indentation, and a failed save leaves the model intact. Only stale
+  `.tmdl` files are deleted; a README or other non-TMDL file in the model folder is
+  no longer removed on save (#224, #201).
 - **Breaking:** mutation saves and staged commits now block newly introduced validation
   errors before writing. Existing errors and warnings remain non-blocking; `--force` saves
   with a notice, and `tx config set validateOnSave false` disables the gate. `validate`

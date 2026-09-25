@@ -11,6 +11,10 @@ Adapter around Microsoft Tabular Object Model.
   TOM database name → sibling `.platform` displayName → file/folder name
   (a PBIP `definition` folder inherits its item root's name) → caller fallback
   → `(unnamed)`.
+- Save TMDL without churn (`TomModelExporter` + `TmdlFolderSync`): serialize to a
+  staging folder, then write only files whose content changed (ignoring EOLs and
+  trailing newlines), keep each rewritten file's EOL/BOM, match each M partition's
+  existing `source =` depth, and delete only stale `.tmdl` files.
 
 ## Mutation structure
 
