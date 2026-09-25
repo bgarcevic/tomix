@@ -39,7 +39,7 @@ public sealed class MoveModelObjectHandler
             return TomixResult<MoveModelObjectResult>.Fail(error.Code, error.Message, error.ExitCode, error.Hint);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: false, request.Overwrite, request.NoSync, DryRun: request.DryRun);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync, DryRun: request.DryRun);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "mv", _stores,
@@ -82,7 +82,8 @@ public sealed class MoveModelObjectHandler
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
                         BrokenReferences: broken.Count > 0 ? broken : null,
                         FixedReferences: request.FixRefs && fixup.FixedPaths.Count > 0 ? fixup.FixedPaths : null,
-                        DryRun: request.DryRun));
+                        DryRun: request.DryRun,
+                        NewValidationErrors: outcome.Validation?.NewErrorCount));
             },
             new MoveModelObjectResult(plan.SourceDisplay, plan.DestinationDisplay, false, null, Reverted: true),
             cancellationToken);

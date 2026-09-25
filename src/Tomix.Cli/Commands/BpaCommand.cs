@@ -86,7 +86,7 @@ internal sealed class BpaCommand : ICommandModule
             Description = "With --fix: also apply destructive Delete() fixes that remove model objects"
         };
 
-        var forceOption = LifecycleOptions.Force("Save fixes despite validation errors");
+        var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
 
         var saveOption = LifecycleOptions.Save();
@@ -416,6 +416,7 @@ internal sealed class BpaCommand : ICommandModule
         var stageOption = LifecycleOptions.Stage();
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
+        var forceOption = LifecycleOptions.Force();
 
         var command = new Command(name, description)
         {
@@ -427,7 +428,8 @@ internal sealed class BpaCommand : ICommandModule
             serializationOption,
             stageOption,
             revertOption,
-            noSyncOption
+            noSyncOption,
+            forceOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -455,7 +457,8 @@ internal sealed class BpaCommand : ICommandModule
                     Serialization: parseResult.GetValue(serializationOption) ?? "",
                     Stage: parseResult.GetValue(stageOption),
                     Revert: parseResult.GetValue(revertOption),
-                    NoSync: parseResult.GetValue(noSyncOption)),
+                    NoSync: parseResult.GetValue(noSyncOption),
+                    Force: parseResult.GetValue(forceOption)),
                 cancellationToken);
 
             return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderIgnore, BpaRulesRenderer.ToIgnoreJson);

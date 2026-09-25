@@ -71,17 +71,25 @@ public static class MutationRunner
 
         try
         {
+            var validationBaseline = await SaveValidation.CaptureAsync(
+                session, context, stores.ShouldValidateOnSave(), cancellationToken);
             var (changed, summary, buildResult) = await mutate(mutator, session, context);
 
             if (!changed)
                 return TomixResult<TResult>.Ok(buildResult(new MutationOutcome(false, null)));
 
             var outcome = await MutationLifecycle.CompleteAsync(
-                mutator, context, command, summary, cancellationToken);
+                mutator, session, context, validationBaseline, command, summary, cancellationToken);
 
             // A failed workspace sync leaves the mirror behind the source; render the saved
             // result but exit non-zero so CI catches the drift.
-            return TomixResult<TResult>.Ok(buildResult(outcome), outcome.SyncFailed ? 1 : 0);
+            return TomixResult<TResult>.Ok(
+                buildResult(outcome), outcome.SyncFailed ? 1 : 0,
+                SaveValidation.ForcedNotice(context.Force ? outcome.Validation : null));
+        }
+        catch (SaveValidationBlockedException ex)
+        {
+            return SaveValidation.Blocked<TResult>(ex.Delta);
         }
         catch (UnsupportedAddOptionException ex)
         {

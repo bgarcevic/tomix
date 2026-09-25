@@ -17,12 +17,14 @@ internal sealed class StageCommand : ICommandModule
 
     private readonly CliStateStore _state;
     private readonly StagingStore _staging;
+    private readonly Func<bool> _validateOnSave;
 
-    public StageCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, StagingStore staging)
+    public StageCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, StagingStore staging, Func<bool>? validateOnSave = null)
     {
         _providers = providers;
         _state = state;
         _staging = staging;
+        _validateOnSave = validateOnSave ?? (() => true);
     }
 
     public Command Build()
@@ -40,7 +42,7 @@ internal sealed class StageCommand : ICommandModule
     {
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Commit even if the source changed since staging began (overwrites it)."
+            Description = "Commit despite source drift and newly introduced validation errors."
         };
         var command = new Command("commit", "Promote staged mutations onto the source (and workspace mirror)")
         {
@@ -69,7 +71,7 @@ internal sealed class StageCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Committing staged changes...",
-                () => new StageHandler(_staging).CommitAsync(
+                () => new StageHandler(_staging, _validateOnSave).CommitAsync(
                     reference, _providers, parseResult.GetValue(forceOption), cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
             return CommandOutput.Render(parseResult, result, format, RenderCommit);

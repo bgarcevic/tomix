@@ -88,6 +88,8 @@ public sealed class ScriptHandler
                 await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
                 var summary = await session.GetSummaryAsync(cancellationToken);
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
+                var validationBaseline = SaveValidation.ForSnapshot(
+                    snapshot, context, _stores.ShouldValidateOnSave());
 
                 if (request.DryRun)
                 {
@@ -124,7 +126,8 @@ public sealed class ScriptHandler
                 }
 
                 var outcome = await MutationLifecycle.CompleteAsync(
-                    mutator, context, "script", $"script ({inputs.Count} inputs)", cancellationToken);
+                    mutator, session, context, validationBaseline,
+                    "script", $"script ({inputs.Count} inputs)", cancellationToken);
                 stopwatch.Stop();
 
                 return TomixResult<ScriptRunResult>.Ok(
@@ -137,8 +140,14 @@ public sealed class ScriptHandler
                         outcome.Staged,
                         outcome.Synced,
                         outcome.SyncTarget,
-                        outcome.SyncWarning));
+                        outcome.SyncWarning,
+                        outcome.Validation?.NewErrorCount),
+                    diagnostics: SaveValidation.ForcedNotice(context.Force ? outcome.Validation : null));
             });
+        }
+        catch (SaveValidationBlockedException ex)
+        {
+            return SaveValidation.Blocked<ScriptRunResult>(ex.Delta);
         }
         catch (NotSupportedException ex)
         {
@@ -214,7 +223,9 @@ public sealed record ScriptRunResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? SyncTarget = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null)
+    string? SyncWarning = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? NewValidationErrors = null)
 {
     public static ScriptRunResult CreateDryRun(
         string modelName,
@@ -244,7 +255,8 @@ public sealed record ScriptRunResult(
         bool? staged = null,
         bool synced = false,
         string? syncTarget = null,
-        string? syncWarning = null)
+        string? syncWarning = null,
+        int? newValidationErrors = null)
         => new(
             modelName,
             DryRun: false,
@@ -262,7 +274,8 @@ public sealed record ScriptRunResult(
             RuntimeError: null,
             Synced: synced,
             SyncTarget: syncTarget,
-            SyncWarning: syncWarning);
+            SyncWarning: syncWarning,
+            NewValidationErrors: newValidationErrors);
 
     public static ScriptRunResult Failed(
         string modelName,

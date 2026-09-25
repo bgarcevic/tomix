@@ -43,5 +43,5 @@ public sealed record AppServices(
     /// <summary>The active session, read from disk at call time (never cached).</summary>
     public CliConnectionState? LoadCurrentSession() => State.LoadCurrentSession();
 
-    public MutationStores Mutations => new(Staging, LoadCurrentSession);
+    public MutationStores Mutations => new(Staging, LoadCurrentSession, ConfigStore.ValidateOnSaveEnabled);
 }

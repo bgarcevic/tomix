@@ -246,7 +246,7 @@ internal static class Program
             new ScriptCommand(providers, services.State, mutations),
             new SessionCommand(services.State),
             new SetCommand(providers, services.State, mutations),
-            new StageCommand(providers, services.State, services.Staging),
+            new StageCommand(providers, services.State, services.Staging, services.ConfigStore.ValidateOnSaveEnabled),
             new TestCommand(providers, loadCurrentSession),
             new UpdateCommand(version, releaseSource ?? UnavailableReleaseSource.Instance, services.UpdateCheck),
             new ValidateCommand(providers, services.State),

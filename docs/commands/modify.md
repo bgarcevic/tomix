@@ -4,13 +4,19 @@ Commands that change the model. They share the mutation lifecycle described
 in [Editing & staging](../guides/editing.md): **preview by default**, persist
 with `--save`, batch with `--stage`, or write elsewhere with
 `--save-to <path>` (which implies `--save`). `--serialization tmdl|bim`
-controls the on-disk format, `--force` (alias `-f`) saves past validation
-errors, `--overwrite` lets `--save-to` replace an existing target, and
+controls the on-disk format, `--force` (alias `-f`) saves despite newly
+introduced validation errors, `--overwrite` lets `--save-to` replace an existing target, and
 `--no-sync` skips the workspace mirror. `--dry-run` previews: the change is
-applied to the in-memory model and rendered, but nothing is written. Two commands keep a command-scoped
-`--force` with a different meaning: `rm --force` removes despite DAX
-dependents, and `init`/`connect`/`stage commit`/`deploy`/`config init` use
-`--force` to bypass their own destructive guards.
+applied to the in-memory model and rendered, but nothing is written.
+
+Before `--save` or `--save-to` writes anything, tx runs the same validation as
+`tx validate`. Only errors introduced by this command block the save; existing
+errors and warnings do not. A blocked save exits 1 and lists the new errors.
+`--force` writes anyway and reports the introduced errors. `rm --force` also
+bypasses its dependent-reference guard. Set `validateOnSave` to `false` with
+`tx config set validateOnSave false` to disable this gate; it is on by default.
+Staged edits are checked when you run `tx stage commit`. The `--force` flags on
+`init`, `connect`, `deploy`, and `config init` retain their command-specific uses.
 
 Those shared lifecycle options are not repeated in the tables below.
 

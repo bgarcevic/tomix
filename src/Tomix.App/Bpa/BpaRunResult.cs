@@ -25,7 +25,9 @@ public sealed record BpaRunResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? SyncTarget = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null)
+    string? SyncWarning = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? NewValidationErrors = null)
 {
     /// <summary>
     /// Unevaluable rules projected as error-severity findings ("rule could not be evaluated:

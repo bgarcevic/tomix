@@ -5,6 +5,27 @@ namespace Tomix.App.Tests;
 
 public sealed class ConfigHandlerTests
 {
+    [Fact]
+    public void ValidateOnSave_DefaultsOn_AndCanBeDisabled()
+    {
+        using var dir = new TempDir();
+        var store = new TomixConfigStore(dir.Combine("config.json"));
+        var handler = new ConfigHandler(store);
+
+        Assert.True(store.ValidateOnSaveEnabled());
+        Assert.Equal("true", handler.Get(ConfigKeys.ValidateOnSave).Data!.Value);
+        Assert.Equal("true", handler.List().Data!.Values[ConfigKeys.ValidateOnSave]);
+
+        Assert.False(handler.Set(ConfigKeys.ValidateOnSave, "sometimes").Success);
+        Assert.True(handler.Set(ConfigKeys.ValidateOnSave, "false").Success);
+        Assert.False(store.ValidateOnSaveEnabled());
+        Assert.Equal("false", handler.List().Data!.Values[ConfigKeys.ValidateOnSave]);
+
+        Assert.True(handler.Set(ConfigKeys.ValidateOnSave, " FALSE ").Success);
+        Assert.False(store.ValidateOnSaveEnabled());
+        Assert.Equal("false", handler.Get(ConfigKeys.ValidateOnSave).Data!.Value);
+    }
+
     private static ConfigHandler NewHandler(out string path)
     {
         path = Path.Combine(Path.GetTempPath(), $"tomix-config-test-{Guid.NewGuid():N}.json");
@@ -185,7 +206,8 @@ public sealed class ConfigHandlerTests
             var list = handler.List();
 
             Assert.True(list.Success);
-            Assert.Equal(3, list.Data!.Values.Count);
+            Assert.Equal(4, list.Data!.Values.Count);
+            Assert.Equal("true", list.Data.Values[ConfigKeys.ValidateOnSave]);
             Assert.Equal("true", list.Data.Values[ConfigKeys.NoColor]);
             Assert.Equal("false", list.Data.Values["telemetry"]);
             Assert.Equal(["telemetry"], list.Data.UnsupportedKeys);

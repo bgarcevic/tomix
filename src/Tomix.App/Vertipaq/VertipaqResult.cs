@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Tomix.Core.Vertipaq;
 
 namespace Tomix.App.Vertipaq;
@@ -21,4 +22,6 @@ public sealed record VertipaqAnnotateResult(
     object Saved,
     bool Synced = false,
     string? SyncTarget = null,
-    string? SyncWarning = null);
+    string? SyncWarning = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? NewValidationErrors = null);

@@ -63,7 +63,8 @@ public sealed class ReplaceModelTextHandler
                         request.Pattern, request.Replacement,
                         DryRun: null, replace.ChangeCount, Previews: null,
                         outcome.Saved, outcome.Staged,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
+                        NewValidationErrors: outcome.Validation?.NewErrorCount));
             },
             new ReplaceModelTextResult(
                 request.Pattern, request.Replacement,

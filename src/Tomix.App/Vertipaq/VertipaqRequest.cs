@@ -18,4 +18,5 @@ public sealed record VertipaqRequest(
     string? ExportPath,
     bool Obfuscate,
     bool Annotate,
-    bool Save);
+    bool Save,
+    bool Force = false);

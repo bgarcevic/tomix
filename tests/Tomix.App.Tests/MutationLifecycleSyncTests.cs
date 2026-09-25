@@ -15,7 +15,7 @@ public sealed class MutationLifecycleSyncTests
 
         var outcome = await MutationLifecycle.CompleteAsync(
             new StubMutationSession(deploySucceeds: true),
-            context, "add", "add X", CancellationToken.None);
+            null!, context, null, "add", "add X", CancellationToken.None);
 
         Assert.True(outcome.Synced);
         Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws / MyModel", outcome.SyncTarget);
@@ -49,7 +49,7 @@ public sealed class MutationLifecycleSyncTests
         var session = new StubMutationSession(deploySucceeds: true);
 
         await MutationLifecycle.CompleteAsync(
-            session, NewSaveContext(SyncTarget), command, $"{command} X", CancellationToken.None);
+            session, null!, NewSaveContext(SyncTarget), null, command, $"{command} X", CancellationToken.None);
 
         var expected = deploysPolicyPartitions
             ? ModelDeployOptions.Full
@@ -104,7 +104,7 @@ public sealed class MutationLifecycleSyncTests
 
         var outcome = await MutationLifecycle.CompleteAsync(
             new StubMutationSession(deploySucceeds: false),
-            context, "add", "add X", CancellationToken.None);
+            null!, context, null, "add", "add X", CancellationToken.None);
 
         Assert.False(outcome.Synced);
         Assert.Contains("sync failed", outcome.SyncWarning, StringComparison.OrdinalIgnoreCase);
@@ -117,7 +117,7 @@ public sealed class MutationLifecycleSyncTests
 
         var outcome = await MutationLifecycle.CompleteAsync(
             new StubMutationSession(deploySucceeds: true),
-            context, "add", "add X", CancellationToken.None);
+            null!, context, null, "add", "add X", CancellationToken.None);
 
         Assert.False(outcome.Synced);
         Assert.Null(outcome.SyncTarget);
@@ -131,7 +131,7 @@ public sealed class MutationLifecycleSyncTests
 
         var outcome = await MutationLifecycle.CompleteAsync(
             new StubNonDeployMutationSession(),
-            context, "add", "add X", CancellationToken.None);
+            null!, context, null, "add", "add X", CancellationToken.None);
 
         Assert.False(outcome.Synced);
         Assert.Contains("does not support deploy", outcome.SyncWarning, StringComparison.OrdinalIgnoreCase);
@@ -144,10 +144,10 @@ public sealed class MutationLifecycleSyncTests
 
         var failed = await MutationLifecycle.CompleteAsync(
             new StubMutationSession(deploySucceeds: false),
-            context, "add", "add X", CancellationToken.None);
+            null!, context, null, "add", "add X", CancellationToken.None);
         var succeeded = await MutationLifecycle.CompleteAsync(
             new StubMutationSession(deploySucceeds: true),
-            context, "add", "add X", CancellationToken.None);
+            null!, context, null, "add", "add X", CancellationToken.None);
 
         // SyncFailed drives the non-zero exit code so CI catches mirror drift.
         Assert.True(failed.SyncFailed);

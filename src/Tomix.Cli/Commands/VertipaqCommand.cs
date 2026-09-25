@@ -64,6 +64,7 @@ internal sealed class VertipaqCommand : ICommandModule
             Description = "Write statistics into the model as Vertipaq_* annotations (preview unless --save)"
         };
         var saveOption = new Option<bool>("--save") { Description = "Persist --annotate changes to the model" };
+        var forceOption = LifecycleOptions.Force();
         var exportOption = new Option<string?>("--export")
         {
             Description = "Export statistics to a .vpax file for offline analysis"
@@ -91,6 +92,7 @@ internal sealed class VertipaqCommand : ICommandModule
             statsOption,
             annotateOption,
             saveOption,
+            forceOption,
             exportOption,
             importOption,
             obfuscateOption
@@ -192,7 +194,8 @@ internal sealed class VertipaqCommand : ICommandModule
                 ExportPath: parseResult.GetValue(exportOption),
                 Obfuscate: parseResult.GetValue(obfuscateOption),
                 Annotate: parseResult.GetValue(annotateOption),
-                Save: parseResult.GetValue(saveOption));
+                Save: parseResult.GetValue(saveOption),
+                Force: parseResult.GetValue(forceOption));
 
             var spinnerLabel = !string.IsNullOrWhiteSpace(importPath)
                 ? "Importing statistics..."
@@ -336,7 +339,8 @@ internal sealed class VertipaqCommand : ICommandModule
                 ["saved"] = annotate.Saved,
                 ["synced"] = annotate.Synced,
                 ["syncTarget"] = annotate.SyncTarget,
-                ["syncWarning"] = annotate.SyncWarning
+                ["syncWarning"] = annotate.SyncWarning,
+                ["newValidationErrors"] = annotate.NewValidationErrors
             };
 
         return json;

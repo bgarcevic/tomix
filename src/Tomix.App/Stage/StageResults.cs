@@ -40,4 +40,6 @@ public sealed record StageCommitResult(
     string? Database,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     long? DeployDurationMs,
-    int OpsCommitted);
+    int OpsCommitted,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? NewValidationErrors = null);

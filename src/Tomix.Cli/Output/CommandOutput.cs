@@ -130,6 +130,9 @@ internal static class CommandOutput
         else
             renderHuman(result.Data);
 
+        if (result.Diagnostics.Count > 0 && !OutputFormats.IsJson(format))
+            ErrorOutput.Write(result.Diagnostics, errorFormat);
+
         return result.ExitCode;
     }
 }

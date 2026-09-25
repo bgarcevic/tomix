@@ -7,4 +7,10 @@ namespace Tomix.App.Mutations;
 /// working copies and a call-time session read for the sync target. Threaded from the
 /// composition root so mutations never construct filesystem-backed state themselves.
 /// </summary>
-public sealed record MutationStores(StagingStore Staging, Func<CliConnectionState?> ResolveSession);
+public sealed record MutationStores(
+    StagingStore Staging,
+    Func<CliConnectionState?> ResolveSession,
+    Func<bool>? ValidateOnSave = null)
+{
+    public bool ShouldValidateOnSave() => ValidateOnSave?.Invoke() ?? true;
+}

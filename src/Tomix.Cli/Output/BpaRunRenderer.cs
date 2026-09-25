@@ -272,6 +272,7 @@ internal static class BpaRunRenderer
             ruleLoadDiagnostics = result.RuleLoadDiagnostics ?? Array.Empty<string>(),
             saved = result.Saved,
             staged = result.Staged,
+            newValidationErrors = result.NewValidationErrors,
             results = result.Violations.Select(v => new
             {
                 ruleId = v.RuleId,

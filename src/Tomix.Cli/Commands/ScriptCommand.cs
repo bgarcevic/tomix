@@ -55,7 +55,7 @@ internal sealed class ScriptCommand : ICommandModule
             Description = "Compile the scripts and report errors without running them"
         };
 
-        var forceOption = LifecycleOptions.Force("Write the model even though the scripts introduce DAX validation errors");
+        var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
 
         var saveOption = LifecycleOptions.Save();

@@ -20,10 +20,13 @@ tx config <show|set|init|paths>
 tx config show
 tx config set noColor true
 tx config set defaultFormat json
+tx config set validateOnSave false
 tx config paths --output-format json
 ```
 
 Supported keys are `defaultFormat` (`text` or `json`), `noColor`, `updateCheck`,
+`validateOnSave` (`true` by default; set `false` to allow mutation saves that
+introduce validation errors),
 and the non-secret authentication settings `auth.clientId`, `auth.tenant`, and
 `auth.authority`. An explicit `--output-format` always overrides
 `defaultFormat`; the legacy value `human` is read as `text`.
@@ -116,9 +119,11 @@ Inspect and manage staged (uncommitted) model mutations — see
 | `stage commit` | Promote staged mutations onto the source (and workspace mirror). |
 | `stage discard` | Discard staged mutations without committing them. |
 
-`stage commit --force` commits even if the source changed since staging began
-(overwrites it); without it, source drift blocks the commit so you can
-re-stage. `stage discard --all` discards staged mutations for every model in
+`stage commit` compares validation errors in the source and staged model before
+writing or deploying. New errors block promotion and leave the staged copy
+available. `stage commit --force` bypasses that gate and also commits if the
+source changed since staging began (overwriting it). Without `--force`, source
+drift blocks the commit so you can re-stage. `stage discard --all` discards staged mutations for every model in
 the session, not just the active one. Both `stage commit` (it overwrites the
 source, and the workspace mirror for remote sources) and `stage discard` ask
 for confirmation; pass `--yes` to skip the prompt in scripts.

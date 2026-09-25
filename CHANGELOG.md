@@ -12,6 +12,10 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- **Breaking:** mutation saves and staged commits now block newly introduced validation
+  errors before writing. Existing errors and warnings remain non-blocking; `--force` saves
+  with a notice, and `tx config set validateOnSave false` disables the gate. `validate`
+  also reports direct DAX self-references as `DAX0006` (#210).
 - **Breaking:** removed `incremental-refresh`. Inspect, configure, and remove policies
   with `get`/`set`/`rm <table>/RefreshPolicy`. `set` accepts repeatable `-p`/`--set`
   assignments. Use `refresh --table <table>` to apply the deployed policy and load

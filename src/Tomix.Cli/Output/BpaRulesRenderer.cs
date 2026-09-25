@@ -124,6 +124,7 @@ internal static class BpaRulesRenderer
             ruleIds = result.RuleIds,
             saved = result.Saved,
             staged = result.Staged,
+            newValidationErrors = result.NewValidationErrors,
             model = result.ModelName
         };
 

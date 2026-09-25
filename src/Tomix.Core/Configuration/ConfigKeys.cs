@@ -11,6 +11,9 @@ public static class ConfigKeys
     /// <summary>Set to <c>false</c> to disable the throttled update check and notice.</summary>
     public const string UpdateCheck = "updateCheck";
 
+    /// <summary>Set to <c>false</c> to allow mutations to save new validation errors.</summary>
+    public const string ValidateOnSave = "validateOnSave";
+
     /// <summary>Azure AD application (client) id used for interactive/device-code sign-in. Not a secret.</summary>
     public const string AuthClientId = "auth.clientId";
 
@@ -25,6 +28,7 @@ public static class ConfigKeys
         DefaultFormat,
         NoColor,
         UpdateCheck,
+        ValidateOnSave,
         AuthClientId,
         AuthTenant,
         AuthAuthority

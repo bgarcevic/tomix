@@ -34,4 +34,6 @@ public sealed record SetModelPropertyResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     Tomix.Core.Models.RefreshPolicyInfo? Policy = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? CreatedExpressions = null);
+    IReadOnlyList<string>? CreatedExpressions = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? NewValidationErrors = null);

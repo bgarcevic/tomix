@@ -25,7 +25,7 @@ Create a new object in the model
   opt --set <set>  Set a property on the new object: name=value, e.g. --set formatString="#,0". Repeatable. Names can use dotted paths, bracket indexers, or a DisplayName.
   opt --file <file>  Read the expression from this file
   opt --if-not-exists  Do nothing and exit 0 when the object already exists
-  opt --force, -f  Write the model even though validation reports errors
+  opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
@@ -97,6 +97,7 @@ Put a rule on the model's ignore list
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --force, -f  Save despite newly introduced validation errors
 
 # tx bpa rules list
 List rules from every source, with each rule's status
@@ -118,6 +119,7 @@ Take a rule off the model's ignore list
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --force, -f  Save despite newly introduced validation errors
 
 # tx bpa run
 Run best-practice rules against a model
@@ -129,7 +131,7 @@ Run best-practice rules against a model
   opt --fail-on <fail-on>  Failure threshold: error (default) or warning. Rules that cannot be evaluated count as error-severity findings
   opt --fix  Fix violations whose rules provide a fix expression
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
-  opt --force, -f  Save fixes despite validation errors
+  opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
   opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
@@ -248,7 +250,7 @@ Pretty-print DAX and M expressions (--expression, --path, or every expression in
   opt --lang <lang>  Expression language: dax or m
   opt --type, -t <type>  Disambiguate object type
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --force, -f  Write the model even though validation reports errors
+  opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --stage  Stage this command's mutation
@@ -289,6 +291,7 @@ Move or rename a model object, including in and out of display folders
   arg <destination>  Destination object path
   arg [model]  Optional path to the model; defaults to the active connection
   opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --force, -f  Save despite newly introduced validation errors
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --type, -t <type>  Type to pick when the path matches several objects under a table.
   opt --stage  Stage this command's mutation
@@ -358,7 +361,7 @@ Replace text across model objects
   opt --regex  Interpret the pattern as a regular expression
   opt --case-sensitive  Match text exactly, including letter case
   opt --dry-run  Preview changes without applying
-  opt --force, -f  Write the model even though validation reports errors
+  opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --stage  Stage this command's mutation
   opt --revert  Revert a staged mutation
@@ -371,7 +374,7 @@ Replace text across model objects
 Delete an object from the model
   arg <path>  Object path to remove.
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --force, -f  Remove even if the object has DAX dependents (they break; inspect with 'tx deps')
+  opt --force, -f  Remove despite DAX dependents and save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --if-exists  Exit 0 when the object is already gone
@@ -402,7 +405,7 @@ Run C# scripts against a semantic model
   opt --save-to <save-to>  Write the model to this path after the scripts run (implies --save)
   opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
   opt --dry-run  Compile the scripts and report errors without running them
-  opt --force, -f  Write the model even though the scripts introduce DAX validation errors
+  opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
   opt --stage  Stage this command's mutation
@@ -433,7 +436,7 @@ Change a property on a model object
   opt -q <q>  Compatibility form of --set: the property to set; give its value with -i.
   opt -i <i>  Value for the preceding -q. Pass '-' to read from stdin.
   opt --set, -p <set>  Property assignment as name=value. Repeat to set multiple properties together.
-  opt --force, -f  Save despite refresh-policy validation errors
+  opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).
@@ -461,7 +464,7 @@ Discard staged mutations without committing them
 
 # tx stage commit
 Promote staged mutations onto the source (and workspace mirror)
-  opt --force  Commit even if the source changed since staging began (overwrites it).
+  opt --force  Commit despite source drift and newly introduced validation errors.
 
 # tx test
 Run DAX regression tests against a live model (--update records snapshots, --trx/--ci for pipelines)
@@ -503,6 +506,7 @@ Report VertiPaq storage statistics for a semantic model
   opt --stats  Show a model-level storage summary (combine with view flags for more)
   opt --annotate  Write statistics into the model as Vertipaq_* annotations (preview unless --save)
   opt --save  Persist --annotate changes to the model
+  opt --force, -f  Save despite newly introduced validation errors
   opt --export <export>  Export statistics to a .vpax file for offline analysis
   opt --import <import>  Analyze a previously exported .vpax file offline (no connection needed)
   opt --obfuscate  Mask names and expressions in the exported .vpax; a matching .dict dictionary keeps the mapping private

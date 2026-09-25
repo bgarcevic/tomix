@@ -19,6 +19,15 @@ public sealed class TomixConfigStore
 
     public string FilePath => _path;
 
+    /// <summary>Whether mutation saves are gated; enabled unless explicitly disabled.</summary>
+    public bool ValidateOnSaveEnabled()
+    {
+        var values = Load();
+        return !values.TryGetValue(ConfigKeys.ValidateOnSave, out var value)
+            || !bool.TryParse(value, out var enabled)
+            || enabled;
+    }
+
     public IDictionary<string, string> Load()
     {
         if (!File.Exists(_path))

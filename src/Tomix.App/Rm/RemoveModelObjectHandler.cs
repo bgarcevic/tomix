@@ -74,7 +74,8 @@ public sealed class RemoveModelObjectHandler
                         BrokenReferences: mutation.Changed && referencing.Count > 0 ? referencing : null,
                         CascadeRemoved: mutation.CascadeRemoved,
                         RemainingPolicyPartitions: mutation.RemainingPolicyPartitions,
-                        DryRun: request.DryRun));
+                        DryRun: request.DryRun,
+                        NewValidationErrors: outcome.Validation?.NewErrorCount));
             },
             new RemoveModelObjectResult(false, null, null, null, null, Reverted: true),
             cancellationToken);

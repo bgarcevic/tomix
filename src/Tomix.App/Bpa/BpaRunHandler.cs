@@ -80,6 +80,8 @@ public sealed class BpaRunHandler
         {
             await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            var validationBaseline = SaveValidation.ForSnapshot(
+                snapshot, context, _stores.ShouldValidateOnSave());
 
             // A staged run analyzes a working copy under the config directory, but the annotation's
             // relative external-rule paths are anchored at the original model, so resolve from that
@@ -141,9 +143,17 @@ public sealed class BpaRunHandler
 
                 if (fixResult.FixesApplied > 0 && context.Mode is MutationMode.Save or MutationMode.Stage)
                 {
-                    var outcome = await MutationLifecycle.CompleteAsync(
-                        mutationSession, context, "bpa-fix",
-                        $"bpa-fix {fixResult.FixesApplied} violations", cancellationToken);
+                    MutationOutcome outcome;
+                    try
+                    {
+                        outcome = await MutationLifecycle.CompleteAsync(
+                            mutationSession, session, context, validationBaseline, "bpa-fix",
+                            $"bpa-fix {fixResult.FixesApplied} violations", cancellationToken);
+                    }
+                    catch (SaveValidationBlockedException ex)
+                    {
+                        return SaveValidation.Blocked<BpaRunResult>(ex.Delta);
+                    }
 
                     runResult = runResult with
                     {
@@ -151,8 +161,14 @@ public sealed class BpaRunHandler
                         Staged = outcome.Staged,
                         Synced = outcome.Synced,
                         SyncTarget = outcome.SyncTarget,
-                        SyncWarning = outcome.SyncWarning
+                        SyncWarning = outcome.SyncWarning,
+                        NewValidationErrors = outcome.Validation?.NewErrorCount
                     };
+                    if (context.Force && outcome.Validation is { NewErrorCount: > 0 } delta)
+                        return TomixResult<BpaRunResult>.Ok(
+                            runResult,
+                            exitCode: BpaFailOn.Blocking(runResult.Violations, failOnSeverity).Count > 0 ? 1 : 0,
+                            diagnostics: SaveValidation.ForcedNotice(delta));
                 }
             }
 

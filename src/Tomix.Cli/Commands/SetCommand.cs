@@ -54,7 +54,7 @@ internal sealed class SetCommand : ICommandModule
                 if (!value.Contains('=') || AddCommand.SplitSetName(value).Length == 0)
                     result.AddError($"--set '{value}' must be name=value.");
         });
-        var forceOption = LifecycleOptions.Force("Save despite refresh-policy validation errors");
+        var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")

@@ -74,7 +74,8 @@ public sealed class FormatModelHandler
                             formatted.Success, obj.Path, FormatterLanguages.DisplayName(language),
                             status, formatted.Formatted, outcome.Saved, outcome.Staged,
                             outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                            DryRun: request.DryRun));
+                            DryRun: request.DryRun,
+                            NewValidationErrors: outcome.Validation?.NewErrorCount));
                 },
                 (FormatModelResult)new ObjectFormatResult(false, "", "", "", "", null),
                 cancellationToken);
@@ -138,7 +139,8 @@ public sealed class FormatModelHandler
                         objects.Count, formattedCount, unchangedCount, failedCount,
                         results, outcome.Saved, outcome.Staged,
                         outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
-                        DryRun: request.DryRun));
+                        DryRun: request.DryRun,
+                        NewValidationErrors: outcome.Validation?.NewErrorCount));
             },
             (FormatModelResult)new ModelFormatResult(0, 0, 0, 0, [], null),
             cancellationToken);

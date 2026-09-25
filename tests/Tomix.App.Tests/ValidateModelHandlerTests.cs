@@ -36,6 +36,20 @@ public sealed class ValidateModelHandlerTests
         Assert.Contains(result.Data.Errors, e => e.Code == "DAX0002" && e.Message.Contains("Missing"));
     }
 
+    [Theory]
+    [InlineData(ModelObjectKind.Measure, "[Self]")]
+    [InlineData(ModelObjectKind.CalculatedColumn, "Sales[Self]")]
+    public async Task HandleAsync_DetectsDirectDaxSelfReference(ModelObjectKind kind, string expression)
+    {
+        var obj = Measure("Self", expression) with { Kind = kind };
+        var result = await ValidateAsync(SalesSnapshot(obj));
+
+        Assert.False(result.Data!.Valid);
+        var issue = Assert.Single(result.Data.Errors);
+        Assert.Equal("DAX0006", issue.Code);
+        Assert.Equal("Sales/Self", issue.ObjectName);
+    }
+
     [Fact]
     public async Task HandleAsync_SkipsLocalAnalysis_WhenServerOnly()
     {

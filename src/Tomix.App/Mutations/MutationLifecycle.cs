@@ -41,7 +41,8 @@ public sealed record MutationOutcome(
     bool? Staged,
     bool Synced = false,
     string? SyncTarget = null,
-    string? SyncWarning = null)
+    string? SyncWarning = null,
+    SaveValidationDelta? Validation = null)
 {
     /// <summary>
     /// True when a workspace sync was attempted (or required) and did not happen. The command
@@ -147,7 +148,9 @@ public static class MutationLifecycle
     /// <summary>Persists the just-applied mutation according to the resolved mode.</summary>
     public static async Task<MutationOutcome> CompleteAsync(
         IModelMutationSession mutator,
+        IModelSession session,
         MutationContext context,
+        SaveValidationBaseline? validationBaseline,
         string command,
         string summary,
         CancellationToken cancellationToken)
@@ -155,11 +158,20 @@ public static class MutationLifecycle
         switch (context.Mode)
         {
             case MutationMode.Save:
+                SaveValidationDelta? validation = null;
+                if (validationBaseline is not null)
+                {
+                    validation = SaveValidation.Compare(
+                        validationBaseline.Snapshot,
+                        await session.GetSnapshotAsync(cancellationToken));
+                    if (validationBaseline.Enforce && validation.NewErrorCount > 0)
+                        throw new SaveValidationBlockedException(validation);
+                }
                 var export = await mutator.SaveAsync(context.SaveTarget, context.Serialization, context.Overwrite, cancellationToken);
                 var (synced, syncTarget, syncWarning) = await WorkspaceSync.SyncAsync(
                     mutator, context.SyncTarget, context.Force,
                     WorkspaceSync.SyncOptionsFor(command), cancellationToken);
-                return new MutationOutcome(export.SavedPath, null, synced, syncTarget, syncWarning);
+                return new MutationOutcome(export.SavedPath, null, synced, syncTarget, syncWarning, validation);
 
             case MutationMode.Stage:
                 // Flush the in-memory mutation into the working copy on disk, then record the op.

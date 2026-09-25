@@ -25,7 +25,9 @@ public sealed class ConfigHandler
 
     public TomixResult<ConfigListResult> List()
     {
-        var sorted = _store.Load()
+        var values = _store.Load();
+        values.TryAdd(ConfigKeys.ValidateOnSave, "true");
+        var sorted = values
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
 
@@ -41,7 +43,12 @@ public sealed class ConfigHandler
         if (!ConfigKeys.IsKnown(key))
             return UnknownKey<ConfigGetResult>(key);
 
-        _store.Load().TryGetValue(key, out var value);
+        key = ConfigKeys.All.First(known => known.Equals(key, StringComparison.OrdinalIgnoreCase));
+
+        var values = _store.Load();
+        values.TryGetValue(key, out var value);
+        if (key.Equals(ConfigKeys.ValidateOnSave, StringComparison.OrdinalIgnoreCase))
+            value ??= "true";
         return TomixResult<ConfigGetResult>.Ok(new ConfigGetResult(key, value));
     }
 
@@ -49,6 +56,8 @@ public sealed class ConfigHandler
     {
         if (!ConfigKeys.IsKnown(key))
             return UnknownKey<ConfigSetResult>(key);
+
+        key = ConfigKeys.All.First(known => known.Equals(key, StringComparison.OrdinalIgnoreCase));
 
         var normalized = NormalizeValue(key, value);
         if (!TryValidateValue(key, normalized, out var error))
@@ -77,7 +86,7 @@ public sealed class ConfigHandler
                 error = "defaultFormat must be 'text' or 'json'.";
                 return false;
 
-            case ConfigKeys.NoColor or ConfigKeys.UpdateCheck
+            case ConfigKeys.NoColor or ConfigKeys.UpdateCheck or ConfigKeys.ValidateOnSave
                 when !bool.TryParse(value, out _):
                 error = $"{key} must be 'true' or 'false'.";
                 return false;
@@ -88,11 +97,17 @@ public sealed class ConfigHandler
     }
 
     private static string NormalizeValue(string key, string value)
-        => key.Equals(ConfigKeys.DefaultFormat, StringComparison.OrdinalIgnoreCase) &&
-           value.Equals("human", StringComparison.OrdinalIgnoreCase)
-            ? "text"
-            : value.ToLowerInvariant() is "text" or "json" &&
-              key.Equals(ConfigKeys.DefaultFormat, StringComparison.OrdinalIgnoreCase)
-                ? value.ToLowerInvariant()
-                : value;
+    {
+        if (key.Equals(ConfigKeys.ValidateOnSave, StringComparison.OrdinalIgnoreCase)
+            && bool.TryParse(value, out var validateOnSave))
+            return validateOnSave ? "true" : "false";
+
+        if (!key.Equals(ConfigKeys.DefaultFormat, StringComparison.OrdinalIgnoreCase))
+            return value;
+
+        if (value.Equals("human", StringComparison.OrdinalIgnoreCase))
+            return "text";
+
+        return value.ToLowerInvariant() is "text" or "json" ? value.ToLowerInvariant() : value;
+    }
 }

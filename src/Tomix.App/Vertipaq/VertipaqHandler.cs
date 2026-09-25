@@ -135,15 +135,15 @@ public sealed class VertipaqHandler
 
         var annotate = await AnnotateAsync(request, stats, cancellationToken);
         if (!annotate.Success || annotate.Data is null)
-            return TomixResult<VertipaqResult>.Fail(
-                annotate.Diagnostics.FirstOrDefault()?.Code ?? "TOMIX_MUTATION_FAILED",
-                annotate.Diagnostics.FirstOrDefault()?.Message ?? "Annotation failed.",
-                exitCode: annotate.ExitCode == 0 ? 1 : annotate.ExitCode);
+            return new TomixResult<VertipaqResult>(
+                false, null, annotate.Diagnostics,
+                annotate.ExitCode == 0 ? 1 : annotate.ExitCode);
 
         return TomixResult<VertipaqResult>.Ok(
             new VertipaqResult(
                 stats, analyzedSource, usedRemoteFallback, exportedPath, dictionaryPath, annotate.Data),
-            annotate.ExitCode);
+            annotate.ExitCode,
+            annotate.Diagnostics);
     }
 
     private Task<TomixResult<VertipaqAnnotateResult>> AnnotateAsync(
@@ -152,7 +152,7 @@ public sealed class VertipaqHandler
         CancellationToken cancellationToken)
     {
         var options = new MutationOptions(
-            request.Save, SaveTo: null, Stage: false, Revert: false, Serialization: "", Force: true);
+            request.Save, SaveTo: null, Stage: false, Revert: false, Serialization: "", Force: request.Force);
 
         return MutationRunner.RunAsync(
             _providers, request.Model, options, "vertipaq", _stores,
@@ -182,7 +182,8 @@ public sealed class VertipaqHandler
                     annotated > 0,
                     $"vertipaq annotate {annotated} objects",
                     outcome => new VertipaqAnnotateResult(
-                        annotated, skipped, outcome.Saved, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning)));
+                        annotated, skipped, outcome.Saved, outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
+                        outcome.Validation?.NewErrorCount)));
             },
             new VertipaqAnnotateResult(0, 0, Saved: false),
             cancellationToken);

@@ -38,6 +38,7 @@ internal sealed class MvCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
         var overwriteOption = LifecycleOptions.Overwrite();
+        var forceOption = LifecycleOptions.Force();
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
@@ -65,6 +66,7 @@ internal sealed class MvCommand : ICommandModule
             destinationArgument,
             modelArgument,
             overwriteOption,
+            forceOption,
             dryRunOption,
             typeOption,
             stageOption,
@@ -149,7 +151,8 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(strictRefsOption),
                         FixRefs: !parseResult.GetValue(noFixRefsOption),
                         Overwrite: parseResult.GetValue(overwriteOption),
-                        DryRun: parseResult.GetValue(dryRunOption)),
+                        DryRun: parseResult.GetValue(dryRunOption),
+                        Force: parseResult.GetValue(forceOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 

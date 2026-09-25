@@ -96,7 +96,8 @@ public sealed class SetModelPropertyHandler
                         DryRun: request.DryRun,
                         OldValue: oldValue,
                         IsDaxProperty: isDaxProperty,
-                        Policy: mutation.Policy, CreatedExpressions: mutation.CreatedExpressions));
+                        Policy: mutation.Policy, CreatedExpressions: mutation.CreatedExpressions,
+                        NewValidationErrors: outcome.Validation?.NewErrorCount));
             },
             new SetModelPropertyResult(request.Path, Property: "", Value: "", Saved: false, ValidationErrors: null),
             cancellationToken);

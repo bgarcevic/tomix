@@ -169,7 +169,7 @@ public sealed class StageHandlerTests
 
         config.Staging.WriteManifest(source, manifest);
 
-        var handler = new StageHandler(config.Staging);
+        var handler = new StageHandler(config.Staging, () => false);
         var result = await handler.CommitAsync(
             source,
             [new StubExportProvider(workingDir, sourcePath)],

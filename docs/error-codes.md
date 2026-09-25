@@ -26,6 +26,10 @@ Fields:
 | `code`     | string | The diagnostic code (see tables below). Always present.  |
 | `severity` | string | `Info`, `Warning`, `Error`, or `Fatal`.                  |
 | `hint`     | string | Optional fix suggestion. May be `null`.                  |
+| `blocked` | boolean | Present as `true` when a mutation save is blocked by validation. |
+| `reason` | string | `validation` for a blocked mutation save. |
+| `newValidationErrorCount` | integer | Count of errors introduced by the mutation. |
+| `newErrors` | array | Introduced errors, each with `code`, `message`, and `object`. |
 
 ## Exit Codes
 
@@ -102,6 +106,8 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | `TOMIX_SAVE_FIX_UNSUPPORTED` | 2 | `save --fix` is not supported by the provider. |
 | `TOMIX_SAVE_UNSUPPORTED_PROVIDER` | 1 | The provider does not support model export/saving. |
 | `TOMIX_SAVE_UNSUPPORTED_SERIALIZATION` | 2 | The requested serialization format is not supported. |
+| `TOMIX_SAVE_VALIDATION_BLOCKED` | 1 | A mutation or staged commit introduced validation errors; no target was written. Use `--force` to save anyway. |
+| `TOMIX_SAVE_VALIDATION_FORCED` | 0 | Non-fatal notice on a forced save that introduced validation errors. |
 
 ## Deploy Codes (`TOMIX_DEPLOY_*`)
 
@@ -238,8 +244,8 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 ## Validate Issue Codes
 
 Codes carried on the issues inside a `validate` result (not top-level diagnostics; the
-command exits `1` when any error-severity issue is present). `DAX0001`–`DAX0003` come from
-the offline DAX reference scan, `DAX0004`/`DAX0005` from the offline DAX syntax check
+command exits `1` when any error-severity issue is present). `DAX0001`–`DAX0003` and
+`DAX0006` come from the offline DAX reference scan, `DAX0004`/`DAX0005` from the offline DAX syntax check
 (which runs first — a broken expression reports only its syntax issues); `TOMIX_*` codes
 come from structural integrity checks.
 
@@ -250,6 +256,7 @@ come from structural integrity checks.
 | `DAX0003` | Warning | An unqualified `[X]` reference resolves to no measure or column anywhere in the model. Warning-severity because it may be a query-scoped extension column (`ADDCOLUMNS`/`SUMMARIZE`), which offline analysis cannot see. |
 | `DAX0004` | Error | A DAX expression contains a character that starts no DAX token, or an unbalanced parenthesis/brace. The expression's reference checks are skipped. |
 | `DAX0005` | Error | A DAX expression contains an unterminated string, table name, column reference, or block comment. The expression's reference checks are skipped. |
+| `DAX0006` | Error | A measure or calculated column expression directly references itself. |
 | `TOMIX_BROKEN_RELATIONSHIP` | Error | A relationship endpoint refers to a missing column. |
 | `TOMIX_BROKEN_SORT_BY` | Error | A column's sort-by column does not exist on its table. |
 | `TOMIX_BROKEN_LEVEL` | Error | A hierarchy level is bound to a column that does not exist on its table. |

@@ -64,6 +64,26 @@ internal static class ModelValidation
 
         foreach (var reference in DaxReferenceExtractor.Extract(site.Expression))
         {
+            // A direct reference to the expression's own measure or calculated column is a
+            // circular dependency. Auxiliary DAX properties can legitimately reference their
+            // owning measure, so limit this check to the main expression.
+            if (site.Property == "Expression"
+                && obj.Kind is ModelObjectKind.Measure or ModelObjectKind.CalculatedColumn
+                && string.Equals(reference.Object, obj.Name, StringComparison.OrdinalIgnoreCase)
+                && (reference.Shape == DaxReferenceShape.Unqualified
+                    || (reference.Shape == DaxReferenceShape.Qualified
+                        && string.Equals(reference.Table, OwningTable(obj.Path), StringComparison.OrdinalIgnoreCase))))
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error,
+                    "DAX0006",
+                    $"{(obj.Kind == ModelObjectKind.Measure ? "Measure" : "Calculated column")} [{obj.Name}] references itself.",
+                    obj.Path,
+                    Line(site.Expression, reference.Start),
+                    LineText(site.Expression, reference.Start)));
+                continue;
+            }
+
             switch (reference.Shape)
             {
                 case DaxReferenceShape.Qualified:

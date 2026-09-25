@@ -14,6 +14,9 @@ tx bpa rules <subcommand>
 `bpa run` evaluates the model against a rule collection and reports findings
 by severity; `--fix` applies auto-fixes where the rule provides one
 (`FixExpression`).
+When fixes or rule-ignore changes are saved, the shared validation gate blocks
+new model errors before writing. Use `--force` to save and report them anyway,
+or `tx config set validateOnSave false` to disable the gate (default: on).
 
 The default `standard` ruleset is a curated high-signal subset of the bundled
 catalog — rules that catch broken models, expensive-at-scale patterns, and a
@@ -237,6 +240,7 @@ export/import for offline analysis.
 | `--import <file.vpax>` | Analyze a previously exported `.vpax` offline (no connection needed). |
 | `--obfuscate` | Mask names and expressions in the export; a private `.dict` dictionary keeps the mapping. |
 | `--annotate` | Write statistics into the model as `Vertipaq_*` annotations (preview unless `--save`). |
+| `--force` | With `--annotate --save`, write despite newly introduced validation errors and report them. |
 
 ```sh
 tx vertipaq

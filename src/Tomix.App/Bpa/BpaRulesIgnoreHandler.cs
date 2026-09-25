@@ -16,7 +16,8 @@ public sealed record BpaRulesIgnoreRequest(
     bool Overwrite = false,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    bool Force = false);
 
 public sealed record BpaRulesIgnoreResult(
     string RuleId,
@@ -30,7 +31,9 @@ public sealed record BpaRulesIgnoreResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? SyncTarget = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? SyncWarning = null);
+    string? SyncWarning = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? NewValidationErrors = null);
 
 public sealed class BpaRulesIgnoreHandler
 {
@@ -53,7 +56,7 @@ public sealed class BpaRulesIgnoreHandler
 
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert,
-            request.Serialization, Force: false, Overwrite: request.Overwrite, NoSync: request.NoSync);
+            request.Serialization, request.Force, Overwrite: request.Overwrite, NoSync: request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "bpa-ignore", _stores,
@@ -87,7 +90,8 @@ public sealed class BpaRulesIgnoreHandler
                         request.RuleId, request.Ignore, true,
                         current.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
                         outcome.Saved, outcome.Staged, snapshot.Name,
-                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning));
+                        outcome.Synced, outcome.SyncTarget, outcome.SyncWarning,
+                        outcome.Validation?.NewErrorCount));
             },
             new BpaRulesIgnoreResult("", false, false, [], false, null, ""),
             cancellationToken);

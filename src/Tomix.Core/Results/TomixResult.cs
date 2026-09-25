@@ -8,12 +8,12 @@ public sealed record TomixResult<T>(
     IReadOnlyList<TomixDiagnostic> Diagnostics,
     int ExitCode)
 {
-    public static TomixResult<T> Ok(T data, int exitCode = 0)
+    public static TomixResult<T> Ok(T data, int exitCode = 0, IReadOnlyList<TomixDiagnostic>? diagnostics = null)
     {
         return new TomixResult<T>(
             Success: true,
             Data: data,
-            Diagnostics: Array.Empty<TomixDiagnostic>(),
+            Diagnostics: diagnostics ?? Array.Empty<TomixDiagnostic>(),
             ExitCode: exitCode);
     }
 

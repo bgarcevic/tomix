@@ -11,8 +11,13 @@ namespace Tomix.App.Stage;
 public sealed class StageHandler
 {
     private readonly StagingStore _staging;
+    private readonly Func<bool> _validateOnSave;
 
-    public StageHandler(StagingStore staging) => _staging = staging;
+    public StageHandler(StagingStore staging, Func<bool>? validateOnSave = null)
+    {
+        _staging = staging;
+        _validateOnSave = validateOnSave ?? (() => true);
+    }
 
     public TomixResult<StageStatusResult> Status(ModelReference source)
     {
@@ -119,6 +124,23 @@ public sealed class StageHandler
                 "TOMIX_NO_PROVIDER", $"No provider can open working copy: {manifest.WorkingCopy}", 2,
                 hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
 
+        SaveValidationDelta? validation = null;
+        if (_validateOnSave() || force)
+        {
+            var sourceProvider = providers.ResolveSingleProvider(source);
+            if (sourceProvider is null)
+                return TomixResult<StageCommitResult>.Fail(
+                    "TOMIX_NO_PROVIDER", $"No provider can open source model: {source.Value}", 2);
+
+            await using var sourceSession = await sourceProvider.OpenAsync(source, cancellationToken);
+            await using var workingSession = await provider.OpenAsync(workingReference, cancellationToken);
+            validation = SaveValidation.Compare(
+                await sourceSession.GetSnapshotAsync(cancellationToken),
+                await workingSession.GetSnapshotAsync(cancellationToken));
+            if (!force && validation.NewErrorCount > 0)
+                return SaveValidation.Blocked<StageCommitResult>(validation);
+        }
+
         bool remoteDeployed = false;
         string? deployServer = null;
         string? deployDatabase = null;
@@ -183,7 +205,9 @@ public sealed class StageHandler
         _staging.Discard(source);
         return TomixResult<StageCommitResult>.Ok(new StageCommitResult(
             manifest.Source, null, remoteDeployed,
-            deployServer, deployDatabase, deployDurationMs, manifest.Ops.Count));
+            deployServer, deployDatabase, deployDurationMs, manifest.Ops.Count,
+            NewValidationErrors: validation?.NewErrorCount),
+            diagnostics: SaveValidation.ForcedNotice(force ? validation : null));
     }
 
     // Every stage command must surface a corrupt manifest as the documented diagnostic
