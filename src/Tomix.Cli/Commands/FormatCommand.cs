@@ -167,20 +167,24 @@ internal sealed class FormatCommand : ICommandModule
         }
     }
 
+    // The formatter only speaks DAX and M.
+    private static ExpressionLanguage HighlightLanguage(string language)
+        => FormatterLanguages.IsDax(language) ? ExpressionLanguage.Dax : ExpressionLanguage.M;
+
     internal static void Render(FormatModelResult result)
     {
         switch (result)
         {
             case InlineFormatResult inline:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
-                    FormatterLanguages.IsDax(inline.Language), inline.Formatted));
+                    HighlightLanguage(inline.Language), inline.Formatted));
                 foreach (var error in inline.Errors)
                     Console.Error.WriteLine(error);
                 break;
 
             case ObjectFormatResult obj:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
-                    FormatterLanguages.IsDax(obj.Language), obj.Formatted));
+                    HighlightLanguage(obj.Language), obj.Formatted));
                 if (obj.DryRun == true)
                     AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 if (obj.Synced)

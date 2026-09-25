@@ -19,6 +19,8 @@ public sealed class LsRendererTests
     private const string Sage = "\x1b[38;2;52;137;126m";    // table names
     private const string Moss = "\x1b[38;2;64;129;57m";     // column references
     private const string Orchid = "\x1b[38;2;207;103;172m"; // measure references
+    private const string Lav = "\x1b[38;2;133;114;175m";    // keywords
+    private const string Terra = "\x1b[38;2;150;100;66m";   // variables, M definitions
 
     [Fact]
     public void HiddenTable_MutesEveryCell()
@@ -89,12 +91,14 @@ public sealed class LsRendererTests
     }
 
     [Fact]
-    public void MPartitionExpression_StaysPlain()
+    public void MPartitionExpression_IsHighlighted()
     {
-        var output = RenderTables(Partition("Orders", detail: "import", "let Source = 1 in Source"));
+        var output = RenderTables(Partition("Orders", detail: "import", "let Source = Sql.Database(\"srv\") in Source"));
 
-        Assert.Contains("let Source = 1 in Source", output);
-        Assert.DoesNotContain(Harbor, output);
+        Assert.Contains(Lav + "let", output);
+        Assert.Contains(Terra + "Source", output);
+        Assert.Contains(Harbor + "Sql.Database", output);
+        Assert.Contains("let Source = Sql.Database(\"srv\") in Source", AnsiCodes.Replace(output, ""));
     }
 
     [Fact]

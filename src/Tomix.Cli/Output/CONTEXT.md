@@ -35,7 +35,7 @@ Shared output wiring for all commands.
 - `ConnectRenderer` — connected-model summary (text + JSON projection), show-current and raw-connection views for the `connect` command.
 - `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), `--dry-run` TMSL pretty-print, and the live `AnsiConsole.Status()` progress display fed by XMLA trace events.
 - `UpdateRenderer` — `update` command rendering: `--check` release-notes preview with `[breaking]` badges, and the performed-update summary line.
-- `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions; `ExpressionMarkup`/`DaxMarkup` are the shared DAX highlighting path.
+- `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions; `ExpressionMarkup`/`DaxMarkup`/`MMarkup` are the shared DAX and M highlighting path.
 
 ## Color Strategy
 
@@ -48,7 +48,7 @@ Key rules:
 - Escape model-derived text exactly once at a Spectre markup boundary. Use `Styling.MarkupEscape()`
   when inserting raw text into markup; pass raw text to `Styling` helpers, which already escape it.
   Literal `WriteLine` and JSON/CSV/TMDL/BIM output do not use Spectre escaping.
-- DAX-bearing text goes through `Styling.ExpressionMarkup` (highlighted when `DaxExpressions.IsDaxValue`/`IsDaxExpression` says it is DAX; M and other text escaped plain) so every renderer classifies and highlights expressions the same way.
+- Expression text goes through `Styling.ExpressionMarkup` with an `ExpressionLanguage`: DAX when `DaxExpressions.IsDaxValue`/`IsDaxExpression` says so, M when `MExpressions.IsMValue`/`IsMExpression` (Tomix.App.M) says so, plain otherwise — so every renderer classifies and highlights expressions the same way.
 - JSON, CSV, TMDL, BIM, and CI annotation output paths must never contain markup.
 - `noColor` config and `NO_COLOR` env var disable color via `AnsiConsole.Profile.Capabilities.ColorSystem`.
 

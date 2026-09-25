@@ -16,6 +16,7 @@ public sealed class GetRendererTests
     private const string Sage = "\x1b[38;2;52;137;126m";    // table names
     private const string Moss = "\x1b[38;2;64;129;57m";     // column references
     private const string Orchid = "\x1b[38;2;207;103;172m"; // measure references
+    private const string Lav = "\x1b[38;2;133;114;175m";    // keywords
 
     [Fact]
     public void DaxExpression_IsHighlighted()
@@ -46,18 +47,36 @@ public sealed class GetRendererTests
     }
 
     [Fact]
-    public void MPartitionExpression_StaysPlain()
+    public void MPartitionExpression_IsHighlighted()
     {
         const string m = "Table.SelectRows(Source, each [X] > 0)";
         var partition = new ModelObject("Part", ModelObjectKind.Partition, "Sales/Part",
-            Detail: "m", Expression: m, Description: null, Hidden: false,
+            Detail: "import", Expression: m, Description: null, Hidden: false,
             SourceColumn: null, Children: [],
             Properties: new Dictionary<string, string> { ["PartitionSourceType"] = "M" });
 
         var output = Render(partition, [("expression", m), ("mode", "import")]);
 
-        Assert.DoesNotContain("\x1b[38;2;", output);
-        Assert.Contains("expression: " + m, output);
+        Assert.Contains(Harbor + "Table.SelectRows", output);
+        Assert.Contains(Lav + "each", output);
+        Assert.Contains(Moss + "[X]", output);
+        // Only the expression highlights; other values (the mode) stay plain.
+        Assert.Contains("mode: import", output);
+        Assert.Contains("expression: " + m, System.Text.RegularExpressions.Regex.Replace(output, "\x1b\\[[0-9;]*m", ""));
+    }
+
+    [Fact]
+    public void SharedExpression_IsHighlightedAsM()
+    {
+        const string m = "\"dev\" meta [IsParameterQuery = true]";
+        var expression = new ModelObject("Env", ModelObjectKind.Expression, "Expressions/Env",
+            Detail: "M", Expression: m, Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+
+        var output = Render(expression, [("name", "Env"), ("expression", m)]);
+
+        Assert.Contains(Lav + "meta", output);
+        Assert.DoesNotContain(Sage, output);
     }
 
     private static string Render(

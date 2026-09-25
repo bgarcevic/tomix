@@ -194,8 +194,8 @@ internal sealed class SetCommand : ICommandModule
         if (result.IsDaxProperty
             && !string.Equals(result.OldValue, result.Value, StringComparison.Ordinal))
         {
-            AnsiConsole.MarkupLine($"{Styling.Bold("Before:")} {Styling.ExpressionMarkup(isDax: true, result.OldValue ?? "")}");
-            AnsiConsole.MarkupLine($"{Styling.Bold("After:")} {Styling.ExpressionMarkup(isDax: true, result.Value)}");
+            AnsiConsole.MarkupLine($"{Styling.Bold("Before:")} {Styling.ExpressionMarkup(ExpressionLanguage.Dax, result.OldValue ?? "")}");
+            AnsiConsole.MarkupLine($"{Styling.Bold("After:")} {Styling.ExpressionMarkup(ExpressionLanguage.Dax, result.Value)}");
         }
 
         if (result.Staged == true)

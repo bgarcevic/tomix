@@ -2,8 +2,17 @@ using System.Globalization;
 using System.Text;
 using Spectre.Console;
 using Tomix.Core.Dax;
+using Tomix.Core.M;
 
 namespace Tomix.Cli.Output;
+
+/// <summary>Which highlighter <see cref="Styling.ExpressionMarkup"/> applies.</summary>
+internal enum ExpressionLanguage
+{
+    Plain,
+    Dax,
+    M,
+}
 
 // Hue and chroma are the original design; each color's lightness is tuned so every role keeps
 // ≥3.3:1 contrast on both dark and light terminal backgrounds (the practical ceiling — 4.5:1 on
@@ -61,24 +70,41 @@ internal static class Styling
     /// JSON/CSV paths stay markup-free.
     /// </summary>
     public static string DaxMarkup(string expression, IReadOnlySet<string>? measureNames = null)
+        => SpansMarkup(
+            expression,
+            DaxLanguage.Classify(expression, measureNames)
+                .Select(span => (span.Start, span.Length, ClassificationStyle(span.Classification))));
+
+    /// <summary>
+    /// A Power Query (M) expression as Spectre markup, syntax-highlighted from
+    /// <see cref="MLanguage.Classify"/> with the same palette roles as DAX: keywords, library
+    /// functions, step and field definitions, field access, literals, and comments. Unstyled text
+    /// is escaped, so a field access <c>[Amount]</c> can never inject markup. Use only in human
+    /// output; JSON/CSV paths stay markup-free.
+    /// </summary>
+    public static string MMarkup(string expression)
+        => SpansMarkup(
+            expression,
+            MLanguage.Classify(expression)
+                .Select(span => (span.Start, span.Length, ClassificationStyle(span.Classification))));
+
+    private static string SpansMarkup(string expression, IEnumerable<(int Start, int Length, string? Style)> spans)
     {
-        var spans = DaxLanguage.Classify(expression, measureNames);
         var markup = new StringBuilder(expression.Length);
         var position = 0;
 
-        foreach (var span in spans)
+        foreach (var (start, length, style) in spans)
         {
-            if (span.Start > position)
-                Plain(markup, expression[position..span.Start]);
+            if (start > position)
+                Plain(markup, expression[position..start]);
 
-            var text = expression.Substring(span.Start, span.Length);
-            var style = ClassificationStyle(span.Classification);
+            var text = expression.Substring(start, length);
             if (style is null)
                 Plain(markup, text);
             else
                 markup.Append('[').Append(style).Append(']').Append(MarkupEscape(text)).Append("[/]");
 
-            position = span.Start + span.Length;
+            position = start + length;
         }
 
         if (position < expression.Length)
@@ -105,23 +131,44 @@ internal static class Styling
         };
 
     /// <summary>
-    /// An expression for human output — the one entry point renderers use for DAX-bearing text.
-    /// DAX comes back syntax-highlighted via <see cref="DaxMarkup"/>; anything else (M, plain
-    /// text) is markup-escaped. <paramref name="isDax"/> comes from
-    /// <c>DaxExpressions.IsDaxValue</c>/<c>IsDaxExpression</c> (Tomix.App.Dax);
-    /// <paramref name="measureNames"/> resolves measure references so they color apart from
+    /// The palette style for an M classification, or null when printed plain. M reuses the DAX
+    /// roles: a step or field definition reads as a DAX variable, a field access as a column.
+    /// </summary>
+    private static string? ClassificationStyle(MTextClassification classification) =>
+        classification switch
+        {
+            MTextClassification.Keyword => Palette.Lav.ToMarkup(),
+            MTextClassification.Function => Palette.Harbor.ToMarkup(),
+            MTextClassification.FieldAccess => Palette.Moss.ToMarkup(),
+            MTextClassification.DefinitionName => Palette.Terra.ToMarkup(),
+            MTextClassification.StringLiteral or MTextClassification.Number
+                or MTextClassification.Literal => Palette.Amber.ToMarkup(),
+            MTextClassification.Comment => Palette.Slate.ToMarkup(),
+            _ => null,
+        };
+
+    /// <summary>
+    /// An expression for human output — the one entry point renderers use for expression text.
+    /// DAX comes back syntax-highlighted via <see cref="DaxMarkup"/>, M via
+    /// <see cref="MMarkup"/>, and plain text is markup-escaped. <paramref name="language"/> comes
+    /// from <c>DaxExpressions.IsDaxValue</c>/<c>IsDaxExpression</c> (Tomix.App.Dax) and
+    /// <c>MExpressions.IsMValue</c>/<c>IsMExpression</c> (Tomix.App.M);
+    /// <paramref name="measureNames"/> resolves DAX measure references so they color apart from
     /// columns. A trailing preview note ("... (+2 lines)") rides in <paramref name="suffix"/> so
     /// it stays plain even in a highlighted cell. Use only in human output; JSON/CSV paths stay
     /// markup-free.
     /// </summary>
     public static string ExpressionMarkup(
-        bool isDax,
+        ExpressionLanguage language,
         string text,
         IReadOnlySet<string>? measureNames = null,
         string? suffix = null)
-        => isDax
-            ? DaxMarkup(text, measureNames) + MarkupEscape(suffix ?? "")
-            : MarkupEscape(text + suffix);
+        => language switch
+        {
+            ExpressionLanguage.Dax => DaxMarkup(text, measureNames) + MarkupEscape(suffix ?? ""),
+            ExpressionLanguage.M => MMarkup(text) + MarkupEscape(suffix ?? ""),
+            _ => MarkupEscape(text + suffix),
+        };
 
     private static void Plain(StringBuilder markup, string text) => markup.Append(MarkupEscape(text));
 

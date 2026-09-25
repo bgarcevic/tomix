@@ -332,8 +332,8 @@ With no target, formats every measure (DAX) or every partition (`--lang m`) in t
 is reported per object on stderr (deduplicated with a `(+N more)` count when objects share
 the same failure); `--output-format json` carries it in each result row's `error` field.
 
-Formatted DAX is syntax-highlighted in text output, for both inline `-e` and
-`--path`; piping or redirecting strips the color, so the output stays safe to
+Formatted DAX and M are syntax-highlighted in text output, for both inline `-e`
+and `--path`; piping or redirecting strips the color, so the output stays safe to
 copy back into a model.
 
 | Option | Description |

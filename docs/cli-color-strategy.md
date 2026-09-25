@@ -72,7 +72,8 @@ When changing a palette color, keep this contract: adjust lightness before hue, 
 | Table              | Spectre `Table().RoundedBorder().BorderColor(Palette.Slate)` | Already established in `LsRenderer` |
 | Table row de-emphasis | Whole row in Slate (`Styling.Muted` per cell) | Hidden-object rows in `ls` are muted end to end |
 | Connection banner  | Slate on stderr                               | `Connected to: C:\models\Sales` before the model opens |
-| DAX highlighting   | Role-mapped palette on text output only       | `get` properties, `ls` expression cells, `validate` offending lines, `set` DAX before/after previews, and `format` inline/`--path` output: keywords Lav, functions Harbor, tables Sage, columns Moss, measures Orchid, variables Terra, literals Amber, comments Slate; M expressions and JSON/CSV/TMDL/BIM stay markup-free; `script` and `bpa run --fix` stay plain because neither carries DAX today |
+| DAX highlighting   | Role-mapped palette on text output only       | `get` properties, `ls` expression cells, `validate` offending lines, `set` DAX before/after previews, and `format` inline/`--path` output: keywords Lav, functions Harbor, tables Sage, columns Moss, measures Orchid, variables Terra, literals Amber, comments Slate; JSON/CSV/TMDL/BIM stay markup-free; `script` and `bpa run --fix` stay plain because neither carries DAX today |
+| M highlighting     | Same roles, text output only                  | `get` properties, `ls` expression cells (partitions, shared expressions), and `format --lang m` output: keywords and type names Lav, library functions and `#table`-style constructors Harbor, step and field definitions Terra, field access (`[Amount]`) Moss, literals Amber, comments Slate. A lexical pass (`MLanguage.Classify`), not the parser, so it costs nothing per command |
 | CI annotations     | Plain text, no markup                         | `::error::...` / `##vso[task.logissue...]`       |
 
 ## NO_COLOR Compliance
@@ -105,7 +106,8 @@ All output helpers live in `src/Tomix.Cli/Output/Styling.cs`. Use these instead 
 | `Styling.Guidance(text)`                | Slate                                    |
 | `Styling.MarkupEscape(text)`            | Escapes `[` and `]` for Spectre markup  |
 | `Styling.DaxMarkup(expression)`         | Syntax-highlighted DAX as escaped markup (see Message Categories) |
-| `Styling.ExpressionMarkup(isDax, text)` | The shared entry point for expression text: highlighted when `isDax` (from `DaxExpressions.IsDaxValue`/`IsDaxExpression`), escaped plain otherwise; optional `measureNames` resolves measure references to their own color, optional `suffix` (e.g. `... (+2 lines)`) stays plain |
+| `Styling.MMarkup(expression)`           | Syntax-highlighted M as escaped markup (see Message Categories) |
+| `Styling.ExpressionMarkup(language, text)` | The shared entry point for expression text: `ExpressionLanguage.Dax` or `.M` highlights (decide with `DaxExpressions.IsDaxValue`/`IsDaxExpression` and `MExpressions.IsMValue`/`IsMExpression`), `.Plain` escapes; optional `measureNames` resolves DAX measure references to their own color, optional `suffix` (e.g. `... (+2 lines)`) stays plain |
 | `Styling.SeverityMarkup(severity)`      | Colored severity label (Error/Warning/Info) |
 | `Styling.NewTable(params columns)`      | Rounded-border table with Slate border   |
 

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Spectre.Console;
 using Tomix.App.Dax;
 using Tomix.App.Ls;
+using Tomix.App.M;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Output;
@@ -76,9 +77,9 @@ internal sealed partial class LsRenderer
 
     /// <summary>
     /// The expression cell of a grouped table: DAX renders syntax-highlighted — with the
-    /// model's measure names resolving bracketed references to their own role — while M and
-    /// other text stay escaped plain, and a hidden object mutes the whole cell like the rest of
-    /// its row. The cell shows <c>Expression ?? Detail</c>, so text that did not come from the
+    /// model's measure names resolving bracketed references to their own role — and so does M
+    /// (partitions, shared expressions), while other text stays escaped plain, and a hidden
+    /// object mutes the whole cell like the rest of its row. The cell shows <c>Expression ?? Detail</c>, so text that did not come from the
     /// object's expression (a partition's mode, a role's RLS summary) never highlights, even
     /// for a DAX-bearing kind. A preview note ("... (+2 lines)") rides in
     /// <paramref name="suffix"/> so it escapes plain inside a highlighted cell.
@@ -91,10 +92,19 @@ internal sealed partial class LsRenderer
         => o.Hidden
             ? Styling.Muted(text + suffix)
             : Styling.ExpressionMarkup(
-                o.Expression is not null && DaxExpressions.IsDaxExpression(o.Kind, o.Detail),
+                HighlightLanguage(o),
                 text,
                 measureNames,
                 suffix);
+
+    private static ExpressionLanguage HighlightLanguage(LsObject o)
+    {
+        if (o.Expression is null)
+            return ExpressionLanguage.Plain;
+        if (DaxExpressions.IsDaxExpression(o.Kind, o.Detail))
+            return ExpressionLanguage.Dax;
+        return MExpressions.IsMExpression(o.Kind, o.Detail) ? ExpressionLanguage.M : ExpressionLanguage.Plain;
+    }
 
     private static void RenderGrouped(
         IReadOnlyList<LsObject> objects,

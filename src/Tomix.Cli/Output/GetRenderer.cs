@@ -2,6 +2,7 @@ using System.Globalization;
 using Spectre.Console;
 using Tomix.App.Dax;
 using Tomix.App.Get;
+using Tomix.App.M;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
 
@@ -53,13 +54,15 @@ internal static class GetRenderer
     {
         Console.WriteLine($"{result.Path} ({result.Type})");
 
-        // DAX-bearing values render syntax-highlighted; M and everything else stays plain.
+        // DAX and M values render syntax-highlighted; everything else stays plain.
         // Matched by value, not by property key: the display keys are the camelCase catalog keys
         // while DaxExpressions reports the snapshot contract's PascalCase keys.
         foreach (var (key, value) in result.Properties)
         {
             if (value is string text && DaxExpressions.IsDaxValue(result.Object, text))
-                AnsiConsole.MarkupLine($"{Styling.MarkupEscape(key)}: {Styling.ExpressionMarkup(isDax: true, text, result.MeasureNames)}");
+                AnsiConsole.MarkupLine($"{Styling.MarkupEscape(key)}: {Styling.ExpressionMarkup(ExpressionLanguage.Dax, text, result.MeasureNames)}");
+            else if (value is string m && MExpressions.IsMValue(result.Object, m))
+                AnsiConsole.MarkupLine($"{Styling.MarkupEscape(key)}: {Styling.ExpressionMarkup(ExpressionLanguage.M, m)}");
             else if (value is IReadOnlyList<RefreshPolicyIssue> issues)
                 foreach (var issue in issues)
                     Console.WriteLine($"{key}: {issue.Severity} [{issue.Code}]: {issue.Message}");

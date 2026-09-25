@@ -20,6 +20,10 @@ Core domain types and abstractions.
   `DaxSyntaxCheck` offline syntax analyzer, and the `DaxFormatter` offline formatter that powers
   `tx format`'s DAX. Pure BCL, model-agnostic: it knows syntax, never the model. Model-aware DAX
   analysis (reference extraction, validation) lives in `/src/Tomix.App/Dax`.
+- The M highlighting lexer (`M/MLanguage.Classify`) — a single synchronous lexical pass that
+  classifies Power Query (M) text for syntax highlighting and never throws. It is not a parser:
+  formatting and syntax errors come from the embedded powerquery engine in
+  `/src/Tomix.App/Format/M`. Which model text is M is decided in `/src/Tomix.App/M`.
 
 ## Cross-folder dependencies
 

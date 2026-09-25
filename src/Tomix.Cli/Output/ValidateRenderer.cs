@@ -116,7 +116,7 @@ internal static class ValidateRenderer
         if (noMultiline || string.IsNullOrEmpty(issue.ExpressionLine))
             return message;
 
-        var line = Styling.ExpressionMarkup(isDax: true, issue.ExpressionLine, measureNames);
+        var line = Styling.ExpressionMarkup(ExpressionLanguage.Dax, issue.ExpressionLine, measureNames);
         return $"{message}\n  {Styling.Muted("│ ")}{line}";
     }
 

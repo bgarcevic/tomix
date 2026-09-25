@@ -10,6 +10,14 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- Power Query (M) expressions are syntax-highlighted in text output, like DAX: `get`
+  properties, `ls` partition and shared-expression cells, and `format --lang m` output.
+  Keywords, library functions, step and field definitions, field access, literals, and
+  comments take the same palette roles as their DAX counterparts. JSON/CSV output and
+  piped or redirected text stay plain (#285).
+
 ### Changed
 
 - **Breaking:** mutation saves and staged commits now block newly introduced validation
