@@ -243,8 +243,8 @@ public sealed class MoveModelObjectHandler
     }
 
     /// <summary>
-    /// The source names something outside the snapshot (shared expressions and functions have
-    /// no snapshot kind). Fall back to the string-shape rules and let the mutation resolver be
+    /// The source names something outside the snapshot (e.g. shared expressions have no
+    /// snapshot kind). Fall back to the string-shape rules and let the mutation resolver be
     /// the authority — including its not-found error when the object truly doesn't exist.
     /// </summary>
     private static MoveStep ClassifyUnresolved(MovePathPlan plan, MoveModelObjectRequest request)

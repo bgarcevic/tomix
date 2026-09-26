@@ -39,7 +39,7 @@ internal static class RemoveGuard
         // uniqueness test (same partition-shares-path guard as the rename fixup).
         var matches = ModelObjectLookup.Find(snapshot, DaxObjectForm.Normalize(path), type)
             .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
-                or ModelObjectKind.CalculatedColumn)
+                or ModelObjectKind.CalculatedColumn or ModelObjectKind.Function or ModelObjectKind.Calendar)
             .ToList();
         if (matches.Count != 1)
             return []; // not-found/ambiguous is the mutator's error to raise
@@ -47,12 +47,15 @@ internal static class RemoveGuard
         var target = matches[0];
         var flattened = ModelObjectProjection.Flatten(snapshot);
 
-        // Deleting a table deletes its measures and columns with it: references to any of them
-        // break, while references from inside the table vanish along with it.
+        // Deleting a table deletes its measures, columns, and calendars with it: references to
+        // any of them break, while references from inside the table vanish along with it.
+        // A calendar sharing a table's name blocks on the table's uses too — 'Fiscal' could mean
+        // either, so the guard errs toward asking for --force.
         var targets = new List<ModelObject> { target };
         if (target.Kind == ModelObjectKind.Table)
             targets.AddRange(flattened.Where(o =>
                 o.Kind is ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
+                    or ModelObjectKind.Calendar
                 && IsWithin(o.Path, target.Path)));
 
         var paths = new List<string>();

@@ -168,11 +168,142 @@ public sealed class RenameFixupPlanTests
         Assert.Empty(plan.AllPaths);
     }
 
+    // -- UDFs and calendars (#228) ---------------------------------------------------------------
+
+    [Fact]
+    public async Task MeasureRename_RewritesFunctionBody()
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                Measure("Base", "Sales/Base", "1"),
+                Function("AddTax", "(x) => x * [Base]"),
+            ],
+            "Sales/Base", "New");
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("Functions/AddTax", edit.Path);
+        Assert.Equal(ModelObjectKind.Function, edit.Kind);
+        Assert.Equal("(x) => x * [New]", edit.Value);
+        Assert.Equal(["Functions/AddTax"], plan.FixedPaths);
+        Assert.Empty(plan.UnfixablePaths);
+    }
+
+    [Theory]
+    [InlineData("AddTax", "AddTax ( [Base] ) + AddTax([Base])", "Tax ( [Base] ) + Tax([Base])", "Tax")]
+    [InlineData("Local.AddTax", "Local.AddTax([Base])", "Fin.Tax([Base])", "Fin.Tax")]
+    public async Task FunctionRename_RewritesCallSites(string name, string caller, string expected, string newName)
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                Measure("Base", "Sales/Base", "1"),
+                Function(name, "(x) => x * 1.25"),
+                Measure("Caller", "Sales/Caller", caller),
+            ],
+            $"Functions/{name}", newName);
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("Sales/Caller", edit.Path);
+        Assert.Equal(expected, edit.Value);
+    }
+
+    [Fact]
+    public async Task FunctionRename_LeavesBuiltInsAndStringsAlone()
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                Function("AddTax", "(x) => x"),
+                Measure("Caller", "Sales/Caller", "SUM(Sales[Amount]) & \"AddTax(1)\" // AddTax(2)\n + AddTax(3)"),
+            ],
+            "Functions/AddTax", "Tax");
+
+        Assert.Equal("SUM(Sales[Amount]) & \"AddTax(1)\" // AddTax(2)\n + Tax(3)", Assert.Single(plan.Edits).Value);
+    }
+
+    [Fact]
+    public async Task FunctionRename_RewritesOtherFunctionBodies()
+    {
+        var plan = await Plan(
+            [
+                Table("Sales"),
+                Function("AddTax", "(x) => x * 1.25"),
+                Function("Gross", "(x) => AddTax(x) + 1"),
+            ],
+            "Functions/AddTax", "Tax");
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("Functions/Gross", edit.Path);
+        Assert.Equal("(x) => Tax(x) + 1", edit.Value);
+    }
+
+    [Fact]
+    public async Task CalendarRename_RewritesQuotedReferences()
+    {
+        var plan = await Plan(
+            [
+                Table("Date"),
+                Table("Sales"),
+                Calendar("Fiscal", "Date/Fiscal"),
+                Measure("YTD", "Sales/YTD", "TOTALYTD([Base], 'Fiscal') + CALCULATE([Base], DATESYTD(Fiscal))"),
+            ],
+            "Date/Fiscal", "Fiscal Cal");
+
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("TOTALYTD([Base], 'Fiscal Cal') + CALCULATE([Base], DATESYTD('Fiscal Cal'))", edit.Value);
+    }
+
+    [Fact]
+    public async Task CalendarSharingATableName_IsReportedUnfixable()
+    {
+        // 'Fiscal' could mean the table or the calendar; rewriting it could break the table use.
+        var plan = await Plan(
+            [
+                Table("Fiscal"),
+                Table("Sales"),
+                Calendar("Fiscal", "Sales/Fiscal"),
+                Measure("YTD", "Sales/YTD", "TOTALYTD([Base], 'Fiscal')"),
+            ],
+            "Sales/Fiscal", "Fiscal Cal");
+
+        Assert.Empty(plan.Edits);
+        Assert.Equal(["Sales/YTD"], plan.UnfixablePaths);
+    }
+
+    [Fact]
+    public async Task TableSharingACalendarName_ReportsTableShapedSites_FixesQualifiedOnes()
+    {
+        // Renaming the table: 'Fiscal' alone could mean the calendar, but 'Fiscal'[Day] is the table.
+        var plan = await Plan(
+            [
+                Table("Fiscal"),
+                Table("Sales"),
+                Column("Day", "Fiscal/Day"),
+                Calendar("Fiscal", "Sales/Fiscal"),
+                Measure("YTD", "Sales/YTD", "TOTALYTD([Base], 'Fiscal')"),
+                Measure("Days", "Sales/Days", "COUNT('Fiscal'[Day])"),
+            ],
+            "Fiscal", "Fiscal Table");
+
+        Assert.Equal(["Sales/YTD"], plan.UnfixablePaths);
+        var edit = Assert.Single(plan.Edits);
+        Assert.Equal("COUNT('Fiscal Table'[Day])", edit.Value);
+    }
+
     private static async Task<RenameFixupPlan> Plan(
         IReadOnlyList<ModelObject> objects, string path, string newName, string? newTable = null)
         => await RenameFixup.PlanAsync(
             new StubSession(new ModelSnapshot("M", 1601, objects)),
             path, type: null, newName, newTable, CancellationToken.None);
+
+    private static ModelObject Function(string name, string expression)
+        => new(name, ModelObjectKind.Function, $"Functions/{name}",
+            Detail: null, Expression: expression, Description: null, Hidden: false, SourceColumn: null, Children: []);
+
+    private static ModelObject Calendar(string name, string path)
+        => new(name, ModelObjectKind.Calendar, path,
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []);
 
     private static ModelObject Table(string name, IReadOnlyDictionary<string, string>? properties = null)
         => new(name, ModelObjectKind.Table, name,

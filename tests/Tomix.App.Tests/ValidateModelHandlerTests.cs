@@ -127,6 +127,18 @@ public sealed class ValidateModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_AcceptsQuotedCalendarReference()
+    {
+        // TOTALYTD([X], 'Fiscal') names a calendar, written like a table.
+        var calendar = new ModelObject("Fiscal", ModelObjectKind.Calendar, "Sales/Fiscal",
+            Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []);
+        var result = await ValidateAsync(SalesSnapshot(
+            calendar, Measure("YTD", "TOTALYTD(SUM(Sales[Amount]), 'Fiscal')")));
+
+        Assert.DoesNotContain(result.Data!.Errors, e => e.Code == "DAX0001");
+    }
+
+    [Fact]
     public async Task HandleAsync_DetectsUnknownTable()
     {
         var result = await ValidateAsync(SalesSnapshot(Measure("Total", "SUM('Missing Table'[X])")));

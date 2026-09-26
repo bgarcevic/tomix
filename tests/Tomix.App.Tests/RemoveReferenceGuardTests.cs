@@ -162,6 +162,34 @@ public sealed class RemoveReferenceGuardTests
         Assert.True(session.RemoveCalled);
     }
 
+    [Theory]
+    [InlineData("Functions/AddTax", "Sales/Taxed")] // a UDF call site
+    [InlineData("Date/Fiscal", "Sales/YTD")] // a calendar argument
+    [InlineData("Date", "Sales/YTD")] // the calendar goes with its table
+    public async Task RemoveReferencedFunctionOrCalendar_Blocks(string path, string referencing)
+    {
+        var session = new StubSnapshotSession(new ModelSnapshot("M", 1601,
+        [
+            Obj("Sales", ModelObjectKind.Table, "Sales", null),
+            Obj("Date", ModelObjectKind.Table, "Date", null),
+            Obj("Fiscal", ModelObjectKind.Calendar, "Date/Fiscal", null),
+            Obj("Base", ModelObjectKind.Measure, "Sales/Base", "1"),
+            Obj("Taxed", ModelObjectKind.Measure, "Sales/Taxed", "AddTax([Base])"),
+            Obj("YTD", ModelObjectKind.Measure, "Sales/YTD", "TOTALYTD([Base], 'Fiscal')"),
+            Obj("AddTax", ModelObjectKind.Function, "Functions/AddTax", "(x) => x * 1.25"),
+        ]), cascadeRemoved: null);
+        var result = await Handle(session, path, force: false);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_RM_BREAKS_REFS", result.Diagnostics[0].Code);
+        Assert.Contains(referencing, result.Diagnostics[0].Message);
+        Assert.False(session.RemoveCalled);
+    }
+
+    private static ModelObject Obj(string name, ModelObjectKind kind, string path, string? expression)
+        => new(name, kind, path,
+            Detail: null, Expression: expression, Description: null, Hidden: false, SourceColumn: null, Children: []);
+
     private static Task<Core.Results.TomixResult<RemoveModelObjectResult>> Handle(
         StubSnapshotSession session, string path, bool force, bool dryRun = false)
         => new RemoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(

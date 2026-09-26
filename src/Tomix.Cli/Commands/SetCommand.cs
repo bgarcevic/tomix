@@ -227,7 +227,7 @@ internal sealed class SetCommand : ICommandModule
             return;
 
         AnsiConsole.MarkupLine(Styling.Warning(Styling.MarkupEscape(
-            $"Warning: {references.Count} DAX reference(s) to the old name are now broken: {string.Join(", ", references)}. "
-            + "Update them with 'tx replace' or inspect with 'tx deps'.")));
+            $"Warning: {references.Count} DAX reference(s) to the old name were not rewritten and may be broken: "
+            + $"{string.Join(", ", references)}. Check them with 'tx deps' and update them with 'tx replace'.")));
     }
 }

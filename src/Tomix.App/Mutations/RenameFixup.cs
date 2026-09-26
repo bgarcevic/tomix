@@ -20,7 +20,8 @@ public sealed class RenameBrokenReferencesException : Exception
 
 /// <summary>
 /// The DAX rewrites a rename requires, shared by <c>set -q name</c> and <c>mv</c>. Renaming a
-/// table, measure, or column silently breaks DAX that references the old name; this plan holds
+/// table, measure, column, function (UDF), or calendar silently breaks DAX that references the
+/// old name; this plan holds
 /// the splice-rewritten expressions (applied by default) plus the referencing objects whose DAX
 /// cannot be written back (role RLS filters), which stay a warning — or fail under
 /// <c>--strict-refs</c>. Rewriting by exact reference span preserves the author's formatting and
@@ -77,7 +78,8 @@ internal static class RenameFixup
     /// </summary>
     private static bool IsFixable(ModelObjectKind kind)
         => kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
-            or ModelObjectKind.CalculatedColumn or ModelObjectKind.CalculationItem or ModelObjectKind.Partition;
+            or ModelObjectKind.CalculatedColumn or ModelObjectKind.CalculationItem or ModelObjectKind.Partition
+            or ModelObjectKind.Function;
 
     /// <summary>
     /// Plans the rewrites a rename — and, when <paramref name="newTable"/> is given, a move to
@@ -101,7 +103,7 @@ internal static class RenameFixup
         // otherwise make every measure path look ambiguous and silently skip the check.
         var matches = ModelObjectLookup.Find(snapshot, DaxObjectForm.Normalize(path), type)
             .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
-                or ModelObjectKind.CalculatedColumn)
+                or ModelObjectKind.CalculatedColumn or ModelObjectKind.Function or ModelObjectKind.Calendar)
             .ToList();
         if (matches.Count != 1)
             return RenameFixupPlan.Empty; // not-found/ambiguous is the mutator's error to raise
@@ -118,12 +120,22 @@ internal static class RenameFixup
         var fixedPaths = new List<string>();
         var unfixablePaths = new List<string>();
 
-        foreach (var site in DependencyGraph.FromSnapshot(snapshot).SitesReferencing(target))
+        var graph = DependencyGraph.FromSnapshot(snapshot);
+
+        // 'Fiscal' is written the same for a table and a calendar, so when both share the renamed
+        // name a table-shaped reference could mean either — whichever of the two is renamed,
+        // report those sites instead of guessing. 'Fiscal'[Col] is unambiguously the table.
+        var ambiguousName = target.Kind is ModelObjectKind.Table or ModelObjectKind.Calendar
+            && graph.HasTable(target.Name) && graph.HasCalendar(target.Name);
+
+        foreach (var site in graph.SitesReferencing(target))
         {
             if (nameUnchanged && !site.References.Any(r => r.FullyQualified))
                 continue;
 
-            if (!IsFixable(site.Source.Kind))
+            if (!IsFixable(site.Source.Kind)
+                || (ambiguousName && site.References.Any(r =>
+                    r.Shape is DaxReferenceShape.Table or DaxReferenceShape.TableCandidate)))
             {
                 if (!unfixablePaths.Contains(site.Source.Path))
                     unfixablePaths.Add(site.Source.Path);
@@ -147,8 +159,8 @@ internal static class RenameFixup
            + "Update them with 'tx replace' or inspect with 'tx deps'.";
 
     public static string UnfixableWarning(IReadOnlyList<string> references)
-        => $"Rename breaks {references.Count} DAX reference(s) that cannot be rewritten automatically: "
-           + $"{string.Join(", ", references)}. Update them manually with 'tx replace'.";
+        => $"Rename leaves {references.Count} DAX reference(s) that cannot be rewritten safely: "
+           + $"{string.Join(", ", references)}. Check them with 'tx deps' and update them with 'tx replace'.";
 
     /// <summary>
     /// Rebuilds one expression with every reference to <paramref name="target"/> replaced by its
@@ -159,11 +171,22 @@ internal static class RenameFixup
         var text = new StringBuilder(site.Expression);
         foreach (var reference in site.References.OrderByDescending(r => r.Start))
         {
-            var replacement = target.Kind == ModelObjectKind.Table
-                ? reference.Object is { } child ? $"{QuoteTable(newName)}{Bracket(child)}" : QuoteTable(newName)
-                : reference.FullyQualified
+            var replacement = target.Kind switch
+            {
+                ModelObjectKind.Table => reference.Object is { } child
+                    ? $"{QuoteTable(newName)}{Bracket(child)}"
+                    : QuoteTable(newName),
+
+                // UDF names cannot be quoted or bracketed; the call is written bare (Ns.Func).
+                ModelObjectKind.Function => newName,
+
+                // Calendars are referenced like tables; the quoted form is valid for any name.
+                ModelObjectKind.Calendar => QuoteTable(newName),
+
+                _ => reference.FullyQualified
                     ? $"{QuoteTable(newTable ?? TableOf(target))}{Bracket(newName)}"
-                    : Bracket(newName);
+                    : Bracket(newName),
+            };
 
             text.Remove(reference.Start, reference.End - reference.Start + 1);
             text.Insert(reference.Start, replacement);

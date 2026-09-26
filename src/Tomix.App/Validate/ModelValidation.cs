@@ -106,8 +106,10 @@ internal static class ModelValidation
                             LineText(site.Expression, reference.Start)));
                     break;
 
+                // 'Name' is a table — or a calendar (TOTALYTD([X], 'Fiscal')).
                 case DaxReferenceShape.Table:
-                    if (!index.TableColumns.ContainsKey(reference.Table!))
+                    if (!index.TableColumns.ContainsKey(reference.Table!)
+                        && !index.CalendarNames.Contains(reference.Table!))
                         issues.Add(new ValidationIssue(
                             ValidationSeverity.Error,
                             "DAX0001",
@@ -251,13 +253,18 @@ internal static class ModelValidation
     private sealed record ModelNameIndex(
         Dictionary<string, HashSet<string>> TableColumns,
         HashSet<string> MeasureNames,
-        HashSet<string> ColumnNames)
+        HashSet<string> ColumnNames,
+        HashSet<string> CalendarNames)
     {
         public static ModelNameIndex Build(IReadOnlyList<ModelObject> objects)
         {
             var tableColumns = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var measureNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var columnNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var calendarNames = objects
+                .Where(o => o.Kind == ModelObjectKind.Calendar)
+                .Select(o => o.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             foreach (var table in objects.Where(o => o.Kind == ModelObjectKind.Table))
             {
@@ -272,7 +279,7 @@ internal static class ModelValidation
                     measureNames.Add(measure.Name);
             }
 
-            return new ModelNameIndex(tableColumns, measureNames, columnNames);
+            return new ModelNameIndex(tableColumns, measureNames, columnNames, calendarNames);
         }
     }
 }

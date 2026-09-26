@@ -18,6 +18,8 @@ internal sealed class DependencyGraph
     private readonly Dictionary<string, ModelObject> _measureByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ModelObject> _tableByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _columnsByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ModelObject> _functionByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ModelObject> _calendarByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _forward = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _reverse = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _sortByTargets = new(StringComparer.OrdinalIgnoreCase);
@@ -66,7 +68,7 @@ internal sealed class DependencyGraph
 
             foreach (var site in DaxExpressions.Sites(obj))
             {
-                var references = DaxReferenceExtractor.Extract(site.Expression)
+                var references = DaxReferenceExtractor.Extract(site.Expression, includeFunctionCalls: true)
                     .Where(r => keyed.Any(t => ReferencesTarget(r, t.Target, t.Key)))
                     .ToList();
 
@@ -88,8 +90,21 @@ internal sealed class DependencyGraph
             && string.Equals(table, target.Name, StringComparison.OrdinalIgnoreCase))
             return true;
 
+        // 'Fiscal' names the calendar even when a table shares the name (Resolve prefers the
+        // table); the caller decides whether such an ambiguous site is safe to rewrite.
+        if (target.Kind == ModelObjectKind.Calendar
+            && reference.Shape is DaxReferenceShape.Table or DaxReferenceShape.TableCandidate
+            && string.Equals(reference.Table, target.Name, StringComparison.OrdinalIgnoreCase))
+            return true;
+
         return Resolve(reference) is { } resolved && Eq(Key(resolved), targetKey);
     }
+
+    /// <summary>Whether a table named <paramref name="name"/> exists (case-insensitive, like DAX).</summary>
+    public bool HasTable(string name) => _tableByName.ContainsKey(name);
+
+    /// <summary>Whether a calendar named <paramref name="name"/> exists (case-insensitive, like DAX).</summary>
+    public bool HasCalendar(string name) => _calendarByName.ContainsKey(name);
 
     /// <summary>
     /// Recursive dependency tree. <paramref name="upstream"/> follows "depends on"; otherwise
@@ -169,6 +184,10 @@ internal sealed class DependencyGraph
                 _tableByName.TryAdd(obj.Name, obj);
             else if (obj.Kind == ModelObjectKind.Measure)
                 _measureByName.TryAdd(obj.Name, obj);
+            else if (obj.Kind == ModelObjectKind.Function)
+                _functionByName.TryAdd(obj.Name, obj);
+            else if (obj.Kind == ModelObjectKind.Calendar)
+                _calendarByName.TryAdd(obj.Name, obj);
             else if (obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn)
             {
                 if (!_columnsByName.TryGetValue(obj.Name, out var list))
@@ -190,7 +209,7 @@ internal sealed class DependencyGraph
 
             foreach (var expression in DaxExpressions.ForObject(obj))
             {
-                foreach (var reference in DaxReferenceExtractor.Extract(expression))
+                foreach (var reference in DaxReferenceExtractor.Extract(expression, includeFunctionCalls: true))
                 {
                     var resolved = Resolve(reference);
                     if (resolved is not null && !Eq(Key(resolved), Key(obj)))
@@ -233,11 +252,17 @@ internal sealed class DependencyGraph
                 var path = ModelObjectLookup.NormalizePath($"{reference.Table}/{reference.Object}");
                 return _byPath.GetValueOrDefault(path);
 
-            // 'Table' is always a table; a bare word only counts when a table by that name
-            // exists (the extractor already dropped VAR names, keywords, and function calls).
+            // 'Table' is a table — or a calendar (TOTALYTD([X], 'Fiscal')) when no table has the
+            // name; a bare word only counts when one of them exists (the extractor already
+            // dropped VAR names, keywords, and function calls).
             case DaxReferenceShape.Table:
             case DaxReferenceShape.TableCandidate:
-                return _tableByName.GetValueOrDefault(reference.Table!);
+                return _tableByName.GetValueOrDefault(reference.Table!)
+                       ?? _calendarByName.GetValueOrDefault(reference.Table!);
+
+            // Only model functions (UDFs) resolve; built-ins like SUM( never match.
+            case DaxReferenceShape.FunctionCall:
+                return _functionByName.GetValueOrDefault(reference.Object!);
 
             default:
                 // A lone [X] is a measure first (measures are referenced unqualified), else a column.

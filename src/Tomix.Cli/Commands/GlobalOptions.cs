@@ -6,7 +6,9 @@ namespace Tomix.Cli.Commands;
 
 internal static class GlobalOptions
 {
-    private static string _defaultOutputFormat = OutputFormats.Text;
+    // Per execution context, not process-wide: Program.Run sets it and invokes in the same flow,
+    // while a test configuring a json default cannot leak it into tests running in parallel.
+    private static readonly AsyncLocal<string?> _defaultOutputFormat = new();
     public static readonly Option<string?> Model = new("--model")
     {
         Description = "Path to the semantic model: a TMDL folder, a .bim file, or a model folder",
@@ -16,7 +18,7 @@ internal static class GlobalOptions
     public static readonly Option<string> OutputFormat = new("--output-format")
     {
         Description = "Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.",
-        DefaultValueFactory = _ => _defaultOutputFormat
+        DefaultValueFactory = _ => DefaultOutputFormat
     };
 
     public static readonly Option<string?> ErrorFormat = new("--error-format")
@@ -170,11 +172,11 @@ internal static class GlobalOptions
     }
 
     public static void ConfigureDefaultOutputFormat(string? format)
-        => _defaultOutputFormat = string.Equals(format, OutputFormats.Json, StringComparison.OrdinalIgnoreCase)
+        => _defaultOutputFormat.Value = string.Equals(format, OutputFormats.Json, StringComparison.OrdinalIgnoreCase)
             ? OutputFormats.Json
             : OutputFormats.Text;
 
-    public static string DefaultOutputFormat => _defaultOutputFormat;
+    public static string DefaultOutputFormat => _defaultOutputFormat.Value ?? OutputFormats.Text;
 
     public static string? ModelValue(ParseResult parseResult)
         => parseResult.GetValue(Model);

@@ -239,6 +239,62 @@ public sealed class RenameReferenceFixupTests
         Assert.Equal(["Sales/Derived"], result.Data!.FixedReferences);
     }
 
+    [Fact]
+    public async Task Mv_RenameFunction_RewritesCallersAndFunctionBodies()
+    {
+        var session = SessionWithFunctionsAndCalendar();
+        var result = await new MoveModelObjectHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
+            MvRequest("Functions/AddTax", "Functions/Tax"),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Null(result.Data!.BrokenReferences);
+        Assert.Equal(["Functions/Gross", "Sales/Taxed"], result.Data.FixedReferences!.Order());
+        Assert.Contains(session.LastRewrites!, e => e is { Path: "Sales/Taxed", Value: "Tax([Base])" });
+        Assert.Contains(session.LastRewrites!,
+            e => e is { Path: "Functions/Gross", Kind: ModelObjectKind.Function, Value: "(x) => Tax(x) + 1" });
+    }
+
+    [Fact]
+    public async Task Set_RenameMeasure_RewritesFunctionBody()
+    {
+        var session = SessionWithFunctionsAndCalendar();
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
+            SetRequest("Sales/Base", [new ModelPropertyAssignment("name", "Net")]),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Null(result.Data!.BrokenReferences);
+        Assert.Contains("Functions/AddTax", result.Data.FixedReferences!);
+    }
+
+    [Fact]
+    public async Task Set_RenameCalendar_RewritesReferences()
+    {
+        var session = SessionWithFunctionsAndCalendar();
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
+            SetRequest("Date/Fiscal", [new ModelPropertyAssignment("name", "Fiscal Cal")], strictRefs: true),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(["Sales/YTD"], result.Data!.FixedReferences);
+        Assert.Equal("TOTALYTD([Base], 'Fiscal Cal')", Assert.Single(session.LastRewrites!).Value);
+    }
+
+    [Fact]
+    public async Task Set_RenameCalendarSharingATableName_StrictRefs_FailsBeforeMutating()
+    {
+        var session = SessionWithFunctionsAndCalendar(calendarName: "Sales");
+        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
+            SetRequest("Date/Sales", [new ModelPropertyAssignment("name", "Fiscal Cal")], strictRefs: true),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_RENAME_BREAKS_REFS", result.Diagnostics[0].Code);
+        Assert.False(session.SetPropertyCalled);
+        Assert.Null(session.LastRewrites);
+    }
+
     private static SetModelPropertyRequest SetRequest(
         string path,
         IReadOnlyList<ModelPropertyAssignment> properties,
@@ -271,6 +327,28 @@ public sealed class RenameReferenceFixupTests
     /// <summary>Two measures on table Sales: Derived's DAX references Base via [Base].</summary>
     private static MutationStubs.SnapshotSession NewSession()
         => new(MutationStubs.BaseAndDerived());
+
+    /// <summary>
+    /// UDFs AddTax (calls [Base]) and Gross (calls AddTax), a measure calling AddTax, and a
+    /// calendar on Date referenced by TOTALYTD. <paramref name="calendarName"/> "Sales" makes the
+    /// calendar share a table's name — the ambiguous case.
+    /// </summary>
+    private static MutationStubs.SnapshotSession SessionWithFunctionsAndCalendar(string calendarName = "Fiscal")
+        => new(new ModelSnapshot("M", 1601,
+        [
+            Obj("Sales", ModelObjectKind.Table, "Sales", null),
+            Obj("Date", ModelObjectKind.Table, "Date", null),
+            Obj(calendarName, ModelObjectKind.Calendar, $"Date/{calendarName}", null),
+            Obj("Base", ModelObjectKind.Measure, "Sales/Base", "1"),
+            Obj("Taxed", ModelObjectKind.Measure, "Sales/Taxed", "AddTax([Base])"),
+            Obj("YTD", ModelObjectKind.Measure, "Sales/YTD", $"TOTALYTD([Base], '{calendarName}')"),
+            Obj("AddTax", ModelObjectKind.Function, "Functions/AddTax", "(x) => x * [Base]"),
+            Obj("Gross", ModelObjectKind.Function, "Functions/Gross", "(x) => AddTax(x) + 1"),
+        ]));
+
+    private static ModelObject Obj(string name, ModelObjectKind kind, string path, string? expression)
+        => new(name, kind, path,
+            Detail: null, Expression: expression, Description: null, Hidden: false, SourceColumn: null, Children: []);
 
     /// <summary>A column referenced only by a role's RLS filter — the unfixable case.</summary>
     private static MutationStubs.SnapshotSession SessionWithRlsReference()

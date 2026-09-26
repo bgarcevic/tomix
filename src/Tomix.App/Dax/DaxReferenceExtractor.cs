@@ -17,6 +17,14 @@ public enum DaxReferenceShape
     /// Only count it when the model actually has a table by this name.
     /// </summary>
     TableCandidate,
+
+    /// <summary>
+    /// A bare or dotted word followed by <c>(</c>: <c>AddTax(</c>, <c>Local.AddTax(</c>. A built-in
+    /// function or a user-defined function (UDF) — only count it when the model has a function
+    /// by this name. <see cref="DaxReferenceExtractor.DaxReference.Object"/> holds the full
+    /// (dotted) name; the span covers the name, not the parenthesis.
+    /// </summary>
+    FunctionCall,
 }
 
 /// <summary>
@@ -30,8 +38,8 @@ public static class DaxReferenceExtractor
 {
     /// <summary>A reference found in a DAX expression.</summary>
     /// <param name="Shape">How the reference is written (decides resolution and rewrite form).</param>
-    /// <param name="Table">The table name; <c>null</c> for <see cref="DaxReferenceShape.Unqualified"/>.</param>
-    /// <param name="Object">The bracketed name; <c>null</c> for table-only shapes.</param>
+    /// <param name="Table">The table name; <c>null</c> for <see cref="DaxReferenceShape.Unqualified"/> and <see cref="DaxReferenceShape.FunctionCall"/>.</param>
+    /// <param name="Object">The bracketed name, or the called function's name; <c>null</c> for table-only shapes.</param>
     /// <param name="Start">Inclusive offset of the reference's first character in the expression.</param>
     /// <param name="End">Inclusive offset of the reference's last character in the expression.</param>
     public readonly record struct DaxReference(
@@ -40,7 +48,12 @@ public static class DaxReferenceExtractor
         public bool FullyQualified => Shape == DaxReferenceShape.Qualified;
     }
 
-    public static IReadOnlyList<DaxReference> Extract(string? expression)
+    /// <param name="expression">The DAX text.</param>
+    /// <param name="includeFunctionCalls">
+    /// Also report <see cref="DaxReferenceShape.FunctionCall"/> references. Off by default: most
+    /// calls are built-ins, so only consumers that resolve against model functions opt in.
+    /// </param>
+    public static IReadOnlyList<DaxReference> Extract(string? expression, bool includeFunctionCalls = false)
     {
         if (string.IsNullOrWhiteSpace(expression))
             return [];
@@ -53,6 +66,17 @@ public static class DaxReferenceExtractor
         {
             var token = tokens[i];
             var next = i + 1 < tokens.Count ? tokens[i + 1] : default;
+
+            // A word followed by '(' is a function, never a table.
+            if (token.Kind == DaxTokenKind.Identifier && FunctionCallEnd(tokens, i) is { } last)
+            {
+                if (includeFunctionCalls)
+                    references.Add(new DaxReference(
+                        DaxReferenceShape.FunctionCall, null, FunctionName(tokens, i, last),
+                        token.Start, tokens[last].End));
+                i = last;
+                continue;
+            }
 
             switch (token.Kind)
             {
@@ -80,10 +104,8 @@ public static class DaxReferenceExtractor
                     break;
 
                 case DaxTokenKind.Identifier:
-                    // A word followed by '(' is a function; a VAR name or keyword is not a table.
-                    if (next is { Kind: DaxTokenKind.Symbol, Text: "(" }
-                        || variables.Contains(token.Text)
-                        || Keywords.Contains(token.Text))
+                    // A VAR name or keyword is not a table (function calls were taken above).
+                    if (variables.Contains(token.Text) || Keywords.Contains(token.Text))
                         break;
 
                     references.Add(new DaxReference(
@@ -99,6 +121,32 @@ public static class DaxReferenceExtractor
 
         return references;
     }
+
+    /// <summary>
+    /// When the identifier at <paramref name="first"/> starts a call — a name, or an unbroken
+    /// dotted chain (<c>Ns.Func</c>, no whitespace around the dots), followed by <c>(</c> —
+    /// returns the index of the chain's last identifier; otherwise <c>null</c>. Whitespace
+    /// before the parenthesis is allowed (<c>AddTax ( x )</c>).
+    /// </summary>
+    private static int? FunctionCallEnd(List<DaxToken> tokens, int first)
+    {
+        var last = first;
+        while (last + 2 < tokens.Count
+               && tokens[last + 1] is { Kind: DaxTokenKind.Symbol, Text: "." } dot
+               && tokens[last + 2].Kind == DaxTokenKind.Identifier
+               && dot.Start == tokens[last].End + 1
+               && tokens[last + 2].Start == dot.End + 1)
+            last += 2;
+
+        return last + 1 < tokens.Count && tokens[last + 1] is { Kind: DaxTokenKind.Symbol, Text: "(" }
+            ? last
+            : null;
+    }
+
+    private static string FunctionName(List<DaxToken> tokens, int first, int last)
+        => string.Join('.', tokens.Skip(first).Take(last - first + 1)
+            .Where(t => t.Kind == DaxTokenKind.Identifier)
+            .Select(t => t.Text));
 
     /// <summary>
     /// Names declared with <c>VAR</c> anywhere in the expression. Collected up front so a bare

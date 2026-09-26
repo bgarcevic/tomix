@@ -208,6 +208,34 @@ public sealed class DaxReferenceExtractorTests
         Assert.Equal("Broken", reference.Object);
     }
 
+    [Theory]
+    [InlineData("AddTax(1)", "AddTax", "AddTax")]
+    [InlineData("AddTax ( 1 )", "AddTax", "AddTax")]
+    [InlineData("Local.Fin.AddTax(1)", "Local.Fin.AddTax", "Local.Fin.AddTax")]
+    public void FunctionCalls_AreReportedOnlyWhenRequested(string expression, string name, string span)
+    {
+        Assert.Empty(DaxReferenceExtractor.Extract(expression));
+
+        var reference = Assert.Single(DaxReferenceExtractor.Extract(expression, includeFunctionCalls: true));
+        Assert.Equal(DaxReferenceShape.FunctionCall, reference.Shape);
+        Assert.Equal(name, reference.Object);
+        Assert.Null(reference.Table);
+        AssertSpan(span, expression, reference);
+    }
+
+    [Fact]
+    public void FunctionCalls_InStringsAndComments_AreIgnored()
+    {
+        Assert.Empty(DaxReferenceExtractor.Extract("\"AddTax(1)\" // AddTax(2)", includeFunctionCalls: true));
+    }
+
+    [Fact]
+    public void DottedCall_DoesNotShedATableCandidate()
+    {
+        // "Local" in Local.AddTax(1) is a namespace, not a table.
+        Assert.Empty(DaxReferenceExtractor.Extract("Local.AddTax(1)"));
+    }
+
     private static void AssertSpan(
         string expected, string expression, DaxReferenceExtractor.DaxReference reference)
         => Assert.Equal(expected, expression[reference.Start..(reference.End + 1)]);

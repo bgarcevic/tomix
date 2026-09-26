@@ -126,6 +126,15 @@ public sealed class DepsModelHandlerTests
     }
 
     [Fact]
+    public async Task Downstream_OfFunction_ListsCallers()
+    {
+        // Taxed = "NetOf(2) + SUM(Sales[Amount])" -> a UDF call is an edge; the built-in SUM is not.
+        var result = await Run(Request("Functions/NetOf", downstreamOnly: true));
+
+        Assert.Equal(["Sales/Taxed"], Paths(result.Data!.Downstream));
+    }
+
+    [Fact]
     public async Task Upstream_ScansCalculatedColumnExpressions()
     {
         // RegionAmount = "RELATED('Region'[Amount])" — the reference lives on a calculated
@@ -262,6 +271,7 @@ public sealed class DepsModelHandlerTests
                     Measure("Sales", "RowCount", "COUNTROWS('Region')"),
                     Measure("Sales", "RowCountBare", "COUNTROWS(Region)"),
                     Measure("Sales", "HiddenStuff", "2", hidden: true),
+                    Measure("Sales", "Taxed", "NetOf(2) + SUM(Sales[Amount])"),
                     Measure("Sales", "KpiMeasure", "1", props: new Dictionary<string, string>
                     {
                         ["KpiTargetExpression"] = "[Total]"
