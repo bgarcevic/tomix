@@ -269,7 +269,8 @@ internal sealed class BpaCommand : ICommandModule
                 Details: parseResult.GetValue(detailsOption) || full || ruleScoped,
                 Errors: parseResult.GetValue(errorsOption),
                 Warnings: parseResult.GetValue(warningsOption),
-                Info: parseResult.GetValue(infoOption));
+                Info: parseResult.GetValue(infoOption),
+                CommandTokens: parseResult.Tokens.Select(t => t.Value).ToList());
 
             return CommandOutput.Render(
                 parseResult,

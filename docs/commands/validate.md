@@ -66,6 +66,14 @@ tx bpa run --errors
 tx bpa run --fix --save
 ```
 
+Text output groups findings by severity. Each rule shows its object count, its name,
+and a line with its ID, its category and whether it is `fixable`. `--details` adds the
+guidance and lists the affected objects one per line. The summary line counts the
+findings and shows how many of the evaluated rules passed. Next-step commands are
+printed ready to copy on stderr, reusing your model path and rule options. After
+`--fix`, the output shows how many findings were fixed and remain, and whether the
+result was saved, staged, or kept in memory only.
+
 `bpa run --fix --allow-delete` deletes model objects, so it asks for
 confirmation; `--revert` (drops staged work) asks too. Pass `--yes` to skip
 the prompt in scripts.

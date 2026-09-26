@@ -61,38 +61,117 @@ public class BpaRenderTests
     }
 
     [Fact]
-    public void FormatObjectList_UnderCap_ShowsAll()
-    {
-        var names = new[] { "a", "b", "c" };
-        Assert.Equal("a · b · c", BpaRunView.FormatObjectList(names, full: false, cap: 10));
-    }
+    public void ObjectLines_UnderCap_ShowsAllAndSkipsBlankNames()
+        => Assert.Equal(["a", "b", "c"], BpaRunView.ObjectLines(["a", "", "b", "c"], full: false, cap: 10));
 
     [Fact]
-    public void FormatObjectList_OverCap_TruncatesWithCount()
+    public void ObjectLines_OverCap_TruncatesWithCount()
     {
         var names = Enumerable.Range(1, 13).Select(i => $"o{i}").ToArray();
 
-        var result = BpaRunView.FormatObjectList(names, full: false, cap: 10);
+        var lines = BpaRunView.ObjectLines(names, full: false, cap: 10);
 
-        Assert.StartsWith("o1 · o2 · ", result);
-        Assert.EndsWith(" · … +3 more", result);
-        Assert.DoesNotContain("o11", result);
+        Assert.Equal(11, lines.Count);
+        Assert.Equal("o10", lines[9]);
+        Assert.Equal("… +3 more", lines[10]);
     }
 
     [Fact]
-    public void FormatObjectList_Full_ShowsAllEvenOverCap()
+    public void ObjectLines_Full_ShowsAllEvenOverCap()
     {
         var names = Enumerable.Range(1, 13).Select(i => $"o{i}").ToArray();
 
-        var result = BpaRunView.FormatObjectList(names, full: true, cap: 10);
-
-        Assert.Contains("o13", result);
-        Assert.DoesNotContain("more", result);
+        Assert.Equal(names, BpaRunView.ObjectLines(names, full: true, cap: 10));
     }
 
     [Fact]
-    public void FormatObjectList_Empty_ReturnsEmpty()
-        => Assert.Equal("", BpaRunView.FormatObjectList(Array.Empty<string>(), full: false));
+    public void OrderRuleGroups_CountsFixableObjects()
+    {
+        var violations = new[]
+        {
+            Violation("R1", BpaSeverity.Warning, "a") with { CanFix = true },
+            Violation("R1", BpaSeverity.Warning, "b"),
+            Violation("R2", BpaSeverity.Warning, "c") with { CanFix = true },
+        };
+
+        var groups = BpaRunView.OrderRuleGroups(violations);
+
+        Assert.Equal("1 fixable", BpaRunView.FixableLabel(groups.Single(g => g.RuleId == "R1")));
+        Assert.Equal("fixable", BpaRunView.FixableLabel(groups.Single(g => g.RuleId == "R2")));
+    }
+
+    [Fact]
+    public void FixableLabel_NoneFixable_IsEmpty()
+        => Assert.Equal("", BpaRunView.FixableLabel(BpaRunView.OrderRuleGroups([Violation("R1", BpaSeverity.Error, "a")])[0]));
+
+    [Fact]
+    public void SeveritySections_GroupsBySeverityWithObjectCounts()
+    {
+        var violations = new[]
+        {
+            Violation("I1", BpaSeverity.Info, "a"),
+            Violation("E1", BpaSeverity.Error, "b"),
+            Violation("E1", BpaSeverity.Error, "c"),
+            Violation("E2", BpaSeverity.Error, "d"),
+        };
+
+        var sections = BpaRunView.SeveritySections(BpaRunView.OrderRuleGroups(violations));
+
+        Assert.Equal([BpaSeverity.Error, BpaSeverity.Info], sections.Select(s => s.Severity));
+        Assert.Equal(2, sections[0].Groups.Count);
+        Assert.Equal(3, sections[0].ObjectCount);
+        Assert.Equal(1, sections[1].ObjectCount);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 0, 27, 326, "All 27 rules passed · 326ms")]
+    [InlineData(0, 0, 0, 0, 1, 0, "All 1 rule passed")]
+    [InlineData(3, 32, 0, 5, 27, 326, "3 errors · 32 warnings in 5 of 27 rules · 22 passed · 326ms")]
+    [InlineData(0, 1, 2, 2, 10, 0, "1 warning · 2 info in 2 of 10 rules · 8 passed")]
+    // A rule-error finding can come from a rule outside the evaluated count.
+    [InlineData(1, 0, 0, 1, 0, 0, "1 error in 1 of 1 rule · 0 passed")]
+    public void SummaryLine_ReportsCountsAndPassedRules(
+        int errors, int warnings, int info, int failed, int evaluated, long durationMs, string expected)
+        => Assert.Equal(expected, BpaRunView.SummaryLine(errors, warnings, info, failed, evaluated, durationMs));
+
+    [Fact]
+    public void PackSegments_NeverSplitsASegment()
+    {
+        var lines = BpaRunView.PackSegments(["A_VERY_LONG_RULE_IDENTIFIER", "Category", "", "fixable"], width: 30);
+
+        Assert.Equal(2, lines.Count);
+        Assert.Equal(["A_VERY_LONG_RULE_IDENTIFIER"], lines[0]);
+        Assert.Equal(["Category", "fixable"], lines[1]);
+    }
+
+    [Theory]
+    [InlineData(null, "tx bpa run --details")]
+    [InlineData(new[] { "bpa", "run", "samples/My Model.pbip", "--ruleset", "full" },
+        "tx bpa run 'samples/My Model.pbip' --ruleset full --details")]
+    // Display, fix, and persistence flags (with their values) never leak into a hint.
+    [InlineData(new[] { "bpa", "run", "m.bim", "--full", "--fix", "--save-to", "out", "-y", "--errors" },
+        "tx bpa run m.bim --details")]
+    [InlineData(new[] { "bpa", "run", "m.bim", "--save-to=old.bim", "--trx=old.trx", "--fix=true" },
+        "tx bpa run m.bim --details")]
+    [InlineData(new[] { "bpa", "run", "Sales$(whoami).bim" },
+        "tx bpa run 'Sales$(whoami).bim' --details")]
+    public void HintCommand_EchoesTheCommandLine(string[]? tokens, string expected)
+        => Assert.Equal(expected, BpaRunView.HintCommand(tokens, "--details"));
+
+    [Fact]
+    public void HintCommand_QuotesRuleIdAddedByRenderer()
+        => Assert.Equal("tx bpa run --rule 'RULE_$X'",
+            BpaRunView.HintCommand(null, "--rule", "RULE_$X"));
+
+    [Fact]
+    public void HintCommand_EscapesApostropheForHostShell()
+    {
+        var expected = OperatingSystem.IsWindows()
+            ? "tx bpa run 'O''Brien.bim' --details"
+            : "tx bpa run 'O'\\''Brien.bim' --details";
+
+        Assert.Equal(expected, BpaRunView.HintCommand(["bpa", "run", "O'Brien.bim"], "--details"));
+    }
 
     [Theory]
     [InlineData("[Performance] Do not use X", "Performance", "Do not use X")]

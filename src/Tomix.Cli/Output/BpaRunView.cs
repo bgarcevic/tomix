@@ -11,14 +11,19 @@ internal static class BpaRunView
 {
     internal const int DefaultObjectCap = 10;
 
-    /// <summary>Display flags for the <c>bpa run</c> text output.</summary>
+    /// <summary>
+    /// Display flags for the <c>bpa run</c> text output. <paramref name="CommandTokens"/> is the
+    /// command line as parsed (without the <c>tx</c> prefix), echoed back in next-step hints so
+    /// they stay copy-pasteable; <c>null</c> falls back to plain <c>bpa run</c>.
+    /// </summary>
     internal sealed record RunOptions(
         bool NoMultiline,
         bool Full,
         bool Details,
         bool Errors,
         bool Warnings,
-        bool Info);
+        bool Info,
+        IReadOnlyList<string>? CommandTokens = null);
 
     /// <summary>One rule and every object that violated it, in display order.</summary>
     internal sealed record RuleGroup(
@@ -27,7 +32,14 @@ internal static class BpaRunView
         string Category,
         BpaSeverity Severity,
         string? Description,
-        IReadOnlyList<string> Objects);
+        IReadOnlyList<string> Objects,
+        int FixableCount = 0);
+
+    /// <summary>The rule groups of one severity, with the number of objects they flag.</summary>
+    internal sealed record SeveritySection(
+        BpaSeverity Severity,
+        IReadOnlyList<RuleGroup> Groups,
+        int ObjectCount);
 
     /// <summary>
     /// Collapses violations into one group per rule, ordered by severity
@@ -45,7 +57,8 @@ internal static class BpaRunView
                     first.Category,
                     first.Severity,
                     first.Description,
-                    g.Select(v => v.ObjectName).ToList());
+                    g.Select(v => v.ObjectName).ToList(),
+                    g.Count(v => v.CanFix));
             })
             .OrderByDescending(g => g.Severity)
             .ThenBy(g => g.Category, StringComparer.OrdinalIgnoreCase)
@@ -53,23 +66,143 @@ internal static class BpaRunView
             .ToList();
 
     /// <summary>
-    /// Joins object names with <c>·</c>. When not <paramref name="full"/> and the list
-    /// exceeds <paramref name="cap"/>, shows the first <paramref name="cap"/> then
+    /// Splits ordered groups into one section per severity (Error → Warning → Info), skipping
+    /// severities with no groups.
+    /// </summary>
+    internal static IReadOnlyList<SeveritySection> SeveritySections(IEnumerable<RuleGroup> groups)
+        => groups
+            .GroupBy(g => g.Severity)
+            .OrderByDescending(g => g.Key)
+            .Select(g => new SeveritySection(g.Key, g.ToList(), g.Sum(r => r.Objects.Count)))
+            .ToList();
+
+    /// <summary>
+    /// Object names for the detail view, one per line. When not <paramref name="full"/> and the
+    /// list exceeds <paramref name="cap"/>, keeps the first <paramref name="cap"/> and appends
     /// <c>… +N more</c>. Returns raw text — callers escape for markup.
     /// </summary>
-    internal static string FormatObjectList(IReadOnlyList<string> names, bool full, int cap = DefaultObjectCap)
+    internal static IReadOnlyList<string> ObjectLines(IReadOnlyList<string> names, bool full, int cap = DefaultObjectCap)
     {
-        // Rule-error findings carry no object name; they must not leave a dangling separator.
+        // Rule-error findings carry no object name; they must not render an empty bullet.
         var present = names.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
-        if (present.Count == 0)
-            return "";
-
         if (full || present.Count <= cap)
-            return string.Join(" · ", present);
+            return present;
 
-        var remaining = present.Count - cap;
-        return string.Join(" · ", present.Take(cap)) + $" · … +{remaining} more";
+        return [.. present.Take(cap), $"… +{present.Count - cap} more"];
     }
+
+    /// <summary>
+    /// The fix marker for a rule: <c>fixable</c> when every object can be fixed,
+    /// <c>N fixable</c> when only some can, empty when none can.
+    /// </summary>
+    internal static string FixableLabel(RuleGroup group)
+        => group.FixableCount <= 0 ? ""
+            : group.FixableCount >= group.Objects.Count ? "fixable"
+            : $"{group.FixableCount} fixable";
+
+    /// <summary>
+    /// The one-line run summary, e.g. <c>3 errors · 32 warnings in 5 of 27 rules · 22 passed · 326ms</c>
+    /// or <c>All 27 rules passed · 326ms</c>. Zero severity counts are left out.
+    /// </summary>
+    internal static string SummaryLine(
+        int errors, int warnings, int info, int failedRules, int rulesEvaluated, long durationMs)
+    {
+        var duration = durationMs > 0 ? $" · {durationMs}ms" : "";
+        if (failedRules == 0)
+            return $"All {rulesEvaluated} {Plural(rulesEvaluated, "rule")} passed{duration}";
+
+        var counts = new List<string>(3);
+        if (errors > 0) counts.Add(Count(errors, "error"));
+        if (warnings > 0) counts.Add(Count(warnings, "warning"));
+        if (info > 0) counts.Add($"{info} info");
+
+        // Rule-error findings can come from rules outside the evaluated count; never go negative.
+        var total = Math.Max(rulesEvaluated, failedRules);
+        return $"{string.Join(" · ", counts)} in {failedRules} of {Count(total, "rule")} · {total - failedRules} passed{duration}";
+    }
+
+    /// <summary>
+    /// Packs segments into lines of at most <paramref name="width"/> columns, joined by
+    /// <c> · </c>. A segment is never split, so a long rule ID stays whole on its own line.
+    /// </summary>
+    internal static IReadOnlyList<IReadOnlyList<string>> PackSegments(IEnumerable<string> segments, int width)
+    {
+        var lines = new List<IReadOnlyList<string>>();
+        var current = new List<string>();
+        var length = 0;
+        foreach (var segment in segments.Where(s => s.Length > 0))
+        {
+            if (current.Count > 0 && length + 3 + segment.Length > width)
+            {
+                lines.Add(current);
+                current = [];
+                length = 0;
+            }
+
+            length += (current.Count > 0 ? 3 : 0) + segment.Length;
+            current.Add(segment);
+        }
+
+        if (current.Count > 0)
+            lines.Add(current);
+        return lines;
+    }
+
+    private static readonly HashSet<string> HintDroppedFlags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "--details", "--full", "--no-multiline", "--errors", "--warnings", "--info",
+        "--fix", "--allow-delete", "--save", "--stage", "--revert", "--quiet", "-q",
+        "--yes", "-y", "--force", "-f", "--overwrite", "--no-sync",
+    };
+
+    // Options whose value is dropped with them: a hint must never re-save to the same target.
+    private static readonly HashSet<string> HintDroppedValueOptions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "--save-to", "--serialization", "--trx", "--ci",
+    };
+
+    /// <summary>
+    /// A copy-pasteable <c>tx …</c> command: the user's own command line (so model, ruleset,
+    /// and scope carry over) minus display, fix, persistence, and report flags, plus
+    /// <paramref name="extra"/>.
+    /// </summary>
+    internal static string HintCommand(IReadOnlyList<string>? tokens, params string[] extra)
+    {
+        var kept = new List<string>();
+        var source = tokens ?? ["bpa", "run"];
+        for (var i = 0; i < source.Count; i++)
+        {
+            var equals = source[i].IndexOf('=');
+            var option = equals < 0 ? source[i] : source[i][..equals];
+            if (HintDroppedValueOptions.Contains(option))
+            {
+                if (equals < 0)
+                    i++;
+            }
+            else if (!HintDroppedFlags.Contains(option))
+                kept.Add(source[i]);
+        }
+
+        return "tx " + string.Join(" ", kept.Concat(extra).Select(QuoteToken));
+    }
+
+    /// <summary>Quotes a command argument literally for the host shell used by <c>tx</c> hints.</summary>
+    internal static string QuoteToken(string token)
+    {
+        if (token.Length > 0 && token.All(c => char.IsAsciiLetterOrDigit(c)
+            || c is '_' or '-' or '.' or '/' or ':' or '='))
+            return token;
+
+        // Single quotes suppress variable and command expansion in both PowerShell and POSIX
+        // shells. Their embedded-quote escaping differs, so use the host platform's syntax.
+        return OperatingSystem.IsWindows()
+            ? "'" + token.Replace("'", "''") + "'"
+            : "'" + token.Replace("'", "'\\''") + "'";
+    }
+
+    private static string Count(int n, string noun) => $"{n} {Plural(n, noun)}";
+
+    private static string Plural(int n, string noun) => n == 1 ? noun : noun + "s";
 
     /// <summary>
     /// Drops the leading <c>[Category]</c> segment from a rule name when it duplicates

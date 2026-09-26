@@ -20,6 +20,13 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- `bpa run` text output is redesigned. Findings are grouped by severity, one block per
+  rule, and rule IDs are never split across lines. Each rule shows its category and
+  whether its fixes can be applied (`fixable`). A single summary line counts the
+  findings and the rules that passed. Next-step commands are printed ready to copy on
+  stderr, reusing your model path and rule options. After `--fix`, the output shows how
+  many findings were fixed and remain, and whether the result was saved, staged, or kept
+  in memory only. JSON, TRX, and CI output are unchanged.
 - **Breaking:** mutation JSON results share one persistence contract (#161). `saved` is
   always a bool; the path or `server / database` moved to `savedTo`. A new `status`
   (`saved`, `staged`, `preview`, `dryRun`, `unchanged`, `reverted`) replaces `staged` and

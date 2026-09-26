@@ -6,132 +6,236 @@ using Tomix.Core.Bpa;
 namespace Tomix.Cli.Output;
 
 /// <summary>
-/// Spectre rendering for <c>bpa run</c>: grouped violation output (compact table or
+/// Spectre rendering for <c>bpa run</c>: violations grouped by severity (compact or
 /// per-rule detail), diagnostics footer, JSON projection, and CI logging commands.
 /// Layout decisions live in <see cref="BpaRunView"/>; this file only formats and prints.
 /// </summary>
 internal static class BpaRunRenderer
 {
-    private const int DetailTextWidth = 84;
+    private const int MaxTextWidth = 84;
 
     public static void Render(BpaRunResult result, BpaRunView.RunOptions view)
     {
         // The title is commentary: stderr keeps `tx bpa run > file` down to the findings.
         StdErr.MarkupLine(Styling.Title($"BPA analysis · {result.ModelName}"));
 
-        if (result.Violations.Count == 0)
+        var groups = BpaRunView.OrderRuleGroups(result.Violations);
+        var visible = groups
+            .Where(g => BpaRunView.MatchesFilter(g.Severity, view.Errors, view.Warnings, view.Info))
+            .ToList();
+        var fixRan = result.FixesApplied > 0 || result.FixesSkipped > 0
+            || result.DestructiveFixesSkipped > 0 || result.FixErrors is { Count: > 0 };
+
+        AnsiConsole.WriteLine();
+        if (groups.Count > 0)
         {
+            if (result.FixesApplied > 0)
+                AnsiConsole.MarkupLine(Styling.Muted("Findings before fix:"));
+
+            if (visible.Count == 0)
+                AnsiConsole.MarkupLine(Styling.Muted("Nothing to show for the selected severities."));
+            else
+                RenderSections(visible, view);
+
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine(Styling.Success("No BPA violations found."));
-            RenderDiagnostics(result, view);
-            return;
+            AnsiConsole.Write(new Rule().RuleStyle(new Style(Palette.Slate)));
         }
 
-        var errorCount = result.Violations.Count(v => v.Severity == BpaSeverity.Error);
-        var warningCount = result.Violations.Count(v => v.Severity == BpaSeverity.Warning);
-        var infoCount = result.Violations.Count(v => v.Severity == BpaSeverity.Info);
+        RenderSummary(result, groups.Count, view);
+        RenderDiagnostics(result, view);
 
-        var groups = BpaRunView.OrderRuleGroups(result.Violations);
+        if (fixRan)
+            RenderFixOutcome(result, view);
 
-        var summary = string.Join(" · ",
-            $"{result.Violations.Count} findings",
-            Styling.Error($"{errorCount} errors"),
-            Styling.Warning($"{warningCount} warnings"),
-            $"{infoCount} info",
-            $"{groups.Count} rules");
+        // After --fix the listed findings are pre-fix, so browsing hints would mislead.
+        if (visible.Count > 0 && !fixRan)
+            RenderHints(result, visible, view);
+    }
 
-        var filterActive = view.Errors || view.Warnings || view.Info;
-        if (filterActive)
+    private static void RenderSummary(BpaRunResult result, int failedRules, BpaRunView.RunOptions view)
+    {
+        var errors = result.Violations.Count(v => v.Severity == BpaSeverity.Error);
+        var warnings = result.Violations.Count(v => v.Severity == BpaSeverity.Warning);
+        var info = result.Violations.Count(v => v.Severity == BpaSeverity.Info);
+
+        var text = BpaRunView.SummaryLine(errors, warnings, info, failedRules, result.RulesEvaluated, result.DurationMs);
+        var line = failedRules == 0 ? Styling.Success($"✓ {text}")
+            : errors > 0 ? Styling.Error($"✗ {text}")
+            : warnings > 0 ? Styling.Warning($"✗ {text}")
+            : $"✗ {Styling.MarkupEscape(text)}";
+
+        if (view.Errors || view.Warnings || view.Info)
         {
             var shown = new List<string>(3);
             if (view.Errors) shown.Add("errors");
             if (view.Warnings) shown.Add("warnings");
             if (view.Info) shown.Add("info");
-            summary += "  " + Styling.Muted($"(showing {string.Join(" + ", shown)})");
+            line += "  " + Styling.Muted($"(showing {string.Join(" + ", shown)})");
         }
 
-        AnsiConsole.Write(new Rule().RuleStyle(new Style(Palette.Slate)));
+        AnsiConsole.MarkupLine(line);
+    }
 
-        var visible = groups
-            .Where(g => BpaRunView.MatchesFilter(g.Severity, view.Errors, view.Warnings, view.Info))
-            .ToList();
+    /// <summary>
+    /// One section per severity. Each rule is a count, its name, and a muted metadata line
+    /// (rule ID · category · fixable) packed so the ID is never split; <c>--details</c> adds
+    /// the guidance and the affected objects under the same indent.
+    /// </summary>
+    private static void RenderSections(IReadOnlyList<BpaRunView.RuleGroup> groups, BpaRunView.RunOptions view)
+    {
+        var countWidth = groups.Max(g => $"×{g.Objects.Count}".Length);
+        var indent = new string(' ', 2 + countWidth + 2);
+        // Wrap to the effective render width so Spectre never re-wraps (which would split words).
+        var width = Math.Max(24, Math.Min(MaxTextWidth, AnsiConsole.Profile.Width) - indent.Length);
 
-        if (visible.Count == 0)
+        var first = true;
+        foreach (var section in BpaRunView.SeveritySections(groups))
         {
-            AnsiConsole.MarkupLine(Styling.Muted("  Nothing to show for the selected severities."));
-        }
-        else if (view.Details)
-        {
-            foreach (var group in visible)
-                RenderRuleGroup(group, view);
-        }
-        else
-        {
-            RenderCompact(visible);
-        }
+            if (!first)
+                AnsiConsole.WriteLine();
+            first = false;
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule().RuleStyle(new Style(Palette.Slate)));
-        AnsiConsole.MarkupLine(summary);
-
-        var fixable = result.Violations.Count(v => v.CanFix);
-        if (fixable > 0)
+            var rules = section.Groups.Count == 1 ? "1 rule" : $"{section.Groups.Count} rules";
+            var objects = section.ObjectCount == 1 ? "1 object" : $"{section.ObjectCount} objects";
             AnsiConsole.MarkupLine(
-                Styling.Value($"{fixable} of {result.Violations.Count} can be auto-fixed")
-                + Styling.Muted(" — run  bpa run --fix"));
+                $"{Styling.SeverityHeading(BpaRunView.SeverityWord(section.Severity))}  {Styling.Muted($"{rules} · {objects}")}");
 
+            foreach (var group in section.Groups)
+            {
+                if (view.Details)
+                    AnsiConsole.WriteLine();
+                RenderRule(group, view, countWidth, indent, width);
+            }
+        }
+    }
+
+    private static void RenderRule(
+        BpaRunView.RuleGroup group, BpaRunView.RunOptions view, int countWidth, string indent, int width)
+    {
+        var count = $"×{group.Objects.Count}".PadRight(countWidth);
+        var name = BpaRunView.StripCategoryPrefix(group.RuleName, group.Category);
+        var nameLines = BpaRunView.WrapText(name, width);
+        for (var i = 0; i < nameLines.Count; i++)
+        {
+            var lead = i == 0 ? $"  {Styling.Muted(count)}  " : indent;
+            AnsiConsole.MarkupLine(lead + Styling.Bold(nameLines[i]));
+        }
+
+        var fixable = BpaRunView.FixableLabel(group);
+        foreach (var line in BpaRunView.PackSegments([group.RuleId, group.Category, fixable], width))
+        {
+            var parts = line.Select(s => ReferenceEquals(s, fixable) ? Styling.Success(s) : Styling.Muted(s));
+            AnsiConsole.MarkupLine(indent + string.Join(Styling.Muted(" · "), parts));
+        }
+
+        if (!view.Details)
+            return;
+
+        var guidance = BpaRunView.Guidance(group.Description, view.NoMultiline);
+        foreach (var line in BpaRunView.WrapText(guidance, width))
+            AnsiConsole.MarkupLine(indent + Styling.Guidance(line));
+
+        var objects = BpaRunView.ObjectLines(group.Objects, view.Full);
+        if (objects.Count == 0)
+            return;
+
+        AnsiConsole.MarkupLine(indent + Styling.Muted("Affects:"));
+        foreach (var obj in objects)
+            AnsiConsole.MarkupLine($"{indent}  {Styling.MarkupEscape(obj)}");
+    }
+
+    /// <summary>
+    /// One block for what <c>--fix</c> did: how many findings were fixed and remain, anything
+    /// held back, and where the result went (saved, staged, or only in memory).
+    /// </summary>
+    private static void RenderFixOutcome(BpaRunResult result, BpaRunView.RunOptions view)
+    {
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules evaluated:", result.RulesEvaluated.ToString())}");
 
-        if (result.DurationMs > 0)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Duration:", $"{result.DurationMs}ms")}");
-
-        RenderDiagnostics(result, view);
-
-        if (result.FixesApplied > 0)
+        var total = result.Violations.Count;
+        var parts = new List<string>
         {
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes applied:", result.FixesApplied.ToString())}");
-            if (result.FixesSkipped > 0)
-                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes skipped:", result.FixesSkipped.ToString())}");
-            RenderDestructiveSkipped(result);
-            if (result.FixOutcome.Saved)
-                MutationOutput.RenderSaved(result.FixOutcome, "  ");
-            else if (result.FixOutcome.Status == MutationStatus.Staged)
-                AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
+            $"Fixed {result.FixesApplied} of {total} findings",
+            $"{Math.Max(0, total - result.FixesApplied)} remain"
+        };
+        if (result.FixesSkipped > 0)
+            parts.Add($"{result.FixesSkipped} skipped");
+        var summary = string.Join(" · ", parts);
+        AnsiConsole.MarkupLine(result.FixesApplied > 0 ? Styling.Success($"✓ {summary}") : Styling.Warning(summary));
 
-            MutationOutput.RenderSync(result.FixOutcome, "  ");
-        }
-        else
-        {
-            if (result.FixesSkipped > 0)
-                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Fixes skipped:", result.FixesSkipped.ToString())}");
-            RenderDestructiveSkipped(result);
-        }
+        if (result.DestructiveFixesSkipped > 0)
+            AnsiConsole.MarkupLine(
+                $"  {Styling.Warning($"{result.DestructiveFixesSkipped} destructive fixes skipped")}"
+                + Styling.Muted(" — they delete objects; add --allow-delete to apply"));
 
         if (result.FixErrors is { Count: > 0 })
         {
-            AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine($"  {Styling.Error("Fix errors:")}");
             foreach (var err in result.FixErrors)
                 AnsiConsole.MarkupLine("    {0}", Styling.MarkupEscape(err));
         }
 
-        if (visible.Count > 0)
+        if (result.FixesApplied == 0)
+            return;
+
+        switch (result.FixOutcome.Status)
         {
-            var err = StdErr.Console();
-            err.WriteLine();
-            err.MarkupLine(Styling.Guidance(view.Details
-                ? "Run with --full to list every affected object, or --rule <ID> to focus a single rule."
-                : "Run  bpa run --details  for guidance, or  --rule <ID>  to focus a single rule."));
+            case MutationStatus.Saved:
+                MutationOutput.RenderSaved(result.FixOutcome, "  ");
+                break;
+            case MutationStatus.Staged:
+                AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
+                break;
+            default:
+                // Without --save/--stage the fixes only touched the in-memory copy.
+                HintConsole().MarkupLine("  " + Styling.Warning("Not saved.") + " "
+                    + Styling.Guidance("Persist with:") + " "
+                    + Styling.Option(BpaRunView.HintCommand(view.CommandTokens, "--fix", "--save"))
+                    + Styling.Guidance("  (or --stage)"));
+                break;
         }
+
+        MutationOutput.RenderSync(result.FixOutcome, "  ");
     }
 
-    private static void RenderDestructiveSkipped(BpaRunResult result)
+    /// <summary>Copy-pasteable next steps, on stderr so piped output stays results-only.</summary>
+    private static void RenderHints(
+        BpaRunResult result, IReadOnlyList<BpaRunView.RuleGroup> visible, BpaRunView.RunOptions view)
     {
-        if (result.DestructiveFixesSkipped > 0)
-            AnsiConsole.MarkupLine(
-                $"  {Styling.KeyValue("Destructive fixes skipped:", result.DestructiveFixesSkipped.ToString())}"
-                + Styling.Muted(" — deletes objects; rerun with  --fix --allow-delete  to apply"));
+        var hints = new List<(string Label, string Command)>(3);
+
+        var fixable = result.Violations.Count(v => v.CanFix);
+        if (fixable > 0)
+            hints.Add(($"Fix {fixable} {(fixable == 1 ? "finding" : "findings")}:",
+                BpaRunView.HintCommand(view.CommandTokens, "--fix", "--save")));
+
+        if (!view.Details)
+            hints.Add(("Details:", BpaRunView.HintCommand(view.CommandTokens, "--details")));
+        else if (!view.Full && visible.Any(g => g.Objects.Count > BpaRunView.DefaultObjectCap))
+            hints.Add(("Every object:", BpaRunView.HintCommand(view.CommandTokens, "--full")));
+
+        if (visible.Count > 1)
+            hints.Add(("One rule:", BpaRunView.HintCommand(view.CommandTokens, "--rule", visible[0].RuleId)));
+
+        if (hints.Count == 0)
+            return;
+
+        var err = HintConsole();
+        err.WriteLine();
+        var labelWidth = hints.Max(h => h.Label.Length);
+        foreach (var (label, command) in hints)
+            err.MarkupLine(Styling.Guidance(label.PadRight(labelWidth)) + "  " + Styling.Option(command));
+    }
+
+    /// <summary>
+    /// Stderr console that never hard-wraps, so a long suggested command stays one
+    /// copy-pasteable line (the terminal soft-wraps it instead).
+    /// </summary>
+    private static IAnsiConsole HintConsole()
+    {
+        var err = StdErr.Console();
+        err.Profile.Width = int.MaxValue;
+        return err;
     }
 
     /// <summary>
@@ -163,7 +267,8 @@ internal static class BpaRunRenderer
 
         if (!view.Details)
         {
-            StdErr.MarkupLine(Styling.Muted("  Run  bpa run --details  to list diagnostics."));
+            HintConsole().MarkupLine("  " + Styling.Guidance("List them:") + " "
+                + Styling.Option(BpaRunView.HintCommand(view.CommandTokens, "--details")));
             return;
         }
 
@@ -171,10 +276,6 @@ internal static class BpaRunRenderer
             .Where(r => r.Kind != BpaResultKind.Violation)
             .ToList();
 
-        if (diagnostics.Count == 0)
-            return;
-
-        AnsiConsole.WriteLine();
         foreach (var diag in diagnostics)
         {
             var label = diag.Kind switch
@@ -195,62 +296,6 @@ internal static class BpaRunRenderer
                 Styling.MarkupEscape(scope),
                 Styling.Muted(detail));
         }
-    }
-
-    private static void RenderCompact(IReadOnlyList<BpaRunView.RuleGroup> groups)
-    {
-        var table = new Table().Border(TableBorder.None);
-        table.AddColumn(new TableColumn(Styling.Muted("SEVERITY")));
-        table.AddColumn(new TableColumn(Styling.Muted("CATEGORY")));
-        table.AddColumn(new TableColumn(Styling.Muted("RULE / ID")));
-        table.AddColumn(new TableColumn(Styling.Muted("COUNT")).RightAligned());
-
-        foreach (var group in groups)
-        {
-            var name = BpaRunView.StripCategoryPrefix(group.RuleName, group.Category);
-            // Rule name on line 1, the (copy-able) rule id dimmed on line 2 of the same cell,
-            // so the severity/category/count columns stay aligned regardless of id length.
-            var rule = $"{Styling.Bold(name)}\n{Styling.Muted(group.RuleId)}";
-            table.AddRow(
-                Styling.SeverityHeading(BpaRunView.SeverityWord(group.Severity)),
-                Styling.MarkupEscape(group.Category),
-                rule,
-                Styling.Muted($"×{group.Objects.Count}"));
-        }
-
-        AnsiConsole.Write(table);
-    }
-
-    private static void RenderRuleGroup(BpaRunView.RuleGroup group, BpaRunView.RunOptions view)
-    {
-        AnsiConsole.WriteLine();
-
-        // Wrap to the effective render width so Spectre never re-wraps (which would
-        // split words). Account for the 2-space indent; cap at DetailTextWidth.
-        var width = Math.Max(24, Math.Min(DetailTextWidth, AnsiConsole.Profile.Width - 2));
-
-        var word = BpaRunView.SeverityWord(group.Severity);
-
-        var header = new Grid().Expand();
-        header.AddColumn();
-        header.AddColumn(new GridColumn().RightAligned());
-        header.AddRow(
-            $"{Styling.SeverityHeading(word)}  {Styling.MarkupEscape(group.Category)}",
-            Styling.Muted($"×{group.Objects.Count}"));
-        AnsiConsole.Write(header);
-
-        var name = BpaRunView.StripCategoryPrefix(group.RuleName, group.Category);
-        AnsiConsole.MarkupLine($"  {Styling.Bold(name)}  {Styling.Muted($"[{group.RuleId}]")}");
-
-        var guidance = BpaRunView.Guidance(group.Description, view.NoMultiline);
-        if (guidance.Length > 0)
-            foreach (var line in BpaRunView.WrapText(guidance, width))
-                AnsiConsole.MarkupLine($"  {Styling.Guidance(line)}");
-
-        var objects = BpaRunView.FormatObjectList(group.Objects, view.Full);
-        if (objects.Length > 0)
-            foreach (var line in BpaRunView.WrapText($"Affects  {objects}", width))
-                AnsiConsole.MarkupLine($"  {Styling.Muted(line)}");
     }
 
     /// <summary>
