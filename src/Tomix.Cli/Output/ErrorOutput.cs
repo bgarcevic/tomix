@@ -55,10 +55,7 @@ internal static class ErrorOutput
             return;
         }
 
-        var errConsole = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(Console.Error)
-        });
+        var errConsole = StdErr.Console();
 
         foreach (var diagnostic in diagnostics)
         {

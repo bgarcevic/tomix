@@ -55,10 +55,7 @@ internal static class ConfirmationHelper
             return false;
         }
 
-        var errConsole = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(Console.Error)
-        });
+        var errConsole = StdErr.Console();
         return errConsole.Confirm($"  {Styling.MarkupEscape(action)} {Styling.MarkupEscape(subject)}?", defaultValue: false);
     }
 }

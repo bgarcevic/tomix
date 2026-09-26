@@ -53,10 +53,7 @@ internal static class UpdateNotice
                 && CliVersion.TryParse(version, out var current)
                 && latest.IsNewerThan(current))
             {
-                var errConsole = AnsiConsole.Create(new AnsiConsoleSettings
-                {
-                    Out = new AnsiConsoleOutput(Console.Error)
-                });
+                var errConsole = StdErr.Console();
                 errConsole.MarkupLine(Styling.Muted(Styling.MarkupEscape(
                     $"A new version of tx is available: {version} -> {latest}. Run 'tx update' to upgrade.")));
             }

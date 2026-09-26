@@ -58,7 +58,7 @@ public sealed class DeployRendererTests
     [Fact]
     public void DiffFailure_SaysDiffUnavailableButPlanShown()
     {
-        var output = Render(DryRun(diffError: "not authenticated"));
+        var output = Render(DryRun(diffError: "not authenticated"), stderr: true);
 
         Assert.Contains("Diff unavailable: not authenticated", output);
         Assert.Contains("Showing deploy plan only.", output);
@@ -80,7 +80,7 @@ public sealed class DeployRendererTests
     private static DiffModelResult NoChanges()
         => new(HasChanges: false, Summary: new DiffSummary(0, 0, 0), Changes: []);
 
-    private static string Render(DeployModelResult result)
+    private static string Render(DeployModelResult result, bool stderr = false)
     {
         var captured = ConsoleCapture.Run(
             () =>
@@ -93,7 +93,7 @@ public sealed class DeployRendererTests
         // Spectre emits true-color escapes even in detect mode under redirection and soft-wraps
         // long lines at the detected console width; neither styling nor wrapping is under test
         // here, so strip escapes and collapse whitespace before asserting.
-        return CollapseSpace(AnsiEscapes.Replace(captured.Stdout, ""));
+        return CollapseSpace(AnsiEscapes.Replace(stderr ? captured.Stderr : captured.Stdout, ""));
     }
 
     private static readonly Regex AnsiEscapes = new(@"\x1b\[[0-9;]*m", RegexOptions.Compiled);

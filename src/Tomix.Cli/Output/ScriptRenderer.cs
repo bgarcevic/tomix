@@ -8,12 +8,9 @@ internal static class ScriptRenderer
 {
     public static void RenderText(ScriptRunResult result, string format)
     {
-        var err = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(Console.Error)
-        });
+        var err = StdErr.Console();
 
-        AnsiConsole.MarkupLine(Styling.Title($"Model: {result.ModelName}"));
+        err.MarkupLine(Styling.Title($"Model: {result.ModelName}"));
 
         if (result.DryRun)
         {
@@ -41,7 +38,7 @@ internal static class ScriptRenderer
                 : Styling.Value($"Script {i + 1}/{result.Inputs.Count}: {input.Source}"));
 
             if (OutputFormats.IsTextLike(format))
-                AnsiConsole.MarkupLine(Styling.Value($"Running {input.Source}..."));
+                err.MarkupLine(Styling.Value($"Running {input.Source}..."));
 
             if (i < result.Messages.Count)
                 AnsiConsole.WriteLine(result.Messages[i].Text);
@@ -61,7 +58,7 @@ internal static class ScriptRenderer
         AnsiConsole.MarkupLine(Styling.Success(
             $"Done: {result.ScriptsExecuted} script(s) executed."));
         if (result.Status == MutationStatus.Preview)
-            AnsiConsole.MarkupLine(Styling.Warning(MutationOutput.NotSavedHint));
+            err.MarkupLine(Styling.Warning(MutationOutput.NotSavedHint));
         else if (result.Status == MutationStatus.Staged)
             AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
         else if (result.Saved)

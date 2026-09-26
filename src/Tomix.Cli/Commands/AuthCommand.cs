@@ -212,7 +212,7 @@ internal sealed class AuthCommand : ICommandModule
 
     private static string PromptSecret(string label)
     {
-        var errConsole = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+        var errConsole = StdErr.Console();
         return errConsole.Prompt(new TextPrompt<string>($"{label}:").Secret());
     }
 
@@ -246,7 +246,7 @@ internal sealed class AuthCommand : ICommandModule
         if (!result.LoggedIn || result.Identity is null)
         {
             AnsiConsole.MarkupLine(Styling.Warning("Not logged in"));
-            AnsiConsole.MarkupLine(Styling.Guidance("Sign in first with 'tx auth login'."));
+            StdErr.MarkupLine(Styling.Guidance("Sign in first with 'tx auth login'."));
             return;
         }
 

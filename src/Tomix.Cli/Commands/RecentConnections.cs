@@ -200,7 +200,7 @@ internal static class RecentConnections
         var selected = Prompt(recents);
         if (selected is null)
         {
-            StdErr().MarkupLine(Styling.Muted("Cancelled."));
+            StdErr.MarkupLine(Styling.Muted("Cancelled."));
             exitCode = 0;
             return false;
         }
@@ -223,7 +223,7 @@ internal static class RecentConnections
         prompt.AddChoices(Enumerable.Range(0, recents.Count));
         prompt.AddChoice(-1);
 
-        var picked = StdErr().Prompt(prompt);
+        var picked = StdErr.Console().Prompt(prompt);
         return picked < 0 ? null : recents[picked];
     }
 
@@ -295,7 +295,4 @@ internal static class RecentConnections
         => ErrorOutput.Write(
             [new TomixDiagnostic(code, DiagnosticSeverity.Error, message, hint)],
             errorFormat);
-
-    private static IAnsiConsole StdErr()
-        => AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
 }

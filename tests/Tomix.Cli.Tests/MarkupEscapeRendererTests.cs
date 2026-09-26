@@ -58,8 +58,8 @@ public sealed partial class MarkupEscapeRendererTests
 
         var captured = Capture(() => BpaRunRenderer.Render(result, options));
 
-        AssertLiteral(captured.Stdout,
-            "BPA analysis · [Model]", "[Category]", "[Column]", "Synced: [Target]");
+        AssertLiteral(captured.Stderr, "BPA analysis · [Model]");
+        AssertLiteral(captured.Stdout, "[Category]", "[Column]", "Synced: [Target]");
     }
 
     [Fact]
@@ -70,7 +70,8 @@ public sealed partial class MarkupEscapeRendererTests
 
         var captured = Capture(() => ScriptRenderer.RenderText(result, "text"));
 
-        AssertLiteral(captured.Stdout, "Model: [Model]", "Synced: [Target]");
+        AssertLiteral(captured.Stderr, "Model: [Model]");
+        AssertLiteral(captured.Stdout, "Synced: [Target]");
     }
 
     [Fact]
@@ -106,7 +107,7 @@ public sealed partial class MarkupEscapeRendererTests
 
         var captured = Capture(() => DeployRenderer.Render(result, SampleModel.Locate()));
 
-        AssertLiteral(captured.Stdout, "Diff unavailable: [Diff error]");
+        AssertLiteral(captured.Stderr, "Diff unavailable: [Diff error]");
     }
 
     [Fact]

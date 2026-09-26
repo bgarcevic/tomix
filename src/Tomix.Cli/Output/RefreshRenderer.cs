@@ -17,7 +17,7 @@ internal static class RefreshRenderer
         {
             AnsiConsole.MarkupLine(Styling.Guidance(
                 $"Would apply refresh policy: {preview.Table} on {result.Database} (effective {preview.EffectiveDate:yyyy-MM-dd}). No data loading. Expired partitions may be removed."));
-            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: no policy was applied. Partition changes are determined on execution."));
+            StdErr.MarkupLine(Styling.Guidance("Dry run: no policy was applied. Partition changes are determined on execution."));
             return;
         }
         if (result.PolicyApplication is { } policy)
@@ -27,7 +27,7 @@ internal static class RefreshRenderer
                 AnsiConsole.MarkupLine(Styling.Muted(operation));
             if (policy.Operations.Count == 0)
                 AnsiConsole.MarkupLine(Styling.Muted("Partitions already match the policy; no changes."));
-            AnsiConsole.MarkupLine(Styling.Guidance("No data was loaded. Run 'tx refresh --table <table>' to load data."));
+            StdErr.MarkupLine(Styling.Guidance("No data was loaded. Run 'tx refresh --table <table>' to load data."));
             return;
         }
 
@@ -41,12 +41,14 @@ internal static class RefreshRenderer
             $"[{Palette.Moss.ToMarkup()}]on[/] " +
             $"[{Palette.Harbor.ToMarkup()}]{Styling.MarkupEscape(server)}[/] " +
             $"[{Palette.Moss.ToMarkup()}]({seconds})[/]";
-        AnsiConsole.MarkupLine(header);
-        AnsiConsole.WriteLine();
+        // The header is commentary: stderr keeps `tx refresh > file` down to the statistics.
+        var err = StdErr.Console();
+        err.MarkupLine(header);
+        err.WriteLine();
 
         if (result.Tables.Count == 0)
         {
-            AnsiConsole.MarkupLine(Styling.Muted("No per-table statistics available. Use without --no-progress to capture XMLA trace events."));
+            err.MarkupLine(Styling.Muted("No per-table statistics available. Use without --no-progress to capture XMLA trace events."));
             return;
         }
 

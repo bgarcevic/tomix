@@ -163,7 +163,7 @@ internal sealed class StageCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.KeyValue("Ops:", $"      {result.OpCount}"));
         foreach (var op in result.Ops)
             AnsiConsole.WriteLine($"  {op.Seq}. {op.Summary}");
-        AnsiConsole.MarkupLine(Styling.Guidance("Run 'tx stage commit' to promote, or 'tx stage discard' to drop."));
+        StdErr.MarkupLine(Styling.Guidance("Run 'tx stage commit' to promote, or 'tx stage discard' to drop."));
     }
 
     private static void RenderList(StageListResult result)

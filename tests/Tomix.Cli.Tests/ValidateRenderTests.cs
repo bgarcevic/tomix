@@ -27,8 +27,10 @@ public sealed partial class ValidateRenderTests
             () => ValidateRenderer.Render(result, errorsOnly: false, noMultiline: false, includeBanner: true),
             captureAnsiConsole: true);
 
-        Assert.Contains("Validating: basic-tmdl", captured.Stdout);
-        Assert.DoesNotContain("(unnamed)", captured.Stdout);
+        // The banner is commentary (#255): stderr, never the findings on stdout.
+        Assert.Contains("Validating: basic-tmdl", captured.Stderr);
+        Assert.DoesNotContain("Validating", captured.Stdout);
+        Assert.DoesNotContain("(unnamed)", captured.Stderr);
     }
 
     [Fact]
@@ -40,7 +42,7 @@ public sealed partial class ValidateRenderTests
             () => ValidateRenderer.Render(result, errorsOnly: false, noMultiline: false, includeBanner: true),
             captureAnsiConsole: true);
 
-        Assert.Contains("Validating: Sales [Q1]", captured.Stdout);
+        Assert.Contains("Validating: Sales [Q1]", captured.Stderr);
     }
 
     [Fact]

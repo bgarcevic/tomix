@@ -60,6 +60,11 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- Text-mode banners and hints go to stderr, so `tx validate > file` (and `bpa run`,
+  `refresh`, `test`, `script`, `deploy`) captures only the result. Moved: the
+  "Validating:", "BPA analysis ·", "Refreshed … on …", and "DAX tests ·" banners; "Try"
+  and "Run …" hints; mutation "Dry run", "Not saved yet", and "Staged" notices; and
+  workspace sync warnings. Result lines, tables, and counts stay on stdout (#255).
 - Refresh scripts with `--effective-date` now explicitly include `applyRefreshPolicy`,
   as required by the XMLA endpoint. Verified with the inline refresh-policy QA sample.
 

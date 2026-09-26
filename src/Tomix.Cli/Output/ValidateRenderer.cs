@@ -16,10 +16,12 @@ internal static class ValidateRenderer
         bool noMultiline,
         bool includeBanner)
     {
+        // Banners are commentary: stderr keeps `tx validate > file` down to the findings.
+        var err = StdErr.Console();
         if (includeBanner)
-            AnsiConsole.MarkupLine(Styling.Value("Validating..."));
-        AnsiConsole.MarkupLine(Styling.Muted($"Validating: {result.ModelName}"));
-        AnsiConsole.WriteLine();
+            err.MarkupLine(Styling.Value("Validating..."));
+        err.MarkupLine(Styling.Muted($"Validating: {result.ModelName}"));
+        err.WriteLine();
 
         if (result.Valid)
         {

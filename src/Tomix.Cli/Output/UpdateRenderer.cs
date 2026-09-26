@@ -37,8 +37,9 @@ internal static class UpdateRenderer
             }
         }
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(Styling.Guidance("Run 'tx update' to install."));
+        var err = StdErr.Console();
+        err.WriteLine();
+        err.MarkupLine(Styling.Guidance("Run 'tx update' to install."));
     }
 
     public static void RenderApply(UpdateApplyResult result)

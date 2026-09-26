@@ -138,7 +138,7 @@ internal sealed class FindCommand : ICommandModule
                 var hint = caseSensitive
                     ? "remove --case-sensitive to match any casing"
                     : "a shorter or broader pattern, or --regex for pattern matching";
-                AnsiConsole.MarkupLine(Styling.Guidance($"  → Try: {hint}"));
+                StdErr.MarkupLine(Styling.Guidance($"  → Try: {hint}"));
             }
 
             return;

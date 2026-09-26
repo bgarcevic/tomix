@@ -38,7 +38,7 @@ public sealed partial class FormatFlagBindingTests
         Assert.Equal(0, captured.ExitCode);
         var output = StripAnsi(captured.Stdout);
         Assert.Contains("Formatted: 4", output);
-        Assert.Contains("Dry run: nothing was saved.", output);
+        Assert.Contains("Dry run: nothing was saved.", StripAnsi(captured.Stderr));
         Assert.DoesNotContain("Mutation staged.", output);
     }
 

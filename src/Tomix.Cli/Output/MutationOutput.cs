@@ -15,19 +15,22 @@ internal static class MutationOutput
     internal const string LiveModelNotice =
         "Saved to the running Power BI Desktop model. Save the report in Power BI Desktop to keep the change.";
 
-    /// <summary>Renders staged / dry-run / not-saved / saved, then the workspace sync line.</summary>
+    /// <summary>
+    /// Renders staged / dry-run / not-saved / saved, then the workspace sync line. Only the
+    /// "Saved:" and "Synced:" lines are results (stdout); the hints and warnings are stderr.
+    /// </summary>
     public static void RenderPersistence(MutationOutcome outcome, string indent = "")
     {
         switch (outcome.Status)
         {
             case MutationStatus.Staged:
-                AnsiConsole.MarkupLine(indent + Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
+                StdErr.MarkupLine(indent + Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
                 break;
             case MutationStatus.DryRun:
-                AnsiConsole.MarkupLine(indent + Styling.Guidance("Dry run: nothing was saved."));
+                StdErr.MarkupLine(indent + Styling.Guidance("Dry run: nothing was saved."));
                 break;
             case MutationStatus.Preview:
-                AnsiConsole.MarkupLine(indent + Styling.Warning(NotSavedHint));
+                StdErr.MarkupLine(indent + Styling.Warning(NotSavedHint));
                 break;
             case MutationStatus.Saved:
                 RenderSaved(outcome, indent);
@@ -51,7 +54,7 @@ internal static class MutationOutput
     public static void RenderLiveModelNotice(MutationOutcome outcome)
     {
         if (outcome.Persistence == PersistenceKind.LiveModel)
-            StdErr().MarkupLine(Styling.Guidance(LiveModelNotice));
+            StdErr.MarkupLine(Styling.Guidance(LiveModelNotice));
     }
 
     public static void RenderSync(MutationOutcome outcome, string indent = "")
@@ -62,10 +65,6 @@ internal static class MutationOutput
         if (sync.Status == SyncStatus.Succeeded)
             AnsiConsole.MarkupLine(indent + Styling.Success($"Synced: {sync.Target}"));
         else if (sync.Warning is not null)
-            AnsiConsole.MarkupLine(indent + Styling.Warning(sync.Warning));
+            StdErr.MarkupLine(indent + Styling.Warning(sync.Warning));
     }
-
-    // Created per call: tests swap Console.Error, so a cached console would miss the swap.
-    private static IAnsiConsole StdErr()
-        => AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
 }

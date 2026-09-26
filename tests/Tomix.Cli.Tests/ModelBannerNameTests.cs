@@ -27,8 +27,8 @@ public sealed class ModelBannerNameTests
             () => ValidateRenderer.Render(result, errorsOnly: false, noMultiline: false, includeBanner: true),
             captureAnsiConsole: true);
 
-        Assert.Contains($"Validating: {Named}", captured.Stdout);
-        Assert.DoesNotContain("(unnamed)", captured.Stdout);
+        Assert.Contains($"Validating: {Named}", captured.Stderr);
+        Assert.DoesNotContain("(unnamed)", captured.Stderr);
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public sealed class ModelBannerNameTests
             () => TestRunRenderer.Render(result, quiet: false),
             captureAnsiConsole: true);
 
-        Assert.Contains($"DAX tests · {Named}", captured.Stdout);
-        Assert.DoesNotContain("(unnamed)", captured.Stdout);
+        Assert.Contains($"DAX tests · {Named}", captured.Stderr);
+        Assert.DoesNotContain("(unnamed)", captured.Stderr);
     }
 
     [Fact]

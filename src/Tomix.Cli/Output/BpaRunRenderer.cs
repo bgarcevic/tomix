@@ -16,7 +16,8 @@ internal static class BpaRunRenderer
 
     public static void Render(BpaRunResult result, BpaRunView.RunOptions view)
     {
-        AnsiConsole.MarkupLine(Styling.Title($"BPA analysis · {result.ModelName}"));
+        // The title is commentary: stderr keeps `tx bpa run > file` down to the findings.
+        StdErr.MarkupLine(Styling.Title($"BPA analysis · {result.ModelName}"));
 
         if (result.Violations.Count == 0)
         {
@@ -117,8 +118,9 @@ internal static class BpaRunRenderer
 
         if (visible.Count > 0)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine(Styling.Guidance(view.Details
+            var err = StdErr.Console();
+            err.WriteLine();
+            err.MarkupLine(Styling.Guidance(view.Details
                 ? "Run with --full to list every affected object, or --rule <ID> to focus a single rule."
                 : "Run  bpa run --details  for guidance, or  --rule <ID>  to focus a single rule."));
         }
@@ -141,10 +143,11 @@ internal static class BpaRunRenderer
     {
         if (result.RuleLoadDiagnostics is { Count: > 0 } loadDiagnostics)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"  {Styling.Warning("Rule loading:")}");
+            var err = StdErr.Console();
+            err.WriteLine();
+            err.MarkupLine($"  {Styling.Warning("Rule loading:")}");
             foreach (var diag in loadDiagnostics)
-                AnsiConsole.MarkupLine("    {0}", Styling.MarkupEscape(diag));
+                err.MarkupLine($"    {Styling.MarkupEscape(diag)}");
         }
 
         var parts = new List<string>(4);
@@ -160,7 +163,7 @@ internal static class BpaRunRenderer
 
         if (!view.Details)
         {
-            AnsiConsole.MarkupLine(Styling.Muted("  Run  bpa run --details  to list diagnostics."));
+            StdErr.MarkupLine(Styling.Muted("  Run  bpa run --details  to list diagnostics."));
             return;
         }
 

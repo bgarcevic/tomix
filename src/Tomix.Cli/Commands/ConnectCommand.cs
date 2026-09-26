@@ -602,7 +602,7 @@ internal sealed class ConnectCommand : ICommandModule
     }
 
     private static IAnsiConsole ErrConsole()
-        => AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+        => StdErr.Console();
 
     private async Task<(string Server, string? Database)?> ResolveRemoteInteractiveAsync(string? errorFormat, CancellationToken cancellationToken)
     {

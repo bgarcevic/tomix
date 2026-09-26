@@ -16,9 +16,11 @@ internal static class TestRunRenderer
     {
         if (!quiet)
         {
-            AnsiConsole.MarkupLine(Styling.Title($"DAX tests · {result.Database}"));
-            AnsiConsole.MarkupLine(Styling.Muted($"{result.Tests.Count} test(s) from {result.Path}"));
-            AnsiConsole.WriteLine();
+            // Banner is commentary: stderr keeps `tx test > file` down to the outcomes.
+            var err = StdErr.Console();
+            err.MarkupLine(Styling.Title($"DAX tests · {result.Database}"));
+            err.MarkupLine(Styling.Muted($"{result.Tests.Count} test(s) from {result.Path}"));
+            err.WriteLine();
         }
 
         foreach (var test in result.Tests)
@@ -44,7 +46,7 @@ internal static class TestRunRenderer
         AnsiConsole.MarkupLine("  " + Summary(result));
 
         if (result.Missing > 0)
-            AnsiConsole.MarkupLine(Styling.Guidance("  Run  tx test --update  to record missing snapshots."));
+            StdErr.MarkupLine(Styling.Guidance("  Run  tx test --update  to record missing snapshots."));
     }
 
     private static void RenderDifferences(IReadOnlyList<TestDifference> differences, int total)

@@ -174,10 +174,10 @@ internal sealed class RmCommand : ICommandModule
                     $"Would break {wouldBreak.Count} DAX reference(s) in: "
                     + $"{string.Join(", ", wouldBreak.Select(Styling.MarkupEscape))}."));
                 if (result.Reason == "would_block")
-                    AnsiConsole.MarkupLine(Styling.Guidance("Re-run with --force to remove anyway."));
+                    StdErr.MarkupLine(Styling.Guidance("Re-run with --force to remove anyway."));
             }
 
-            AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
+            StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
             return;
         }
 

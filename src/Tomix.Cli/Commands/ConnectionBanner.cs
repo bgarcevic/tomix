@@ -47,9 +47,6 @@ internal static class ConnectionBanner
         if (string.IsNullOrWhiteSpace(label))
             return;
 
-        StdErr().MarkupLine(Styling.Muted($"Connected to: {label}"));
+        StdErr.MarkupLine(Styling.Muted($"Connected to: {label}"));
     }
-
-    private static IAnsiConsole StdErr()
-        => AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
 }

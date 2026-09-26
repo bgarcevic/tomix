@@ -90,6 +90,8 @@ public sealed partial class MarkupEscapeGoldenTests
         var visible = Visible(captured.Stdout, copy.Path);
         Assert.Contains("No matches for '[Missing]'.", visible);
         AssertGolden("find-no-match", visible);
+        // The "Try" hint is commentary (#255): stderr, with the pattern still literal.
+        Assert.Contains("→ Try:", Visible(captured.Stderr, copy.Path));
     }
 
     [Fact]

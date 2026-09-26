@@ -29,9 +29,11 @@ the bottom for where each concern lives.
 - Parse with System.CommandLine only; never hand-parse argv.
 - Exit 0 on success, non-zero on failure. Use the documented exit codes via
   `CommandOutput`; never invent ad-hoc codes in a command.
-- Data goes to stdout. Messages — progress, warnings, errors, hints — go to stderr
-  (`ErrorOutput` / the stderr `AnsiConsole`). A user piping `tx ls` to a file must
-  get only the listing.
+- Data goes to stdout. Messages — banners, progress, warnings, errors, hints — go to
+  stderr (`ErrorOutput` for diagnostics, `StdErr.Console()` / `StdErr.MarkupLine` for
+  everything else). A user piping `tx ls` or `tx validate` to a file must get only the
+  result. Rule of thumb: if removing the line loses data, it is stdout; if it only
+  explains or suggests, it is stderr.
 
 ## Help
 

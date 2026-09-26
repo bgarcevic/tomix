@@ -28,7 +28,7 @@ internal static class DidYouMean
         if (suggestion is null)
             return;
 
-        var err = AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) });
+        var err = StdErr.Console();
         err.MarkupLine(Styling.Guidance($"Did you mean '{suggestion}'?"));
     }
 

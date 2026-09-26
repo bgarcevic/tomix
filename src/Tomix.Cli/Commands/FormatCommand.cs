@@ -186,7 +186,7 @@ internal sealed class FormatCommand : ICommandModule
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
                     HighlightLanguage(obj.Language), obj.Formatted));
                 if (obj.DryRun)
-                    AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
+                    StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 else if (obj.Saved)
                     MutationOutput.RenderSaved(obj.Outcome);
                 MutationOutput.RenderSync(obj.Outcome);
@@ -203,7 +203,7 @@ internal sealed class FormatCommand : ICommandModule
                 else if (model.Status == MutationStatus.Staged)
                     AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
                 else if (model.DryRun)
-                    AnsiConsole.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
+                    StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 else if (model.Formatted > 0)
                     AnsiConsole.MarkupLine(Styling.Muted("Not saved — re-run with --save to persist or --stage to stage."));
 

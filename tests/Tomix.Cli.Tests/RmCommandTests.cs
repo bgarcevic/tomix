@@ -36,7 +36,9 @@ public sealed partial class RmCommandTests
         var output = StripAnsi(captured.Stdout);
         Assert.Contains("Would remove:", output);
         Assert.Contains("Sales/Total Sales", output);
-        Assert.Contains("Dry run: nothing was saved.", output);
+        // Hints are commentary (#255): stderr, so the result on stdout stays pipeable.
+        Assert.Contains("Dry run: nothing was saved.", StripAnsi(captured.Stderr));
+        Assert.DoesNotContain("Dry run", output);
         Assert.DoesNotContain("Removed:", output);
         Assert.Equal(before, Snapshot(model.Path));
     }
@@ -58,7 +60,7 @@ public sealed partial class RmCommandTests
         Assert.Contains("Would remove:", output);
         Assert.Contains("Would break 2 DAX reference(s)", output);
         Assert.Contains("Sales/Total Sales", output);
-        Assert.Contains("Re-run with --force", output);
+        Assert.Contains("Re-run with --force", StripAnsi(captured.Stderr));
         Assert.DoesNotContain("Removed:", output);
         Assert.Equal(before, Snapshot(model.Path));
     }
