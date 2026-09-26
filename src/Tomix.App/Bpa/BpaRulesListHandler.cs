@@ -14,7 +14,8 @@ public sealed record BpaRulesListRequest(
     string? Ruleset = null,
     bool NoDefaults = false,
     bool IgnoredOnly = false,
-    bool DisabledOnly = false);
+    bool DisabledOnly = false,
+    string? RuleId = null);
 
 public sealed record BpaRulesListResult(
     IReadOnlyList<BpaRuleInfo> Rules,
@@ -80,6 +81,7 @@ public sealed class BpaRulesListHandler
             // alongside the ruleset. Remote external files are never fetched here; the loader
             // reports them as skipped.
             var disabled = new HashSet<string>(_userRules.GetDisabled(), StringComparer.OrdinalIgnoreCase);
+            var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var diagnostics = new List<string>();
             var loaded = new List<LoadedRule>(rules);
 
@@ -87,7 +89,7 @@ public sealed class BpaRulesListHandler
             {
                 await using var session = await provider.OpenAsync(request.Model, cancellationToken);
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
-                disabled.UnionWith(BpaIgnoreStore.ReadRuleIds(snapshot.Properties));
+                ignored.UnionWith(BpaIgnoreStore.ReadRuleIds(snapshot.Properties));
 
                 var model = await BpaModelRuleLoader.LoadAsync(
                     snapshot.Properties,
@@ -101,12 +103,15 @@ public sealed class BpaRulesListHandler
                 diagnostics.AddRange(model.Diagnostics);
             }
 
+            // A user-level disable wins over the model's ignore list: it applies to every model.
             var allRules = loaded.Select(r =>
             {
-                var isDisabled = disabled.Contains(r.Rule.Id);
+                var status = disabled.Contains(r.Rule.Id) ? "disabled"
+                    : ignored.Contains(r.Rule.Id) ? "ignored"
+                    : "active";
                 return new BpaRuleInfo(
                     r.Source,
-                    Status: isDisabled ? "disabled" : "active",
+                    Status: status,
                     r.Rule.Id,
                     r.Rule.Name,
                     r.Rule.Category,
@@ -115,29 +120,69 @@ public sealed class BpaRulesListHandler
                     r.Rule.Description,
                     r.Rule.Expression,
                     r.Rule.FixExpression,
-                    Enabled: !isDisabled);
+                    Enabled: status == "active");
             }).ToList();
+
+            if (!string.IsNullOrWhiteSpace(request.RuleId))
+                return FindRule(allRules, request.RuleId, diagnostics);
 
             var filteredRules = (request.DisabledOnly, request.IgnoredOnly, request.All) switch
             {
-                (true, _, _) => allRules.Where(r => !r.Enabled).ToList(),
-                (_, true, _) => allRules.Where(r => !r.Enabled).ToList(),
+                (true, true, _) => allRules.Where(r => !r.Enabled).ToList(),
+                (true, _, _) => allRules.Where(r => r.Status == "disabled").ToList(),
+                (_, true, _) => allRules.Where(r => r.Status == "ignored").ToList(),
                 (_, _, true) => allRules,
                 _ => allRules.Where(r => r.Enabled).ToList()
             };
 
-            var disabledCount = allRules.Count(r => !r.Enabled);
+            var disabledCount = allRules.Count(r => r.Status == "disabled");
+            var ignoredCount = allRules.Count(r => r.Status == "ignored");
             var result = new BpaRulesListResult(
                 filteredRules,
                 new BpaRulesSummary(
                     Total: allRules.Count,
-                    Active: allRules.Count - disabledCount,
+                    Active: allRules.Count - disabledCount - ignoredCount,
                     Disabled: disabledCount,
-                    Ignored: 0),
+                    Ignored: ignoredCount),
                 Diagnostics: diagnostics.Count > 0 ? diagnostics : null);
 
             return TomixResult<BpaRulesListResult>.Ok(result);
         });
+    }
+
+    /// <summary>
+    /// The single-rule lookup behind <c>bpa rules show</c>. The same ID can come from more than one
+    /// source (a model rule overriding the ruleset), so every match is returned. An unknown ID fails
+    /// with up to three IDs that contain the input as a hint.
+    /// </summary>
+    private static TomixResult<BpaRulesListResult> FindRule(
+        IReadOnlyList<BpaRuleInfo> allRules, string ruleId, IReadOnlyList<string> diagnostics)
+    {
+        var matches = allRules.Where(r => r.Id.Equals(ruleId, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0)
+        {
+            var near = allRules
+                .Select(r => r.Id)
+                .Where(id => id.Contains(ruleId, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToList();
+            return TomixResult<BpaRulesListResult>.Fail(
+                "TOMIX_BPA_RULE_NOT_FOUND",
+                $"No BPA rule with ID '{ruleId}'.",
+                exitCode: 2,
+                hint: near.Count > 0
+                    ? $"Did you mean: {string.Join(", ", near)}?"
+                    : "Run 'tx bpa rules list --all' to see every rule ID.");
+        }
+
+        var summary = new BpaRulesSummary(
+            Total: matches.Count,
+            Active: matches.Count(r => r.Status == "active"),
+            Disabled: matches.Count(r => r.Status == "disabled"),
+            Ignored: matches.Count(r => r.Status == "ignored"));
+        return TomixResult<BpaRulesListResult>.Ok(
+            new BpaRulesListResult(matches, summary, diagnostics.Count > 0 ? diagnostics : null));
     }
 
     private static async Task<IReadOnlyList<LoadedRule>> LoadRulesAsync(

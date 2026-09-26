@@ -17,7 +17,9 @@ public sealed record BpaRulesIgnoreRequest(
     bool Stage = false,
     bool Revert = false,
     bool NoSync = false,
-    bool Force = false);
+    bool Force = false,
+    bool AllowUnknown = false,
+    string? RulesFile = null);
 
 public sealed record BpaRulesIgnoreResult(
     string RuleId,
@@ -30,11 +32,17 @@ public sealed class BpaRulesIgnoreHandler
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly MutationStores _stores;
+    private readonly string? _configDirectory;
 
-    public BpaRulesIgnoreHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+    /// <param name="configDirectory">
+    /// Where the user's <c>bpa-rules.json</c> lives, so its rules count as known IDs. Null checks
+    /// against the bundled catalog and the model's own rules only.
+    /// </param>
+    public BpaRulesIgnoreHandler(IEnumerable<IModelProvider> providers, MutationStores stores, string? configDirectory = null)
     {
         _providers = providers.ToList();
         _stores = stores;
+        _configDirectory = configDirectory;
     }
 
     public async Task<TomixResult<BpaRulesIgnoreResult>> HandleAsync(
@@ -49,11 +57,29 @@ public sealed class BpaRulesIgnoreHandler
             request.Save, request.SaveTo, request.Stage, request.Revert,
             request.Serialization, request.Force, Overwrite: request.Overwrite, NoSync: request.NoSync);
 
-        return await MutationRunner.RunAsync(
+        // Set inside the mutation (where the model is already open) and turned into a failure
+        // after it: the mutation reports "unchanged", so nothing is saved or staged.
+        TomixResult<BpaRulesIgnoreResult>? unknownRule = null;
+
+        var result = await MutationRunner.RunAsync(
             _providers, request.Model, options, "bpa-ignore", _stores,
             async (mutator, session, _) =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
+
+                // Only ignoring is checked: unignoring must stay possible for an ID that no longer exists.
+                if (request.Ignore && !request.AllowUnknown)
+                {
+                    var known = await BpaKnownRules.Load(_configDirectory, request.RulesFile).WithModelRulesAsync(
+                        snapshot.Properties,
+                        BpaModelRuleLoader.ResolveBaseDirectory(session, request.Model),
+                        cancellationToken).ConfigureAwait(false);
+                    unknownRule = known.Check<BpaRulesIgnoreResult>(request.RuleId);
+                    if (unknownRule is not null)
+                        return (false, "", outcome => new BpaRulesIgnoreResult(
+                            request.RuleId, request.Ignore, false, [], snapshot.Name)
+                        { Outcome = outcome });
+                }
 
                 var current = new HashSet<string>(
                     BpaIgnoreStore.ReadRuleIds(snapshot.Properties), StringComparer.OrdinalIgnoreCase);
@@ -86,5 +112,7 @@ public sealed class BpaRulesIgnoreHandler
             },
             outcome => new BpaRulesIgnoreResult("", false, false, [], "") { Outcome = outcome },
             cancellationToken);
+
+        return unknownRule ?? result;
     }
 }

@@ -22,6 +22,7 @@ public sealed partial class StdoutStderrSplitTests
         { "bpa", "BPA analysis · basic-tmdl", "1 warning in 1 of 1 rule" },
         { "bpa", "tx bpa run --details", "R1 · Category" },
         { "refresh", "Refreshed Prod on", "Sales" },
+        { "bpa rules list", "tx bpa rules show R1", "R1 · warning · fixable" },
     };
 
     [Theory]
@@ -57,6 +58,12 @@ public sealed partial class StdoutStderrSplitTests
                         [new BpaResult(BpaResultKind.Violation, "R1", "Rule", "Category", BpaSeverity.Warning, Violation: violation)],
                         "basic-tmdl", RulesEvaluated: 1),
                     new BpaRunView.RunOptions(false, false, false, false, false, false));
+                break;
+            case "bpa rules list":
+                BpaRulesRenderer.RenderList(new BpaRulesListResult(
+                    [new BpaRuleInfo("standard", "active", "R1", "[Category] Rule", "Category", BpaSeverity.Warning,
+                        "Column", "Why", "true", "IsHidden = true", Enabled: true)],
+                    new BpaRulesSummary(Total: 1, Active: 1, Disabled: 0, Ignored: 0)));
                 break;
             case "refresh":
                 RefreshRenderer.Render(new RefreshModelResult(

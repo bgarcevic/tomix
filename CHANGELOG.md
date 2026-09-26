@@ -12,6 +12,15 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `bpa rules show <rule-id>` prints one rule in full: its description and reference
+  link, source, status, scope, expression, and fix expression (`--output-format json`
+  supported). An unknown ID fails with `TOMIX_BPA_RULE_NOT_FOUND` and suggests IDs that
+  contain what you typed.
+- `bpa rules disable` and `bpa rules ignore` reject a rule ID that no known rule has,
+  so a typo no longer silently disables nothing. The check covers the bundled catalog,
+  the config-dir `bpa-rules.json`, and (for `ignore`) the model's own rules. It is
+  skipped when a rule source can't be read, and `--allow-unknown` bypasses it. `enable`
+  and `unignore` still accept any ID.
 - Power Query (M) expressions are syntax-highlighted in text output, like DAX: `get`
   properties, `ls` partition and shared-expression cells, and `format --lang m` output.
   Keywords, library functions, step and field definitions, field access, literals, and
@@ -27,6 +36,14 @@ and the API surface that major versions protect.
   stderr, reusing your model path and rule options. After `--fix`, the output shows how
   many findings were fixed and remain, and whether the result was saved, staged, or kept
   in memory only. JSON, TRX, and CI output are unchanged.
+- `bpa rules list` text output replaces the truncating five-column table. Rules are
+  grouped by category, and each rule shows its name, ID, severity, status, and whether it
+  is `fixable`, with nothing cut off. Source is shown only when the listing mixes
+  sources.
+- **Breaking:** `bpa rules list` now tells ignored rules apart from disabled ones. A rule
+  on the model's ignore list has `status: "ignored"` (it was `"disabled"`), and
+  `summary.ignored` is counted (it was always `0`). `--ignored` and `--disabled` now
+  filter separately; before, both returned the same set.
 - **Breaking:** mutation JSON results share one persistence contract (#161). `saved` is
   always a bool; the path or `server / database` moved to `savedTo`. A new `status`
   (`saved`, `staged`, `preview`, `dryRun`, `unchanged`, `reverted`) replaces `staged` and

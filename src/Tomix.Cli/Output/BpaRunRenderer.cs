@@ -231,7 +231,7 @@ internal static class BpaRunRenderer
     /// Stderr console that never hard-wraps, so a long suggested command stays one
     /// copy-pasteable line (the terminal soft-wraps it instead).
     /// </summary>
-    private static IAnsiConsole HintConsole()
+    internal static IAnsiConsole HintConsole()
     {
         var err = StdErr.Console();
         err.Profile.Width = int.MaxValue;

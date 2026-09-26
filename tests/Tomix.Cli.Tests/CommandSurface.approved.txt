@@ -81,6 +81,7 @@ Manage BPA rule collections
 # tx bpa rules disable
 Turn off a built-in rule for this user
   arg <rule-id>  Rule ID
+  opt --allow-unknown  Accept a rule ID that no loaded rule has (for example, one from a remote rule file)
 
 # tx bpa rules enable
 Turn a disabled built-in rule back on
@@ -98,6 +99,7 @@ Put a rule on the model's ignore list
   opt --revert  Revert a staged mutation
   opt --no-sync  Skip workspace sync when workspace mode is active.
   opt --force, -f  Save despite newly introduced validation errors
+  opt --allow-unknown  Accept a rule ID that no loaded rule has (for example, one from a remote rule file)
 
 # tx bpa rules list
 List rules from every source, with each rule's status
@@ -107,6 +109,13 @@ List rules from every source, with each rule's status
   opt --ignored  List only rules on the model's ignore list
   opt --disabled  List only rules disabled for this user
   opt --all  Include disabled and ignored rules in the listing
+
+# tx bpa rules show
+Show a rule's description, scope, expression, and fix
+  arg <rule-id>  Rule ID
+  arg [model]  Path to model
+  opt --ruleset <ruleset>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --no-defaults  Leave the built-in ruleset out of the lookup
 
 # tx bpa rules unignore
 Take a rule off the model's ignore list
