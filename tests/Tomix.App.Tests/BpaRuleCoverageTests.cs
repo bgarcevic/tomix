@@ -45,6 +45,49 @@ public sealed class BpaRuleCoverageTests
         Assert.Equal(["Relationships/A_B"], Flagged(BundledRule("RELATIONSHIP_COLUMNS_SAME_DATA_TYPE"), snapshot));
     }
 
+    [Theory]
+    [InlineData("Unknown")] // TMDL column with no declared dataType (inferred at refresh)
+    [InlineData("")]
+    public void RelationshipColumnsSameDataType_SkipsUndeclaredTypes(string undeclared)
+    {
+        var a = Column("a", "A", dataType: undeclared);
+        var b = Column("b", "B", dataType: "Int64");
+        var rel = Relationship("A_B", "A", "a", "B", "b");
+        var snapshot = new ModelSnapshot("M", 1601, [Table("A", a), Table("B", b), rel]);
+
+        Assert.Empty(Flagged(BundledRule("RELATIONSHIP_COLUMNS_SAME_DATA_TYPE"), snapshot));
+    }
+
+    [Fact]
+    public void DataColumnsMustHaveASourceColumn_SkipsCalculationGroupColumns()
+    {
+        // A calculation group's name column has no source column by design.
+        var groupColumn = Column("Time Calculation", "Time", sourceColumn: null);
+        var group = CalculationGroupTable("Time", groupColumn, CalculationItem("YTD", "Time", "SELECTEDMEASURE()"));
+        var orphan = Column("Orphan", "T", sourceColumn: null);
+        var snapshot = new ModelSnapshot("M", 1601, [group, Table("T", orphan)]);
+
+        Assert.Equal(["T/Orphan"], Flagged(BundledRule("DATA_COLUMNS_MUST_HAVE_A_SOURCE_COLUMN"), snapshot));
+    }
+
+    [Theory]
+    [InlineData("CALCULATE([Total], USERELATIONSHIP('Sales'[ShipDate], 'Date'[Date]))", false)]
+    [InlineData("CALCULATE([Total], USERELATIONSHIP('Date'[Date], 'Sales'[ShipDate]))", false)] // reversed order is valid DAX
+    [InlineData("CALCULATE([Total], USERELATIONSHIP(Date[Date], Sales[ShipDate]))", false)]
+    [InlineData("[Total]", true)]
+    public void InactiveRelationshipsThatAreNeverActivated_RecognizesEitherArgumentOrder(string expression, bool flagged)
+    {
+        var shipDate = Column("ShipDate", "Sales");
+        var total = Measure("Total", "Sales", "1");
+        var byShip = Measure("By Ship", "Sales", expression);
+        var date = Column("Date", "Date");
+        var rel = Relationship("Ship", "Sales", "ShipDate", "Date", "Date", isActive: false);
+        var snapshot = new ModelSnapshot("M", 1601, [Table("Sales", shipDate, total, byShip), Table("Date", date), rel]);
+
+        var expected = flagged ? new[] { "Relationships/Ship" } : [];
+        Assert.Equal(expected, Flagged(BundledRule("INACTIVE_RELATIONSHIPS_THAT_ARE_NEVER_ACTIVATED"), snapshot));
+    }
+
     [Fact]
     public void UnnecessaryColumns_FlagsHiddenUnreferenced_ButNotHierarchyColumns()
     {
@@ -145,10 +188,10 @@ public sealed class BpaRuleCoverageTests
             Children: children,
             Properties: new Dictionary<string, string> { ["ObjectType"] = "Table", ["TableObjectType"] = "Table" });
 
-    private static ModelObject CalculationGroupTable(string name, params ModelObject[] items)
+    private static ModelObject CalculationGroupTable(string name, params ModelObject[] children)
         => new(name, ModelObjectKind.Table, name,
             Detail: null, Expression: null, Description: "desc", Hidden: false, SourceColumn: null,
-            Children: items,
+            Children: children,
             Properties: new Dictionary<string, string> { ["ObjectType"] = "Table", ["TableObjectType"] = "CalculationGroup" });
 
     private static ModelObject CalculationItem(string name, string table, string expression)
@@ -159,25 +202,34 @@ public sealed class BpaRuleCoverageTests
 
     private static ModelObject Column(
         string name, string table, string dataType = "Int64", bool hidden = false,
-        string? usedInHierarchies = null, bool isAvailableInMdx = false)
+        string? usedInHierarchies = null, bool isAvailableInMdx = false, string? sourceColumn = "")
     {
+        // An empty default means "same as the name"; pass null for a column with no source column.
+        sourceColumn = sourceColumn == "" ? name : sourceColumn;
         var props = new Dictionary<string, string>
         {
             ["DataType"] = dataType,
             ["ObjectType"] = "DataColumn",
-            ["SourceColumn"] = name,
             // The TOM summarizer always writes this key (lowercased bool), so the adapter sees it
             // on every real column; defaulting to "false" here matches what a column opted out of
             // MDX looks like in the bag.
             ["IsAvailableInMDX"] = isAvailableInMdx ? "true" : "false",
         };
+        if (sourceColumn is not null)
+            props["SourceColumn"] = sourceColumn;
         if (usedInHierarchies is not null)
             props["UsedInHierarchies"] = usedInHierarchies;
 
         return new ModelObject(name, ModelObjectKind.Column, $"{table}/{name}",
-            Detail: null, Expression: null, Description: "desc", Hidden: hidden, SourceColumn: name,
+            Detail: null, Expression: null, Description: "desc", Hidden: hidden, SourceColumn: sourceColumn,
             Children: [], Properties: props);
     }
+
+    private static ModelObject Measure(string name, string table, string expression)
+        => new(name, ModelObjectKind.Measure, $"{table}/{name}",
+            Detail: null, Expression: expression, Description: "desc", Hidden: false, SourceColumn: null,
+            Children: [],
+            Properties: new Dictionary<string, string> { ["ObjectType"] = "Measure", ["FormatString"] = "0" });
 
     private static ModelObject Role(string name, string[] members)
     {
@@ -192,7 +244,8 @@ public sealed class BpaRuleCoverageTests
             Properties: new Dictionary<string, string> { ["ObjectType"] = "ModelRole", ["RlsExpression"] = "" });
     }
 
-    private static ModelObject Relationship(string name, string fromTable, string fromCol, string toTable, string toCol)
+    private static ModelObject Relationship(
+        string name, string fromTable, string fromCol, string toTable, string toCol, bool isActive = true)
         => new(name, ModelObjectKind.Relationship, $"Relationships/{name}",
             Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
             Children: [],
@@ -205,7 +258,7 @@ public sealed class BpaRuleCoverageTests
                 ["FromCardinality"] = "Many",
                 ["ToCardinality"] = "One",
                 ["CrossFilteringBehavior"] = "OneDirection",
-                ["IsActive"] = "true",
+                ["IsActive"] = isActive ? "true" : "false",
                 ["ObjectType"] = "Relationship",
             });
 }

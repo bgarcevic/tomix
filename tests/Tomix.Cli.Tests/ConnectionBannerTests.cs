@@ -13,7 +13,7 @@ namespace Tomix.Cli.Tests;
 /// reaches --quiet or machine output.
 /// </summary>
 [Collection(ConsoleStateCollection.Name)]
-public sealed class ConnectionBannerTests
+public sealed partial class ConnectionBannerTests
 {
     private static readonly IReadOnlyList<IModelProvider> Providers = [new TmdlModelProvider()];
 
@@ -31,6 +31,19 @@ public sealed class ConnectionBannerTests
         Assert.Contains(SampleTmdl, captured.Stderr);
         // The listing itself stays on stdout; the banner must not pollute it.
         Assert.DoesNotContain("Connected to:", captured.Stdout);
+    }
+
+    [Fact]
+    public void Announce_RedirectedStderr_KeepsALongTargetOnOneLine()
+    {
+        // Redirected stderr has no terminal width, so Spectre used to hard-wrap at 80 columns and
+        // split the path — the banner test above failed whenever the repo lived at a long path.
+        var longPath = Path.Combine(Path.GetTempPath(), string.Join(" ", Enumerable.Repeat("long folder name", 12)), "model");
+        var parsed = TestRoot.With(new LsCommand(Providers, TestServices.Create().State).Build()).Parse(["ls"]);
+
+        var captured = ConsoleCapture.Run(() => ConnectionBanner.Announce(parsed, new ModelReference(longPath)));
+
+        Assert.Equal($"Connected to: {longPath}", StripAnsi(captured.Stderr).TrimEnd('\r', '\n'));
     }
 
     [Fact]
@@ -91,4 +104,9 @@ public sealed class ConnectionBannerTests
 
         return (TestRoot.With(new LsCommand(Providers, services.State).Build()), services.State);
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex("\x1b\\[[0-9;]*m")]
+    private static partial System.Text.RegularExpressions.Regex AnsiRegex();
+
+    private static string StripAnsi(string text) => AnsiRegex().Replace(text, "");
 }

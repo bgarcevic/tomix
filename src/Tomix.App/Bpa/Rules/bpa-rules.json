@@ -156,7 +156,7 @@
     "Name": "[Performance] Avoid using many-to-many relationships on tables used for dynamic row level security",
     "Category": "Performance",
     "Description": "Using many-to-many relationships on tables which use dynamic row level security can cause serious query performance degradation. This pattern's performance problems compound when snowflaking multiple many-to-many relationships against a table which contains row level security. Instead, use one of the patterns shown in the article below where a single dimension table relates many-to-one to a security table.\r\n\r\nReference: https://www.elegantbi.com/post/dynamicrlspatterns",
-    "Severity": 3,
+    "Severity": 2,
     "Scope": "Table",
     "Expression": "UsedInRelationships.Any(FromCardinality == \"Many\" and ToCardinality== \"Many\")\r\nand\r\nRowLevelSecurity.Any(it.Length > 0)",
     "CompatibilityLevel": 1200
@@ -245,7 +245,7 @@
     "Name": "[DAX Expressions] Column references should be fully qualified",
     "Category": "DAX Expressions",
     "Description": "Using fully qualified column references makes it easier to distinguish between column and measure references, and also helps avoid certain errors. When referencing a column in DAX, first specify the table name, then specify the column name in square brackets.\r\nReference: https://www.elegantbi.com/post/top10bestpractices",
-    "Severity": 3,
+    "Severity": 2,
     "Scope": "Measure, KPI, TablePermission, CalculationItem",
     "Expression": "DependsOn.Any(Key.ObjectType = \"Column\" and Value.Any(not FullyQualified))",
     "CompatibilityLevel": 1200
@@ -255,8 +255,8 @@
     "Name": "[DAX Expressions] Measure references should be unqualified",
     "Category": "DAX Expressions",
     "Description": "Using unqualified measure references makes it easier to distinguish between column and measure references, and also helps avoid certain errors. When referencing a measure using DAX, do not specify the table name. Use only the measure name in square brackets.\r\nReference: https://www.elegantbi.com/post/top10bestpractices",
-    "Severity": 3,
-    "Scope": "Measure, CalculatedColumn, CalculatedTable, KPI, CalculationItem",
+    "Severity": 2,
+    "Scope": "Measure, CalculatedColumn, KPI, CalculationItem",
     "Expression": "DependsOn.Any(Key.ObjectType = \"Measure\" and Value.Any(FullyQualified))",
     "CompatibilityLevel": 1200
   },
@@ -337,7 +337,7 @@
     "Description": "Inactive relationships are activated using the USERELATIONSHIP function. If an inactive relationship is not referenced in any measure via this function, the relationship will not be used. It should be determined whether the relationship is not necessary or to activate the relationship via this method.\r\n\r\nReference: https://docs.microsoft.com/power-bi/guidance/relationships-active-inactive\r\nReference: https://dax.guide/userelationship/",
     "Severity": 2,
     "Scope": "Relationship",
-    "Expression": "IsActive == false\r\nand not\r\n(\r\nModel.AllMeasures.Any(RegEx.IsMatch(Expression,\r\n\"(?i)USERELATIONSHIP\\s*\\(\\s*\\'*\" +\r\ncurrent.FromTable.Name + \"\\'*\\[\" + \r\ncurrent.FromColumn.Name + \"\\]\\s*,\\s*\\'*\" +\r\ncurrent.ToTable.Name + \"\\'*\\[\" +\r\ncurrent.ToColumn.Name + \"\\]\"))\r\nor\r\nModel.AllCalculationItems.Any(RegEx.IsMatch(Expression,\r\n\"(?i)USERELATIONSHIP\\s*\\(\\s*\\'*\" +\r\ncurrent.FromTable.Name + \"\\'*\\[\" + \r\ncurrent.FromColumn.Name + \"\\]\\s*,\\s*\\'*\" +\r\ncurrent.ToTable.Name + \"\\'*\\[\" +\r\ncurrent.ToColumn.Name + \"\\]\"))\r\n)",
+    "Expression": "IsActive == false\r\nand not\r\n(\r\nModel.AllMeasures.Any(RegEx.IsMatch(Expression,\r\n\"(?i)USERELATIONSHIP\\s*\\(\\s*(\\'*\" +\r\ncurrent.FromTable.Name + \"\\'*\\[\" + current.FromColumn.Name + \"\\]\\s*,\\s*\\'*\" + current.ToTable.Name + \"\\'*\\[\" + current.ToColumn.Name + \"\\]\" +\r\n\"|\\'*\" +\r\ncurrent.ToTable.Name + \"\\'*\\[\" + current.ToColumn.Name + \"\\]\\s*,\\s*\\'*\" + current.FromTable.Name + \"\\'*\\[\" + current.FromColumn.Name + \"\\]\" +\r\n\")\"))\r\nor\r\nModel.AllCalculationItems.Any(RegEx.IsMatch(Expression,\r\n\"(?i)USERELATIONSHIP\\s*\\(\\s*(\\'*\" +\r\ncurrent.FromTable.Name + \"\\'*\\[\" + current.FromColumn.Name + \"\\]\\s*,\\s*\\'*\" + current.ToTable.Name + \"\\'*\\[\" + current.ToColumn.Name + \"\\]\" +\r\n\"|\\'*\" +\r\ncurrent.ToTable.Name + \"\\'*\\[\" + current.ToColumn.Name + \"\\]\\s*,\\s*\\'*\" + current.FromTable.Name + \"\\'*\\[\" + current.FromColumn.Name + \"\\]\" +\r\n\")\"))\r\n)",
     "CompatibilityLevel": 1200
   },
   {
@@ -367,7 +367,7 @@
     "Description": "Data columns must have a source column. A data column without a source column will cause an error when processing the model.",
     "Severity": 3,
     "Scope": "DataColumn",
-    "Expression": "string.IsNullOrWhitespace(SourceColumn)",
+    "Expression": "string.IsNullOrWhitespace(SourceColumn)\r\nand not Table.CalculationItems.Any()",
     "CompatibilityLevel": 1200
   },
   {
@@ -405,9 +405,9 @@
     "Name": "[Error Prevention] Relationship columns should be of the same data type",
     "Category": "Error Prevention",
     "Description": "Columns used in a relationship should be of the same data type. Ideally, they will be of integer data type (see the related rule '[Formatting] Relationship columns should be of integer data type'). Having columns within a relationship which are of different data types may lead to various issues.",
-    "Severity": 3,
+    "Severity": 2,
     "Scope": "Relationship",
-    "Expression": "FromColumn.DataType != ToColumn.DataType",
+    "Expression": "FromColumn.DataType != ToColumn.DataType\r\nand FromColumn.DataType != \"\" and FromColumn.DataType != \"Unknown\"\r\nand ToColumn.DataType != \"\" and ToColumn.DataType != \"Unknown\"",
     "CompatibilityLevel": 1200
   },
   {
@@ -584,7 +584,7 @@
     "Name": "[Formatting] Objects should not start or end with a space",
     "Category": "Formatting",
     "Description": "Objects should not start or end with a space",
-    "Severity": 3,
+    "Severity": 2,
     "Scope": "Model, Table, Measure, Hierarchy, Perspective, Partition, DataColumn, CalculatedColumn",
     "Expression": "Name.StartsWith(\" \") or Name.EndsWith(\" \")",
     "CompatibilityLevel": 1200
@@ -616,7 +616,7 @@
     "Name": "[Formatting] Provide format string for measures",
     "Category": "Formatting",
     "Description": "Visible measures should have their format string property assigned",
-    "Severity": 3,
+    "Severity": 2,
     "Scope": "Measure",
     "Expression": "not IsHidden \r\nand not Table.IsHidden \r\nand string.IsNullOrWhitespace(FormatString) \r\nand string.IsNullOrWhitespace(FormatStringExpression)",
     "CompatibilityLevel": 1200

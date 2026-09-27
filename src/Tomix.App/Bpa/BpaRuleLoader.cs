@@ -38,36 +38,43 @@ public sealed class BpaRuleLoader
 
     /// <summary>
     /// The curated subset of the bundled catalog that makes up the <c>standard</c> ruleset.
-    /// Style-opinion and advisory rules remain available through <c>--ruleset full</c>.
+    /// It also drives the deploy BPA gate, which blocks on error severity by default, so
+    /// error-severity rules here must flag only a broken model (it fails to deploy, refresh, or
+    /// query correctly). Noisy, heuristic, and style-opinion rules remain available through
+    /// <c>--ruleset full</c>.
     /// </summary>
     private static readonly HashSet<string> CuratedRuleIds = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Error prevention
         "DATA_COLUMNS_MUST_HAVE_A_SOURCE_COLUMN",
         "EXPRESSION_RELIANT_OBJECTS_MUST_HAVE_AN_EXPRESSION",
         "RELATIONSHIP_COLUMNS_SAME_DATA_TYPE",
         "AVOID_THE_USERELATIONSHIP_FUNCTION_AND_RLS_AGAINST_THE_SAME_TABLE",
         "AVOID_INVALID_NAME_CHARACTERS",
-        "OBJECTS_SHOULD_NOT_START_OR_END_WITH_A_SPACE",
-        "FIX_REFERENTIAL_INTEGRITY_VIOLATIONS",
+        "AVOID_INVALID_DESCRIPTION_CHARACTERS",
         "SET_ISAVAILABLEINMDX_TO_TRUE_ON_NECESSARY_COLUMNS",
-        "AVOID_FLOATING_POINT_DATA_TYPES",
+        // Performance
         "AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS",
+        "REDUCE_USAGE_OF_LONG-LENGTH_COLUMNS_WITH_HIGH_CARDINALITY",
         "MANY-TO-MANY_RELATIONSHIPS_SHOULD_BE_SINGLE-DIRECTION",
         "AVOID_USING_MANY-TO-MANY_RELATIONSHIPS_ON_TABLES_USED_FOR_DYNAMIC_ROW_LEVEL_SECURITY",
-        "ISAVAILABLEINMDX_FALSE_NONATTRIBUTE_COLUMNS",
         "MODEL_SHOULD_HAVE_A_DATE_TABLE",
-        "DATE/CALENDAR_TABLES_SHOULD_BE_MARKED_AS_A_DATE_TABLE",
         "REMOVE_AUTO-DATE_TABLE",
-        "REDUCE_USAGE_OF_LONG-LENGTH_COLUMNS_WITH_HIGH_CARDINALITY",
+        // DAX expressions
         "DAX_COLUMNS_FULLY_QUALIFIED",
         "DAX_MEASURES_UNQUALIFIED",
-        "USE_THE_DIVIDE_FUNCTION_FOR_DIVISION",
+        "AVOID_DUPLICATE_MEASURES",
         "AVOID_USING_THE_IFERROR_FUNCTION",
         "FILTER_MEASURE_VALUES_BY_COLUMNS",
+        "INACTIVE_RELATIONSHIPS_THAT_ARE_NEVER_ACTIVATED",
         "EVALUATEANDLOG_SHOULD_NOT_BE_USED_IN_PRODUCTION_MODELS",
+        // Maintenance
+        "FIX_REFERENTIAL_INTEGRITY_VIOLATIONS",
+        "CALCULATION_GROUPS_WITH_NO_CALCULATION_ITEMS",
+        // Formatting
+        "OBJECTS_SHOULD_NOT_START_OR_END_WITH_A_SPACE",
         "PROVIDE_FORMAT_STRING_FOR_MEASURES",
         "HIDE_FOREIGN_KEYS",
-        "NUMERIC_COLUMN_SUMMARIZE_BY",
         "MONTH_(AS_A_STRING)_MUST_BE_SORTED"
     };
 

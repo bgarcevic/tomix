@@ -77,6 +77,13 @@ and the API surface that major versions protect.
   partitions. M that does not parse is left unchanged and reported with its line and column
   (#196).
 
+- The `standard` BPA ruleset (the `bpa run` default and the deploy gate) is re-curated so
+  error severity means a broken model. Six style and convention rules drop from error to
+  warning, so they no longer block `deploy`. Five noisy or heuristic rules move to `full`,
+  and four precise ones join `standard` (26 rules). False positives are fixed for
+  calculation-group columns, undeclared column types, field-parameter tables, and
+  `USERELATIONSHIP` with reversed arguments. See [BPA rulesets](docs/commands/validate.md).
+
 ### Removed
 
 - The `TOMIX_POWERQUERY_FORMATTER_API` environment variable. M formatting no longer uses a
@@ -84,6 +91,8 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- Stderr commentary (banners, hints) is no longer hard-wrapped at 80 columns when stderr
+  is redirected, so `2> log.txt` keeps a long model path on one line.
 - Renames rewrite DAX references in user-defined functions (UDFs) and to UDFs and
   calendars (#228). A UDF body that references a renamed measure, column, or table is
   rewritten instead of reported as broken. Renaming a UDF rewrites its call sites

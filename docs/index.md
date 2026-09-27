@@ -32,24 +32,20 @@ $ tx find "SUM" --in expressions
 $ tx bpa run
 BPA analysis · basic-tmdl
 
-● ERROR  2 rules · 12 objects
-  ×7  Do not summarize numeric columns
-      NUMERIC_COLUMN_SUMMARIZE_BY · Formatting · fixable
-  ×5  Provide format string for measures
-      PROVIDE_FORMAT_STRING_FOR_MEASURES · Formatting
-
-● WARNING  2 rules · 5 objects
+● WARNING  3 rules · 9 objects
   ×4  Hide foreign keys
       HIDE_FOREIGN_KEYS · Formatting · fixable
+  ×4  Provide format string for measures
+      PROVIDE_FORMAT_STRING_FOR_MEASURES · Formatting
   ×1  Model should have a date table
       MODEL_SHOULD_HAVE_A_DATE_TABLE · Performance
 
 ────────────────────────────────────────────────────────────────────────────────
-✗ 12 errors · 5 warnings in 4 of 27 rules · 23 passed · 133ms
+✗ 9 warnings in 3 of 26 rules · 23 passed · 159ms
 
-Fix 11 findings:  tx bpa run --fix --save
-Details:          tx bpa run --details
-One rule:         tx bpa run --rule NUMERIC_COLUMN_SUMMARIZE_BY
+Fix 4 findings:  tx bpa run --fix --save
+Details:         tx bpa run --details
+One rule:        tx bpa run --rule HIDE_FOREIGN_KEYS
 
 $ tx deploy --server MyWorkspace --database basic-tmdl
 OK Deployed basic-tmdl to MyWorkspace (4.1s)

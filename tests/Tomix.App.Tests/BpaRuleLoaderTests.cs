@@ -1,4 +1,5 @@
 using Tomix.App.Bpa;
+using Tomix.Core.Bpa;
 
 namespace Tomix.App.Tests;
 
@@ -19,19 +20,60 @@ public sealed class BpaRuleLoaderTests
         var standard = await BpaRuleLoader.LoadRulesetAsync("standard", CancellationToken.None);
         var catalog = BpaRuleLoader.LoadBundledCatalog();
 
-        // Exactly the curated IDs must resolve against the catalog — a drop below 27 means a
+        // Exactly the curated IDs must resolve against the catalog — a drop below 26 means a
         // curated ID drifted from the bundled rule IDs.
-        Assert.Equal(27, standard.Count);
+        Assert.Equal(26, standard.Count);
         Assert.True(standard.Count < catalog.Count);
         Assert.Contains(standard, r => r.Id == "AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS");
+    }
 
-        // Style-opinion rules stay out of the curated default.
-        Assert.DoesNotContain(standard, r => r.Id == "OBJECTS_WITH_NO_DESCRIPTION");
-        Assert.DoesNotContain(standard, r => r.Id == "FIRST_LETTER_OF_OBJECTS_MUST_BE_CAPITALIZED");
+    [Theory]
+    // Style-opinion rules.
+    [InlineData("OBJECTS_WITH_NO_DESCRIPTION")]
+    [InlineData("FIRST_LETTER_OF_OBJECTS_MUST_BE_CAPITALIZED")]
+    [InlineData("NUMERIC_COLUMN_SUMMARIZE_BY")]
+    // Destructive-fix maintenance rules.
+    [InlineData("UNNECESSARY_COLUMNS")]
+    [InlineData("UNNECESSARY_MEASURES")]
+    // Noisy or heuristic rules that fire on most real models.
+    [InlineData("ISAVAILABLEINMDX_FALSE_NONATTRIBUTE_COLUMNS")]
+    [InlineData("AVOID_FLOATING_POINT_DATA_TYPES")]
+    [InlineData("USE_THE_DIVIDE_FUNCTION_FOR_DIVISION")]
+    [InlineData("DATE/CALENDAR_TABLES_SHOULD_BE_MARKED_AS_A_DATE_TABLE")]
+    public async Task LoadRulesetAsync_Standard_LeavesOptInRulesToFull(string ruleId)
+    {
+        var standard = await BpaRuleLoader.LoadRulesetAsync("standard", CancellationToken.None);
+        var full = await BpaRuleLoader.LoadRulesetAsync("full", CancellationToken.None);
 
-        // Destructive-fix maintenance rules stay out of the curated default.
-        Assert.DoesNotContain(standard, r => r.Id == "UNNECESSARY_COLUMNS");
-        Assert.DoesNotContain(standard, r => r.Id == "UNNECESSARY_MEASURES");
+        Assert.DoesNotContain(standard, r => r.Id == ruleId);
+        Assert.Contains(full, r => r.Id == ruleId);
+    }
+
+    [Fact]
+    public async Task LoadRulesetAsync_Standard_ErrorSeverityIsReservedForErrorPrevention()
+    {
+        // The deploy gate blocks on error severity by default, so a curated error-severity rule
+        // must flag a broken model, not a style or performance preference.
+        var standard = await BpaRuleLoader.LoadRulesetAsync("standard", CancellationToken.None);
+
+        var misfiled = standard
+            .Where(r => r.Severity == BpaSeverity.Error && r.Category != "Error Prevention")
+            .Select(r => r.Id);
+        Assert.Empty(misfiled);
+    }
+
+    [Theory]
+    [InlineData("RELATIONSHIP_COLUMNS_SAME_DATA_TYPE")]
+    [InlineData("DAX_COLUMNS_FULLY_QUALIFIED")]
+    [InlineData("DAX_MEASURES_UNQUALIFIED")]
+    [InlineData("PROVIDE_FORMAT_STRING_FOR_MEASURES")]
+    [InlineData("OBJECTS_SHOULD_NOT_START_OR_END_WITH_A_SPACE")]
+    [InlineData("AVOID_USING_MANY-TO-MANY_RELATIONSHIPS_ON_TABLES_USED_FOR_DYNAMIC_ROW_LEVEL_SECURITY")]
+    public void LoadBundledCatalog_AdvisoryRules_AreWarningsSoTheyDoNotBlockDeploy(string ruleId)
+    {
+        var rule = BpaRuleLoader.LoadBundledCatalog().Single(r => r.Id == ruleId);
+
+        Assert.Equal(BpaSeverity.Warning, rule.Severity);
     }
 
     [Fact]

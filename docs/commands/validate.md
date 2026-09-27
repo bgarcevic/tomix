@@ -21,7 +21,22 @@ or `tx config set validateOnSave false` to disable the gate (default: on).
 The default `standard` ruleset is a curated high-signal subset of the bundled
 catalog — rules that catch broken models, expensive-at-scale patterns, and a
 small core of consumer-experience checks. Use `--ruleset full` for the entire
-bundled catalog (including style and advisory rules).
+bundled catalog (including style, advisory, and heuristic rules that fire on
+most models).
+
+`standard` also drives the [`deploy`](connect.md#deploy-deploy-to-a-workspace) BPA gate, which blocks on
+error-severity findings by default. Error severity is therefore reserved for
+findings that mean the model is broken: a data column with no source column,
+an expression-reliant object with no expression, invalid characters in a name
+or description, `USERELATIONSHIP` against a table with row-level security, and
+sort-by or hierarchy columns hidden from MDX. Everything else in `standard` is
+a warning or info that `bpa run` reports without blocking a deploy
+(`deploy --bpa-fail-on warning` blocks on warnings too).
+
+A few rules — high-cardinality bi-directional relationships, long high-
+cardinality columns, and referential-integrity violations — read VertiPaq
+statistics and stay silent on a model without them, so an offline `standard`
+run is a metadata check.
 
 The bundled catalog is embedded in the application and cannot be overridden by
 placing a file beside the executable. Use `--rules`, model rule annotations, or
