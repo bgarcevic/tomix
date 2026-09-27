@@ -94,6 +94,16 @@ public sealed class PropertyFlagTests
     }
 
     [Fact]
+    public void SetSet_RepeatableAcrossAliases_KeepsOrder()
+    {
+        var parsed = BuildSetRoot().Parse(
+            ["set", "Sales/Amount", "--set", "a=1", "--set", "b=2", "-p", "c=3"]);
+
+        Assert.Empty(parsed.Errors);
+        Assert.Equal(["a=1", "b=2", "c=3"], parsed.GetValue<string[]>("--set")!);
+    }
+
+    [Fact]
     public void SetSetWithCompatibilityQi_Conflicts()
     {
         var captured = ConsoleCapture.Invoke(BuildSetRoot().Parse(

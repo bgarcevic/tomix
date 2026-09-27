@@ -62,6 +62,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ],
         ["set"] = [
             "tx set \"Table[Measure]\" --set expression=\"CALCULATE(SUM(Sales[Amount]))\"",
+            "tx set \"Sales[Total Sales]\" --set formatString=\"#,0\" --set displayFolder=KPIs --save",
             "tx set tables/Sales/Name -i \"Sales_v2\"",
         ],
         ["mv"] = [

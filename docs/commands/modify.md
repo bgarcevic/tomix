@@ -147,6 +147,7 @@ tx set <path> [model] [options]
 
 ```sh
 tx set "Sales[Total Sales]" -q "CALCULATE(SUM(Sales[Amount]))"    # expression is the default property
+tx set "Sales[Total Sales]" --set formatString="#,0" --set displayFolder=KPIs --save   # one load, one save
 tx set tables/Sales/Name -i "Sales_v2" --save
 tx set tables/Sales -q excludeFromModelRefresh -i true
 tx set "Sales[Amount]" -q summarizeBy -i Sum
