@@ -84,29 +84,11 @@ internal static class Program
         }
 
         var parseResult = root.Parse(args);
-        if (parseResult.Errors.Count == 0 && UnknownOptionGuard.TryReject(parseResult, args))
-            return 2;
-
         if (parseResult.Errors.Count > 0)
-        {
-            var commandNames = root.Subcommands.Select(c => c.Name).ToList();
-            foreach (var error in parseResult.Errors)
-            {
-                if (error.Message.Contains("is not a valid command", StringComparison.OrdinalIgnoreCase) ||
-                    error.Message.Contains("Unrecognized command", StringComparison.OrdinalIgnoreCase) ||
-                    error.Message.Contains("Required command was not provided", StringComparison.OrdinalIgnoreCase))
-                {
-                    var firstArg = args.FirstOrDefault(a => !a.StartsWith('-'));
-                    if (firstArg is not null)
-                        DidYouMean.WriteSuggestion(firstArg, commandNames);
-                }
-            }
+            return UsageErrors.Report(parseResult, args);
 
-            // Invoke prints the parse errors, but returns System.CommandLine's default of 1;
-            // usage errors exit 2 per the documented contract (docs/error-codes.md).
-            parseResult.Invoke();
+        if (UnknownOptionGuard.TryReject(parseResult, args))
             return 2;
-        }
 
         if (configLoadError is not null && !CanRunWithCorruptConfig(parseResult, args))
         {

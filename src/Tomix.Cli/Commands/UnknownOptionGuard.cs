@@ -7,14 +7,14 @@ namespace Tomix.Cli.Commands;
 /// <summary>
 /// Rejects option-lookalike tokens (e.g. a typo'd <c>--path-only</c>) that System.CommandLine
 /// would otherwise bind to an optional positional argument, silently changing what the command
-/// does. Tokens after a bare <c>--</c> separator are exempt so callers can still pass literal
-/// values that start with a dash.
+/// does, or leave unmatched once the positionals are full. Tokens after a bare <c>--</c>
+/// separator are exempt so callers can still pass literal values that start with a dash.
 /// </summary>
 internal static class UnknownOptionGuard
 {
     /// <summary>
     /// Writes a usage error to stderr and returns true when an option-lookalike token was bound
-    /// to a positional argument. Callers should exit with code 2.
+    /// to a positional argument or left unmatched. Callers should exit with code 2.
     /// </summary>
     public static bool TryReject(ParseResult parseResult, IReadOnlyList<string> args)
     {
@@ -53,7 +53,7 @@ internal static class UnknownOptionGuard
                 return offending.Value;
         }
 
-        return null;
+        return parseResult.UnmatchedTokens.FirstOrDefault(lookalikes.Contains);
     }
 
     private static string Hint(string token, Command command)
@@ -64,7 +64,8 @@ internal static class UnknownOptionGuard
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        var escape = $"Run 'tx {command.Name} --help' to see options, or put '--' before " +
+        var help = command is RootCommand ? "tx --help" : $"tx {command.Name} --help";
+        var escape = $"Run '{help}' to see options, or put '--' before " +
                      "positional values that start with '-'.";
         var suggestion = DidYouMean.Suggest(token, known);
         return suggestion is null ? escape : $"Did you mean '{suggestion}'? {escape}";
