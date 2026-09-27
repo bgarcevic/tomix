@@ -17,6 +17,9 @@ public sealed class ConnectExitCodeTests
     [Theory]
     [InlineData("connect", "--remote", "somehost", "db")]
     [InlineData("connect", "-w", "some-folder")]
+    [InlineData("connect", "--list")]
+    [InlineData("connect", "--local", "--list", "localhost:56164")]
+    [InlineData("connect", "--local", "--list", "--clear")]
     public void UsageErrors_ExitTwo(params string[] args)
     {
         var (exitCode, stderr) = Invoke(NoProviders, args);

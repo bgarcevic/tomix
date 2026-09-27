@@ -33,6 +33,26 @@ public sealed class VertipaqHandlerTests
         Assert.Equal(2, result.ExitCode);
     }
 
+    // Desktop sessions saved without a database (before connect resolved it) must still export:
+    // extraction has no auto-select, so the handler looks the single database up first.
+    [Fact]
+    public async Task HandleAsync_LocalInstanceWithoutDatabase_ResolvesItBeforeExport()
+    {
+        var analyzer = new StubAnalyzer();
+        var handler = new VertipaqHandler(
+            [new LocalInstanceDatabaseResolverTests.CatalogProvider("db-guid")], analyzer, TestStores);
+
+        var result = await handler.HandleAsync(
+            new VertipaqRequest(
+                new ModelReference("localhost:56164"),
+                RemoteSyncTarget: null, TableFilter: null, ImportPath: null,
+                ExportPath: "out.vpax", Obfuscate: false, Annotate: false, Save: false),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(new ModelReference("localhost:56164", "db-guid"), analyzer.AnalyzedModel);
+    }
+
     [Fact]
     public async Task HandleAsync_Import_ReadsTheVpaxFile()
     {

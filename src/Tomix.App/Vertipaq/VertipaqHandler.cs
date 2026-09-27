@@ -1,3 +1,4 @@
+using Tomix.App.Connect;
 using Tomix.App.Mutations;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
@@ -78,6 +79,13 @@ public sealed class VertipaqHandler
                     exitCode: 2,
                     hint: "Connect to a deployed model (tx connect -s <workspace> -d <model>) or analyze an exported file with --import <file.vpax>.");
             }
+
+            // Extraction connects without auto-selecting a database, so a Desktop target saved
+            // without one (sessions from before connect resolved it, or --server localhost:<port>)
+            // would fail. Desktop holds exactly one database, so look it up.
+            if (liveModel.IsLocalInstance && string.IsNullOrWhiteSpace(liveModel.Database) &&
+                await LocalInstanceDatabaseResolver.TryResolveAsync(_providers, liveModel.Value, cancellationToken) is { } database)
+                liveModel = liveModel with { Database = database };
 
             analyzedSource = liveModel.Value;
 

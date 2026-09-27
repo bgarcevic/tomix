@@ -26,6 +26,9 @@ and the API surface that major versions protect.
   Keywords, library functions, step and field definitions, field access, literals, and
   comments take the same palette roles as their DAX counterparts. JSON/CSV output and
   piped or redirected text stay plain (#285).
+- `tx connect --local --list` lists running Power BI Desktop instances (report name,
+  `localhost:<port>` endpoint, database id) without connecting, so scripts and agents can
+  choose one without the picker. JSON via `--output-format json` (#299).
 
 ### Changed
 
@@ -91,6 +94,9 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `tx connect --local` and `tx connect localhost:<port>` now look up and save the Desktop
+  instance's database (a GUID) and open the model to validate it, so `tx vertipaq --export`
+  works without `-d`. VertiPaq also resolves the database when an older saved session has none (#299).
 - Stderr commentary (banners, hints) is no longer hard-wrapped at 80 columns when stderr
   is redirected, so `2> log.txt` keeps a long model path on one line.
 - Renames rewrite DAX references in user-defined functions (UDFs) and to UDFs and

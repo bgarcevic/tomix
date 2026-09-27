@@ -262,6 +262,44 @@ public class ConnectPlanHandlerTests
         Assert.NotNull(plan.Target.Validation);
     }
 
+    // A Desktop endpoint without a database must look the database up (without prompting, so
+    // with or without a TTY): VertiPaq extraction cannot connect without an Initial Catalog.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    public void Plan_LocalEndpointWithoutDatabase_NeedsDatabaseLookup(bool local, bool canPrompt)
+    {
+        var plan = ConnectPlanHandler.Plan(Request(server: "localhost:56164", local: local, canPrompt: canPrompt));
+
+        Assert.Equal(ConnectNeedKind.LocalInstanceDatabase, plan.Need?.Kind);
+        Assert.Equal("localhost:56164", plan.Need!.Endpoint);
+    }
+
+    [Fact]
+    public void Plan_LocalEndpointWithResolvedDatabase_ValidatesIt()
+    {
+        var plan = ConnectPlanHandler.Plan(Request(
+            server: "localhost:56164", database: "db-guid", local: true, databaseResolved: true));
+
+        Assert.Null(plan.Need);
+        Assert.Equal("db-guid", plan.Target!.Database);
+        Assert.Equal("db-guid", plan.Target.Validation?.Database);
+    }
+
+    // A failed lookup folds back as resolved-with-no-database and must not loop.
+    [Fact]
+    public void Plan_LocalEndpointWithUnresolvableDatabase_Converges()
+    {
+        var plan = ConnectPlanHandler.Plan(Request(server: "localhost:56164", local: true, databaseResolved: true));
+
+        Assert.Null(plan.Need);
+        Assert.Equal("localhost:56164", plan.Target!.RemoteServer);
+        Assert.Null(plan.Target.Database);
+        Assert.Null(plan.Target.Validation);
+    }
+
     [Fact]
     public void Plan_LocalWithoutEndpoint_NeedsDiscoveryEvenWithoutTty()
     {

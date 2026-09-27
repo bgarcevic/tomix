@@ -67,6 +67,10 @@ internal sealed class ConnectCommand : ICommandModule
             Description = "Connect through this saved profile (list them with 'tx profile list')"
         };
         profileOption.Aliases.Add("-p");
+        var listOption = new Option<bool>("--list")
+        {
+            Description = "With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting."
+        };
         var clearOption = new Option<bool>("--clear")
         {
             Description = "Forget the active connection"
@@ -91,6 +95,7 @@ internal sealed class ConnectCommand : ICommandModule
             workspaceOption,
             localOption,
             remoteOption,
+            listOption,
             profileOption,
             clearOption,
             forceOption,
@@ -121,6 +126,24 @@ internal sealed class ConnectCommand : ICommandModule
                     return RenderRecentOptionError(parseResult, "--recent cannot be combined with a server/database, --profile, --workspace, --remote, or --local.");
 
                 return await ConnectRecentAsync(handler, parseResult, format, cancellationToken);
+            }
+
+            if (parseResult.GetValue(listOption))
+            {
+                if (!parseResult.GetValue(localOption))
+                    return RenderWorkspaceOptionError(parseResult, "--list requires --local.");
+
+                if (!string.IsNullOrWhiteSpace(parseResult.GetValue(serverArgument)) ||
+                    !string.IsNullOrWhiteSpace(parseResult.GetValue(databaseArgument)) ||
+                    !string.IsNullOrWhiteSpace(parseResult.GetValue(profileOption)) ||
+                    parseResult.GetResult(workspaceOption) is not null ||
+                    parseResult.GetValue(remoteOption) ||
+                    parseResult.GetValue(clearOption))
+                    return RenderWorkspaceOptionError(parseResult,
+                        "--list cannot be combined with a server/database, --profile, --workspace, --remote, or --clear.");
+
+                var listed = await new ConnectLocalListHandler(_providers).HandleAsync(cancellationToken);
+                return CommandOutput.Render(parseResult, listed, format, RenderLocalList, ProjectLocalListJson);
             }
 
             if (parseResult.GetValue(clearOption))
@@ -285,6 +308,7 @@ internal sealed class ConnectCommand : ICommandModule
                                         "Multiple Power BI Desktop instances found. Connect to one directly, e.g. 'tx connect localhost:<port>':"));
                                     foreach (var found in instances)
                                         ErrConsole().MarkupLine(Styling.Muted($"  {ConnectPrompts.DescribeInstance(found)}"));
+                                    ErrConsole().MarkupLine(Styling.Guidance("List them as data: tx connect --local --list --output-format json"));
                                     return 1;
                                 }
 
@@ -294,6 +318,14 @@ internal sealed class ConnectCommand : ICommandModule
 
                             desktopInstance = instance;
                             request = request with { Server = instance.Endpoint };
+                            break;
+                        }
+
+                    case ConnectNeedKind.LocalInstanceDatabase:
+                        {
+                            var localDatabase = await LocalInstanceDatabaseResolver.TryResolveAsync(
+                                _providers, need.Endpoint, cancellationToken);
+                            request = request with { Database = localDatabase, DatabaseResolved = true };
                             break;
                         }
                 }
@@ -556,6 +588,39 @@ internal sealed class ConnectCommand : ICommandModule
                 local = entry.Connection.Local,
                 profile = entry.Connection.Profile,
                 workspace = entry.Connection.Workspace
+            }).ToArray()
+        };
+
+    private static void RenderLocalList(ConnectLocalListResult result)
+    {
+        var err = ErrConsole();
+        if (result.Instances.Count == 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Warning("No running Power BI Desktop instances found."));
+            err.MarkupLine(Styling.Guidance("Open a report in Power BI Desktop, then try again."));
+            return;
+        }
+
+        foreach (var instance in result.Instances)
+        {
+            var name = instance.ReportName is null
+                ? Styling.Muted("(unknown report)")
+                : Styling.Bold(instance.ReportName);
+            var database = instance.Database is null ? "" : $"  {Styling.Muted(instance.Database)}";
+            AnsiConsole.MarkupLine($"{name}  {Styling.Value(instance.Endpoint)}{database}");
+        }
+
+        err.MarkupLine(Styling.Guidance("Connect: tx connect <endpoint>"));
+    }
+
+    private static object ProjectLocalListJson(ConnectLocalListResult result)
+        => new
+        {
+            instances = result.Instances.Select(instance => new
+            {
+                endpoint = instance.Endpoint,
+                reportName = instance.ReportName,
+                database = instance.Database
             }).ToArray()
         };
 

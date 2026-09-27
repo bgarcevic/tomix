@@ -146,6 +146,18 @@ public sealed class ConnectPlanHandler
         if (r.Local && model is null && !ModelReference.IsLocalInstanceEndpoint(remoteServer))
             return Outcome(r, reinterpreted, need: new ConnectNeed(ConnectNeedKind.DesktopDiscovery));
 
+        // A Desktop instance's database is a GUID nobody types, so look it up rather than store
+        // the endpoint alone: VertiPaq extraction needs an explicit catalog. Not a prompt, so it
+        // runs without a TTY too. DatabaseResolved stops a failed lookup from being retried.
+        if (model is null &&
+            ModelReference.IsLocalInstanceEndpoint(remoteServer) &&
+            string.IsNullOrWhiteSpace(r.Database) &&
+            !r.DatabaseResolved &&
+            string.IsNullOrWhiteSpace(r.WorkspaceValue))
+            return Outcome(r, reinterpreted, need: new ConnectNeed(
+                ConnectNeedKind.LocalInstanceDatabase,
+                Endpoint: remoteServer));
+
         // A bare workspace name (e.g. "MyWorkspace") is shorthand for the workspace's XMLA
         // endpoint. Expand it to a fully-qualified endpoint so the stored connection can be
         // opened by every remote provider (CanOpen checks IsRemote) and validated by the CLI
@@ -316,7 +328,13 @@ public enum ConnectNeedKind
     MirrorFolder,
 
     /// <summary>--local without an endpoint: discover running Power BI Desktop instances.</summary>
-    DesktopDiscovery
+    DesktopDiscovery,
+
+    /// <summary>
+    /// Local Desktop endpoint without a database: look up its single (GUID-named) database.
+    /// Resolved without prompting; fold back with <c>DatabaseResolved</c> even when none is found.
+    /// </summary>
+    LocalInstanceDatabase
 }
 
 public sealed record ConnectNeed(

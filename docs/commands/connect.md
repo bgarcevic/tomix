@@ -15,7 +15,8 @@ workspace name, an endpoint, or a local model path.
 
 | Option | Description |
 |--------|-------------|
-| `--local` | Attach to a Power BI Desktop instance running on this machine (Windows only). |
+| `--local` | Attach to a Power BI Desktop instance running on this machine (Windows only). The instance's database (a GUID) is looked up and saved automatically. |
+| `--list` | With `--local`: list running Desktop instances (report name, endpoint, database) without connecting. Works without a TTY; use `--output-format json` for scripts and agents. |
 | `--remote` | Pick a workspace and model interactively from your tenant (requires a TTY; sign in first with `tx auth login`). |
 | `-p, --profile <name>` | Connect through a saved profile. |
 | `--clear` | Forget the active connection. |
@@ -30,6 +31,8 @@ tx connect --remote
 tx connect MyWorkspace Sales
 tx connect ./model.tmdl
 tx connect --local                  # Power BI Desktop (Windows only)
+tx connect --local --list           # running Desktop instances, no connect
+tx connect localhost:56164          # a specific Desktop instance from the list
 tx connect ./model.tmdl -w MyWorkspace Sales
 ```
 
