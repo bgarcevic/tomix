@@ -19,6 +19,7 @@ Shared output wiring for all commands.
 - `CsvOutput` — CSV serialization (the `--format csv` contract).
 - `PropertyCsvRenderer` — CSV columns/rows driven by the shared property catalog (`Tomix.Core.Properties.ModelPropertyCatalog`); `get` and `ls` both render CSV through it so their columns cannot drift.
 - `ErrorOutput` — diagnostic rendering to stderr (JSON or colored text).
+- `SyntaxErrorCaret` — the source line and `^` marker under an expression syntax error, for inline `tx format -e` failures in text mode.
 - `StdErr` — the stderr console for commentary (banners, hints, prompts, notices). Use it instead of constructing `AnsiConsole.Create(... Console.Error)`; it is created per call so tests can swap `Console.Error`, and it inherits the no-color setting. Stdout carries only results.
 - `DidYouMean` — Levenshtein-based "Did you mean?" suggestion helper for unknown subcommands.
 - `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).

@@ -49,11 +49,23 @@ assert.equal(broken.ok, false);
 assert.equal(broken.error.kind, "parse");
 assert.equal(broken.error.line, 3);
 assert.equal(broken.error.column, 1);
+assert.equal(broken.error.code, "expectedCsvContinuation");
+// The span covers the offending token ("in"); endColumn is inclusive.
+assert.equal(broken.error.endLine, 3);
+assert.equal(broken.error.endColumn, 2);
 assert.ok(broken.error.message.length > 0);
 
 // Lexer error: unterminated string.
 const lexBroken = await diagnose('let x = "abc in x');
-assert.deepEqual(lexBroken.errors, [{ kind: "lex", message: "Unterminated string", line: 1, column: 9 }]);
+assert.deepEqual(lexBroken.errors, [
+    { kind: "lex", code: "unterminatedMultilineToken", message: "Unterminated string", line: 1, column: 9, endLine: null, endColumn: null },
+]);
+
+// Running out of input: no offending token, so the error points at the last character.
+const eof = await diagnose("let x = 1");
+assert.equal(eof.errors[0].code, "expectedClosingTokenKind");
+assert.equal(eof.errors[0].line, 1);
+assert.equal(eof.errors[0].column, 9);
 
 assert.deepEqual(await diagnose("let x = 1 in x"), { errors: [] });
 
@@ -61,5 +73,6 @@ assert.deepEqual(await diagnose("let x = 1 in x"), { errors: [] });
 const invalid = JSON.parse(await engine.format("{"));
 assert.equal(invalid.ok, false);
 assert.equal(invalid.error.kind, "internal");
+assert.equal(invalid.error.code, null);
 
 console.log(`powerquery engine smoke passed (formatter ${pkg.dependencies["@microsoft/powerquery-formatter"]}, parser ${pkg.dependencies["@microsoft/powerquery-parser"]}, ${(bundle.length / 1024).toFixed(0)} KB)`);

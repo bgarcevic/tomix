@@ -4,6 +4,7 @@ using Tomix.App.Format;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Cli.Output;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Commands;
@@ -134,16 +135,29 @@ internal sealed class FormatCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
-            return CommandOutput.Render(
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
+            var exitCode = CommandOutput.Render(
                 result,
                 formatValue,
                 Render,
                 data => (object)data,
                 renderCsv: null,
-                GlobalOptions.ErrorFormatValue(parseResult, formatValue));
+                errorFormat);
+
+            if (!result.Success && !quiet && !string.IsNullOrWhiteSpace(expression) && !OutputFormats.IsJson(errorFormat ?? ""))
+                WriteInlineCaret(expression, result.Diagnostics);
+
+            return exitCode;
         });
 
         return command;
+    }
+
+    // The user typed this source, so show where it breaks. Only the first error: the parser stops there.
+    private static void WriteInlineCaret(string expression, IReadOnlyList<TomixDiagnostic> diagnostics)
+    {
+        if (diagnostics.SelectMany(d => d.SyntaxErrors ?? []).FirstOrDefault() is { } error)
+            SyntaxErrorCaret.Write(expression, error);
     }
 
     // A sweep failure must not be silent: otherwise an HTTP error from the M formatter reports
@@ -152,10 +166,10 @@ internal sealed class FormatCommand : ICommandModule
     private static void WriteFailureDetails(IReadOnlyList<ModelFormatObjectResult> results)
     {
         var failures = results
-            .Where(r => r.Status == "failed" && !string.IsNullOrWhiteSpace(r.Error))
+            .Where(r => r.Status == "failed" && !string.IsNullOrWhiteSpace(r.Error?.Message))
             .ToList();
 
-        foreach (var group in failures.GroupBy(r => r.Error))
+        foreach (var group in failures.GroupBy(r => r.Error!.Message))
         {
             var first = group.First();
             var label = first.Measure is null
@@ -178,8 +192,6 @@ internal sealed class FormatCommand : ICommandModule
             case InlineFormatResult inline:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
                     HighlightLanguage(inline.Language), inline.Formatted));
-                foreach (var error in inline.Errors)
-                    Console.Error.WriteLine(error);
                 break;
 
             case ObjectFormatResult obj:
@@ -193,7 +205,9 @@ internal sealed class FormatCommand : ICommandModule
                 break;
 
             case ModelFormatResult model:
-                AnsiConsole.MarkupLine(Styling.Success($"Formatted: {model.Formatted}"));
+                // A failure applies nothing, so the formatted count is only what would have changed.
+                var notApplied = model.Failed > 0 && model.Formatted > 0 ? " (not applied)" : "";
+                AnsiConsole.MarkupLine(Styling.Success($"Formatted: {model.Formatted}{notApplied}"));
                 AnsiConsole.MarkupLine(Styling.Warning($"Unchanged: {model.Unchanged}"));
                 AnsiConsole.MarkupLine(Styling.Error($"Failed: {model.Failed}"));
                 WriteFailureDetails(model.Results);
@@ -204,7 +218,7 @@ internal sealed class FormatCommand : ICommandModule
                     AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
                 else if (model.DryRun)
                     StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
-                else if (model.Formatted > 0)
+                else if (model.Formatted > 0 && model.Failed == 0)
                     AnsiConsole.MarkupLine(Styling.Muted("Not saved — re-run with --save to persist or --stage to stage."));
 
                 MutationOutput.RenderSync(model.Outcome);

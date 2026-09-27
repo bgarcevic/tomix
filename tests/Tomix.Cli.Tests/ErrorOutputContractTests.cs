@@ -48,6 +48,34 @@ public sealed class ErrorOutputContractTests
         Assert.Equal("TOMIX_REAL_ERROR", json.RootElement.GetProperty("code").GetString());
     }
 
+    [Fact]
+    public void JsonEnvelope_SyntaxErrors_CarryPositionAndObjectPath()
+    {
+        var json = CaptureJson(new TomixDiagnostic(
+            "TOMIX_FORMAT_FAILED", DiagnosticSeverity.Error, "Formatting failed",
+            ObjectPath: "Sales/Sales", Line: 3, Column: 1,
+            SyntaxErrors: [new ExpressionSyntaxError("lex", "unterminatedMultilineToken", "Unterminated string", 3, 1)]));
+
+        var root = json.RootElement;
+        Assert.Equal("Sales/Sales", root.GetProperty("objectPath").GetString());
+        Assert.Equal(3, root.GetProperty("line").GetInt32());
+        Assert.Equal(1, root.GetProperty("column").GetInt32());
+        var error = Assert.Single(root.GetProperty("syntaxErrors").EnumerateArray().ToList());
+        // Unknown end positions are omitted, as in `tx format` sweep rows.
+        Assert.Equal(
+            ["stage", "code", "message", "line", "column"],
+            error.EnumerateObject().Select(p => p.Name));
+    }
+
+    [Fact]
+    public void JsonEnvelope_WithoutSyntaxErrors_OmitsTheirFields()
+    {
+        var json = CaptureJson(new TomixDiagnostic("TOMIX_TEST", DiagnosticSeverity.Error, "test message"));
+
+        foreach (var name in new[] { "objectPath", "line", "column", "syntaxErrors" })
+            Assert.False(json.RootElement.TryGetProperty(name, out _), name);
+    }
+
     [Theory]
     // Explicit --error-format always wins, whatever stdout is doing.
     [InlineData("ls --error-format json", "json")]

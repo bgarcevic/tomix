@@ -1,4 +1,5 @@
 using Tomix.App.Format.M;
+using Tomix.Core.Diagnostics;
 
 namespace Tomix.App.Format;
 
@@ -43,7 +44,10 @@ public sealed class OfflineMFormatterClient : IExpressionFormatterClient
             cancellationToken);
 
         if (!result.Ok)
-            return new ExpressionFormatResponse(false, request.Expression, [Describe(result.Error!)]);
+            return new ExpressionFormatResponse(false, request.Expression, [Describe(result.Error!)])
+            {
+                SyntaxErrors = ToSyntaxErrors(result.Error!)
+            };
 
         // The formatter ends its output with a newline; stored expressions do not, and keeping it
         // would make every already-formatted expression look changed.
@@ -52,6 +56,22 @@ public sealed class OfflineMFormatterClient : IExpressionFormatterClient
             : result.Text;
         return new ExpressionFormatResponse(true, formatted, []);
     }
+
+    // Internal failures (a timeout, an engine that failed to load) say nothing about the M itself.
+    private static IReadOnlyList<ExpressionSyntaxError> ToSyntaxErrors(PowerQueryEngineError error)
+        => error.Kind == PowerQueryErrorKind.Internal
+            ? []
+            :
+            [
+                new ExpressionSyntaxError(
+                    error.Kind == PowerQueryErrorKind.Lex ? "lex" : "parse",
+                    error.Code,
+                    error.Message,
+                    error.Line,
+                    error.Column,
+                    error.EndLine,
+                    error.EndColumn)
+            ];
 
     private static string Describe(PowerQueryEngineError error)
     {

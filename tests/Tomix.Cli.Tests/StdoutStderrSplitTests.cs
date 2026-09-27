@@ -25,6 +25,23 @@ public sealed partial class StdoutStderrSplitTests
         { "bpa rules list", "tx bpa rules show R1", "R1 · warning · fixable" },
     };
 
+    [Fact]
+    public void RedirectedStderr_KeepsLongLinesWhole()
+    {
+        // Redirected stderr has no width; Spectre's 80-column fallback used to hard-wrap, splitting
+        // a long model path in the "Connected to:" banner across lines.
+        var path = Path.Combine("C:", "Users", "someone with a long name", "repos", "tomix-cli",
+            ".claude", "worktrees", "a-fairly-long-worktree-name", "samples", "basic-tmdl");
+        var line = $"Connected to: {path}";
+
+        var captured = ConsoleCapture.Run(() => StdErr.MarkupLine(Styling.Muted(line)));
+
+        Assert.True(line.Length > 80, "The line must be longer than Spectre's fallback width.");
+        // Strip color only (CI runners get it; a local run may not). Line breaks must survive, or
+        // a wrapped line would pass.
+        Assert.Equal(line, Ansi().Replace(captured.Stderr, "").TrimEnd());
+    }
+
     [Theory]
     [MemberData(nameof(Cases))]
     public void Banner_GoesToStderr_ResultStaysOnStdout(string command, string banner, string resultLine)

@@ -50,6 +50,23 @@ internal static class ErrorOutput
                     message = issue.Message,
                     @object = issue.Object
                 }).ToList();
+            if (error?.ObjectPath is { } objectPath)
+                errorObj["objectPath"] = objectPath;
+            if (error?.Line is { } line)
+                errorObj["line"] = line;
+            if (error?.Column is { } column)
+                errorObj["column"] = column;
+            if (error?.SyntaxErrors is { } syntaxErrors)
+                errorObj["syntaxErrors"] = syntaxErrors.Select(syntax => new
+                {
+                    stage = syntax.Stage,
+                    code = syntax.Code,
+                    message = syntax.Message,
+                    line = syntax.Line,
+                    column = syntax.Column,
+                    endLine = syntax.EndLine,
+                    endColumn = syntax.EndColumn
+                }).ToList();
 
             Console.Error.WriteLine(JsonSerializer.Serialize(errorObj, Options));
             return;

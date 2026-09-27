@@ -9,8 +9,7 @@ public interface IFormatModelResult;
 public sealed record InlineFormatResult(
     bool Success,
     string Formatted,
-    string Language,
-    IReadOnlyList<string> Errors) : IFormatModelResult;
+    string Language) : IFormatModelResult;
 
 public sealed record ObjectFormatResult(
     bool Success,
@@ -34,4 +33,4 @@ public sealed record ModelFormatObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Partition,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? Error = null);
+    FormatError? Error = null);

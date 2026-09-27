@@ -63,9 +63,10 @@ public sealed partial class FormatFlagBindingTests
             BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--dry-run"]),
             captureAnsiConsole: true);
 
-        Assert.Equal(0, captured.ExitCode);
+        Assert.Equal(1, captured.ExitCode);
         Assert.Contains("Failed: 4", StripAnsi(captured.Stdout));
         var stderr = StripAnsi(captured.Stderr);
+        Assert.Contains("No changes applied: 4 of 4 expressions failed to format.", stderr);
         Assert.Contains("HTTP 415", stderr);
         Assert.Contains("(+3 more)", stderr);
         Assert.Equal(1, stderr.Split("HTTP 415").Length - 1);
@@ -78,8 +79,10 @@ public sealed partial class FormatFlagBindingTests
             BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--dry-run", "--output-format", "json"]),
             captureAnsiConsole: true);
 
-        Assert.Equal(0, captured.ExitCode);
+        Assert.Equal(1, captured.ExitCode);
         using var document = JsonDocument.Parse(captured.Stdout);
+        var diagnostic = Assert.Single(document.RootElement.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.GetProperty("code").GetString());
         var failed = document.RootElement
             .GetProperty("data")
             .GetProperty("results")
@@ -88,7 +91,13 @@ public sealed partial class FormatFlagBindingTests
             .ToList();
 
         Assert.Equal(4, failed.Count);
-        Assert.All(failed, r => Assert.Contains("HTTP 415", r.GetProperty("error").GetString()));
+        Assert.All(failed, r =>
+        {
+            // `error` is an object; a failure that is not a syntax error has only a message.
+            var error = r.GetProperty("error");
+            Assert.Contains("HTTP 415", error.GetProperty("message").GetString());
+            Assert.Equal(["message"], error.EnumerateObject().Select(p => p.Name));
+        });
     }
 
     private static RootCommand BuildFailingRoot()

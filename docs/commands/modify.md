@@ -395,12 +395,48 @@ Power Query (M) is formatted offline too, by Microsoft's
 [powerquery-formatter](https://github.com/microsoft/powerquery-formatter) bundled inside `tx`
 and run in-process — no network, no Node.js, nothing else to install. M is wrapped at 40
 columns (120 with `--long`) with four-space indentation, so results can differ from the
-network formatter previous releases used. M that does not parse is left
-unchanged and reported with its line and column (`M syntax error on line 3, column 1: ...`).
+network formatter previous releases used. M that does not lex or parse is left
+unchanged and reported with its line and column (`M syntax error on line 3, column 1: ...`),
+counted from the start of the expression. For an inline `-e` expression, text output also
+shows the offending line with a caret under the error:
+
+```text
+Error: Formatting failed: M syntax error on line 1, column 12: A comma cannot proceed an 'in'
+1 | let x = 1, in x
+  |            ^^
+```
+
+With `--output-format json`, an inline or `--path` failure is a `TOMIX_FORMAT_FAILED` error
+whose `syntaxErrors` array gives the stage, code, and span of each error (see
+[error codes](../error-codes.md)).
 
 With no target, formats every measure (DAX) or every partition (`--lang m`) in the model. Objects that fail to format are counted in `Failed: N` and the formatter's error
 is reported per object on stderr (deduplicated with a `(+N more)` count when objects share
-the same failure); `--output-format json` carries it in each result row's `error` field.
+the same failure). With `--output-format json`, each failed result row carries an `error`
+object: `message` always, plus `stage`, `code`, `line`, `column`, `endLine`, and `endColumn`
+when the failure is a syntax error:
+
+```json
+{
+  "table": "Category",
+  "status": "failed",
+  "partition": "Category-25da50ca",
+  "error": {
+    "message": "M syntax error on line 4, column 1: A comma cannot proceed an 'in'",
+    "stage": "parse",
+    "code": "expectedCsvContinuation",
+    "line": 4,
+    "column": 1,
+    "endLine": 4,
+    "endColumn": 2
+  }
+}
+```
+
+If any object fails, nothing is applied, saved, or staged: the run exits 1 with
+`TOMIX_FORMAT_FAILED` (`No changes applied: N of M expressions failed to format.`), and the
+text summary shows `Formatted: N (not applied)`. The result rows are still written, so the
+counts show what would change once the failures are fixed.
 
 Formatted DAX and M are syntax-highlighted in text output, for both inline `-e`
 and `--path`; piping or redirecting strips the color, so the output stays safe to

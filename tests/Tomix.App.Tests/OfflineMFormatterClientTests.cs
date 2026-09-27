@@ -1,4 +1,5 @@
 using Tomix.App.Format;
+using Tomix.Core.Diagnostics;
 
 namespace Tomix.App.Tests;
 
@@ -62,6 +63,10 @@ public sealed class OfflineMFormatterClientTests
         Assert.False(response.Success);
         Assert.Equal(broken, response.Formatted);
         Assert.StartsWith("M syntax error on line 3, column 1: ", Assert.Single(response.Errors), StringComparison.Ordinal);
+        var syntax = Assert.Single(response.SyntaxErrors);
+        Assert.Equal(
+            new ExpressionSyntaxError("parse", "expectedCsvContinuation", syntax.Message, 3, 1, 3, 2),
+            syntax);
     }
 
     [Fact]
@@ -71,6 +76,9 @@ public sealed class OfflineMFormatterClientTests
 
         Assert.False(response.Success);
         Assert.Equal("M syntax error on line 1, column 9: Unterminated string", Assert.Single(response.Errors));
+        Assert.Equal(
+            new ExpressionSyntaxError("lex", "unterminatedMultilineToken", "Unterminated string", 1, 9),
+            Assert.Single(response.SyntaxErrors));
     }
 
     [Fact]

@@ -30,6 +30,9 @@ Fields:
 | `reason` | string | `validation` for a blocked mutation save. |
 | `newValidationErrorCount` | integer | Count of errors introduced by the mutation. |
 | `newErrors` | array | Introduced errors, each with `code`, `message`, and `object`. |
+| `objectPath` | string | The model object the error is about, when there is one (for example `tx format --path`). |
+| `line`, `column` | integer | 1-based position of the first syntax error, relative to the expression (not the file). |
+| `syntaxErrors` | array | Lexer/parser errors in an expression. Each has `stage` (`lex` or `parse`), `code` (the engine's error name, such as `expectedTokenKind`), `message`, `line`, `column`, and `endLine`/`endColumn` (the offending token's last character, inclusive). Fields the engine does not know are omitted: lex errors, and parse errors at the end of the input, have no end position. |
 
 ## Exit Codes
 
@@ -285,7 +288,7 @@ come from structural integrity checks.
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |
-| `TOMIX_FORMAT_FAILED` | 1 | `format --expression` failed to format the inline expression. DAX is formatted offline; M is formatted by a network service, so unreachable-service errors apply to M only. The message includes the formatter's error details. |
+| `TOMIX_FORMAT_FAILED` | 1 | `format` could not format the inline expression (`--expression`) or the object (`--path`), or a whole-model run had failed expressions and applied nothing (the result rows are still written; each failed row's `error` says why). DAX and M are both formatted offline. The message includes the formatter's error details; M that does not lex or parse also carries `line`, `column`, and `syntaxErrors` (plus `objectPath` for `--path`). |
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_COMPLETION_SHELL_REQUIRED` | 2 | `completion` called without its required shell argument. |
 | `TOMIX_PROFILE_TARGET_REQUIRED` | 2 | A new profile has no usable remote, local-model, Desktop, or active-session target. |

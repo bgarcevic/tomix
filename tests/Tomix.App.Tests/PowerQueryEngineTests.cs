@@ -83,13 +83,46 @@ public sealed class PowerQueryEngineTests(PowerQueryEngineTests.SharedEngine sha
         Assert.NotEmpty(error.Message);
     }
 
-    [Fact]
-    public async Task Diagnose_UnterminatedString_ReturnsLexError()
+    // Known-broken M and exactly where the engine must point. End positions are the offending
+    // token's last character (inclusive); lex errors and running out of input know only a start.
+    [Theory]
+    [InlineData("let x = \"abc in x", "lex", "unterminatedMultilineToken", 1, 9, null, null)]
+    [InlineData("let x = 1 /* oops in x", "lex", "unterminatedMultilineToken", 1, 11, null, null)]
+    [InlineData("let x = #\"abc", "lex", "unterminatedMultilineToken", 1, 9, null, null)]
+    [InlineData("0x", "lex", "expected", 1, 1, null, null)]
+    [InlineData("let\n    x = 1,\nin\n    x", "parse", "expectedCsvContinuation", 3, 1, 3, 2)]
+    [InlineData("let x = 1", "parse", "expectedClosingTokenKind", 1, 9, null, null)]
+    [InlineData("let\n    x = 1\n    y = 2\nin\n    y", "parse", "expectedClosingTokenKind", 3, 5, 3, 5)]
+    [InlineData("[a = ]", "parse", "expectedAnyTokenKind", 1, 6, 1, 6)]
+    [InlineData("#table({\"a\"}, {{1}", "parse", "expectedClosingTokenKind", 1, 18, null, null)]
+    [InlineData("{1, , 2}", "parse", "expectedAnyTokenKind", 1, 5, 1, 5)]
+    [InlineData("1 2", "parse", "unusedTokensRemain", 1, 3, 1, 3)]
+    public async Task Diagnose_BrokenM_ReportsStageCodeAndSpan(
+        string text,
+        string stage,
+        string code,
+        int line,
+        int column,
+        int? endLine,
+        int? endColumn)
     {
-        var result = await _engine.DiagnoseAsync("let x = \"abc in x", CancellationToken.None);
+        var result = await _engine.DiagnoseAsync(text, CancellationToken.None);
 
         var error = Assert.Single(result.Errors);
-        Assert.Equal(new PowerQueryEngineError(PowerQueryErrorKind.Lex, "Unterminated string", 1, 9), error);
+        Assert.NotEmpty(error.Message);
+        Assert.Equal(
+            new PowerQueryEngineError(
+                Enum.Parse<PowerQueryErrorKind>(stage, ignoreCase: true), code, error.Message, line, column, endLine, endColumn),
+            error);
+    }
+
+    [Fact]
+    public async Task Diagnose_LexErrorLineMap_ReportsTheSpecificMessage()
+    {
+        // The lexer wraps per-line errors in a map whose own message is only "Error on line(s): 0".
+        var result = await _engine.DiagnoseAsync("0x", CancellationToken.None);
+
+        Assert.Equal("Expected a hex literal", Assert.Single(result.Errors).Message);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Tomix.App.Format;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Tests;
@@ -191,11 +192,12 @@ public sealed class FormatModelHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_WholeModelSweepFailure_CarriesErrorDetailAndExitsZero()
+    public async Task HandleAsync_WholeModelSweepFailure_CarriesErrorDetailAndExitsOne()
     {
         // Issue #200: sweep failures reported only "Failed: N" and dropped the formatter's error
         // text, so users had to re-run inline to learn why. The detail now rides on each failed
-        // row; the sweep still succeeds with exit 0 by design.
+        // row. A failure applies nothing, so the run exits 1 with TOMIX_FORMAT_FAILED; exit 0 let
+        // CI pass over a broken expression.
         var handler = new FormatModelHandler(
             [new StubProvider(new StubSession(Snapshot()))],
             new FailingFormatter(["Formatter service returned HTTP 415: unsupported media type"]),
@@ -213,13 +215,18 @@ public sealed class FormatModelHandlerTests
                 SaveTo: null),
             CancellationToken.None);
 
-        Assert.True(result.Success);
-        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.Success); // The rows still render: they say where each expression breaks.
+        Assert.Equal(1, result.ExitCode);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("No changes applied: 1 of 1 expressions failed to format.", diagnostic.Message);
         var model = Assert.IsType<ModelFormatResult>(result.Data);
         Assert.Equal(1, model.Failed);
         var row = Assert.Single(model.Results);
         Assert.Equal("failed", row.Status);
-        Assert.Contains("HTTP 415", row.Error);
+        Assert.Contains("HTTP 415", row.Error!.Message);
+        Assert.Null(row.Error.Line); // No syntax error, so no position.
     }
 
     [Fact]
@@ -244,9 +251,113 @@ public sealed class FormatModelHandlerTests
 
         Assert.False(result.Success);
         var diagnostic = result.Diagnostics.First();
-        Assert.Equal("TOMIX_MUTATION_FAILED", diagnostic.Code);
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.Code);
+        Assert.Equal("Sales/Total Sales", diagnostic.ObjectPath);
         Assert.Contains("Sales/Total Sales", diagnostic.Message);
         Assert.Contains("Syntax error near 'this'.", diagnostic.Message);
+    }
+
+    private static readonly ExpressionSyntaxError StrayComma =
+        new("parse", "expectedCsvContinuation", "A comma cannot proceed an 'in'", 4, 1, 4, 2);
+
+    private static FailingFormatter SyntaxFailure()
+        => new(["M syntax error on line 4, column 1: A comma cannot proceed an 'in'"], [StrayComma]);
+
+    [Fact]
+    public async Task HandleAsync_InlineSyntaxError_CarriesStructuredPosition()
+    {
+        var handler = new FormatModelHandler([], SyntaxFailure(), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference(""),
+                Expression: "let x = 1, in x",
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, result.ExitCode);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.Code);
+        Assert.Equal(4, diagnostic.Line);
+        Assert.Equal(1, diagnostic.Column);
+        Assert.Equal(StrayComma, Assert.Single(diagnostic.SyntaxErrors!));
+    }
+
+    [Fact]
+    public async Task HandleAsync_InlineFailureWithoutPosition_OmitsSyntaxErrors()
+    {
+        var handler = new FormatModelHandler([], new FailingFormatter(["The engine timed out."]), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference(""),
+                Expression: "let x = 1 in x",
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.Code);
+        Assert.Null(diagnostic.Line);
+        Assert.Null(diagnostic.SyntaxErrors);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ObjectPathSyntaxError_CarriesObjectPathAndPosition()
+    {
+        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], SyntaxFailure(), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: "Sales/Total Sales",
+                Language: "m",
+                Type: ModelObjectKind.Measure,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_FORMAT_FAILED", diagnostic.Code);
+        Assert.Equal("Sales/Total Sales", diagnostic.ObjectPath);
+        Assert.Equal(StrayComma, Assert.Single(diagnostic.SyntaxErrors!));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ModelSweepSyntaxError_RowErrorCarriesPosition()
+    {
+        var handler = new FormatModelHandler([new StubProvider(new StubSession(Snapshot()))], SyntaxFailure(), TestStores);
+
+        var result = await handler.HandleAsync(
+            new FormatModelRequest(
+                new ModelReference("any"),
+                Expression: null,
+                Path: null,
+                Language: "m",
+                Type: null,
+                Long: false,
+                Save: false,
+                SaveTo: null),
+            CancellationToken.None);
+
+        var row = Assert.Single(Assert.IsType<ModelFormatResult>(result.Data).Results);
+        Assert.Equal(
+            new FormatError(
+                "M syntax error on line 4, column 1: A comma cannot proceed an 'in'",
+                "parse", "expectedCsvContinuation", 4, 1, 4, 2),
+            row.Error);
     }
 
     [Fact]
@@ -560,15 +671,23 @@ public sealed class FormatModelHandlerTests
     private sealed class FailingFormatter : IExpressionFormatterClient
     {
         private readonly IReadOnlyList<string> _errors;
+        private readonly IReadOnlyList<ExpressionSyntaxError> _syntaxErrors;
 
-        public FailingFormatter(IReadOnlyList<string> errors) => _errors = errors;
+        public FailingFormatter(IReadOnlyList<string> errors, IReadOnlyList<ExpressionSyntaxError>? syntaxErrors = null)
+        {
+            _errors = errors;
+            _syntaxErrors = syntaxErrors ?? [];
+        }
 
         public bool CanFormat(string language) => true;
 
         public Task<ExpressionFormatResponse> FormatAsync(
             ExpressionFormatRequest request,
             CancellationToken cancellationToken)
-            => Task.FromResult(new ExpressionFormatResponse(false, request.Expression, _errors));
+            => Task.FromResult(new ExpressionFormatResponse(false, request.Expression, _errors)
+            {
+                SyntaxErrors = _syntaxErrors
+            });
     }
 
     private sealed class StubProvider : IModelProvider

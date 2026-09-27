@@ -46,6 +46,7 @@ public sealed class OfflineMFormatterCorpusTests
                 Assert.True(
                     first.Success,
                     $"Offline M formatting failed for {path} ({kind}, long: {isLong}): {string.Join("; ", first.Errors)}");
+                Assert.Empty(first.SyntaxErrors); // No false positives on real-world M.
 
                 var second = await client.FormatAsync(
                     new ExpressionFormatRequest(first.Formatted, FormatterLanguages.PowerQuery, isLong),

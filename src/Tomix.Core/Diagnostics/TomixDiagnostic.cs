@@ -12,7 +12,8 @@ public sealed record TomixDiagnostic(
     bool? Blocked = null,
     string? Reason = null,
     int? NewValidationErrorCount = null,
-    IReadOnlyList<ValidationErrorDetail>? NewErrors = null);
+    IReadOnlyList<ValidationErrorDetail>? NewErrors = null,
+    IReadOnlyList<ExpressionSyntaxError>? SyntaxErrors = null);
 
 /// <summary>A validation error introduced by a mutation, without application-layer types.</summary>
 public sealed record ValidationErrorDetail(string Code, string Message, string Object);

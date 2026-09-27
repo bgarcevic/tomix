@@ -188,7 +188,7 @@ internal sealed class PowerQueryEngine : IDisposable
     }
 
     private static PowerQueryEngineError Internal(string message)
-        => new(PowerQueryErrorKind.Internal, message, null, null);
+        => new(PowerQueryErrorKind.Internal, null, message, null, null, null, null);
 
     private static PowerQueryEngineError UnexpectedResponse(string json)
         => Internal($"The offline Power Query engine returned an unexpected response: {json}");
@@ -254,8 +254,20 @@ internal enum PowerQueryErrorKind
     Internal
 }
 
-/// <summary>An engine error. <see cref="Line"/> and <see cref="Column"/> are 1-based, or null when the error has no position.</summary>
-internal sealed record PowerQueryEngineError(PowerQueryErrorKind Kind, string Message, int? Line, int? Column);
+/// <summary>
+/// An engine error. <see cref="Code"/> names the upstream error (for example <c>expectedTokenKind</c>)
+/// and is null for internal errors. <see cref="Line"/> and <see cref="Column"/> are 1-based, or null
+/// when the error has no position; <see cref="EndLine"/> and <see cref="EndColumn"/> mark the
+/// offending token's last character (inclusive), or are null when only the start is known.
+/// </summary>
+internal sealed record PowerQueryEngineError(
+    PowerQueryErrorKind Kind,
+    string? Code,
+    string Message,
+    int? Line,
+    int? Column,
+    int? EndLine,
+    int? EndColumn);
 
 /// <summary><see cref="Text"/> is set when <see cref="Ok"/>; otherwise <see cref="Error"/> is. Formatted text ends with a newline.</summary>
 internal sealed record PowerQueryFormatResult(bool Ok, string? Text, PowerQueryEngineError? Error);

@@ -93,6 +93,10 @@ public static class MutationRunner
         {
             return SaveValidation.Blocked<TResult>(ex.Delta);
         }
+        catch (Format.ExpressionFormatFailedException ex)
+        {
+            return Format.FormatFailure.Result<TResult>(ex.Message, ex.SyntaxErrors, ex.ObjectPath);
+        }
         catch (UnsupportedAddOptionException ex)
         {
             return TomixResult<TResult>.Fail("TOMIX_ADD_OPTION_UNSUPPORTED", ex.Message);
