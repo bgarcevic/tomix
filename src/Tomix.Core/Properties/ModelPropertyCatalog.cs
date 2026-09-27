@@ -362,7 +362,8 @@ public static class ModelPropertyCatalog
     /// <summary>
     /// Projects the object's full property set, ordered and keyed by JSON key. Annotations from
     /// the property bag are appended after the descriptors as <c>annotation:&lt;name&gt;</c>
-    /// entries (name-ordered); they appear in JSON and text output, while CSV stays limited to
+    /// entries (name-ordered), then translations as <c>translation:&lt;culture&gt;/&lt;property&gt;</c>,
+    /// the token <c>set</c> takes. Both appear in JSON and text output, while CSV stays limited to
     /// the fixed descriptor columns.
     /// </summary>
     public static IReadOnlyDictionary<string, object?> Project(ModelObject obj)
@@ -378,6 +379,16 @@ public static class ModelPropertyCatalog
                      .Where(p => p.Key.StartsWith(PropertyBagKeys.AnnotationPrefix, StringComparison.Ordinal))
                      .OrderBy(p => p.Key, StringComparer.Ordinal))
             properties[$"annotation:{key[PropertyBagKeys.AnnotationPrefix.Length..]}"] = value;
+
+        foreach (var (key, value) in obj.Properties
+                     .Where(p => p.Key.StartsWith(PropertyBagKeys.TranslationPrefix, StringComparison.Ordinal))
+                     .OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            // The bag carries the TOM property name (DisplayFolder); set and get use displayFolder.
+            var spec = key[PropertyBagKeys.TranslationPrefix.Length..];
+            var slash = spec.LastIndexOf('/');
+            properties[$"translation:{spec[..(slash + 1)]}{char.ToLowerInvariant(spec[slash + 1])}{spec[(slash + 2)..]}"] = value;
+        }
 
         return properties;
     }

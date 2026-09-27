@@ -112,6 +112,7 @@ public static class TomModelSummarizer
             [PropertyBagKeys.ForceUniqueNames] = model.ForceUniqueNames.ToString().ToLowerInvariant()
         };
         AddAnnotations(modelProps, model.Annotations);
+        AddTranslations(modelProps, model, model);
 
         return new ModelSnapshot(name, database.CompatibilityLevel, objects, modelProps, model.Description);
     }
@@ -154,6 +155,7 @@ public static class TomModelSummarizer
             [PropObjectType] = "Table"
         };
         AddAnnotations(tableProps, table.Annotations);
+        AddTranslations(tableProps, table, table.Model);
 
         foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
             children.Add(BuildColumn(column, path, relIndex, hierarchyUsage));
@@ -237,6 +239,7 @@ public static class TomModelSummarizer
             [PropObjectType] = column.Type == ColumnType.Calculated ? "CalculatedColumn" : "DataColumn"
         };
         AddAnnotations(props, column.Annotations);
+        AddTranslations(props, column, column.Table.Model);
 
         if (column is CalculatedTableColumn ctc)
         {
@@ -290,6 +293,7 @@ public static class TomModelSummarizer
             [PropObjectType] = "Measure"
         };
         AddAnnotations(props, measure.Annotations);
+        AddTranslations(props, measure, measure.Table.Model);
 
         return new ModelObject(
             measure.Name,
@@ -340,6 +344,7 @@ public static class TomModelSummarizer
             [PropertyBagKeys.SourceLineageTag] = hierarchy.SourceLineageTag ?? ""
         };
         AddAnnotations(props, hierarchy.Annotations);
+        AddTranslations(props, hierarchy, hierarchy.Table.Model);
         var levels = hierarchy.Levels
             .OrderBy(l => l.Ordinal)
             .Select(l => new ModelObject(
@@ -352,13 +357,7 @@ public static class TomModelSummarizer
                 Hidden: false,
                 SourceColumn: null,
                 Children: [],
-                Properties: new Dictionary<string, string>
-                {
-                    [PropertyBagKeys.Ordinal] = l.Ordinal.ToString(),
-                    [PropLineageTag] = l.LineageTag ?? "",
-                    [PropertyBagKeys.SourceLineageTag] = l.SourceLineageTag ?? "",
-                    [PropObjectType] = "Level"
-                }))
+                Properties: LevelProperties(l)))
             .ToList();
 
         return new ModelObject(
@@ -634,10 +633,38 @@ public static class TomModelSummarizer
             ? (ds.Name, ds is StructuredDataSource ? "Structured" : "Provider")
             : ("", "");
 
+    private static Dictionary<string, string> LevelProperties(Level level)
+    {
+        var props = new Dictionary<string, string>
+        {
+            [PropertyBagKeys.Ordinal] = level.Ordinal.ToString(),
+            [PropLineageTag] = level.LineageTag ?? "",
+            [PropertyBagKeys.SourceLineageTag] = level.SourceLineageTag ?? "",
+            [PropObjectType] = "Level"
+        };
+        AddTranslations(props, level, level.Hierarchy.Table.Model);
+        return props;
+    }
+
     private static void AddAnnotations(Dictionary<string, string> props, IEnumerable<Annotation> annotations)
     {
         foreach (var annotation in annotations)
             props[$"Annotation:{annotation.Name}"] = annotation.Value ?? "";
+    }
+
+    private static readonly TranslatedProperty[] TranslatedProperties =
+        [TranslatedProperty.Caption, TranslatedProperty.Description, TranslatedProperty.DisplayFolder];
+
+    // One keyed lookup per culture and property, so a model without cultures pays nothing.
+    private static void AddTranslations(Dictionary<string, string> props, MetadataObject obj, Model? model)
+    {
+        if (model is null)
+            return;
+
+        foreach (var culture in model.Cultures)
+            foreach (var property in TranslatedProperties)
+                if (culture.ObjectTranslations[obj, property] is { Value.Length: > 0 } translation)
+                    props[$"{PropertyBagKeys.TranslationPrefix}{culture.Name}/{property}"] = translation.Value;
     }
 
     private static Dictionary<string, List<string>> BuildHierarchyUsageIndex(Model model)

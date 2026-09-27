@@ -164,6 +164,33 @@ public sealed class PropertyCatalogTests
     }
 
     [Fact]
+    public void Project_AppendsTranslationsAfterAnnotations_InSetSyntax()
+    {
+        // The projected key is the same token `set --set` takes, so get output can be pasted back.
+        var measure = Leaf(ModelObjectKind.Measure) with
+        {
+            Properties = new Dictionary<string, string>
+            {
+                [$"{PropertyBagKeys.TranslationPrefix}sv-SE/Caption"] = "Intäkt",
+                [$"{PropertyBagKeys.TranslationPrefix}da-DK/DisplayFolder"] = "Nøgletal",
+                [$"{PropertyBagKeys.TranslationPrefix}da-DK/Caption"] = "Omsætning",
+                [$"{PropertyBagKeys.AnnotationPrefix}Alpha"] = "a"
+            }
+        };
+
+        var projected = ModelPropertyCatalog.Project(measure);
+        var descriptorKeys = ModelPropertyCatalog.For(ModelObjectKind.Measure).Select(d => d.JsonKey).ToList();
+
+        Assert.Equal(
+            [
+                .. descriptorKeys, "annotation:Alpha",
+                "translation:da-DK/caption", "translation:da-DK/displayFolder", "translation:sv-SE/caption"
+            ],
+            projected.Keys.ToList());
+        Assert.Equal("Omsætning", projected["translation:da-DK/caption"]);
+    }
+
+    [Fact]
     public void Project_RelationshipAndRole_ReadBagAndDetail()
     {
         var relationship = Leaf(ModelObjectKind.Relationship) with

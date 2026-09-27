@@ -159,6 +159,19 @@ tx set "Sales Territory/'Sales Territories'/Region" -q ordinal -i 2
 tx set Sales/Sales -t partition -q mode -i DirectQuery
 ```
 
+Translations use `translation:<culture>/<property>`, where the property is
+`caption` (alias `name`), `description`, or `displayFolder` (measures,
+columns, and hierarchies only). Tables, columns, measures, hierarchies,
+levels, and the model root (`.`) can be translated. The culture must exist
+already; add it with `tx add Cultures/<culture> -t Culture`. An empty value
+removes the translation, and `tx get` reads translations back under the same key.
+
+```sh
+tx add Cultures/da-DK -t Culture --save
+tx set "Sales[Total Sales]" --set translation:da-DK/caption="Omsætning" --set translation:da-DK/displayFolder="Nøgletal" --save
+tx set "Sales[Total Sales]" --set translation:da-DK/caption= --save   # remove it
+```
+
 When the edited property carries DAX (for example a measure's `expression`),
 text output previews the change with `Before:`/`After:` lines and syntax
 colors. Non-DAX properties, unchanged values, and `--output-format json`

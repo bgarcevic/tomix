@@ -94,4 +94,7 @@ public static class PropertyBagKeys
     public const string Timeout = "Timeout";
     public const string ContextExpression = "ContextExpression";
     public const string AnnotationPrefix = "Annotation:";
+
+    /// <summary>Prefix of <c>Translation:&lt;culture&gt;/&lt;Caption|Description|DisplayFolder&gt;</c> entries.</summary>
+    public const string TranslationPrefix = "Translation:";
 }

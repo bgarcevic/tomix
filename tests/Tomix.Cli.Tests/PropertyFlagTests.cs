@@ -103,6 +103,26 @@ public sealed class PropertyFlagTests
         Assert.Equal(["a=1", "b=2", "c=3"], parsed.GetValue<string[]>("--set")!);
     }
 
+    [Theory]
+    [InlineData("translation:da-DK/caption=", "")]   // explicit empty: removes, never waits on stdin
+    [InlineData("expression=-", "from stdin")]
+    [InlineData("description=a=b", "a=b")]
+    public void SetAssignments_OnlyDashReadsStdin(string raw, string expected)
+    {
+        var original = Console.In;
+        Console.SetIn(new StringReader("from stdin"));
+        try
+        {
+            var assignment = Assert.Single(SetCommand.ParseSetAssignments([raw]));
+
+            Assert.Equal(expected, assignment.Value);
+        }
+        finally
+        {
+            Console.SetIn(original);
+        }
+    }
+
     [Fact]
     public void SetSetWithCompatibilityQi_Conflicts()
     {

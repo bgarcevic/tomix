@@ -49,12 +49,14 @@ functions include `expression` and `isHidden`. The model root has its own
 path — `tx get .` reports the compatibility level, `culture`,
 `defaultMode`, and the other model-level scalars. Object
 annotations are appended as `annotation:<name>` entries in text and JSON
-output (CSV keeps the fixed per-kind columns).
+output, followed by translations as `translation:<culture>/<property>`
+(the same token `tx set` takes). CSV keeps the fixed per-kind columns.
 
 ```sh
 tx get "Sales/Total Sales"
 tx get "Sales/Total Sales" --query expression
 tx get "Sales/Total Sales" --query annotation:PBI_FormatHint
+tx get "Sales/Total Sales" --query translation:da-DK/caption
 tx get "Relationships/rel-customers"
 tx get "Expressions/Environment" --query expression   # a shared M parameter's value
 tx get . --query culture                         # a model-level scalar

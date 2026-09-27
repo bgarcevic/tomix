@@ -1,5 +1,7 @@
+using Tomix.App.ModelObjects;
 using Tomix.App.Set;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
@@ -227,6 +229,38 @@ public sealed class SetModelPropertyHandlerTests
         Assert.False(result.Success);
         Assert.NotEqual(0, result.ExitCode);
         Assert.Equal(before, Files(model.Path));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Translation_RoundTripsThroughTmdl()
+    {
+        using var config = new TempConfigDir();
+        using var model = SampleModel.CopyToTemp();
+        var reference = new ModelReference(model.Path);
+        await using (var session = await new TmdlModelProvider().OpenAsync(reference, CancellationToken.None))
+        {
+            var mutation = (IModelMutationSession)session;
+            mutation.AddObject(new ModelObjectAddRequest("Cultures/da-DK", "Culture", null, [], IfNotExists: false));
+            await mutation.SaveAsync(null, "", overwrite: false, CancellationToken.None);
+        }
+
+        var handler = new SetModelPropertyHandler([new TmdlModelProvider()], config.Stores);
+        var result = await handler.HandleAsync(
+            NewRequest(
+                [new("translation:da-DK/caption", "Omsætning i alt"), new("translation:da-DK/displayFolder", "Nøgletal")],
+                revert: false,
+                path: "Sales/Total Sales",
+                save: true,
+                model: model.Path),
+            CancellationToken.None);
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        await using var reopened = await new TmdlModelProvider().OpenAsync(reference, CancellationToken.None);
+        var measure = ModelObjectProjection.Flatten(await reopened.GetSnapshotAsync(CancellationToken.None))
+            .Single(o => o.Path == "Sales/Total Sales");
+        var projected = ModelPropertyCatalog.Project(measure);
+        Assert.Equal("Omsætning i alt", projected["translation:da-DK/caption"]);
+        Assert.Equal("Nøgletal", projected["translation:da-DK/displayFolder"]);
     }
 
     private static SortedDictionary<string, string> Files(string root)

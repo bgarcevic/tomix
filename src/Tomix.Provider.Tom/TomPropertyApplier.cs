@@ -21,7 +21,7 @@ internal static class TomPropertyApplier
     {
         // Annotation names are case-sensitive and their values are opaque (often JSON), so handle
         // them before the property name is normalized/lowercased.
-        if (TryApplyAnnotation(target, assignment))
+        if (TryApplyAnnotation(target, assignment) || TryApplyTranslation(target, assignment))
             return;
 
         var property = TomMutationPaths.NormalizeProperty(assignment.Property);
@@ -182,6 +182,76 @@ internal static class TomPropertyApplier
             existing.Value = assignment.Value;
         else
             annotations.Add(new Annotation { Name = name, Value = assignment.Value });
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handles a <c>translation:&lt;culture&gt;/&lt;property&gt;</c> assignment by setting or
+    /// replacing the object's translation in that culture, or removing it when the value is empty.
+    /// The culture must already exist, so a mistyped culture name cannot create a new culture.
+    /// Returns false when the property is not a translation.
+    /// </summary>
+    private static bool TryApplyTranslation(object target, ModelPropertyAssignment assignment)
+    {
+        if (!assignment.Property.StartsWith(PropertyBagKeys.TranslationPrefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var spec = assignment.Property[PropertyBagKeys.TranslationPrefix.Length..];
+        var slash = spec.LastIndexOf('/');
+        var cultureName = slash > 0 ? spec[..slash].Trim() : "";
+        var propertyName = slash > 0 ? spec[(slash + 1)..].Trim() : "";
+        if (cultureName.Length == 0 || propertyName.Length == 0)
+            throw new ArgumentException(
+                $"'{assignment.Property}' must be translation:<culture>/<property>, for example translation:da-DK/caption.");
+
+        var property = TomMutationPaths.NormalizeProperty(propertyName) switch
+        {
+            "caption" or "name" => TranslatedProperty.Caption,
+            "description" => TranslatedProperty.Description,
+            "displayfolder" => TranslatedProperty.DisplayFolder,
+            _ => throw new NotSupportedException(
+                $"Cannot translate '{propertyName}'. Translatable properties: caption, description, displayFolder.")
+        };
+
+        var (translatable, model, kindPlural, hasDisplayFolder) = target switch
+        {
+            Database database => ((MetadataObject)database.Model, database.Model, "the model root", false),
+            Table table => (table, table.Model, "tables", false),
+            Column column => (column, column.Table.Model, "columns", true),
+            Measure measure => (measure, measure.Table.Model, "measures", true),
+            Hierarchy hierarchy => (hierarchy, hierarchy.Table.Model, "hierarchies", true),
+            Level level => (level, level.Hierarchy.Table.Model, "levels", false),
+            _ => throw new NotSupportedException(
+                $"Translations are not supported for {target.GetType().Name} objects; translate tables, columns, measures, hierarchies, levels, or the model root (.).")
+        };
+        if (property == TranslatedProperty.DisplayFolder && !hasDisplayFolder)
+            throw new NotSupportedException(
+                $"Cannot translate displayFolder on {kindPlural}: only measures, columns, and hierarchies have display folders.");
+
+        var culture = model.Cultures.FirstOrDefault(c => string.Equals(c.Name, cultureName, StringComparison.OrdinalIgnoreCase))
+            ?? throw new ArgumentException(
+                $"Culture '{cultureName}' does not exist. Add it first: tx add Cultures/{cultureName} -t Culture");
+
+        var existing = culture.ObjectTranslations[translatable, property];
+        if (string.IsNullOrEmpty(assignment.Value))
+        {
+            if (existing is not null)
+                culture.ObjectTranslations.Remove(existing);
+        }
+        else if (existing is not null)
+        {
+            existing.Value = assignment.Value;
+        }
+        else
+        {
+            culture.ObjectTranslations.Add(new ObjectTranslation
+            {
+                Object = translatable,
+                Property = property,
+                Value = assignment.Value
+            });
+        }
 
         return true;
     }

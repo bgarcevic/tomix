@@ -132,9 +132,7 @@ internal sealed class SetCommand : ICommandModule
             }
 
             IReadOnlyList<ModelPropertyAssignment> assignments = sets.Length > 0
-                ? sets.Select(set => new ModelPropertyAssignment(
-                    AddCommand.SplitSetName(set),
-                    InputValueResolver.Resolve(set[(set.IndexOf('=') + 1)..]) ?? "")).ToArray()
+                ? ParseSetAssignments(sets)
                 : string.IsNullOrWhiteSpace(query)
                     ? Array.Empty<ModelPropertyAssignment>()
                     : [new ModelPropertyAssignment(query, InputValueResolver.Resolve(rawValue) ?? "")];
@@ -178,6 +176,17 @@ internal sealed class SetCommand : ICommandModule
 
         return command;
     }
+
+    // "name=" is an explicit empty value (it clears or removes the property), so only "-" reads
+    // stdin. The implicit read on an empty value would block a script whose stdin is redirected.
+    internal static IReadOnlyList<ModelPropertyAssignment> ParseSetAssignments(IEnumerable<string> sets)
+        => sets.Select(set =>
+        {
+            var value = set[(set.IndexOf('=') + 1)..];
+            return new ModelPropertyAssignment(
+                AddCommand.SplitSetName(set),
+                value == "-" ? InputValueResolver.Resolve(value) ?? "" : value);
+        }).ToArray();
 
     internal static void Render(SetModelPropertyResult result)
     {
