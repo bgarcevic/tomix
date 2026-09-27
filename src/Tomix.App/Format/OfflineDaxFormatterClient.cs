@@ -1,11 +1,13 @@
 using Tomix.Core.Dax;
+using Tomix.Core.Diagnostics;
 
 namespace Tomix.App.Format;
 
 /// <summary>
 /// Formats DAX entirely offline through the vendored engine behind <see cref="DaxFormatter"/>:
 /// no network, no rate limits, identical behavior air-gapped. Expressions with DAX syntax
-/// errors are rejected with the error's line and message instead of being formatted, and when
+/// errors are rejected with each error's position (structured, in the shape the M engine
+/// reports) and message instead of being formatted, and when
 /// the formatter declines because printing would change the code, the response says where the
 /// first difference is.
 /// </summary>
@@ -23,11 +25,14 @@ public sealed class OfflineDaxFormatterClient : IExpressionFormatterClient
         var syntaxIssues = DaxSyntaxCheck.Analyze(request.Expression);
         if (syntaxIssues.Count > 0)
         {
+            var errors = syntaxIssues.Select(issue => ToSyntaxError(request.Expression, issue)).ToList();
             return Task.FromResult(new ExpressionFormatResponse(
                 false,
                 request.Expression,
-                [.. syntaxIssues.Select(issue =>
-                    $"DAX syntax error on line {LineOf(request.Expression, issue.Start)}: {issue.Message}")]));
+                [.. errors.Select(error => $"DAX syntax error on line {error.Line}, column {error.Column}: {error.Message}")])
+            {
+                SyntaxErrors = errors
+            });
         }
 
         var result = DaxFormatter.TryFormat(request.Expression);
@@ -45,15 +50,14 @@ public sealed class OfflineDaxFormatterClient : IExpressionFormatterClient
         return Task.FromResult(new ExpressionFormatResponse(true, result.Formatted, []));
     }
 
-    private static int LineOf(string text, int offset)
+    // The end is the issue's last character (inclusive); an issue at the end of the text has only a start.
+    private static ExpressionSyntaxError ToSyntaxError(string expression, DaxSyntaxIssue issue)
     {
-        var line = 1;
-        for (var i = 0; i < offset && i < text.Length; i++)
-        {
-            if (text[i] == '\n')
-                line++;
-        }
+        var (line, column) = SourcePosition.Of(expression, issue.Start);
+        if (issue.Length == 0)
+            return new ExpressionSyntaxError(issue.Stage, issue.Code, issue.Message, line, column);
 
-        return line;
+        var (endLine, endColumn) = SourcePosition.Of(expression, issue.Start + issue.Length - 1);
+        return new ExpressionSyntaxError(issue.Stage, issue.Code, issue.Message, line, column, endLine, endColumn);
     }
 }

@@ -404,6 +404,9 @@ DAX is formatted offline by the engine bundled with `tx` — no network, no rate
 result air-gapped. DAX output uses the bundled formatter's style: a 65-column prettier-style
 layout with keywords and known function names upper-cased, so results differ from the
 daxformatter.com style previous releases produced (and from Power BI's format button).
+DAX that does not parse is left unchanged and reported with its line and column
+(`DAX syntax error on line 1, column 19: Expected ',' or ')', but found 'Sales'.`), with the
+same caret and `syntaxErrors` as M below.
 
 Power Query (M) is formatted offline too, by Microsoft's
 [powerquery-formatter](https://github.com/microsoft/powerquery-formatter) bundled inside `tx`

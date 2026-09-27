@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Tomix.Core.Dax;
 
 /// <summary>The kind of offline syntax problem found in a DAX expression.</summary>
@@ -14,6 +16,15 @@ public enum DaxSyntaxErrorKind
 
     /// <summary>A <c>/* */</c> comment whose <c>*/</c> is missing.</summary>
     UnterminatedComment,
+
+    /// <summary>A token where a comma, a closing bracket, or the end of the expression belongs.</summary>
+    UnexpectedToken,
+
+    /// <summary>An operator, bracket, or the end where an operand belongs, as in <c>1 +</c>.</summary>
+    MissingOperand,
+
+    /// <summary>A <c>VAR</c> without <c>=</c> or without <c>RETURN</c>.</summary>
+    IncompleteVarBlock,
 }
 
 /// <summary>
@@ -25,14 +36,28 @@ public readonly record struct DaxSyntaxIssue(
     int Start,
     int Length,
     DaxSyntaxErrorKind Kind,
-    string Message);
+    string Message)
+{
+    /// <summary><c>lex</c> for problems inside a single token, <c>parse</c> for problems between tokens.</summary>
+    public string Stage => Kind is DaxSyntaxErrorKind.UnexpectedCharacter
+        or DaxSyntaxErrorKind.UnterminatedLiteral
+        or DaxSyntaxErrorKind.UnterminatedComment
+        ? "lex"
+        : "parse";
+
+    /// <summary>The kind as a stable camelCase name, for machine output.</summary>
+    public string Code => JsonNamingPolicy.CamelCase.ConvertName(Kind.ToString());
+}
 
 /// <summary>
-/// Offline DAX syntax checking over a single expression: reports characters that start no token,
-/// unterminated literals and block comments, and unbalanced parentheses or braces. The check runs
-/// over the token stream, so everything inside a string or comment is correctly ignored, and an
-/// expression full of quirks (<c>''</c>/<c>]]</c> escapes, <c>dt"…"</c>, omitted arguments) is
-/// accepted exactly as DAX accepts it.
+/// Offline DAX syntax checking over a single expression, in two passes. The token pass reports
+/// characters that start no token, unterminated literals and block comments, and unbalanced
+/// parentheses or braces; it runs over the token stream, so everything inside a string or
+/// comment is ignored, and an expression full of quirks (<c>''</c>/<c>]]</c> escapes,
+/// <c>dt"…"</c>, omitted arguments) is accepted exactly as DAX accepts it. When the tokens are
+/// sound, the parser reports its first grammar error: a missing operand or comma, tokens left
+/// after the expression, or an incomplete <c>VAR</c> block. Only the first, because what follows
+/// a grammar error is the parser's guess.
 /// </summary>
 public static class DaxSyntaxCheck
 {
@@ -107,6 +132,15 @@ public static class DaxSyntaxCheck
                 DaxSyntaxErrorKind.UnbalancedGroup,
                 $"'{symbol}' has no matching closing bracket."));
 
+        // A token problem already explains everything after it; the grammar would only echo it.
+        if (issues.Count == 0)
+        {
+            var errors = new List<Engine.DaxParseError>();
+            Engine.DaxParser.Parse(dax, errors);
+            if (errors.Count > 0)
+                issues.Add(new DaxSyntaxIssue(errors[0].Start, errors[0].Length, Kind(errors[0].Kind), errors[0].Message));
+        }
+
         return issues;
 
         void Close(char expectedOpen, char closer, Engine.DaxToken closerToken)
@@ -123,6 +157,13 @@ public static class DaxSyntaxCheck
             open.RemoveAt(open.Count - 1);
         }
     }
+
+    private static DaxSyntaxErrorKind Kind(Engine.DaxParseErrorKind kind) => kind switch
+    {
+        Engine.DaxParseErrorKind.MissingOperand => DaxSyntaxErrorKind.MissingOperand,
+        Engine.DaxParseErrorKind.IncompleteVarBlock => DaxSyntaxErrorKind.IncompleteVarBlock,
+        _ => DaxSyntaxErrorKind.UnexpectedToken
+    };
 
     private static DaxSyntaxIssue Unterminated(Engine.DaxToken token, string what) =>
         new(token.Start, token.Length, DaxSyntaxErrorKind.UnterminatedLiteral, $"Unterminated {what}.");

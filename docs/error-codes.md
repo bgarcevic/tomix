@@ -32,7 +32,7 @@ Fields:
 | `newErrors` | array | Introduced errors, each with `code`, `message`, and `object`. |
 | `objectPath` | string | The model object the error is about, when there is one (for example `tx format --path`). |
 | `line`, `column` | integer | 1-based position of the first syntax error, relative to the expression (not the file). |
-| `syntaxErrors` | array | Lexer/parser errors in an expression. Each has `stage` (`lex` or `parse`), `code` (the engine's error name, such as `expectedTokenKind`), `message`, `line`, `column`, and `endLine`/`endColumn` (the offending token's last character, inclusive). Fields the engine does not know are omitted: lex errors, and parse errors at the end of the input, have no end position. |
+| `syntaxErrors` | array | Lexer/parser errors in an expression. Each has `stage` (`lex` or `parse`), `code` (the engine's error name, such as `expectedTokenKind` for M or `missingOperand` for DAX), `message`, `line`, `column`, and `endLine`/`endColumn` (the offending token's last character, inclusive). Fields the engine does not know are omitted: lex errors, and parse errors at the end of the input, have no end position. |
 
 ## Exit Codes
 
@@ -249,8 +249,10 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 
 Codes carried on the issues inside a `validate` result (not top-level diagnostics; the
 command exits `1` when any error-severity issue is present). `DAX0001`–`DAX0003` and
-`DAX0006` come from the offline DAX reference scan, `DAX0004`/`DAX0005` from the offline DAX syntax check
-(which runs first — a broken expression reports only its syntax issues); `TOMIX_*` codes
+`DAX0006` come from the offline DAX reference scan, `DAX0004`/`DAX0005` from the offline DAX syntax check's
+token pass, and `DAX0007`–`DAX0009` from its grammar pass (the first grammar error only, and
+only when the tokens are sound). The syntax check runs first — a broken expression reports
+only its syntax issues; `TOMIX_*` codes
 come from structural integrity checks.
 
 | Code | Severity | Trigger |
@@ -261,6 +263,9 @@ come from structural integrity checks.
 | `DAX0004` | Error | A DAX expression contains a character that starts no DAX token, or an unbalanced parenthesis/brace. The expression's reference checks are skipped. |
 | `DAX0005` | Error | A DAX expression contains an unterminated string, table name, column reference, or block comment. The expression's reference checks are skipped. |
 | `DAX0006` | Error | A measure or calculated column expression directly references itself. |
+| `DAX0007` | Error | The DAX parser found a token where a comma, a closing bracket, or the end of the expression belongs: a missing comma between arguments (`SUM(a b)`), or text left over after a complete expression. The expression's reference checks are skipped. |
+| `DAX0008` | Error | The DAX parser found an operator, a closing bracket, or the end of the expression where an operand belongs (`1 +`, `1 * * 2`, `f(x + )`). The expression's reference checks are skipped. |
+| `DAX0009` | Error | A `VAR` has no `=` after its name, or a `VAR` block has no `RETURN`. The expression's reference checks are skipped. |
 | `TOMIX_BROKEN_RELATIONSHIP` | Error | A relationship endpoint refers to a missing column. |
 | `TOMIX_BROKEN_SORT_BY` | Error | A column's sort-by column does not exist on its table. |
 | `TOMIX_BROKEN_LEVEL` | Error | A hierarchy level is bound to a column that does not exist on its table. |
@@ -288,7 +293,7 @@ come from structural integrity checks.
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |
-| `TOMIX_FORMAT_FAILED` | 1 | `format` could not format the inline expression (`--expression`) or the object (`--path`), or a whole-model run had failed expressions and applied nothing (the result rows are still written; each failed row's `error` says why). DAX and M are both formatted offline. The message includes the formatter's error details; M that does not lex or parse also carries `line`, `column`, and `syntaxErrors` (plus `objectPath` for `--path`). |
+| `TOMIX_FORMAT_FAILED` | 1 | `format` could not format the inline expression (`--expression`) or the object (`--path`), or a whole-model run had failed expressions and applied nothing (the result rows are still written; each failed row's `error` says why). DAX and M are both formatted offline. The message includes the formatter's error details; DAX or M that does not lex or parse also carries `line`, `column`, and `syntaxErrors` (plus `objectPath` for `--path`). |
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_COMPLETION_SHELL_REQUIRED` | 2 | `completion` called without its required shell argument. |
 | `TOMIX_PROFILE_TARGET_REQUIRED` | 2 | A new profile has no usable remote, local-model, Desktop, or active-session target. |

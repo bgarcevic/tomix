@@ -151,7 +151,9 @@ Offline analysis runs on every DAX-bearing expression (measures, calculated
 columns/items/tables, role filters, secondary measure expressions). Syntax is
 checked first: illegal characters, unterminated string/table/bracket literals
 and block comments, and unbalanced parentheses or braces are reported as
-`DAX0004`/`DAX0005` errors — and when an expression's syntax is broken, its
+`DAX0004`/`DAX0005` errors. When those pass, the DAX parser reports its first
+grammar error: a missing comma or leftover text (`DAX0007`), a missing operand
+(`DAX0008`), or a `VAR` without `=` or `RETURN` (`DAX0009`). When an expression's syntax is broken, its
 reference checks are skipped, since a never-closed bracket makes everything
 after it read wrong. Syntactically valid expressions then get the offline
 reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).

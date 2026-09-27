@@ -6,12 +6,14 @@ namespace Tomix.Core.Dax.Engine;
 /// <summary>
 /// A recursive-descent parser with precedence climbing for expressions. It recognizes enough DAX
 /// structure to lay code out well and treats anything it does not recognize as a plain token, so
-/// unfamiliar syntax degrades to neutral formatting instead of being lost.
+/// unfamiliar syntax degrades to neutral formatting instead of being lost. Given an error list,
+/// it also records where the grammar breaks; recording never changes the tree it builds.
 /// </summary>
-internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
+internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source, List<DaxParseError>? errors = null)
 {
     private readonly IReadOnlyList<DaxToken> tokens = tokens;
     private readonly string source = source;
+    private readonly List<DaxParseError>? errors = errors;
     private int position;
 
     /// <summary>Words that begin a definition inside a DEFINE block, and therefore end the previous one.</summary>
@@ -27,11 +29,21 @@ internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
         "CALCULATIONGROUP", "CALCULATIONITEM", "ORDER", "START", "RETURN", "DENSIFY", "WITH"
     };
 
-    public static DaxScript Parse(string source)
+    public static DaxScript Parse(string source) => Parse(source, errors: null);
+
+    /// <summary>Parses <paramref name="source"/>, adding each grammar error to <paramref name="errors"/> in source order.</summary>
+    public static DaxScript Parse(string source, List<DaxParseError>? errors)
     {
-        var parser = new DaxParser(DaxLexer.Tokenize(source), source);
+        var parser = new DaxParser(DaxLexer.Tokenize(source), source, errors);
         return parser.ParseScript();
     }
+
+    private void Report(DaxToken at, DaxParseErrorKind kind, string message)
+        => errors?.Add(new DaxParseError(
+            at.Start, at.Kind == DaxTokenKind.EndOfFile ? 0 : Math.Max(at.Length, 1), kind, message));
+
+    private static string Describe(DaxToken token)
+        => token.Kind == DaxTokenKind.EndOfFile ? "the expression ended" : $"found '{token.Text}'";
 
     private DaxToken Current => tokens[position];
     private DaxToken Peek(int offset = 1) =>
@@ -52,10 +64,19 @@ internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
             var terminator = Current.Kind == DaxTokenKind.Semicolon ? Advance() : null;
             statements.Add(new DaxStatement(body, terminator));
 
+            // A query is a series of statements, but a plain expression is complete on its own:
+            // anything after it that no semicolon separates is left over.
+            if (terminator is null && !AtEnd && IsPlainExpression(body))
+                Report(Current, DaxParseErrorKind.UnexpectedToken,
+                    $"Unexpected '{Current.Text}' after the end of the expression.");
+
             if (position == before) statements.Add(new DaxLeaf(Advance())); // never spin
         }
         return new DaxScript(statements, Current);
     }
+
+    private static bool IsPlainExpression(DaxNode node)
+        => node is not (DaxDefine or DaxEvaluate or DaxDefinition or DaxFunctionDefinition);
 
     private DaxNode ParseStatement()
     {
@@ -343,13 +364,21 @@ internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
                 {
                     if (Peek().Kind == DaxTokenKind.OpenParenthesis)
                         return ParseCall();
+                    if (Current.IsKeyword("RETURN"))
+                        Report(Current, DaxParseErrorKind.MissingOperand, "Expected an expression, but found 'RETURN'.");
                     var parts = new List<DaxToken> { Advance() };
                     if (Current.Kind == DaxTokenKind.ColumnReference) parts.Add(Advance());
                     return parts.Count > 1 ? new DaxReference(parts) : new DaxLeaf(parts[0]);
                 }
 
-            default:
+            case DaxTokenKind.Number or DaxTokenKind.String or DaxTokenKind.DateTime
+                or DaxTokenKind.QueryParameter or DaxTokenKind.Unknown:
                 return new DaxLeaf(Advance());
+
+            // An operator, a closing bracket, a separator, or the end: the operand is missing.
+            default:
+                Report(Current, DaxParseErrorKind.MissingOperand, $"Expected an expression, but {Describe(Current)}.");
+                return AtEnd ? new DaxLeaf(EmptyToken) : new DaxLeaf(Advance());
         }
     }
 
@@ -411,6 +440,10 @@ internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
                 separators.Add(Advance());
                 continue;
             }
+            // A missing closer is the token check's to report; anything else is a missing comma.
+            if (Current.Kind != closing && !AtEnd)
+                Report(Current, DaxParseErrorKind.UnexpectedToken,
+                    $"Expected ',' or '{(closing == DaxTokenKind.CloseParenthesis ? ')' : '}')}', but {Describe(Current)}.");
             break;
         }
 
@@ -427,6 +460,8 @@ internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
             var name = AtEnd ? EmptyToken : Advance();
             if (!Current.IsOperator("=") && !Current.IsOperator(":="))
             {
+                Report(Current, DaxParseErrorKind.IncompleteVarBlock,
+                    $"Expected '=' after VAR {name.Text}, but {Describe(Current)}.");
                 variables.Add(new DaxVariable(keyword, name, EmptyToken, new DaxLeaf(EmptyToken)));
                 break;
             }
@@ -435,12 +470,31 @@ internal sealed class DaxParser(IReadOnlyList<DaxToken> tokens, string source)
         }
 
         if (!Current.IsKeyword("RETURN"))
+        {
+            Report(Current, DaxParseErrorKind.IncompleteVarBlock, "VAR block has no RETURN.");
             return new DaxVarReturn(variables, null, null);
+        }
 
         var returnKeyword = Advance();
         return new DaxVarReturn(variables, returnKeyword, ParseExpression());
     }
 }
+
+/// <summary>What kind of grammar error the parser found.</summary>
+internal enum DaxParseErrorKind
+{
+    /// <summary>A token where a comma, closing bracket, or the end was expected.</summary>
+    UnexpectedToken,
+
+    /// <summary>An operator, bracket, or the end where an operand was expected.</summary>
+    MissingOperand,
+
+    /// <summary>A VAR without '=' or without RETURN.</summary>
+    IncompleteVarBlock
+}
+
+/// <summary>A grammar error: the offending token's offset and length in the source, and a message.</summary>
+internal readonly record struct DaxParseError(int Start, int Length, DaxParseErrorKind Kind, string Message);
 
 internal static class DaxPrecedence
 {

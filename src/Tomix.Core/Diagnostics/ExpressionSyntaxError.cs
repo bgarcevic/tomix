@@ -1,7 +1,7 @@
 namespace Tomix.Core.Diagnostics;
 
 /// <summary>
-/// A lexer or parser error in an expression (M today, DAX later), language-neutral so every
+/// A lexer or parser error in an M or DAX expression, language-neutral so every
 /// expression engine reports positions the same way.
 /// </summary>
 /// <param name="Stage"><c>lex</c> or <c>parse</c>.</param>

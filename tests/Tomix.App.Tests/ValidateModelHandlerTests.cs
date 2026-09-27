@@ -223,6 +223,20 @@ public sealed class ValidateModelHandlerTests
         Assert.Contains("Unterminated string literal", issue.Message);
     }
 
+    [Theory]
+    [InlineData("SUM(Sales[Amount] Sales[Amount])", "DAX0007", "Expected ',' or ')'")]
+    [InlineData("SUM(Sales[Amount]) +", "DAX0008", "Expected an expression")]
+    [InlineData("VAR x = SUM(Sales[Amount])", "DAX0009", "VAR block has no RETURN")]
+    public async Task HandleAsync_ReportsGrammarError_WithItsOwnCode(string expression, string code, string message)
+    {
+        // Balanced brackets and resolvable references: only the parser can see these are broken.
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", expression)));
+
+        var issue = Assert.Single(result.Data!.Errors);
+        Assert.Equal(code, issue.Code);
+        Assert.Contains(message, issue.Message);
+    }
+
     [Fact]
     public async Task HandleAsync_ReportsLineOfSyntaxError()
     {

@@ -8,9 +8,10 @@ using Tomix.Core.Diagnostics;
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// M that does not lex or parse fails <c>tx format</c> with <c>TOMIX_FORMAT_FAILED</c> and says
-/// where (#197): JSON errors carry structured <c>syntaxErrors</c>, and text errors for an inline
-/// expression show the offending line with a caret. Runs the real offline M engine.
+/// M (#197) or DAX (#203) that does not lex or parse fails <c>tx format</c> with
+/// <c>TOMIX_FORMAT_FAILED</c> and says where: JSON errors carry structured <c>syntaxErrors</c>,
+/// and text errors for an inline expression show the offending line with a caret. Runs the real
+/// offline engines.
 /// </summary>
 [Collection(ConsoleStateCollection.Name)]
 public sealed partial class FormatSyntaxErrorTests
@@ -98,6 +99,52 @@ public sealed partial class FormatSyntaxErrorTests
     public void Caret_WithoutAUsablePosition_RendersNothing(int? line, int? column)
         => Assert.Null(SyntaxErrorCaret.Render(
             "let x = 1 in x", new ExpressionSyntaxError("parse", null, "m", line, column)));
+
+    // ── DAX (#203): the same shape, from the DAX parser ─────────────────────
+
+    private const string MissingComma = "SUM(Sales[Amount] Sales[Cost])";
+
+    private static RootCommand BuildDaxRoot()
+    {
+        var services = TestServices.Create();
+        return TestRoot.With(new FormatCommand(
+            [], new OfflineDaxFormatterClient(), services.State, services.Mutations).Build());
+    }
+
+    [Fact]
+    public void DaxInlineSyntaxError_Json_CarriesStructuredSyntaxErrors()
+    {
+        var captured = ConsoleCapture.Invoke(
+            BuildDaxRoot().Parse(["format", "-e", MissingComma, "--lang", "dax", "--output-format", "json"]));
+
+        Assert.Equal(1, captured.ExitCode);
+        using var json = JsonDocument.Parse(captured.Stderr);
+        var root = json.RootElement;
+        Assert.Equal("TOMIX_FORMAT_FAILED", root.GetProperty("code").GetString());
+
+        var error = Assert.Single(root.GetProperty("syntaxErrors").EnumerateArray().ToList());
+        Assert.Equal("parse", error.GetProperty("stage").GetString());
+        Assert.Equal("unexpectedToken", error.GetProperty("code").GetString());
+        Assert.Equal(1, error.GetProperty("line").GetInt32());
+        Assert.Equal(19, error.GetProperty("column").GetInt32());
+        Assert.Equal(1, error.GetProperty("endLine").GetInt32());
+        Assert.Equal(23, error.GetProperty("endColumn").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(MissingComma, "1 | SUM(Sales[Amount] Sales[Cost])", "  |                   ^^^^^")]
+    [InlineData("1 +", "1 | 1 +", "  |    ^")] // The end of the input: a single caret after the last character.
+    public void DaxInlineSyntaxError_Text_PointsAtTheOffendingToken(string dax, string sourceLine, string caret)
+    {
+        var captured = ConsoleCapture.Invoke(
+            BuildDaxRoot().Parse(["format", "-e", dax, "--lang", "dax"]),
+            captureAnsiConsole: true);
+
+        Assert.Equal(1, captured.ExitCode);
+        var lines = StripAnsi(captured.Stderr).ReplaceLineEndings("\n").Split('\n');
+        Assert.Contains(sourceLine, lines);
+        Assert.Contains(caret, lines);
+    }
 
     [System.Text.RegularExpressions.GeneratedRegex("\x1b\\[[0-9;]*m")]
     private static partial System.Text.RegularExpressions.Regex AnsiRegex();

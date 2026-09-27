@@ -3,6 +3,7 @@ using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Mutations;
 using Tomix.Core.Dax;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Validate;
@@ -140,11 +141,18 @@ internal static class ModelValidation
         }
     }
 
-    /// <summary>DAX0004 for illegal characters and unbalanced groups, DAX0005 for unterminated literals/comments.</summary>
-    private static string SyntaxCode(DaxSyntaxErrorKind kind) =>
-        kind is DaxSyntaxErrorKind.UnterminatedLiteral or DaxSyntaxErrorKind.UnterminatedComment
-            ? "DAX0005"
-            : "DAX0004";
+    /// <summary>
+    /// DAX0004 for illegal characters and unbalanced groups, DAX0005 for unterminated
+    /// literals/comments, and DAX0007–DAX0009 for the parser's grammar errors.
+    /// </summary>
+    private static string SyntaxCode(DaxSyntaxErrorKind kind) => kind switch
+    {
+        DaxSyntaxErrorKind.UnterminatedLiteral or DaxSyntaxErrorKind.UnterminatedComment => "DAX0005",
+        DaxSyntaxErrorKind.UnexpectedToken => "DAX0007",
+        DaxSyntaxErrorKind.MissingOperand => "DAX0008",
+        DaxSyntaxErrorKind.IncompleteVarBlock => "DAX0009",
+        _ => "DAX0004"
+    };
 
     private static void CheckStructure(ModelObject obj, ModelNameIndex index, List<ValidationIssue> issues)
     {
@@ -212,7 +220,7 @@ internal static class ModelValidation
 
     /// <summary>The 1-based line of <paramref name="offset"/> in <paramref name="expression"/>.</summary>
     private static string Line(string expression, int offset)
-        => (LineIndex(expression, offset) + 1).ToString();
+        => SourcePosition.Of(expression, offset).Line.ToString();
 
     /// <summary>
     /// The offending line's text for human output: trailing whitespace trimmed and very long
@@ -225,22 +233,9 @@ internal static class ModelValidation
             return null;
 
         var lines = expression.Split('\n');
-        var line = Math.Min(LineIndex(expression, offset), lines.Length - 1);
+        var line = Math.Min(SourcePosition.Of(expression, offset).Line - 1, lines.Length - 1);
         var text = lines[line].TrimEnd();
         return text.Length > MaxExpressionLine ? text[..(MaxExpressionLine - 3)] + "..." : text;
-    }
-
-    /// <summary>The 0-based index of the line containing <paramref name="offset"/>.</summary>
-    private static int LineIndex(string expression, int offset)
-    {
-        var line = 0;
-        for (var i = 0; i < offset && i < expression.Length; i++)
-        {
-            if (expression[i] == '\n')
-                line++;
-        }
-
-        return line;
     }
 
     private static string OwningTable(string path)
