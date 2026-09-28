@@ -20,6 +20,9 @@ public sealed class ConnectExitCodeTests
     [InlineData("connect", "--list")]
     [InlineData("connect", "--local", "--list", "localhost:56164")]
     [InlineData("connect", "--local", "--list", "--clear")]
+    [InlineData("connect", "SomeWorkspace", "SomeModel", "--list")]
+    [InlineData("connect", "SomeWorkspace", "--list", "--remote")]
+    [InlineData("connect", "SomeWorkspace", "--list", "-w", "folder")]
     public void UsageErrors_ExitTwo(params string[] args)
     {
         var (exitCode, stderr) = Invoke(NoProviders, args);

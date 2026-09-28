@@ -18,7 +18,7 @@ argument can be a workspace name, an endpoint, or a local model path.
 | Option | Description |
 |--------|-------------|
 | `--local` | Attach to a Power BI Desktop instance running on this machine (Windows only). The instance's database (a GUID) is looked up and saved automatically. |
-| `--list` | With `--local`: list running Desktop instances (report name, endpoint, database) without connecting. Works without a TTY; use `--output-format json` for scripts and agents. |
+| `--list` | List without connecting or changing the active connection. With a server (`tx connect <workspace> --list`): the semantic models on that workspace or endpoint, with compatibility level and last update. With `--local`: running Desktop instances (report name, endpoint, database). Works without a TTY; use `--output-format json` for scripts and agents. |
 | `--remote` | Pick a workspace and model interactively from your tenant (requires a TTY; sign in first with `tx auth login`). |
 | `-p, --profile <name>` | Connect through a saved profile. |
 | `--clear` | Forget the active connection. |
@@ -33,10 +33,25 @@ tx connect --remote
 tx connect MyWorkspace Sales
 tx connect ./model.tmdl
 tx connect --local                  # Power BI Desktop (Windows only)
+tx connect MyWorkspace --list       # models on a workspace, no connect
 tx connect --local --list           # running Desktop instances, no connect
 tx connect localhost:56164          # a specific Desktop instance from the list
 tx connect ./model.tmdl -w MyWorkspace Sales
 ```
+
+A workspace that hosts more than one model cannot be opened without naming one:
+commands such as `tx ls -s MyWorkspace` fail with `TOMIX_DATABASE_REQUIRED`. List
+the models first, then pass one with `-d`:
+
+```sh
+tx connect MyWorkspace --list --output-format json
+tx ls -s MyWorkspace -d Sales
+```
+
+With `--output-format json` the listing is
+`{"server": "<endpoint>", "models": [{"name", "compatibilityLevel", "lastUpdate"}]}`
+inside the standard envelope; `compatibilityLevel` and `lastUpdate` are `null` when the
+server does not report them.
 
 ## `deploy` — deploy to a workspace
 

@@ -57,6 +57,21 @@ public sealed class ProviderConnectionGuardTests
     }
 
     [Fact]
+    public async Task RunAsync_DatabaseRequired_MapsToDatabaseRequired_WithListHint()
+    {
+        var workspace = ModelReference.Remote("powerbi://api.powerbi.com/v1.0/myorg/Workspace");
+        var result = await ProviderConnectionGuard.RunAsync(
+            workspace, () => Throwing(new ModelConnectionException(
+                ModelConnectionFailureKind.DatabaseRequired,
+                "Multiple databases on the endpoint (2); specify one with --database.")));
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_DATABASE_REQUIRED", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Equal($"List the models on the endpoint: tx connect \"{workspace.Value}\" --list", result.Diagnostics[0].Hint);
+    }
+
+    [Fact]
     public async Task RunAsync_DoesNotClassifyDatabaseFromExceptionMessage()
     {
         var result = await ProviderConnectionGuard.RunAsync(

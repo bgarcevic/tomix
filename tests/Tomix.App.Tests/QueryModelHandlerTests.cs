@@ -155,6 +155,20 @@ public sealed class QueryModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ReturnsDatabaseRequired_WhenEndpointHostsSeveralModels()
+    {
+        var handler = new QueryModelHandler(
+            [new QueryStubs.ThrowingProvider(new ModelConnectionException(
+                ModelConnectionFailureKind.DatabaseRequired, "Multiple databases on the endpoint (3)."))],
+            RemoteState);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_DATABASE_REQUIRED", result.Diagnostics[0].Code);
+        Assert.Contains("--list", result.Diagnostics[0].Hint);
+    }
+
+    [Fact]
     public async Task HandleAsync_ReturnsQueryFailed_WhenExecutionThrows()
     {
         var session = new QueryStubs.Session { Throw = new InvalidOperationException("syntax error near BAD") };

@@ -69,7 +69,7 @@ internal sealed class ConnectCommand : ICommandModule
         profileOption.Aliases.Add("-p");
         var listOption = new Option<bool>("--list")
         {
-            Description = "With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting"
+            Description = "List without connecting: with <server>, the semantic models on that workspace or endpoint; with --local, running Power BI Desktop instances (report, endpoint, database)"
         };
         var clearOption = new Option<bool>("--clear")
         {
@@ -130,17 +130,30 @@ internal sealed class ConnectCommand : ICommandModule
 
             if (parseResult.GetValue(listOption))
             {
-                if (!parseResult.GetValue(localOption))
-                    return RenderWorkspaceOptionError(parseResult, "--list requires --local.");
+                var listServer = parseResult.GetValue(serverArgument);
+                var local = parseResult.GetValue(localOption);
+                if (!local && string.IsNullOrWhiteSpace(listServer))
+                    return RenderWorkspaceOptionError(parseResult, "--list requires --local or a server (e.g. 'tx connect <workspace> --list').");
 
-                if (!string.IsNullOrWhiteSpace(parseResult.GetValue(serverArgument)) ||
+                if ((local && !string.IsNullOrWhiteSpace(listServer)) ||
                     !string.IsNullOrWhiteSpace(parseResult.GetValue(databaseArgument)) ||
                     !string.IsNullOrWhiteSpace(parseResult.GetValue(profileOption)) ||
                     parseResult.GetResult(workspaceOption) is not null ||
                     parseResult.GetValue(remoteOption) ||
                     parseResult.GetValue(clearOption))
-                    return RenderWorkspaceOptionError(parseResult,
-                        "--list cannot be combined with a server/database, --profile, --workspace, --remote, or --clear.");
+                    return RenderWorkspaceOptionError(parseResult, local
+                        ? "--local --list cannot be combined with a server/database, --profile, --workspace, --remote, or --clear."
+                        : "<server> --list cannot be combined with a database, --profile, --workspace, --remote, or --clear.");
+
+                if (!local)
+                {
+                    var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+                    var models = await CliSpinner.RunAsync(
+                        "Listing models...",
+                        () => new ConnectRemoteListHandler(_providers).HandleAsync(listServer!, cancellationToken),
+                        suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
+                    return CommandOutput.Render(parseResult, models, format, RenderRemoteList, ProjectRemoteListJson);
+                }
 
                 var listed = await new ConnectLocalListHandler(_providers).HandleAsync(cancellationToken);
                 return CommandOutput.Render(parseResult, listed, format, RenderLocalList, ProjectLocalListJson);
@@ -621,6 +634,41 @@ internal sealed class ConnectCommand : ICommandModule
                 endpoint = instance.Endpoint,
                 reportName = instance.ReportName,
                 database = instance.Database
+            }).ToArray()
+        };
+
+    private static void RenderRemoteList(ConnectRemoteListResult result)
+    {
+        var err = ErrConsole();
+        if (result.Models.Count == 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Warning($"No semantic models found on {result.Server}."));
+            return;
+        }
+
+        foreach (var model in result.Models)
+        {
+            var details = new List<string>();
+            if (model.CompatibilityLevel is { } level)
+                details.Add($"CL {level}");
+            if (model.LastUpdate is { } updated)
+                details.Add($"updated {updated.UtcDateTime:yyyy-MM-dd HH:mm} UTC");
+            var suffix = details.Count == 0 ? "" : $"  {Styling.Muted(string.Join(", ", details))}";
+            AnsiConsole.MarkupLine($"{Styling.Bold(model.Name)}{suffix}");
+        }
+
+        err.MarkupLine(Styling.Guidance($"Connect: tx connect \"{result.Server}\" <model>"));
+    }
+
+    private static object ProjectRemoteListJson(ConnectRemoteListResult result)
+        => new
+        {
+            server = result.Server,
+            models = result.Models.Select(model => new
+            {
+                name = model.Name,
+                compatibilityLevel = model.CompatibilityLevel,
+                lastUpdate = model.LastUpdate
             }).ToArray()
         };
 

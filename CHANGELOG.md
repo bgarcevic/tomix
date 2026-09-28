@@ -10,6 +10,19 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx connect <workspace> --list` lists the semantic models on a workspace or XMLA
+  endpoint without connecting (name, compatibility level, last update). It works
+  non-interactively and with `--output-format json`, so scripts and agents can
+  discover models on a workspace that hosts more than one.
+
+### Changed
+
+- Opening a workspace that hosts several models without naming one now fails with
+  `TOMIX_DATABASE_REQUIRED` (exit 2) and a hint to run `tx connect <workspace> --list`,
+  instead of `TOMIX_CONNECT_FAILED` / `TOMIX_QUERY_FAILED` (exit 1).
+
 ## [0.4.3] - 2026-09-28
 
 ### Changed

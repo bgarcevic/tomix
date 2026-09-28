@@ -6,7 +6,7 @@ namespace Tomix.App.Diagnostics;
 
 /// <summary>
 /// Converts provider connection failures into the uniform diagnostics every model-opening
-/// handler must emit (<c>TOMIX_DATABASE_NOT_FOUND</c>, <c>TOMIX_AUTH_REQUIRED</c>,
+/// handler must emit (<c>TOMIX_DATABASE_NOT_FOUND</c>, <c>TOMIX_DATABASE_REQUIRED</c>, <c>TOMIX_AUTH_REQUIRED</c>,
 /// <c>TOMIX_CONNECT_FAILED</c>). Handlers wrap their open-and-work body in
 /// <see cref="RunAsync{T}"/> instead of copying these catch blocks; handler-specific
 /// exceptions should be caught inside the body so they keep their own diagnostics.
@@ -24,9 +24,8 @@ public static class ProviderConnectionGuard
             return await action();
         }
         catch (ModelConnectionException ex)
-            when (ex.Kind == ModelConnectionFailureKind.DatabaseNotFound)
         {
-            return TomixResult<T>.Fail("TOMIX_DATABASE_NOT_FOUND", ex.Message, exitCode: 1);
+            return ConnectionFailure<T>(model, ex);
         }
         catch (AuthenticationRequiredException ex)
         {
@@ -42,4 +41,21 @@ public static class ProviderConnectionGuard
                 hint: "Verify the server URL and credentials.");
         }
     }
+
+    /// <summary>
+    /// Maps a classified <see cref="ModelConnectionException"/> to its diagnostic. Public for
+    /// handlers that open sessions outside <see cref="RunAsync{T}"/> (e.g. <c>query</c>).
+    /// </summary>
+    public static TomixResult<T> ConnectionFailure<T>(ModelReference? model, ModelConnectionException ex)
+        => ex.Kind switch
+        {
+            ModelConnectionFailureKind.DatabaseRequired => TomixResult<T>.Fail(
+                "TOMIX_DATABASE_REQUIRED",
+                ex.Message,
+                exitCode: 2,
+                hint: model is null
+                    ? "Name the model with --database."
+                    : $"List the models on the endpoint: tx connect \"{model.Value}\" --list"),
+            _ => TomixResult<T>.Fail("TOMIX_DATABASE_NOT_FOUND", ex.Message, exitCode: 1)
+        };
 }

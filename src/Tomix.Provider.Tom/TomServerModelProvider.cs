@@ -114,7 +114,9 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
         {
             1 => server.Databases[0],
             0 => throw new InvalidOperationException("No databases are available on the endpoint."),
-            _ => throw new InvalidOperationException("Multiple databases on the endpoint; specify one with --database.")
+            var count => throw new ModelConnectionException(
+                ModelConnectionFailureKind.DatabaseRequired,
+                $"Multiple databases on the endpoint ({count}); specify one with --database.")
         };
     }
 }

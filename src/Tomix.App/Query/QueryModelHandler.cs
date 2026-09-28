@@ -1,3 +1,4 @@
+using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
@@ -101,6 +102,10 @@ public sealed class QueryModelHandler
                 Timings: result.Runs is { Count: > 0 } ? result.Runs[0].Timings : null,
                 Plans: result.Plans,
                 Benchmark: QueryBenchmark.Compute(result.Runs)));
+        }
+        catch (ModelConnectionException ex)
+        {
+            return ProviderConnectionGuard.ConnectionFailure<QueryModelResult>(target, ex);
         }
         catch (AuthenticationRequiredException ex)
         {

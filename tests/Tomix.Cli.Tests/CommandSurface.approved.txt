@@ -190,7 +190,7 @@ Set or show the active connection
   opt --workspace, -w [<target>]  Enable workspace mode: mirror saves between the primary source and a secondary target. Primary remote -> pass a local folder or .bim file. Primary local -> pass <server> <database>. Pass -w with no value to pick the target workspace and model interactively.
   opt --local  Attach to a Power BI Desktop instance running on this machine (Windows only)
   opt --remote  Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login')
-  opt --list  With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting
+  opt --list  List without connecting: with <server>, the semantic models on that workspace or endpoint; with --local, running Power BI Desktop instances (report, endpoint, database)
   opt --profile, -p <name>  Connect through this saved profile (list them with 'tx profile list')
   opt --clear  Forget the active connection
   opt --force  Allow workspace mode to initialize over a folder that already has content

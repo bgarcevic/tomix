@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.Query;
 using Tomix.App.State;
@@ -77,6 +78,10 @@ public sealed class TestRunHandler
                     hint: "Tests run only on live models connected via XMLA (-s <workspace> -d <model>).");
 
             return await RunTestsAsync(request, target, querySession, tests, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ModelConnectionException ex)
+        {
+            return ProviderConnectionGuard.ConnectionFailure<TestRunResult>(target, ex);
         }
         catch (AuthenticationRequiredException ex)
         {

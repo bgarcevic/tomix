@@ -4,7 +4,10 @@ namespace Tomix.Core.Models;
 public enum ModelConnectionFailureKind
 {
     /// <summary>The requested database does not exist on the endpoint.</summary>
-    DatabaseNotFound
+    DatabaseNotFound,
+
+    /// <summary>The endpoint hosts several databases and none was named.</summary>
+    DatabaseRequired
 }
 
 /// <summary>
