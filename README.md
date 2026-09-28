@@ -8,6 +8,8 @@ Desktop instance running on your machine.
 Semantic models are code. They deserve tooling that works where code lives:
 in a terminal, in scripts, in CI, in a diff.
 
+![tx connecting to a PBIP model, searching expressions, and tracing a measure's dependencies](docs/assets/media/explore.gif)
+
 Read the full [documentation](https://bgarcevic.github.io/tomix-cli/) for
 installation, quickstart guides, command references, and scripting examples.
 
@@ -64,6 +66,15 @@ command can become the input of your next script. `ls`, `get`, `query`,
 the model formats too (`tmdl`, `bim`, `tmsl`).
 The [samples](samples/) folder also contains a full PBIP model if you want
 something more realistic than `basic-tmdl` to explore.
+
+Lint a model and let `bpa` fix what it can:
+
+![tx bpa run listing findings, then tx bpa run --fix --save fixing two of three](docs/assets/media/bpa.gif)
+
+Batch edits in a staging area, commit them together, and diff against the
+released model:
+
+![tx add and tx set staged, committed with tx stage commit, then compared with tx diff](docs/assets/media/edit.gif)
 
 ## Install
 

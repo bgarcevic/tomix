@@ -26,7 +26,7 @@ internal sealed class RmCommand : ICommandModule
     {
         var pathArgument = new Argument<string>("path")
         {
-            Description = "Object path to remove."
+            Description = "Object path to remove"
         };
         var modelArgument = new Argument<string>("model")
         {
@@ -48,7 +48,7 @@ internal sealed class RmCommand : ICommandModule
         var serializationOption = LifecycleOptions.Serialization();
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Type to pick when the path matches several objects under a table."
+            Description = "Type to pick when the path matches several objects under a table"
         };
         typeOption.Aliases.Add("-t");
         var saveOption = LifecycleOptions.Save();

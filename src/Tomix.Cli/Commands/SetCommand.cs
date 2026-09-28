@@ -36,12 +36,12 @@ internal sealed class SetCommand : ICommandModule
         };
         var queryOption = new Option<string?>("-q")
         {
-            Description = "Compatibility form of --set: the property to set; give its value with -i."
-        };
+            Description = "Compatibility form of --set: the property to set; give its value with -i"
+        }.In(HelpGroups.Compatibility);
         var valueOption = new Option<string?>("-i")
         {
-            Description = "Value for the preceding -q. Pass '-' to read from stdin."
-        };
+            Description = "Compatibility form of --set: the value for the preceding -q. Pass '-' to read from stdin."
+        }.In(HelpGroups.Compatibility);
         var setOption = new Option<string[]>("--set", "-p")
         {
             Description = "Property assignment as name=value. Repeat to set multiple properties together.",
@@ -59,7 +59,7 @@ internal sealed class SetCommand : ICommandModule
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name)."
+            Description = "Type to pick when the path matches several objects (e.g. a measure and a partition sharing a name)"
         };
         typeOption.Aliases.Add("-t");
         var saveOption = LifecycleOptions.Save();
@@ -70,11 +70,11 @@ internal sealed class SetCommand : ICommandModule
         var noSyncOption = LifecycleOptions.NoSync();
         var strictRefsOption = new Option<bool>("--strict-refs")
         {
-            Description = "Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)."
+            Description = "Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)"
         };
         var noFixRefsOption = new Option<bool>("--no-fix-refs")
         {
-            Description = "Do not rewrite DAX references to the renamed object; warn instead."
+            Description = "Do not rewrite DAX references to the renamed object; warn instead"
         };
 
         var command = new Command("set", "Change a property on a model object")

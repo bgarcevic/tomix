@@ -38,7 +38,7 @@ internal sealed class VertipaqCommand : ICommandModule
         };
 
         var tablesOption = new Option<bool>("--tables") { Description = "Show the tables view" };
-        var columnsOption = new Option<bool>("--columns") { Description = "Show the columns view (default)" };
+        var columnsOption = new Option<bool>("--columns") { Description = "Show the columns view, the one shown when no view is chosen" };
         var relationshipsOption = new Option<bool>("--relationships") { Description = "Show the relationships view" };
         var partitionsOption = new Option<bool>("--partitions") { Description = "Show the partitions view" };
         var allOption = new Option<bool>("--all") { Description = "Include the tables, columns, relationships, and partitions views" };

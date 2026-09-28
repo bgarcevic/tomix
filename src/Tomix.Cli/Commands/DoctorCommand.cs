@@ -32,7 +32,7 @@ internal sealed class DoctorCommand : ICommandModule
     public Command Build()
     {
         var format = OutputFormats.CreateOption(GlobalOptions.DefaultOutputFormat);
-        var command = new Command("doctor", "Check whether the local tomix environment is ready.")
+        var command = new Command("doctor", "Check whether the local environment is ready")
         {
             format
         };

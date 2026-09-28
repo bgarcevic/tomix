@@ -37,16 +37,31 @@ the bottom for where each concern lives.
 
 ## Help
 
-- `-h` / `--help` shows full help; running a parent command bare (e.g. `tx`) shows
-  concise help. Never make bare invocation an error.
+- `-h` / `--help` and `tx help <command>` show full help; running a parent command
+  bare (`tx`, `tx bpa`) shows its help and exits 0. Never make bare invocation an
+  error.
 - Lead with examples. Every command's help gets an `Examples:` block showing the
   2–3 most common invocations; complex syntax (e.g. `ls` path filters) is taught
   by example, not by grammar.
-- Order help by frequency of use: most common commands and flags first.
-- Group subcommands into sections in root help (Explore / Edit / Remote / Quality /
-  Workspace). A flat list of 30+ commands is unusable. [tomix: gap — implement in
-  `SpectreHelpAction` / `HelpRenderer`.]
-- On typo or invalid subcommand, suggest the closest match ("Did you mean `ls`?").
+- Order help by frequency of use: most common commands and flags first. Root help
+  lists commands before global options; a command's page lists its own options
+  and names the globals on one line instead of repeating them.
+- Group subcommands into sections in root help (Discover / Modify / Connect /
+  Validate / Manage). A flat list of 30+ commands is unusable.
+- Group a long option list with `HelpGroups` tags (`Save options:`, `Rule
+  options:`, ...). The mutation lifecycle flags are tagged by `LifecycleOptions`;
+  compatibility forms go in `Compatibility options:`, last.
+- Help wraps to the terminal width (capped at 100) with hanging indents, and is
+  not wrapped when redirected. Every page must fit in 80 columns
+  (`HelpLayoutTests`).
+- Command descriptions are one line of at most 60 characters with no trailing
+  period and no flags; detail goes in `SpectreHelpAction.CommandNotes`. Option
+  descriptions: one sentence has no trailing period, several sentences each end
+  with one, and defaults are written `(default: x)`.
+- Every option that takes a value names it in `HelpPlaceholders` (`--save-to
+  <path>`, not `--save-to <save-to>`).
+- On typo or invalid subcommand, print one `TOMIX_UNKNOWN_COMMAND` diagnostic with
+  the closest match ("Did you mean `ls`?") on stderr — never the help page.
 - Format help with the `Styling` role palette (see `docs/cli-color-strategy.md`);
   link to web docs at the end.
 
@@ -243,6 +258,7 @@ than a missing-key error. **Scripts wanting a command's own diagnostics must rea
 ## Known gaps checklist
 
 - [x] Grouped sections + Examples blocks in help
+- [x] Help wraps to the terminal, groups long option lists, and fits 80 columns; `tx help <command>`
 - [x] `NO_COLOR` / `TERM=dumb` handling verified or added
 - [x] Confirmations with `--yes` on `rm`, `replace`, `deploy`, `stage commit`, `script --save`/`--revert`, `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and partition-risky `refresh`; `--dry-run` on `deploy`
 - [x] `-q/--quiet` global flag (suppresses spinners, progress, non-essential output)

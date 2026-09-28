@@ -44,12 +44,12 @@ internal sealed class AddCommand : ICommandModule
         {
             Description = "Compatibility form of --expression / --set: an unpaired -i is the new object's value; pair each -q with a following -i to set a property. Use '-' to read from stdin.",
             Arity = ArgumentArity.ZeroOrMore
-        };
+        }.In(HelpGroups.Compatibility);
         var queryOption = new Option<string[]?>("-q")
         {
             Description = "Compatibility form of --set: property name to set on the newly-created object; pair each -q with a following -i value. Repeatable.",
             Arity = ArgumentArity.ZeroOrMore
-        };
+        }.In(HelpGroups.Compatibility);
         var expressionOption = new Option<string?>("--expression")
         {
             Description = "Expression or value for the new object. Use '-' to read from stdin."
@@ -86,56 +86,56 @@ internal sealed class AddCommand : ICommandModule
 
         var modeOption = new Option<string?>("--mode")
         {
-            Description = "Storage mode for the partition: Import, DirectQuery, Dual, DirectLake, Push, or Default."
+            Description = "Storage mode for the partition: Import, DirectQuery, Dual, DirectLake, Push, or Default"
         };
         modeOption.AcceptAmongIgnoreCase("Import", "DirectQuery", "Dual", "DirectLake", "Push", "Default");
         var sourceOption = new Option<string?>("--source")
         {
-            Description = "Provider name for a ProviderDataSource (e.g. System.Data.SqlClient)."
+            Description = "Provider name for a ProviderDataSource (e.g. System.Data.SqlClient)"
         };
         var endpointOption = new Option<string?>("--endpoint")
         {
-            Description = "Server/endpoint address for a data source connection."
+            Description = "Server or endpoint address for a data source connection"
         };
         var connectionStringOption = new Option<string?>("--connection-string")
         {
-            Description = "The connection string used by a ProviderDataSource."
+            Description = "Connection string for a ProviderDataSource"
         };
         var sourceTableOption = new Option<string?>("--source-table")
         {
-            Description = "Source entity/table name for an EntityPartition."
+            Description = "Source entity or table name for an EntityPartition"
         };
         var sourceDatabaseOption = new Option<string?>("--source-database")
         {
-            Description = "Source database name for a data source connection (Provider/Structured data sources)."
+            Description = "Source database name for a ProviderDataSource or StructuredDataSource"
         };
         var sourceSchemaOption = new Option<string?>("--source-schema")
         {
-            Description = "Source schema name for an EntityPartition."
+            Description = "Source schema name for an EntityPartition"
         };
         var partitionExpressionOption = new Option<string?>("--partition-expression")
         {
-            Description = "The M or DAX expression defining the partition's source."
+            Description = "M or DAX expression that defines the partition's source"
         };
         var columnsOption = new Option<string?>("--columns")
         {
-            Description = "Comma-separated column names to create on a new table (Table type only)."
+            Description = "Comma-separated column names to create on a new table (Table type only)"
         };
         var sourceTypeOption = new Option<string?>("--source-type")
         {
-            Description = "Connection protocol for a StructuredDataSource (e.g. tds)."
+            Description = "Connection protocol for a StructuredDataSource (e.g. tds)"
         };
         var rangeStartOption = new Option<string?>("--range-start")
         {
-            Description = "Refresh-policy range start for a PolicyRangePartition (yyyy-MM-dd)."
+            Description = "Refresh-policy range start for a PolicyRangePartition (yyyy-MM-dd)"
         };
         var rangeEndOption = new Option<string?>("--range-end")
         {
-            Description = "Refresh-policy range end for a PolicyRangePartition (yyyy-MM-dd)."
+            Description = "Refresh-policy range end for a PolicyRangePartition (yyyy-MM-dd)"
         };
         var rangeGranularityOption = new Option<string?>("--range-granularity")
         {
-            Description = "Refresh-policy range granularity for a PolicyRangePartition: Day (default), Month, Quarter, Year."
+            Description = "Refresh-policy range granularity for a PolicyRangePartition: Day, Month, Quarter, or Year (default: Day)"
         };
         rangeGranularityOption.AcceptAmongIgnoreCase("Day", "Month", "Quarter", "Year");
 
@@ -179,7 +179,7 @@ internal sealed class AddCommand : ICommandModule
         };
 
         foreach (var option in extraOptions)
-            command.Options.Add(option);
+            command.Options.Add(option.In("Partition and data source options"));
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {

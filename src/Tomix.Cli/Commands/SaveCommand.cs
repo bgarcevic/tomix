@@ -40,17 +40,17 @@ internal sealed class SaveCommand : ICommandModule
 
         var serializationOption = new Option<string?>("--serialization")
         {
-            Description = "How the model is written: tmdl or bim (tmsl and auto also accepted). Defaults to the loaded model's format."
+            Description = "How the model is written: tmdl or bim; tmsl and auto also accepted (default: the loaded model's format)"
         };
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "tmsl", "auto");
         var overwriteOption = LifecycleOptions.Overwrite("Replace an existing output file or directory");
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
-            Description = "Apply BPA rule fixes before saving, where a rule provides one. Rules that cannot be evaluated block the save"
+            Description = "Apply BPA rule fixes before saving, where a rule provides one. Rules that cannot be evaluated block the save."
         };
         var bpaRulesOption = new Option<string[]>("--bpa-rules")
         {
-            Description = "Additional BPA rule files to enforce for this save, alongside the built-in ruleset.",
+            Description = "Additional BPA rule files to enforce for this save, alongside the built-in ruleset",
             Arity = ArgumentArity.ZeroOrMore
         };
         var supportingFilesOption = new Option<bool>("--supporting-files")
@@ -59,7 +59,7 @@ internal sealed class SaveCommand : ICommandModule
         };
         var noSyncOption = new Option<bool>("--no-sync")
         {
-            Description = "Skip workspace sync when workspace mode is active."
+            Description = "Skip workspace sync when workspace mode is active"
         };
 
         var command = new Command("save", "Write a model to disk in a chosen format")

@@ -25,15 +25,15 @@ internal sealed class UpdateCommand : ICommandModule
     {
         var check = new Option<bool>("--check")
         {
-            Description = "Preview only: show the latest version and release notes without changing anything."
+            Description = "Preview only: show the latest version and release notes without changing anything"
         };
         var targetVersion = new Option<string?>("--version")
         {
-            Description = "Update (or downgrade, with --yes) to a specific released version instead of the latest."
+            Description = "Update (or downgrade, with --yes) to a specific released version instead of the latest"
         };
         var format = OutputFormats.CreateOption(GlobalOptions.DefaultOutputFormat);
 
-        var command = new Command("update", "Update tx to the latest release.")
+        var command = new Command("update", "Update tx to the latest release")
         {
             check,
             targetVersion,

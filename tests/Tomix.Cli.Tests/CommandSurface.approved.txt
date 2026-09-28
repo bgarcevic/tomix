@@ -1,14 +1,14 @@
 # tx
-tx - inspect, validate, query, test, and deploy tabular semantic models
+browse, edit, lint, diff, and deploy tabular semantic models
   opt --help, -?, -h, /?, /h  Show help and usage information
   opt --version  Show version information
-  opt --model, -m <model>  Path to the semantic model: a TMDL folder, a .bim file, or a model folder
-  opt --output-format <output-format>  Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.
-  opt --error-format <error-format>  Format for messages written to stderr: text (default) or json. Unrecognized values fall back to text.
-  opt --server, -s <server>  Workspace to connect to: a name, a powerbi:// or asazure:// endpoint, or a local address
-  opt --database, -d <database>  Name of the semantic model to use on the workspace
-  opt --auth <auth>  How to authenticate: auto, interactive, spn, or managed-identity (default: auto)
-  opt --recent, --recents <recent>  Pick a model from the recently used list: no value opens a picker, a number picks that entry (1 is the most recent).
+  opt --model, -m <path>  Path to the semantic model: a TMDL folder, a .bim file, or a model folder
+  opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
+  opt --error-format <format>  Format for messages written to stderr: text or json (default: text). Unrecognized values fall back to text.
+  opt --server, -s <workspace>  Workspace to connect to: a name, a powerbi:// or asazure:// endpoint, or a local address
+  opt --database, -d <name>  Name of the semantic model to use on the workspace
+  opt --auth <method>  How to authenticate: auto, interactive, spn, or managed-identity (default: auto)
+  opt --recent, --recents [<n>]  Pick a model from the recently used list: no value opens a picker, a number picks that entry (1 is the most recent)
   opt --debug  Show the full stack trace on stderr when an unexpected error occurs
   opt --non-interactive  Never prompt for input. When required input is missing, fail with an error saying what to provide.
   opt --yes, -y  Skip confirmation prompts for destructive operations
@@ -19,50 +19,50 @@ Create a new object in the model
   arg <path>  Where to create the object, slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX form also accepted: "'Sales'[Revenue]". Combine with -t. For relationships, use 'Sales[Key]->Product[Key]' (many side first).
   arg [model]  Optional path to the model; defaults to the active connection
   opt --type, -t <type>  Type of object to create. Supported values: Table, CalcTable, CalcGroup, Measure, CalcColumn, DataColumn, Hierarchy, Level, Calendar, CalcItem, KPI, Partition, MPartition, EntityPartition, PolicyRangePartition, Expression, Function, Perspective, Culture, ProviderDataSource, StructuredDataSource, Role, TablePermission, Member, Relationship. Data sources always require -t (no path keyword infers them).
-  opt -i <i>  Compatibility form of --expression / --set: an unpaired -i is the new object's value; pair each -q with a following -i to set a property. Use '-' to read from stdin.
-  opt -q <q>  Compatibility form of --set: property name to set on the newly-created object; pair each -q with a following -i value. Repeatable.
-  opt --expression, -e <expression>  Expression or value for the new object. Use '-' to read from stdin.
-  opt --set <set>  Set a property on the new object: name=value, e.g. --set formatString="#,0". Repeatable. Names can use dotted paths, bracket indexers, or a DisplayName.
+  opt -i <value>  Compatibility form of --expression / --set: an unpaired -i is the new object's value; pair each -q with a following -i to set a property. Use '-' to read from stdin.
+  opt -q <property>  Compatibility form of --set: property name to set on the newly-created object; pair each -q with a following -i value. Repeatable.
+  opt --expression, -e <expr>  Expression or value for the new object. Use '-' to read from stdin.
+  opt --set <name=value>  Set a property on the new object: name=value, e.g. --set formatString="#,0". Repeatable. Names can use dotted paths, bracket indexers, or a DisplayName.
   opt --file <file>  Read the expression from this file
   opt --if-not-exists  Do nothing and exit 0 when the object already exists
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --stage  Stage this command's mutation
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
-  opt --mode <mode>  Storage mode for the partition: Import, DirectQuery, Dual, DirectLake, Push, or Default.
-  opt --source <source>  Provider name for a ProviderDataSource (e.g. System.Data.SqlClient).
-  opt --endpoint <endpoint>  Server/endpoint address for a data source connection.
-  opt --connection-string <connection-string>  The connection string used by a ProviderDataSource.
-  opt --source-table <source-table>  Source entity/table name for an EntityPartition.
-  opt --source-database <source-database>  Source database name for a data source connection (Provider/Structured data sources).
-  opt --source-schema <source-schema>  Source schema name for an EntityPartition.
-  opt --partition-expression <partition-expression>  The M or DAX expression defining the partition's source.
-  opt --columns <columns>  Comma-separated column names to create on a new table (Table type only).
-  opt --source-type <source-type>  Connection protocol for a StructuredDataSource (e.g. tds).
-  opt --range-start <range-start>  Refresh-policy range start for a PolicyRangePartition (yyyy-MM-dd).
-  opt --range-end <range-end>  Refresh-policy range end for a PolicyRangePartition (yyyy-MM-dd).
-  opt --range-granularity <range-granularity>  Refresh-policy range granularity for a PolicyRangePartition: Day (default), Month, Quarter, Year.
+  opt --no-sync  Skip workspace sync when workspace mode is active
+  opt --mode <mode>  Storage mode for the partition: Import, DirectQuery, Dual, DirectLake, Push, or Default
+  opt --source <provider>  Provider name for a ProviderDataSource (e.g. System.Data.SqlClient)
+  opt --endpoint <address>  Server or endpoint address for a data source connection
+  opt --connection-string <string>  Connection string for a ProviderDataSource
+  opt --source-table <name>  Source entity or table name for an EntityPartition
+  opt --source-database <name>  Source database name for a ProviderDataSource or StructuredDataSource
+  opt --source-schema <name>  Source schema name for an EntityPartition
+  opt --partition-expression <expr>  M or DAX expression that defines the partition's source
+  opt --columns <names>  Comma-separated column names to create on a new table (Table type only)
+  opt --source-type <protocol>  Connection protocol for a StructuredDataSource (e.g. tds)
+  opt --range-start <date>  Refresh-policy range start for a PolicyRangePartition (yyyy-MM-dd)
+  opt --range-end <date>  Refresh-policy range end for a PolicyRangePartition (yyyy-MM-dd)
+  opt --range-granularity <unit>  Refresh-policy range granularity for a PolicyRangePartition: Day, Month, Quarter, or Year (default: Day)
 
 # tx auth
-Sign in, sign out, and check authentication for remote workspaces
+Sign in to, out of, and check remote workspaces
 
 # tx auth login
 Sign in to a Power BI, Fabric, or Analysis Services account
-  opt --username, -u <username>  Service-principal application (client) id
-  opt --password <password>  Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file.
-  opt --password-file <password-file>  Path to a file containing the service-principal client secret (trailing newline ignored)
-  opt --tenant <tenant>  Tenant id or domain (required for service principal)
+  opt --username, -u <app-id>  Service-principal application (client) id
+  opt --password <->  Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file.
+  opt --password-file <file>  Path to a file containing the service-principal client secret (trailing newline ignored)
+  opt --tenant <id>  Tenant id or domain (required for service principal)
   opt --identity, -I  Sign in with a managed identity (Azure-hosted; use --username for user-assigned)
-  opt --certificate <certificate>  Certificate file (PEM or PKCS12) for signing in as a service principal
-  opt --certificate-password <certificate-password>  Certificate password source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --certificate-password-file.
-  opt --certificate-password-file <certificate-password-file>  Path to a file containing the certificate password (trailing newline ignored)
+  opt --certificate <file>  Certificate file (PEM or PKCS12) for signing in as a service principal
+  opt --certificate-password <->  Certificate password source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --certificate-password-file.
+  opt --certificate-password-file <file>  Path to a file containing the certificate password (trailing newline ignored)
   opt --device-code  Use the device-code flow instead of a local browser
-  opt --client-id <client-id>  Override the Azure AD client id used for interactive/device-code sign-in
+  opt --client-id <id>  Override the Azure AD client id used for interactive/device-code sign-in
   opt --save  Keep the service principal credentials for future sign-ins (default: true). Pass --save false to use them only for this login.
 
 # tx auth logout
@@ -72,11 +72,11 @@ Sign out and forget the cached credentials
 Show authentication status
 
 # tx bpa
-Run best-practice rules against a model and manage rule collections
+Run best-practice rules and manage rule collections
 
 # tx bpa rules
 Manage BPA rule collections
-  opt --rules-file <rules-file>  Path to a BPA rules JSON file
+  opt --rules-file <file>  Path to a BPA rules JSON file
 
 # tx bpa rules disable
 Turn off a built-in rule for this user
@@ -93,18 +93,18 @@ Put a rule on the model's ignore list
   arg [model]  Path to model
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --stage  Stage this command's mutation
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
   opt --force, -f  Save despite newly introduced validation errors
   opt --allow-unknown  Accept a rule ID that no loaded rule has (for example, one from a remote rule file)
 
 # tx bpa rules list
 List rules from every source, with each rule's status
   arg [model]  Path to model
-  opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-defaults  Leave the built-in ruleset out of the listing
   opt --ignored  List only rules on the model's ignore list
   opt --disabled  List only rules disabled for this user
@@ -114,7 +114,7 @@ List rules from every source, with each rule's status
 Show a rule's description, scope, expression, and fix
   arg <rule-id>  Rule ID
   arg [model]  Path to model
-  opt --ruleset <ruleset>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <name>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-defaults  Leave the built-in ruleset out of the lookup
 
 # tx bpa rules unignore
@@ -123,92 +123,92 @@ Take a rule off the model's ignore list
   arg [model]  Path to model
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --stage  Stage this command's mutation
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
   opt --force, -f  Save despite newly introduced validation errors
 
 # tx bpa run
 Run best-practice rules against a model
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --rules, -r <rules>  BPA rule files or URLs, as JSON
-  opt --ruleset <ruleset>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --rules, -r <file|url>  BPA rule files or URLs (JSON). Repeatable.
+  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
   opt --no-model-rules  Skip rules embedded in the model's annotations
   opt --no-defaults  Exclude the selected standard BPA ruleset
-  opt --fail-on <fail-on>  Failure threshold: error (default) or warning. Rules that cannot be evaluated count as error-severity findings
+  opt --fail-on <level>  Failure threshold: error or warning (default: error). Rules that cannot be evaluated count as error-severity findings.
   opt --fix  Fix violations whose rules provide a fix expression
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --rule <rule>  Run only specific rule(s) by ID
-  opt --ci <ci>  Print CI log-group commands to stderr for the given system: vsts or github
-  opt --trx <trx>  Write results to a .trx test-run file at this path
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --rule <id>  Run only this rule. Repeatable.
+  opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
+  opt --trx <file>  Write results to a .trx test-run file at this path
   opt --allow-external-rules  Allow rule URLs found in model annotations to be fetched
-  opt --path <path>  Limit analysis to matched objects (literal names, wildcards, or paths)
+  opt --path <pattern>  Limit analysis to matched objects (literal names, wildcards, or paths)
   opt --no-multiline  Show each rule's guidance on one line
-  opt --details  Show full guidance and affected objects per rule (default is a compact list)
+  opt --details  Show full guidance and affected objects per rule instead of a compact list
   opt --full  Detail view listing every affected object (implies --details)
   opt --errors  Show only error-severity rules (combinable with --warnings/--info)
   opt --warnings  Show only warning-severity rules (combinable with --errors/--info)
   opt --info  Show only info-severity rules (combinable with --errors/--warnings)
-  opt --stage  Stage this command's mutation
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
 
 # tx completion
-Generate a shell completion script.
-  arg [shell]  Target shell: bash, zsh, fish, or powershell.
-  opt --output-format <output-format>  Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.
+Generate a shell completion script
+  arg [shell]  Target shell: bash, zsh, fish, or powershell
+  opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
 
 # tx config
 Inspect and change CLI configuration
 
 # tx config init
-Write a default config.json.
+Write a default config.json
   opt --force  Replace an existing config file
 
 # tx config paths
-Show resolved paths for local CLI files.
+Show resolved paths for local CLI files
 
 # tx config set
-Change a configuration value.
-  arg <key>  Configuration key.
-  arg <value>  Configuration value.
+Change a configuration value
+  arg <key>  Configuration key
+  arg <value>  Configuration value
 
 # tx config show
-Print the current CLI configuration.
+Print the current CLI configuration
 
 # tx connect
-Set active connection (workspace, local path, or PBI Desktop). No args = show current. --recent = reconnect to a recently used model.
-  arg [server]  Workspace name, endpoint, or local model path; combine with --local for Power BI Desktop.
-  arg [database]  Semantic model name (omit on a TTY to pick from the workspace's models).
-  opt --workspace, -w <workspace>  Enable workspace mode: mirror saves between the primary source and a secondary target. Primary remote -> pass a local folder or .bim file. Primary local -> pass <server> <database>. Pass -w with no value to pick the target workspace and model interactively.
+Set or show the active connection
+  arg [server]  Workspace name, endpoint, or local model path; combine with --local for Power BI Desktop
+  arg [database]  Semantic model name (omit on a TTY to pick from the workspace's models)
+  opt --workspace, -w [<target>]  Enable workspace mode: mirror saves between the primary source and a secondary target. Primary remote -> pass a local folder or .bim file. Primary local -> pass <server> <database>. Pass -w with no value to pick the target workspace and model interactively.
   opt --local  Attach to a Power BI Desktop instance running on this machine (Windows only)
-  opt --remote  Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login').
-  opt --list  With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting.
-  opt --profile, -p <profile>  Connect through this saved profile (list them with 'tx profile list')
+  opt --remote  Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login')
+  opt --list  With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting
+  opt --profile, -p <name>  Connect through this saved profile (list them with 'tx profile list')
   opt --clear  Forget the active connection
-  opt --force  Allow workspace mode to initialize over a folder that already has content.
-  opt --workspace-format <workspace-format>  How a local workspace is stored on disk (tmdl or bim); detected from the path when omitted.
-  opt --workspace-auth <workspace-auth>  How to authenticate the remote side of workspace mode. Defaults to --auth when set, otherwise auto.
+  opt --force  Allow workspace mode to initialize over a folder that already has content
+  opt --workspace-format <format>  How a local workspace is stored on disk (tmdl or bim); detected from the path when omitted
+  opt --workspace-auth <method>  How to authenticate the remote side of workspace mode (default: --auth when set, otherwise auto)
 
 # tx deploy
 Deploy a semantic model to a workspace
   arg [model]  Optional path to the model to deploy; defaults to the active connection
-  opt --profile, -p <profile>  Deploy through a saved profile for this run only; see 'tx profile list' and 'tx profile set'
+  opt --profile, -p <name>  Deploy through a saved profile for this run only; see 'tx profile list' and 'tx profile set'
   opt --create-only  Create the target model only if it does not exist yet; fail when it does
-  opt --xmla <xmla>  Write the deployment as a TMSL script to this file instead of deploying. Pass '-' to write to stdout.
-  opt --skip-bpa  Skip the BPA gate check for this deploy.
+  opt --xmla <file>  Write the deployment as a TMSL script to this file instead of deploying. Pass '-' to write to stdout.
+  opt --skip-bpa  Skip the BPA gate check for this deploy
   opt --fix-bpa  Apply BPA rule fixes to the model before deploying, where a rule provides one
-  opt --bpa-rules <bpa-rules>  Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset.
-  opt --bpa-fail-on <bpa-fail-on>  Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after --fix-bpa fixes. Rules that cannot be evaluated count as error-severity findings
+  opt --bpa-rules <file>  Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset
+  opt --bpa-fail-on <level>  Severity threshold for the BPA gate: error or warning (default: error). Applies before the deploy and again after --fix-bpa fixes. Rules that cannot be evaluated count as error-severity findings.
   opt --force  Force deployment, bypassing validation checks
-  opt --ci <ci>  Print CI log-group commands to stderr for the given system: vsts or github
+  opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --dry-run  Preview what would change on the remote target without deploying
   opt --deploy-connections  Overwrite the target's data sources (default: keep the target's connection strings)
   opt --deploy-partitions  Overwrite the target's table partitions (default: keep the target's partitions and processed data)
@@ -227,60 +227,60 @@ Trace what an object uses and what uses it
   opt --deep  Walk the dependency chain recursively
   opt --unused  List measures and columns that nothing depends on
   opt --hidden  With --unused: restrict the list to unused objects that are hidden
-  opt --max-depth <max-depth>  How deep --deep walks (default: 10)
-  opt --type, -t <type>  Type to pick when the path matches several objects under a table.
+  opt --max-depth <n>  How deep --deep walks (default: 10)
+  opt --type, -t <type>  Type to pick when the path matches several objects under a table
 
 # tx diff
-Show the structural differences between two semantic models. Exit codes: 0 = identical, 1 = differences found, 2 = error
+Show the structural differences between two models
   arg <left>  Path to the first model: a TMDL folder or .bim file
   arg <right>  Path to the second model: a TMDL folder or .bim file
 
 # tx doctor
-Check whether the local tomix environment is ready.
-  opt --output-format <output-format>  Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.
+Check whether the local environment is ready
+  opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
 
 # tx find
 Search model objects for matching text
   arg <pattern>  The text or regex to look for
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --in <in>  Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all (default: all; annotations are only searched when requested explicitly)
-  opt --type, -t <type>  Only search objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
+  opt --in <scope>  Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all (default: all; annotations are only searched when requested explicitly)
+  opt --type, -t <type>  Only search objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function
   opt --regex  Interpret the pattern as a regular expression
   opt --case-sensitive  Match text exactly, including letter case
   opt --paths-only  Print one matching object path per line for piping
   opt --no-multiline  Show multi-line match context on one line. Applies to text output.
 
 # tx format
-Pretty-print DAX and M expressions (--expression, --path, or every expression in the model)
+Pretty-print DAX and M expressions
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --expression, -e <expression>  The expression to format, given inline
+  opt --expression, -e <expr>  The expression to format, given inline
   opt --path <path>  Format the expression on a model object path
   opt --long  Prefer long lines when formatting M
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --lang <lang>  Expression language: dax or m
-  opt --type, -t <type>  Disambiguate object type
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --lang <language>  Expression language: dax or m
+  opt --type, -t <type>  Type to pick when the path matches several objects under a table
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
-  opt --stage  Stage this command's mutation
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
 
 # tx get
 Read a model object's properties
   arg <path>  The object to read, slash-separated: 'Sales', 'Sales/Amount'. DAX form works too.
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --query <query>  Read just one property (for example --query expression)
-  opt --type, -t <type>  Type to pick when the path matches several objects under a table.
+  opt --query <property>  Read just one property (for example --query expression)
+  opt --type, -t <type>  Type to pick when the path matches several objects under a table
 
 # tx init
 Start a new empty semantic model
   arg [output-path]  Where to create the model; defaults to the global --model path
-  opt --compat, --compatibility-level <compatibility-level>  Compatibility level (default: 1702 when mode is PowerBI, 1500 otherwise).
-  opt --compatibility-mode <compatibility-mode>  Compatibility mode: AnalysisServices, PowerBI. Default: PowerBI.
+  opt --compat, --compatibility-level <level>  Compatibility level (default: 1702 when mode is PowerBI, 1500 otherwise)
+  opt --compatibility-mode <mode>  Compatibility mode: AnalysisServices or PowerBI (default: PowerBI)
   opt --name <name>  Name of the new model (default: the directory's name)
-  opt --serialization <serialization>  How the new model is written: tmdl, bim, or pbip (default: tmdl)
+  opt --serialization <format>  How the new model is written: tmdl, bim, or pbip (default: tmdl)
   opt --force  Clear anything already at the target path
 
 # tx load
@@ -291,30 +291,30 @@ Open a semantic model and print a summary
 List model objects
   arg [path-filter]  Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard ('Sa*', '*/Amount'); quote names with spaces ("'Net Sales'/'Sales Amount'"); inside quotes, '' is a literal apostrophe.
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --type, -t <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
-  opt --paths-only  Print one object path per line, ready for piping.
+  opt --type, -t <type>  Filter by type: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function
+  opt --paths-only  Print one object path per line, ready for piping
   opt --no-multiline  Show multi-line cell content (e.g. measure expressions) on one line, truncated. Applies to text output.
 
 # tx mv (aliases: move, rename)
-Move or rename a model object, including in and out of display folders
+Move or rename a model object or display folder
   arg <source>  Source object path
   arg <destination>  Destination object path
   arg [model]  Optional path to the model; defaults to the active connection
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --force, -f  Save despite newly introduced validation errors
   opt --dry-run  Preview: show the change without saving, staging, or syncing
-  opt --type, -t <type>  Type to pick when the path matches several objects under a table.
-  opt --stage  Stage this command's mutation
+  opt --type, -t <type>  Type to pick when the path matches several objects under a table
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --strict-refs  Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail).
-  opt --no-fix-refs  Do not rewrite DAX references to the renamed or moved object; warn instead.
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --strict-refs  Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail)
+  opt --no-fix-refs  Do not rewrite DAX references to the renamed or moved object; warn instead
 
 # tx profile
-Manage named connection profiles for switching between environments
+Manage named connection profiles
 
 # tx profile list
 Show the profiles you've saved
@@ -326,7 +326,7 @@ Delete a saved profile
 # tx profile set
 Create or update a saved profile
   arg <name>  Profile name
-  opt --desc, --description <description>  Free-form description of this profile
+  opt --desc, --description <text>  Free-form description of this profile
   opt --from-active  Fill the profile from the current active connection
 
 # tx profile show
@@ -334,93 +334,93 @@ Print a saved profile's details
   arg <name>  Profile to show
 
 # tx query
-Run a DAX or DMV query against a live model (inline text, --query, --file, or stdin)
-  arg [query]  The DAX or DMV query text ('-' = read from stdin).
-  opt --query <query>  Inline query text ('-' = read from stdin).
-  opt --file <file>  Read the query from a file ('-' = read from stdin).
-  opt --param <param>  Query parameter as name=value, referenced as @name in DAX. Repeatable.
-  opt --limit <limit>  Maximum number of rows to return.
-  opt --output-file, -o <output-file>  Write results to a file as json or csv (from --output-format, else the file extension).
-  opt --no-validate  Skip the EVALUATE/DEFINE/SELECT keyword pre-check and send the text as-is.
-  opt --trace <trace>  Show server timings (formula vs storage engine). Add a path to also dump raw trace events. Needs admin rights.
+Run a DAX or DMV query against a live model
+  arg [query]  The DAX or DMV query text ('-' = read from stdin)
+  opt --query <text>  Inline query text ('-' = read from stdin)
+  opt --file <file>  Read the query from a file ('-' = read from stdin)
+  opt --param <name=value>  Query parameter as name=value, referenced as @name in DAX. Repeatable.
+  opt --limit <n>  Maximum number of rows to return
+  opt --output-file, -o <file>  Write results to a file as json or csv (from --output-format, else the file extension)
+  opt --no-validate  Skip the EVALUATE/DEFINE/SELECT keyword pre-check and send the text as-is
+  opt --trace [<file>]  Show server timings (formula vs storage engine). Add a path to also dump raw trace events. Needs admin rights.
   opt --plan  Show the logical and physical DAX query plans. Needs admin rights.
   opt --cold  Clear the model cache before each run so timings reflect a cold cache. Needs admin rights.
-  opt --runs <runs>  Execute the query N times and report per-run timings with Avg/Min/Max/StdDev (default: 1).
+  opt --runs <n>  Run the query N times and report per-run timings with Avg/Min/Max/StdDev (default: 1)
 
 # tx refresh
-Refresh data on a deployed model (--refresh-type full|auto|calculate|...)
-  opt --refresh-type <refresh-type>  Kind of refresh to run: full, dataonly, automatic, calculate, clearvalues, defragment, or add (default: automatic)
-  opt --table <table>  Refresh only these tables; the whole model is refreshed when omitted. Repeatable.
-  opt --partition <partition>  Refresh only these partitions, written as TableName.PartitionName; leave --table unset. Repeatable.
+Refresh data on a deployed model
+  opt --refresh-type <type>  Kind of refresh to run: full, dataonly, automatic, calculate, clearvalues, defragment, or add (default: automatic)
+  opt --table <name>  Refresh only these tables; the whole model is refreshed when omitted. Repeatable.
+  opt --partition <table.partition>  Refresh only these partitions, written as TableName.PartitionName; leave --table unset. Repeatable.
   opt --apply-refresh-policy  Let an incremental refresh policy choose the partitions (default: true). Pass false to refresh without it.
-  opt --skip-refresh-policy  Shorthand for --apply-refresh-policy false.
-  opt --effective-date <effective-date>  Evaluate incremental refresh policies as if today were this date (yyyy-MM-dd).
-  opt --max-parallelism <max-parallelism>  Maximum parallel refresh operations.
-  opt --dry-run  Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only.
+  opt --skip-refresh-policy  Shorthand for --apply-refresh-policy false
+  opt --effective-date <date>  Evaluate incremental refresh policies as if today were this date (yyyy-MM-dd)
+  opt --max-parallelism <n>  Maximum parallel refresh operations
+  opt --dry-run  Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only
   opt --policy-only  Apply one table's saved refresh policy without loading data; may remove expired partitions. Requires --table.
-  opt --no-progress  Turn off live progress tracking (useful in CI and when piping).
-  opt --trace <trace>  Write raw XMLA trace events: with no value to stderr, with a value to that log file.
+  opt --no-progress  Turn off live progress tracking (useful in CI and when piping)
+  opt --trace [<file>]  Write raw XMLA trace events: with no value to stderr, with a value to that log file
 
 # tx replace
 Replace text across model objects
   arg [pattern]  The text or regex to look for
   arg [replacement]  Replacement text
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --in <in>  Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all. 'all' covers every scope except annotations (explicit-only: values are often tool-generated JSON).
-  opt --type, -t <type>  Only replace in objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
+  opt --in <scope>  Scope: names, expressions, descriptions, displayFolders, formatStrings, annotations, all. 'all' covers every scope except annotations (explicit-only: values are often tool-generated JSON).
+  opt --type, -t <type>  Only replace in objects of this kind: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function
   opt --regex  Interpret the pattern as a regular expression
   opt --case-sensitive  Match text exactly, including letter case
   opt --dry-run  Preview changes without applying
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
-  opt --stage  Stage this command's mutation
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
 
 # tx rm (aliases: remove)
 Delete an object from the model
-  arg <path>  Object path to remove.
+  arg <path>  Object path to remove
   arg [model]  Optional path to the model; defaults to the active connection
   opt --force, -f  Remove despite DAX dependents and save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
   opt --if-exists  Exit 0 when the object is already gone
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --type, -t <type>  Type to pick when the path matches several objects under a table.
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --type, -t <type>  Type to pick when the path matches several objects under a table
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --stage  Stage this command's mutation
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
 
 # tx save
 Write a model to disk in a chosen format
   arg [model]  Model path, Fabric path, or omit to use the active connection
-  opt --output-file, -o <output-file>  Where to write the model. Omit to write it back to where it was loaded from.
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted). Defaults to the loaded model's format.
+  opt --output-file, -o <file>  Where to write the model. Omit to write it back to where it was loaded from.
+  opt --serialization <format>  How the model is written: tmdl or bim; tmsl and auto also accepted (default: the loaded model's format)
   opt --overwrite  Replace an existing output file or directory
-  opt --fix-bpa  Apply BPA rule fixes before saving, where a rule provides one. Rules that cannot be evaluated block the save
-  opt --bpa-rules <bpa-rules>  Additional BPA rule files to enforce for this save, alongside the built-in ruleset.
+  opt --fix-bpa  Apply BPA rule fixes before saving, where a rule provides one. Rules that cannot be evaluated block the save.
+  opt --bpa-rules <file>  Additional BPA rule files to enforce for this save, alongside the built-in ruleset
   opt --supporting-files  Write a {modelName}.SemanticModel/ folder (with .platform and definition.pbism) around the output. Only applies to tmdl/bim written to a bare target.
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
 
 # tx script
 Run C# scripts against a semantic model
   arg [model]  Model path, Fabric path, or omit to use the active connection
   opt --file, --script <file>  Script files to run (.cs or .csx). Repeatable.
-  opt --expression, -e <expression>  C# expressions to run inline. Pass '-' to read from stdin.
-  opt --save-to <save-to>  Write the model to this path after the scripts run (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --expression, -e <code>  C# expressions to run inline. Pass '-' to read from stdin.
+  opt --save-to <path>  Write the model to this path after the scripts run (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
   opt --dry-run  Compile the scripts and report errors without running them
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --stage  Stage this command's mutation
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
+  opt --no-sync  Skip workspace sync when workspace mode is active
 
 # tx session
 Inspect this terminal's CLI session
@@ -443,21 +443,21 @@ Print this session's details (ID, file path, active state)
 Change a property on a model object
   arg <path>  The object to change, slash-separated. DAX form works too.
   arg [model]  Optional path to the model; defaults to the active connection
-  opt -q <q>  Compatibility form of --set: the property to set; give its value with -i.
-  opt -i <i>  Value for the preceding -q. Pass '-' to read from stdin.
-  opt --set, -p <set>  Property assignment as name=value. Repeat to set multiple properties together.
+  opt -q <property>  Compatibility form of --set: the property to set; give its value with -i
+  opt -i <value>  Compatibility form of --set: the value for the preceding -q. Pass '-' to read from stdin.
+  opt --set, -p <name=value>  Property assignment as name=value. Repeat to set multiple properties together.
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --dry-run  Preview: show the change without saving, staging, or syncing
-  opt --type, -t <type>  Disambiguate when the path matches multiple objects (e.g. a measure and a partition sharing a name).
+  opt --type, -t <type>  Type to pick when the path matches several objects (e.g. a measure and a partition sharing a name)
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
-  opt --save-to <save-to>  Write the saved model to this path instead of its source (implies --save)
-  opt --serialization <serialization>  How the model is written: tmdl or bim (tmsl and auto also accepted)
-  opt --stage  Stage this command's mutation
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
   opt --revert  Revert a staged mutation
-  opt --no-sync  Skip workspace sync when workspace mode is active.
-  opt --strict-refs  Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail).
-  opt --no-fix-refs  Do not rewrite DAX references to the renamed object; warn instead.
+  opt --no-sync  Skip workspace sync when workspace mode is active
+  opt --strict-refs  Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)
+  opt --no-fix-refs  Do not rewrite DAX references to the renamed object; warn instead
 
 # tx stage
 Inspect and manage staged (uncommitted) model mutations
@@ -473,30 +473,30 @@ Discard staged mutations without committing them
   opt --all  Discard staged mutations for every model in the session, not just the active one
 
 # tx stage commit
-Promote staged mutations onto the source (and workspace mirror)
-  opt --force  Commit despite source drift and newly introduced validation errors.
+Commit staged mutations to the source and workspace mirror
+  opt --force  Commit despite source drift and newly introduced validation errors
 
 # tx test
-Run DAX regression tests against a live model (--update records snapshots, --trx/--ci for pipelines)
+Run DAX regression tests against a live model
   arg [path]  Test file or directory searched recursively for .dax tests (default: current directory)
-  opt --update  Record mode: run each query and (re)write its .expected.json snapshot from the actual result.
-  opt --filter <filter>  Run only tests whose name matches a * wildcard pattern (case-insensitive).
-  opt --param <param>  Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.
-  opt --max-rows <max-rows>  Per-query row cap; a query exceeding it fails as an error (default: 10000).
-  opt --ci <ci>  Print CI log-group commands to stderr for the given system: vsts or github
-  opt --trx <trx>  Write results to a .trx test-run file at this path
+  opt --update  Record mode: run each query and (re)write its .expected.json snapshot from the actual result
+  opt --filter <pattern>  Run only tests whose name matches a * wildcard pattern (case-insensitive)
+  opt --param <name=value>  Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.
+  opt --max-rows <n>  Per-query row cap; a query exceeding it fails as an error (default: 10000)
+  opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
+  opt --trx <file>  Write results to a .trx test-run file at this path
 
 # tx update
-Update tx to the latest release.
-  opt --check  Preview only: show the latest version and release notes without changing anything.
-  opt --version <version>  Update (or downgrade, with --yes) to a specific released version instead of the latest.
-  opt --output-format <output-format>  Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.
+Update tx to the latest release
+  opt --check  Preview only: show the latest version and release notes without changing anything
+  opt --version <version>  Update (or downgrade, with --yes) to a specific released version instead of the latest
+  opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
 
 # tx validate
-Check a model's DAX expressions and relationship integrity (--ci for CI output, --trx for test results)
+Check DAX expressions and relationship integrity
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --ci <ci>  Print CI log-group commands to stderr for the given system: vsts or github
-  opt --trx <trx>  Write results to a .trx test-run file at this path
+  opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
+  opt --trx <file>  Write results to a .trx test-run file at this path
   opt --errors-only  Only show errors
   opt --no-warnings  Leave out analyzer warnings
   opt --no-multiline  Show multi-line cell content on one line. Applies to text output.
@@ -506,18 +506,18 @@ Check a model's DAX expressions and relationship integrity (--ci for CI output, 
 Report VertiPaq storage statistics for a semantic model
   arg [table]  Table name to filter the analysis to a single table
   opt --tables  Show the tables view
-  opt --columns  Show the columns view (default)
+  opt --columns  Show the columns view, the one shown when no view is chosen
   opt --relationships  Show the relationships view
   opt --partitions  Show the partitions view
   opt --all  Include the tables, columns, relationships, and partitions views
   opt --detail  Extra columns: data/dictionary/hierarchy size breakdown, encoding, segments
-  opt --fields <fields>  Comma-separated fields to display (e.g. name,card,size,%tbl,%db,bar). Available fields vary by view; requires a single view. Text and csv output only.
-  opt --top <top>  Limit each view to the N largest rows. Text and csv output only.
+  opt --fields <list>  Comma-separated fields to display (e.g. name,card,size,%tbl,%db,bar). Available fields vary by view; requires a single view. Text and csv output only.
+  opt --top <n>  Limit each view to the N largest rows. Text and csv output only.
   opt --stats  Show a model-level storage summary (combine with view flags for more)
   opt --annotate  Write statistics into the model as Vertipaq_* annotations (preview unless --save)
   opt --save  Persist --annotate changes to the model
   opt --force, -f  Save despite newly introduced validation errors
-  opt --export <export>  Export statistics to a .vpax file for offline analysis
-  opt --import <import>  Analyze a previously exported .vpax file offline (no connection needed)
+  opt --export <file>  Export statistics to a .vpax file for offline analysis
+  opt --import <file>  Analyze a previously exported .vpax file offline (no connection needed)
   opt --obfuscate  Mask names and expressions in the exported .vpax; a matching .dict dictionary keeps the mapping private
 

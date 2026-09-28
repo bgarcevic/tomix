@@ -67,6 +67,13 @@ help-snapshot test in `Tomix.Cli.Tests` will remind you if you forget, and
 `./scripts/dev.sh snapshot` (`.\scripts\dev.ps1 snapshot` on Windows)
 regenerates the snapshot.
 
+The terminal screenshots and GIFs in `docs/assets/media` are recorded from
+the real CLI, not drawn by hand. When a command's output changes, re-record
+them with `uv run scripts/docs-media/record.py` (or name one scene, e.g.
+`... record.py bpa`). The scenes — commands, sample model, window size — live
+in `scripts/docs-media/scenes.json`. Recording runs on Windows, macOS, and
+Linux; it needs the .NET SDK and a monospace font (Cascadia Mono preferred).
+
 ## Bugs and ideas
 
 Open an [issue](https://github.com/bgarcevic/tomix-cli/issues). For bugs,

@@ -40,13 +40,13 @@ internal sealed class LsCommand : ICommandModule
 
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Filter by type: {ModelObjectTypeCatalog.DiscoveryListText}."
+            Description = $"Filter by type: {ModelObjectTypeCatalog.DiscoveryListText}"
         };
         typeOption.Aliases.Add("-t");
 
         var pathsOnlyOption = new Option<bool>("--paths-only")
         {
-            Description = "Print one object path per line, ready for piping."
+            Description = "Print one object path per line, ready for piping"
         };
 
         var noMultilineOption = new Option<bool>("--no-multiline")

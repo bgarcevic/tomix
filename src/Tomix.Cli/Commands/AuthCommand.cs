@@ -26,7 +26,7 @@ internal sealed class AuthCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("auth", "Sign in, sign out, and check authentication for remote workspaces");
+        var command = new Command("auth", "Sign in to, out of, and check remote workspaces");
         command.Subcommands.Add(BuildLogin());
         command.Subcommands.Add(BuildLogout());
         command.Subcommands.Add(BuildStatus());

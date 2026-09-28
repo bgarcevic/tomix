@@ -1,8 +1,8 @@
 using System.CommandLine;
-using System.CommandLine.Help;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Tomix.App.Format;
+using Tomix.Cli.Output;
 
 namespace Tomix.Cli.Tests;
 
@@ -121,8 +121,8 @@ public sealed class CommandSurfaceSnapshotTests
         sb.Append('\n');
     }
 
-    // Mirrors the alias ordering and value placeholder of SpectreHelpAction so the
-    // snapshot reads like the help output it stands in for.
+    // Uses the help's value placeholder, but lists every alias: help shows only the short and
+    // primary long names, and this snapshot is what keeps the reference docs' alias lists honest.
     private static string FormatOption(Option option)
     {
         var names = new List<string> { option.Name };
@@ -132,13 +132,7 @@ public sealed class CommandSurfaceSnapshotTests
             .ThenBy(n => n.Length)
             .ThenBy(n => n));
 
-        if (option is { ValueType: not null } && option.ValueType != typeof(bool) && option.ValueType != typeof(bool?)
-            && option is not HelpOption and not VersionOption)
-        {
-            joined += $" <{option.Name.TrimStart('-')}>";
-        }
-
-        return joined;
+        return SpectreHelpAction.Placeholder(option) is { } placeholder ? $"{joined} {placeholder}" : joined;
     }
 
     /// <summary>Visible commands only, each with its display path prefixed by <paramref name="prefix"/>.</summary>

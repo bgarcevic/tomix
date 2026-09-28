@@ -51,7 +51,7 @@ internal sealed class ValidateCommand : ICommandModule
             Description = "Only show errors reported by the connected server"
         };
 
-        var command = new Command("validate", "Check a model's DAX expressions and relationship integrity (--ci for CI output, --trx for test results)")
+        var command = new Command("validate", "Check DAX expressions and relationship integrity")
         {
             modelArgument,
             ciOption,

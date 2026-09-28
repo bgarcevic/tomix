@@ -22,6 +22,10 @@ Shared output wiring for all commands.
 - `SyntaxErrorCaret` — the source line and `^` marker under an expression syntax error, for inline `tx format -e` failures in text mode.
 - `StdErr` — the stderr console for commentary (banners, hints, prompts, notices). Use it instead of constructing `AnsiConsole.Create(... Console.Error)`; it is created per call so tests can swap `Console.Error`, and it inherits the no-color setting. Stdout carries only results.
 - `DidYouMean` — Levenshtein-based "Did you mean?" suggestion helper for unknown subcommands.
+- `HelpRenderer` (`SpectreHelpAction`) — all `--help` output: root sections, per-command notes and
+  examples, wrapping to the terminal width. `HelpGroups` tags options into named help sections;
+  `HelpPlaceholders` names each option's value (`<path>`). Layout and text rules are enforced by
+  `HelpLayoutTests` (see the Help section of `docs/cli-ux-guidelines.md`).
 - `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).
 - `TraceWriter` / `NonDisposingTextWriter` — shared `--trace` destination plumbing for `refresh` and `query`: resolves the option value (bare/`-` → stderr, otherwise file) and opens the writer; the wrapper keeps `using` scopes from disposing the process-shared `Console.Error`.
 - `LsRenderer` — Spectre.Console tables for the `ls` command.

@@ -14,6 +14,17 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     /// </summary>
     public override bool ClearsParseErrors => true;
 
+    internal const string DocsUrl = "https://bgarcevic.github.io/tomix-cli/";
+
+    /// <summary>Help never wraps wider than this, however wide the terminal (clap's default too).</summary>
+    internal const int MaxWidth = 100;
+
+    /// <summary>A label column wider than this moves descriptions onto their own lines.</summary>
+    private const int MaxLabelColumn = 40;
+
+    /// <summary>Indent of a description placed under its label (the stacked layout).</summary>
+    private const int StackedIndent = 8;
+
     internal static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["ls", "get", "find", "deps", "query"]),
@@ -22,6 +33,21 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
     ];
+
+    /// <summary>
+    /// Detail that is too long for a command's one-line description (which also appears in the
+    /// root command list): printed on the command's own help page, under the description.
+    /// </summary>
+    internal static readonly Dictionary<string, string> CommandNotes = new(StringComparer.Ordinal)
+    {
+        ["connect"] = "With no arguments, shows the active connection. --recent reconnects to a recently used model.",
+        ["diff"] = "Exit codes: 0 = identical, 1 = differences found, 2 = error.",
+        ["format"] = "Formats an inline expression (--expression), one object (--path), or every expression in the model.",
+        ["query"] = "The query comes from the positional argument, --query, --file, or stdin.",
+        ["refresh"] = "Runs an automatic refresh unless --refresh-type says otherwise.",
+        ["test"] = "--update records snapshots; --trx and --ci produce pipeline output.",
+        ["validate"] = "--ci prints CI log groups; --trx writes a test-results file.",
+    };
 
     internal static readonly Dictionary<string, string[]> CommandExamples = new(StringComparer.Ordinal)
     {
@@ -56,14 +82,14 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx test ./tests --filter \"totals/*\" --trx results.trx --ci vsts",
         ],
         ["add"] = [
-            "tx add tables/Sales/measures/Revenue -i \"CALCULATE(SUM(Sales[Amount]))\"",
-            "tx add tables/Sales/measures/Revenue -i - < query.txt",
-            "tx add Sales/Revenue -t Measure -i \"CALCULATE(SUM(Sales[Amount]))\"",
+            "tx add Sales/Revenue -t Measure -e \"SUM(Sales[Amount])\"",
+            "tx add Sales/Revenue -t Measure -e - < revenue.dax",
+            "tx add Sales/Margin -t Measure -e \"[Profit] / [Sales]\" --set formatString=0.0%",
         ],
         ["set"] = [
             "tx set \"Table[Measure]\" --set expression=\"CALCULATE(SUM(Sales[Amount]))\"",
-            "tx set \"Sales[Total Sales]\" --set formatString=\"#,0\" --set displayFolder=KPIs --save",
-            "tx set tables/Sales/Name -i \"Sales_v2\"",
+            "tx set \"Sales[Total Sales]\" --set displayFolder=KPIs --save",
+            "tx set tables/Sales --set name=Sales_v2",
         ],
         ["mv"] = [
             "tx mv tables/Sales/measures/OldName tables/Sales/measures/NewName",
@@ -134,6 +160,12 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx bpa run --output-format json",
             "tx bpa run --fix",
         ],
+        ["bpa run"] = [
+            "tx bpa run",
+            "tx bpa run --errors --details",
+            "tx bpa run --fix --save",
+            "tx bpa run --ci github --fail-on warning",
+        ],
         ["validate"] = [
             "tx validate",
             "tx validate --ci github",
@@ -188,269 +220,382 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 
     public override int Invoke(ParseResult parseResult)
     {
-        var command = parseResult.CommandResult.Command;
+        Write(parseResult.CommandResult.Command, concise: false, TerminalWidth());
+        return 0;
+    }
+
+    /// <summary>
+    /// The width help wraps to: the terminal's, capped at <see cref="MaxWidth"/>. Redirected
+    /// output is not wrapped, so a pager or file gets whole lines and never a hard break.
+    /// </summary>
+    internal static int TerminalWidth()
+        => Console.IsOutputRedirected ? int.MaxValue : Math.Clamp(AnsiConsole.Profile.Width, 40, MaxWidth);
+
+    /// <summary>
+    /// Writes help for <paramref name="command"/>. <paramref name="concise"/> is the bare
+    /// <c>tx</c> form: the command list without the global options.
+    /// </summary>
+    internal static void Write(Command command, bool concise, int width)
+    {
+        // Lines are wrapped here, with hanging indents; Spectre must not wrap them again.
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;
 
         try
         {
+            var help = new HelpWriter(Math.Max(width, 40));
             if (command is RootCommand)
-                WriteRoot(command);
+                help.WriteRoot(command, concise);
             else
-                WriteCommand(command);
+                help.WriteCommand(command);
         }
         finally
         {
             AnsiConsole.Profile.Width = originalWidth;
         }
-
-        return 0;
     }
 
-    private static void WriteRoot(Command root)
+    /// <summary>The page path of a command: "bpa run" for <c>tx bpa run</c>, "" for the root.</summary>
+    internal static string CommandPath(Command command)
     {
-        AnsiConsole.MarkupLine($"{Styling.Title("tomix")} {Styling.Muted("- open source semantic model CLI")}");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(Styling.Title("Usage:"));
-        AnsiConsole.MarkupLine($"  {Styling.Bold("tx")} {Styling.Bold("[command]")} {Styling.Option("[options]")}");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(Styling.Title("Global options:"));
-
-        // Derived from the actual root options (help/version plus the recursive globals) so the
-        // root help can never drift from what the parser accepts.
-        WriteOptionRows(root.Options
-            .Where(option => !option.Hidden)
-            .Select(option => (FormatOptionAliases(option), option.Description ?? "")));
-
-        AnsiConsole.WriteLine();
-        WriteSectionedCommands(root);
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(Styling.Muted("Use `tx <command> --help` for command-specific options."));
-    }
-
-    private static void WriteSectionedCommands(Command root)
-    {
-        var subcommandMap = root.Subcommands.ToDictionary(sc => sc.Name, StringComparer.Ordinal);
-
-        foreach (var (heading, commandNames) in RootSections)
+        var chain = new List<string>();
+        for (var current = command; current is not null and not RootCommand;
+             current = current.Parents.OfType<Command>().FirstOrDefault())
         {
-            AnsiConsole.MarkupLine(Styling.Title($"{heading}:"));
-            var sectionCommands = commandNames.Where(subcommandMap.ContainsKey).Select(name => subcommandMap[name]).ToList();
-            WriteCommandRows(sectionCommands);
-            AnsiConsole.WriteLine();
+            chain.Insert(0, current.Name);
         }
 
-        // Safety net: a registered command missing from RootSections must still show up in help
-        // rather than silently vanishing.
-        var listed = RootSections.SelectMany(section => section.Commands)
-            .ToHashSet(StringComparer.Ordinal);
-        var unlisted = root.Subcommands.Where(sc => !listed.Contains(sc.Name)).ToList();
-        if (unlisted.Count > 0)
-        {
-            AnsiConsole.MarkupLine(Styling.Title("Other:"));
-            WriteCommandRows(unlisted);
-            AnsiConsole.WriteLine();
-        }
+        return string.Join(' ', chain);
     }
 
-    private static void WriteCommandRows(List<Command> commands)
+    /// <summary>
+    /// The option's names as shown in help: short aliases first, then the long name. Long aliases
+    /// (<c>--recents</c>, <c>--compat</c>) and the help option's legacy spellings (<c>-?</c>,
+    /// <c>/?</c>, <c>/h</c>) still parse but are not listed; the reference docs cover them.
+    /// </summary>
+    internal static IReadOnlyList<string> DisplayNames(Option option)
     {
-        var rows = commands.Select(sc =>
+        var shorts = option.Aliases.Prepend(option.Name)
+            .Where(n => n.Length == 2 && n[0] == '-' && n != "-?")
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(n => n, StringComparer.Ordinal);
+        return option.Name.StartsWith("--", StringComparison.Ordinal)
+            ? shorts.Append(option.Name).ToList()
+            : shorts.ToList();
+    }
+
+    /// <summary>The value placeholder: <c>&lt;path&gt;</c>, or <c>[&lt;n&gt;]</c> when the value is optional.</summary>
+    internal static string? Placeholder(Option option)
+    {
+        if (!HelpPlaceholders.TakesValue(option))
+            return null;
+
+        var name = $"<{option.HelpName ?? option.Name.TrimStart('-')}>";
+        // Only a single optional value is bracketed; repeatable options take one value per use.
+        return option.Arity is { MinimumNumberOfValues: 0, MaximumNumberOfValues: 1 } ? $"[{name}]" : name;
+    }
+
+    /// <summary>The save flags in the order a reader weighs them, whatever order a command declares them in.</summary>
+    private static readonly string[] SaveOrder =
+        ["--save", "--save-to", "--stage", "--revert", "--dry-run", "--serialization", "--overwrite", "--force", "--no-sync"];
+
+    private readonly record struct Row(string Label, string StyledLabel, string Description);
+
+    private sealed class HelpWriter(int width)
+    {
+        public void WriteRoot(Command root, bool concise)
         {
-            var plainLabel = sc.Name;
-            var styledParts = new List<string> { Styling.Bold(sc.Name) };
-            foreach (var arg in sc.Arguments.Where(a => !a.Hidden))
+            AnsiConsole.MarkupLine($"{Styling.Bold("tx")} {Styling.Muted("—")} {Styling.MarkupEscape(root.Description ?? "")}");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"{Styling.Title("Usage:")} {Styling.Bold("tx")} {Styling.Value("<command>")} {Styling.Option("[options]")}");
+            AnsiConsole.WriteLine();
+
+            WriteSectionedCommands(root);
+
+            if (!concise)
             {
-                if (arg.Arity.MinimumNumberOfValues == 0)
-                {
-                    plainLabel += $" [{arg.Name}]";
-                    styledParts.Add(Styling.Value($"[{arg.Name}]"));
-                }
-                else
-                {
-                    plainLabel += $" <{arg.Name}>";
-                    styledParts.Add(Styling.Value($"<{arg.Name}>"));
-                }
+                AnsiConsole.MarkupLine(Styling.Title("Global options:"));
+                // Derived from the actual root options (help/version plus the recursive globals)
+                // so the root help can never drift from what the parser accepts.
+                WriteOptionRows(root.Options.Where(option => !option.Hidden).ToList());
+                AnsiConsole.WriteLine();
+                WriteFooter("Run 'tx help <command>' for a command's options and examples.");
             }
-            return (PlainLabel: plainLabel, StyledLabel: string.Join(" ", styledParts), Description: sc.Description ?? "");
-        }).ToList();
-
-        if (rows.Count == 0)
-            return;
-
-        var labelWidth = rows.Max(r => r.PlainLabel.Length) + 2;
-        foreach (var row in rows)
-        {
-            var padding = new string(' ', labelWidth - row.PlainLabel.Length);
-            AnsiConsole.MarkupLine($"  {row.StyledLabel}{padding}{Styling.MarkupEscape(row.Description)}");
-        }
-    }
-
-    private static void WriteCommand(Command command)
-    {
-        var parentChain = GetParentChain(command);
-        var hasSubcommands = command.Subcommands.Count > 0;
-
-        if (!string.IsNullOrEmpty(command.Description))
-        {
-            AnsiConsole.MarkupLine(Styling.Title("Description:"));
-            AnsiConsole.MarkupLine($"  {Styling.MarkupEscape(command.Description)}");
-            AnsiConsole.WriteLine();
-        }
-
-        AnsiConsole.MarkupLine(Styling.Title("Usage:"));
-        var usageParts = new List<string> { "tx" };
-        usageParts.AddRange(parentChain);
-        var usageLine = Styling.Bold(string.Join(" ", usageParts));
-
-        foreach (var arg in command.Arguments.Where(a => !a.Hidden))
-        {
-            if (arg.Arity.MinimumNumberOfValues == 0)
-                usageLine += " " + Styling.Value($"[{arg.Name}]");
             else
-                usageLine += " " + Styling.Value($"<{arg.Name}>");
+            {
+                WriteFooter("Run 'tx help <command>' for a command's options, or 'tx --help' for global options.");
+            }
         }
 
-        if (hasSubcommands)
-            usageLine += " " + Styling.Bold("[command]");
-
-        usageLine += " " + Styling.Option("[options]");
-        AnsiConsole.MarkupLine($"  {usageLine}");
-        AnsiConsole.WriteLine();
-
-        if (hasSubcommands)
+        public void WriteCommand(Command command)
         {
-            WriteCommandsSection(command);
+            var path = CommandPath(command);
+
+            if (!string.IsNullOrEmpty(command.Description))
+            {
+                WriteParagraph(command.Description, 0);
+                AnsiConsole.WriteLine();
+            }
+
+            if (CommandNotes.TryGetValue(path, out var notes))
+            {
+                WriteParagraph(notes, 0, Styling.Muted);
+                AnsiConsole.WriteLine();
+            }
+
+            WriteUsage(command, path);
+
+            if (command.Subcommands.Any(sc => !sc.Hidden))
+            {
+                AnsiConsole.MarkupLine(Styling.Title("Commands:"));
+                WriteCommandRows(command.Subcommands.Where(sc => !sc.Hidden).ToList(), includeArguments: true);
+                AnsiConsole.WriteLine();
+            }
+
+            var arguments = command.Arguments.Where(a => !a.Hidden).ToList();
+            if (arguments.Count > 0)
+            {
+                AnsiConsole.MarkupLine(Styling.Title("Arguments:"));
+                WriteRows(arguments.Select(a =>
+                {
+                    var label = ArgumentLabel(a);
+                    return new Row(label, Styling.Value(label), a.Description ?? "");
+                }).ToList());
+                AnsiConsole.WriteLine();
+            }
+
+            var (local, global) = GroupedOptions(command);
+
+            // Untagged options first, then the command's own groups in first-seen order, then the
+            // shared save flags, then the compatibility forms.
+            foreach (var group in local.GroupBy(o => HelpGroups.Of(o) ?? "")
+                         .OrderBy(g => g.Key switch { "" => 0, HelpGroups.Save => 2, HelpGroups.Compatibility => 3, _ => 1 }))
+            {
+                AnsiConsole.MarkupLine(Styling.Title($"{(group.Key.Length == 0 ? "Options" : group.Key)}:"));
+                WriteOptionRows(group.Key == HelpGroups.Save
+                    ? group.OrderBy(o => Array.IndexOf(SaveOrder, o.Name) is var i and >= 0 ? i : SaveOrder.Length).ToList()
+                    : group.ToList());
+                AnsiConsole.WriteLine();
+            }
+
+            if (CommandExamples.TryGetValue(path, out var examples))
+            {
+                AnsiConsole.MarkupLine(Styling.Title("Examples:"));
+                foreach (var example in examples)
+                    AnsiConsole.MarkupLine($"  {Styling.Path(example)}");
+                AnsiConsole.WriteLine();
+            }
+
+            if (global.Count > 0)
+            {
+                // Each page used to list all thirteen globals in full: nearly half of every
+                // command's help. They are the same everywhere, so name them and point at the root.
+                var names = string.Join(", ", global.Select(o => o.Name));
+                var heading = "Global options:";
+                var lines = Wrap($"{names} (see 'tx --help')", width - heading.Length - 1);
+                AnsiConsole.MarkupLine($"{Styling.Title(heading)} {Styling.Muted(lines[0])}");
+                foreach (var line in lines.Skip(1))
+                    AnsiConsole.MarkupLine($"{new string(' ', heading.Length + 1)}{Styling.Muted(line)}");
+            }
+        }
+
+        private void WriteUsage(Command command, string path)
+        {
+            var usage = $"{Styling.Title("Usage:")} {Styling.Bold($"tx {path}")}";
+            foreach (var arg in command.Arguments.Where(a => !a.Hidden))
+                usage += " " + Styling.Value(ArgumentLabel(arg, bracketOptional: true));
+            if (command.Subcommands.Any(sc => !sc.Hidden))
+                usage += " " + Styling.Value("<command>");
+            usage += " " + Styling.Option("[options]");
+            AnsiConsole.MarkupLine(usage);
             AnsiConsole.WriteLine();
         }
 
-        var arguments = command.Arguments.Where(a => !a.Hidden).ToList();
-        if (arguments.Count > 0)
+        private void WriteSectionedCommands(Command root)
         {
-            AnsiConsole.MarkupLine(Styling.Title("Arguments:"));
-            WriteArgumentRows(arguments.Select(a => ($"<{a.Name}>", a.Description ?? "")));
-            AnsiConsole.WriteLine();
+            var subcommands = root.Subcommands.Where(sc => !sc.Hidden).ToDictionary(sc => sc.Name, StringComparer.Ordinal);
+            var sections = RootSections
+                .Select(s => (s.Heading, Commands: s.Commands.Where(subcommands.ContainsKey).Select(n => subcommands[n]).ToList()))
+                .ToList();
+
+            // Safety net: a registered command missing from RootSections must still show up in
+            // help rather than silently vanishing.
+            var listed = RootSections.SelectMany(section => section.Commands).ToHashSet(StringComparer.Ordinal);
+            var unlisted = subcommands.Values.Where(sc => !listed.Contains(sc.Name)).ToList();
+            if (unlisted.Count > 0)
+                sections.Add(("Other", unlisted));
+
+            // One label column across every section, so the descriptions line up down the page.
+            var labelWidth = sections.SelectMany(s => s.Commands).Max(c => CommandLabel(c, false).Length);
+            foreach (var (heading, commands) in sections)
+            {
+                AnsiConsole.MarkupLine(Styling.Title($"{heading}:"));
+                WriteCommandRows(commands, includeArguments: false, labelWidth);
+                AnsiConsole.WriteLine();
+            }
         }
 
-        var (localOptions, globalOptions) = GetGroupedOptions(command);
-
-        if (localOptions.Count > 0)
+        private void WriteCommandRows(List<Command> commands, bool includeArguments, int? labelWidth = null)
         {
-            AnsiConsole.MarkupLine(Styling.Title("Options:"));
-            WriteOptionRows(localOptions.Select(o => (FormatOptionAliases(o), o.Description ?? "")));
-            AnsiConsole.WriteLine();
+            var rows = commands.Select(c =>
+            {
+                var label = CommandLabel(c, includeArguments);
+                var styled = Styling.Bold(c.Name) + label[c.Name.Length..] switch
+                {
+                    "" => "",
+                    var args => " " + Styling.Value(args.TrimStart()),
+                };
+                return new Row(label, styled, c.Description ?? "");
+            }).ToList();
+            WriteRows(rows, labelWidth);
         }
 
-        if (globalOptions.Count > 0)
+        private void WriteOptionRows(List<Option> options)
         {
-            AnsiConsole.MarkupLine(Styling.Title("Global options:"));
-            WriteOptionRows(globalOptions.Select(o => (FormatOptionAliases(o), o.Description ?? "")));
-            AnsiConsole.WriteLine();
+            // Long names line up in their own column when any option in the block has a short alias.
+            var anyShort = options.Any(o => DisplayNames(o)[0] is { } first && !first.StartsWith("--", StringComparison.Ordinal));
+            var rows = options.Select(option =>
+            {
+                var names = DisplayNames(option);
+                var joined = string.Join(", ", names);
+                if (anyShort && names[0].StartsWith("--", StringComparison.Ordinal))
+                    joined = "    " + joined;
+
+                var placeholder = Placeholder(option);
+                var label = placeholder is null ? joined : $"{joined} {placeholder}";
+                var styled = Styling.Option(joined) + (placeholder is null ? "" : " " + Styling.Value(placeholder));
+                return new Row(label, styled, option.Description ?? "");
+            }).ToList();
+            WriteRows(rows);
         }
 
-        var commandKey = string.Join(" ", parentChain);
-        if (CommandExamples.TryGetValue(commandKey, out var examples))
+        private void WriteRows(List<Row> rows, int? labelWidth = null)
         {
-            AnsiConsole.MarkupLine(Styling.Title("Examples:"));
-            foreach (var example in examples)
-                AnsiConsole.MarkupLine($"  {Styling.Path(example)}");
-            AnsiConsole.WriteLine();
+            if (rows.Count == 0)
+                return;
+
+            const int indent = 2;
+            var widest = labelWidth ?? rows.Max(r => r.Label.Length);
+            var column = indent + widest + 2;
+            var stacked = column > MaxLabelColumn;
+
+            foreach (var row in rows)
+            {
+                if (stacked)
+                {
+                    AnsiConsole.MarkupLine($"  {row.StyledLabel}");
+                    if (row.Description.Length > 0)
+                        WriteParagraph(row.Description, StackedIndent);
+                    continue;
+                }
+
+                var lines = Wrap(row.Description, width - column);
+                var padding = new string(' ', column - indent - row.Label.Length);
+                AnsiConsole.MarkupLine($"  {row.StyledLabel}{padding}{Styling.MarkupEscape(lines[0])}");
+                foreach (var line in lines.Skip(1))
+                    AnsiConsole.MarkupLine($"{new string(' ', column)}{Styling.MarkupEscape(line)}");
+            }
+        }
+
+        private void WriteParagraph(string text, int indent, Func<string, string>? style = null)
+        {
+            style ??= Styling.MarkupEscape;
+            foreach (var line in Wrap(text, width - indent))
+                AnsiConsole.MarkupLine($"{new string(' ', indent)}{style(line)}");
+        }
+
+        private void WriteFooter(string hint)
+        {
+            WriteParagraph(hint, 0, Styling.Muted);
+            AnsiConsole.MarkupLine(Styling.Muted($"Docs: {DocsUrl}"));
         }
     }
 
-    private static void WriteCommandsSection(Command command)
-    {
-        AnsiConsole.MarkupLine(Styling.Title("Commands:"));
-        WriteCommandRows(command.Subcommands.ToList());
-    }
+    /// <summary>
+    /// The name, plus its positional arguments on a group's own page. The root list shows names
+    /// only: arguments widened its label column enough to wrap descriptions at 80 columns, and
+    /// every command's page states them on its Usage line.
+    /// </summary>
+    private static string CommandLabel(Command command, bool includeArguments)
+        => includeArguments
+            ? string.Join(' ', command.Arguments.Where(a => !a.Hidden)
+                .Select(a => ArgumentLabel(a, bracketOptional: true)).Prepend(command.Name))
+            : command.Name;
 
-    private static void WriteOptionRows(IEnumerable<(string Label, string Description)> rows)
-    {
-        var rowList = rows.ToList();
-        var labelWidth = rowList.Max(r => r.Label.Length) + 2;
-        foreach (var (label, description) in rowList)
-        {
-            var styled = StyleOptionLabel(label);
-            var padding = new string(' ', labelWidth - label.Length);
-            AnsiConsole.MarkupLine($"  {styled}{padding}{Styling.MarkupEscape(description)}");
-        }
-    }
+    private static string ArgumentLabel(Argument argument, bool bracketOptional = false)
+        => bracketOptional && argument.Arity.MinimumNumberOfValues == 0 ? $"[{argument.Name}]" : $"<{argument.Name}>";
 
-    private static void WriteArgumentRows(IEnumerable<(string Label, string Description)> rows)
-    {
-        var rowList = rows.ToList();
-        var labelWidth = rowList.Max(r => r.Label.Length) + 2;
-        foreach (var (label, description) in rowList)
-            AnsiConsole.MarkupLine($"  {Styling.Value(label.PadRight(labelWidth))}{Styling.MarkupEscape(description)}");
-    }
-
-    private static (List<Option> Local, List<Option> Global) GetGroupedOptions(Command command)
+    private static (List<Option> Local, List<Option> Global) GroupedOptions(Command command)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var local = new List<Option>();
         var global = new List<Option>();
 
-        foreach (var opt in command.Options.Where(o => !o.Hidden))
+        // Every command carries its own --help; it is listed with the globals instead.
+        foreach (var opt in command.Options.Where(o => !o.Hidden && o is not HelpOption))
         {
             if (seen.Add(opt.Name))
                 local.Add(opt);
         }
 
-        var parent = command.Parents.OfType<Command>().FirstOrDefault();
-        while (parent is not null)
+        for (var parent = command.Parents.OfType<Command>().FirstOrDefault(); parent is not null;
+             parent = parent.Parents.OfType<Command>().FirstOrDefault())
         {
             foreach (var opt in parent.Options.Where(o => !o.Hidden && o.Recursive))
             {
                 if (seen.Add(opt.Name))
                     global.Add(opt);
             }
-            parent = parent.Parents.OfType<Command>().FirstOrDefault();
         }
+
+        if (command.Options.OfType<HelpOption>().FirstOrDefault() is { } help && seen.Add(help.Name))
+            global.Add(help);
 
         return (local, global);
     }
 
-    private static List<string> GetParentChain(Command command)
+    /// <summary>
+    /// Word-wraps <paramref name="text"/> to <paramref name="width"/> columns. Always returns at
+    /// least one line; a word longer than the width is broken rather than overflowing.
+    /// </summary>
+    internal static List<string> Wrap(string text, int width)
     {
-        var chain = new List<string>();
-        var current = command;
-        while (current is not null and not RootCommand)
+        var lines = new List<string>();
+        if (width <= 0 || text.Length <= width)
         {
-            chain.Insert(0, current.Name);
-            current = current.Parents.OfType<Command>().FirstOrDefault();
-        }
-        return chain;
-    }
-
-    private static string StyleOptionLabel(string label)
-    {
-        var valueStart = label.LastIndexOf(" <");
-        if (valueStart < 0)
-            return Styling.Option(label);
-
-        var flags = label[..valueStart];
-        var valueArg = label[valueStart..];
-        return Styling.Option(flags) + " " + Styling.Value(valueArg[1..]);
-    }
-
-    private static string FormatOptionAliases(Option option)
-    {
-        var names = new List<string> { option.Name };
-        foreach (var alias in option.Aliases)
-            names.Add(alias);
-        var sorted = names
-            .OrderByDescending(n => n.StartsWith("--"))
-            .ThenBy(n => n.Length)
-            .ThenBy(n => n);
-        var joined = string.Join(", ", sorted);
-
-        if (option is { ValueType: not null } && option.ValueType != typeof(bool) && option.ValueType != typeof(bool?)
-            && option is not HelpOption and not VersionOption)
-        {
-            var valueName = option.Name.TrimStart('-');
-            joined += $" <{valueName}>";
+            lines.Add(text);
+            return lines;
         }
 
-        return joined;
+        var current = new System.Text.StringBuilder();
+        foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var remaining = word;
+            while (remaining.Length > 0)
+            {
+                var space = current.Length == 0 ? 0 : 1;
+                if (current.Length + space + remaining.Length <= width)
+                {
+                    if (space == 1)
+                        current.Append(' ');
+                    current.Append(remaining);
+                    remaining = "";
+                }
+                else if (current.Length > 0)
+                {
+                    lines.Add(current.ToString());
+                    current.Clear();
+                }
+                else
+                {
+                    lines.Add(remaining[..width]);
+                    remaining = remaining[width..];
+                }
+            }
+        }
+
+        if (current.Length > 0 || lines.Count == 0)
+            lines.Add(current.ToString());
+        return lines;
     }
 }

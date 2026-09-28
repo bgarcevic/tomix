@@ -287,6 +287,8 @@ come from structural integrity checks.
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
 | `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |
 | `TOMIX_UNKNOWN_OPTION` | 2 | An unrecognized `--option` would have been bound to a positional argument (e.g. a typo'd flag). Put `--` before positional values that must start with `-`. |
+| `TOMIX_UNKNOWN_COMMAND` | 2 | The subcommand name is not one `tx` (or the named command group) has, e.g. `tx lss`. The hint suggests the closest command. A command group run with no subcommand (e.g. `tx bpa`) is not an error: it prints the group's help and exits 0. |
+| `TOMIX_USAGE` | 2 | The command line does not parse: a required argument or option value is missing, a value is not one the option accepts, or there is an extra argument. The hint names the command's `--help`. |
 | `TOMIX_QUIET_COLLISION` | 2 | Text was passed right after `-q`, but `-q` means `--quiet` and never consumes a value: on `query` the text would run as the positional query with quiet on, and on `get` it was read as the optional `[model]` path. Pass query text positionally or via `--query`. |
 | `TOMIX_MOVE_UNSUPPORTED` | 1 | `mv` across tables called with an unsupported path shape; a cross-table move needs a `Table/Measure` source and destination. Moving a non-measure across tables surfaces as `TOMIX_MUTATION_UNSUPPORTED` from the provider. |
 | `TOMIX_MOVE_INVALID_PATH` | 2 | `mv` source or destination is missing an object name (empty path, trailing `/`). |

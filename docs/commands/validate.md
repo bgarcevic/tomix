@@ -14,6 +14,9 @@ tx bpa rules <subcommand>
 `bpa run` evaluates the model against a rule collection and reports findings
 by severity; `--fix` applies auto-fixes where the rule provides one
 (`FixExpression`).
+
+![tx bpa run --fix --save: findings before the fix, then two of three fixed and saved](../assets/media/bpa.png)
+
 When fixes or rule-ignore changes are saved, the shared validation gate blocks
 new model errors before writing. Use `--force` to save and report them anyway,
 or `tx config set validateOnSave false` to disable the gate (default: on).

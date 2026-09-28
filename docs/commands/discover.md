@@ -107,6 +107,8 @@ tx deps [path] [model] [options]
 | `--downstream` | Trace only what uses this object. |
 | `--deep` | Walk the dependency chain recursively. |
 | `--max-depth <n>` | How deep `--deep` walks (default: 10). |
+
+![tx deps showing the measures Sales/Profit uses and the measure that uses it](../assets/media/explore.png)
 | `--unused` | List measures and columns that nothing depends on. |
 | `--hidden` | With `--unused`: restrict the list to unused objects that are hidden. |
 | `-t, --type <type>` | Type to pick when the path matches several objects under a table. |

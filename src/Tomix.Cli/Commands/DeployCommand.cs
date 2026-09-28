@@ -53,21 +53,21 @@ internal sealed class DeployCommand : ICommandModule
         };
         var skipBpaOption = new Option<bool>("--skip-bpa")
         {
-            Description = "Skip the BPA gate check for this deploy."
-        };
+            Description = "Skip the BPA gate check for this deploy"
+        }.In("BPA gate options");
         var fixBpaOption = new Option<bool>("--fix-bpa")
         {
             Description = "Apply BPA rule fixes to the model before deploying, where a rule provides one"
-        };
+        }.In("BPA gate options");
         var bpaRulesOption = new Option<string[]>("--bpa-rules")
         {
-            Description = "Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset.",
+            Description = "Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset",
             Arity = ArgumentArity.ZeroOrMore
-        };
+        }.In("BPA gate options");
         var bpaFailOnOption = new Option<string?>("--bpa-fail-on")
         {
-            Description = "Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after --fix-bpa fixes. Rules that cannot be evaluated count as error-severity findings"
-        };
+            Description = "Severity threshold for the BPA gate: error or warning (default: error). Applies before the deploy and again after --fix-bpa fixes. Rules that cannot be evaluated count as error-severity findings."
+        }.In("BPA gate options");
         var forceOption = new Option<bool>("--force")
         {
             Description = "Force deployment, bypassing validation checks"
@@ -83,31 +83,31 @@ internal sealed class DeployCommand : ICommandModule
         var deployConnectionsOption = new Option<bool>("--deploy-connections")
         {
             Description = "Overwrite the target's data sources (default: keep the target's connection strings)"
-        };
+        }.In("Overwrite options");
         var deployPartitionsOption = new Option<bool>("--deploy-partitions")
         {
             Description = "Overwrite the target's table partitions (default: keep the target's partitions and processed data)"
-        };
+        }.In("Overwrite options");
         var deployPolicyPartitionsOption = new Option<bool>("--deploy-policy-partitions")
         {
             Description = "With --deploy-partitions: also overwrite incremental-refresh policy partitions, discarding processed data (default: keep them)"
-        };
+        }.In("Overwrite options");
         var deploySharedExpressionsOption = new Option<bool>("--deploy-shared-expressions")
         {
             Description = "Overwrite the target's shared expressions / M parameters (default: keep the target's values)"
-        };
+        }.In("Overwrite options");
         var deployRolesOption = new Option<bool>("--deploy-roles")
         {
             Description = "Overwrite the target's security roles (default: keep the target's roles)"
-        };
+        }.In("Overwrite options");
         var deployRoleMembersOption = new Option<bool>("--deploy-role-members")
         {
             Description = "With --deploy-roles: also overwrite role members (default: keep the target's members)"
-        };
+        }.In("Overwrite options");
         var deployFullOption = new Option<bool>("--deploy-full")
         {
             Description = "Overwrite everything, including incremental-refresh partitions (cannot be combined with other --deploy-* flags)"
-        };
+        }.In("Overwrite options");
 
         var command = new Command("deploy", "Deploy a semantic model to a workspace")
         {

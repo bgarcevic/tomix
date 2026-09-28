@@ -318,10 +318,17 @@ internal static class BpaRunRenderer
             AnsiConsole.MarkupLine($"    {Styling.MarkupEscape(skipped.RuleId)}");
 
         // `tx vertipaq` needs a live engine; for a plain model file the command alone would fail.
-        HintConsole().MarkupLine(view.CanCollectVertipaqStats
-            ? "  " + Styling.Guidance("Collect them:") + " " + Styling.Option(BpaEngine.VertipaqAnnotateCommand)
-            : "  " + Styling.Guidance("Collect them:") + " "
-                + Styling.MarkupEscape("statistics come from a deployed model; " + BpaEngine.VertipaqFileModelGuidance));
+        var hint = HintConsole();
+        if (view.CanCollectVertipaqStats)
+        {
+            hint.MarkupLine("  " + Styling.Guidance("Collect them:") + " " + Styling.Option(BpaEngine.VertipaqAnnotateCommand));
+            return;
+        }
+
+        // One command per line: a single guidance sentence wrapped in any normal-width terminal.
+        hint.MarkupLine("  " + Styling.Guidance("Collect them from a deployed copy:"));
+        hint.MarkupLine("    " + Styling.Option(BpaEngine.VertipaqWorkspaceConnectCommand));
+        hint.MarkupLine("    " + Styling.Option(BpaEngine.VertipaqAnnotateCommand));
     }
 
     /// <summary>

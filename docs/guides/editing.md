@@ -29,6 +29,8 @@ tx stage commit     # promote staged mutations onto the source (and workspace mi
 tx stage discard    # throw them away
 ```
 
+![tx add and tx set staged, committed with tx stage commit, then compared with tx diff](../assets/media/edit.gif)
+
 An individual staged mutation can be undone with `--revert` on the command
 that created it.
 

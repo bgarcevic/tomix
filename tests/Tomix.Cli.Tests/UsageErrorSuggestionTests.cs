@@ -30,7 +30,7 @@ public sealed class UsageErrorSuggestionTests
         var captured = Report("set", "Foo", "bar", "baz");
 
         Assert.Equal(2, captured.ExitCode);
-        Assert.Contains("Unrecognized command or argument 'baz'", captured.Stderr);
+        Assert.Contains("Unexpected argument 'baz'", captured.Stderr);
         Assert.DoesNotContain("Did you mean", captured.Stderr);
         Assert.DoesNotContain("was not matched", captured.Stderr);
     }

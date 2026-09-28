@@ -17,13 +17,13 @@ internal static class GlobalOptions
 
     public static readonly Option<string> OutputFormat = new("--output-format")
     {
-        Description = "Format for data written to stdout: text (default), json, csv, tmsl (alias: bim), or tmdl. Availability varies by command.",
+        Description = "Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.",
         DefaultValueFactory = _ => DefaultOutputFormat
     };
 
     public static readonly Option<string?> ErrorFormat = new("--error-format")
     {
-        Description = "Format for messages written to stderr: text (default) or json. Unrecognized values fall back to text.",
+        Description = "Format for messages written to stderr: text or json (default: text). Unrecognized values fall back to text.",
         Recursive = true
     };
 
@@ -47,7 +47,7 @@ internal static class GlobalOptions
 
     public static readonly Option<string?> Recent = new("--recent")
     {
-        Description = "Pick a model from the recently used list: no value opens a picker, a number picks that entry (1 is the most recent).",
+        Description = "Pick a model from the recently used list: no value opens a picker, a number picks that entry (1 is the most recent)",
         Arity = ArgumentArity.ZeroOrOne,
         Recursive = true
     };

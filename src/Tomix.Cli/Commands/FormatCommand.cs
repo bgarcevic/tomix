@@ -56,7 +56,7 @@ internal sealed class FormatCommand : ICommandModule
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Disambiguate object type"
+            Description = "Type to pick when the path matches several objects under a table"
         };
         typeOption.Aliases.Add("-t");
         var saveOption = LifecycleOptions.Save();
@@ -67,7 +67,7 @@ internal sealed class FormatCommand : ICommandModule
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
 
-        var command = new Command("format", "Pretty-print DAX and M expressions (--expression, --path, or every expression in the model)")
+        var command = new Command("format", "Pretty-print DAX and M expressions")
         {
             modelArgument,
             expressionOption,

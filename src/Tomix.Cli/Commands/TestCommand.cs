@@ -36,12 +36,12 @@ internal sealed class TestCommand : ICommandModule
 
         var updateOption = new Option<bool>("--update")
         {
-            Description = "Record mode: run each query and (re)write its .expected.json snapshot from the actual result."
+            Description = "Record mode: run each query and (re)write its .expected.json snapshot from the actual result"
         };
 
         var filterOption = new Option<string?>("--filter")
         {
-            Description = "Run only tests whose name matches a * wildcard pattern (case-insensitive)."
+            Description = "Run only tests whose name matches a * wildcard pattern (case-insensitive)"
         };
 
         var paramOption = new Option<string[]>("--param")
@@ -52,7 +52,7 @@ internal sealed class TestCommand : ICommandModule
 
         var maxRowsOption = new Option<int?>("--max-rows")
         {
-            Description = "Per-query row cap; a query exceeding it fails as an error (default: 10000)."
+            Description = "Per-query row cap; a query exceeding it fails as an error (default: 10000)"
         };
         maxRowsOption.Validators.Add(result =>
         {
@@ -70,7 +70,7 @@ internal sealed class TestCommand : ICommandModule
             Description = "Write results to a .trx test-run file at this path"
         };
 
-        var command = new Command("test", "Run DAX regression tests against a live model (--update records snapshots, --trx/--ci for pipelines)")
+        var command = new Command("test", "Run DAX regression tests against a live model")
         {
             pathArgument,
             updateOption,

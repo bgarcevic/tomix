@@ -1,0 +1,48 @@
+{
+  "defaults": {
+    "cols": 100,
+    "rows": 30,
+    "title": "tx"
+  },
+  "scenes": [
+    {
+      "name": "explore",
+      "description": "Connect to a PBIP model, search expressions, and trace dependencies",
+      "setup": { "sales/AdventureWorks.SemanticModel": "samples/AdventureWorks Sales.SemanticModel" },
+      "cwd": "sales",
+      "steps": [
+        { "run": "tx connect ./AdventureWorks.SemanticModel" },
+        { "run": "tx find DIVIDE --in expressions" },
+        { "run": "tx deps \"Sales/Profit\"", "clear": true }
+      ]
+    },
+    {
+      "name": "bpa",
+      "description": "Run the Best Practice Analyzer, then auto-fix what it can",
+      "setup": { "sales/AdventureWorks.SemanticModel": "samples/AdventureWorks Sales.SemanticModel" },
+      "cwd": "sales",
+      "rows": 32,
+      "steps": [
+        { "run": "tx connect ./AdventureWorks.SemanticModel --quiet", "hidden": true },
+        { "run": "tx bpa run" },
+        { "run": "tx bpa run --fix --save", "clear": true }
+      ]
+    },
+    {
+      "name": "edit",
+      "description": "Stage edits, commit them, and diff against the released model",
+      "setup": {
+        "sales/AdventureWorks.SemanticModel": "samples/AdventureWorks Sales.SemanticModel",
+        "released/AdventureWorks.SemanticModel": "samples/AdventureWorks Sales.SemanticModel"
+      },
+      "cwd": "sales",
+      "steps": [
+        { "run": "tx connect ./AdventureWorks.SemanticModel --quiet", "hidden": true },
+        { "run": "tx add \"Sales/Margin %\" -t Measure -e \"DIVIDE([Profit], [Sales])\" --stage" },
+        { "run": "tx set \"Sales/Sales\" -p description=\"Net revenue after discounts.\" --stage" },
+        { "run": "tx stage commit --yes" },
+        { "run": "tx diff ../released/AdventureWorks.SemanticModel ./AdventureWorks.SemanticModel" }
+      ]
+    }
+  ]
+}

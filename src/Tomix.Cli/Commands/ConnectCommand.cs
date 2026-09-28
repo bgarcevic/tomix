@@ -40,12 +40,12 @@ internal sealed class ConnectCommand : ICommandModule
     {
         var serverArgument = new Argument<string>("server")
         {
-            Description = "Workspace name, endpoint, or local model path; combine with --local for Power BI Desktop.",
+            Description = "Workspace name, endpoint, or local model path; combine with --local for Power BI Desktop",
             Arity = ArgumentArity.ZeroOrOne
         };
         var databaseArgument = new Argument<string>("database")
         {
-            Description = "Semantic model name (omit on a TTY to pick from the workspace's models).",
+            Description = "Semantic model name (omit on a TTY to pick from the workspace's models)",
             Arity = ArgumentArity.ZeroOrOne
         };
         var workspaceOption = new Option<string?>("--workspace")
@@ -60,7 +60,7 @@ internal sealed class ConnectCommand : ICommandModule
         };
         var remoteOption = new Option<bool>("--remote")
         {
-            Description = "Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login')."
+            Description = "Pick a workspace and semantic model interactively from your Power BI tenant (requires a TTY; sign in first with 'tx auth login')"
         };
         var profileOption = new Option<string?>("--profile")
         {
@@ -69,7 +69,7 @@ internal sealed class ConnectCommand : ICommandModule
         profileOption.Aliases.Add("-p");
         var listOption = new Option<bool>("--list")
         {
-            Description = "With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting."
+            Description = "With --local: list running Power BI Desktop instances (report, endpoint, database) without connecting"
         };
         var clearOption = new Option<bool>("--clear")
         {
@@ -77,18 +77,18 @@ internal sealed class ConnectCommand : ICommandModule
         };
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Allow workspace mode to initialize over a folder that already has content."
+            Description = "Allow workspace mode to initialize over a folder that already has content"
         };
         var workspaceFormatOption = new Option<string?>("--workspace-format")
         {
-            Description = "How a local workspace is stored on disk (tmdl or bim); detected from the path when omitted."
+            Description = "How a local workspace is stored on disk (tmdl or bim); detected from the path when omitted"
         };
         var workspaceAuthOption = new Option<string?>("--workspace-auth")
         {
-            Description = "How to authenticate the remote side of workspace mode. Defaults to --auth when set, otherwise auto."
+            Description = "How to authenticate the remote side of workspace mode (default: --auth when set, otherwise auto)"
         };
 
-        var command = new Command("connect", "Set active connection (workspace, local path, or PBI Desktop). No args = show current. --recent = reconnect to a recently used model.")
+        var command = new Command("connect", "Set or show the active connection")
         {
             serverArgument,
             databaseArgument,

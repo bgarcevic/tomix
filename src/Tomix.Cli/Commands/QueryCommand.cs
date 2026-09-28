@@ -30,19 +30,19 @@ internal sealed class QueryCommand : ICommandModule
     {
         var queryArgument = new Argument<string?>("query")
         {
-            Description = "The DAX or DMV query text ('-' = read from stdin).",
+            Description = "The DAX or DMV query text ('-' = read from stdin)",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var queryOption = new Option<string?>("--query")
         {
-            Description = "Inline query text ('-' = read from stdin)."
+            Description = "Inline query text ('-' = read from stdin)"
         };
 
 
         var fileOption = new Option<string?>("--file")
         {
-            Description = "Read the query from a file ('-' = read from stdin)."
+            Description = "Read the query from a file ('-' = read from stdin)"
         };
 
         var paramOption = new Option<string[]>("--param")
@@ -53,7 +53,7 @@ internal sealed class QueryCommand : ICommandModule
 
         var limitOption = new Option<int?>("--limit")
         {
-            Description = "Maximum number of rows to return."
+            Description = "Maximum number of rows to return"
         };
         limitOption.Validators.Add(result =>
         {
@@ -63,13 +63,13 @@ internal sealed class QueryCommand : ICommandModule
 
         var outputFileOption = new Option<string?>("--output-file")
         {
-            Description = "Write results to a file as json or csv (from --output-format, else the file extension)."
+            Description = "Write results to a file as json or csv (from --output-format, else the file extension)"
         };
         outputFileOption.Aliases.Add("-o");
 
         var noValidateOption = new Option<bool>("--no-validate")
         {
-            Description = "Skip the EVALUATE/DEFINE/SELECT keyword pre-check and send the text as-is."
+            Description = "Skip the EVALUATE/DEFINE/SELECT keyword pre-check and send the text as-is"
         };
 
         var traceOption = new Option<string?>("--trace")
@@ -90,7 +90,7 @@ internal sealed class QueryCommand : ICommandModule
 
         var runsOption = new Option<int?>("--runs")
         {
-            Description = "Execute the query N times and report per-run timings with Avg/Min/Max/StdDev (default: 1)."
+            Description = "Run the query N times and report per-run timings with Avg/Min/Max/StdDev (default: 1)"
         };
         runsOption.Validators.Add(result =>
         {
@@ -98,7 +98,7 @@ internal sealed class QueryCommand : ICommandModule
                 result.AddError("--runs must be at least 1.");
         });
 
-        var command = new Command("query", "Run a DAX or DMV query against a live model (inline text, --query, --file, or stdin)")
+        var command = new Command("query", "Run a DAX or DMV query against a live model")
         {
             queryArgument,
             queryOption,

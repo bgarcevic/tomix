@@ -26,7 +26,7 @@ internal sealed class DiffCommand : ICommandModule
 
         var command = new Command(
             "diff",
-            "Show the structural differences between two semantic models. Exit codes: 0 = identical, 1 = differences found, 2 = error")
+            "Show the structural differences between two models")
         {
             leftArgument,
             rightArgument

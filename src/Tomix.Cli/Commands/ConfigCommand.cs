@@ -34,7 +34,7 @@ internal sealed class ConfigCommand : ICommandModule
     {
         var forceOption = new Option<bool>("--force") { Description = "Replace an existing config file" };
 
-        var command = new Command("init", "Write a default config.json.")
+        var command = new Command("init", "Write a default config.json")
         {
             forceOption
         };
@@ -55,10 +55,10 @@ internal sealed class ConfigCommand : ICommandModule
 
     private Command BuildSet()
     {
-        var keyArgument = new Argument<string>("key") { Description = "Configuration key." };
-        var valueArgument = new Argument<string>("value") { Description = "Configuration value." };
+        var keyArgument = new Argument<string>("key") { Description = "Configuration key" };
+        var valueArgument = new Argument<string>("value") { Description = "Configuration value" };
 
-        var command = new Command("set", "Change a configuration value.")
+        var command = new Command("set", "Change a configuration value")
         {
             keyArgument,
             valueArgument
@@ -82,7 +82,7 @@ internal sealed class ConfigCommand : ICommandModule
 
     private Command BuildPaths()
     {
-        var command = new Command("paths", "Show resolved paths for local CLI files.");
+        var command = new Command("paths", "Show resolved paths for local CLI files");
 
         command.SetAction(parseResult =>
         {
@@ -106,7 +106,7 @@ internal sealed class ConfigCommand : ICommandModule
 
     private Command BuildShow()
     {
-        var command = new Command("show", "Print the current CLI configuration.");
+        var command = new Command("show", "Print the current CLI configuration");
 
         command.SetAction(parseResult =>
         {

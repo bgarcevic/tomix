@@ -42,7 +42,7 @@ internal sealed class MvCommand : ICommandModule
         var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Type to pick when the path matches several objects under a table."
+            Description = "Type to pick when the path matches several objects under a table"
         };
         typeOption.Aliases.Add("-t");
         var stageOption = LifecycleOptions.Stage();
@@ -53,14 +53,14 @@ internal sealed class MvCommand : ICommandModule
         var serializationOption = LifecycleOptions.Serialization();
         var strictRefsOption = new Option<bool>("--strict-refs")
         {
-            Description = "Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail)."
+            Description = "Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail)"
         };
         var noFixRefsOption = new Option<bool>("--no-fix-refs")
         {
-            Description = "Do not rewrite DAX references to the renamed or moved object; warn instead."
+            Description = "Do not rewrite DAX references to the renamed or moved object; warn instead"
         };
 
-        var command = new Command("mv", "Move or rename a model object, including in and out of display folders")
+        var command = new Command("mv", "Move or rename a model object or display folder")
         {
             sourceArgument,
             destinationArgument,

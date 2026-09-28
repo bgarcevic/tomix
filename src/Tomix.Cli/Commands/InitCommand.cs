@@ -17,13 +17,13 @@ internal sealed class InitCommand : ICommandModule
 
         var compatibilityLevelOption = new Option<int?>("--compatibility-level")
         {
-            Description = "Compatibility level (default: 1702 when mode is PowerBI, 1500 otherwise)."
+            Description = "Compatibility level (default: 1702 when mode is PowerBI, 1500 otherwise)"
         };
         compatibilityLevelOption.Aliases.Add("--compat");
 
         var compatibilityModeOption = new Option<string?>("--compatibility-mode")
         {
-            Description = "Compatibility mode: AnalysisServices, PowerBI. Default: PowerBI."
+            Description = "Compatibility mode: AnalysisServices or PowerBI (default: PowerBI)"
         };
 
         var nameOption = new Option<string?>("--name")

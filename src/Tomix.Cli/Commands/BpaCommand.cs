@@ -36,7 +36,7 @@ internal sealed class BpaCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("bpa", "Run best-practice rules against a model and manage rule collections");
+        var command = new Command("bpa", "Run best-practice rules and manage rule collections");
         command.Subcommands.Add(BuildRulesCommand());
         command.Subcommands.Add(BuildRunCommand());
         return command;
@@ -52,29 +52,29 @@ internal sealed class BpaCommand : ICommandModule
 
         var rulesOption = new Option<string[]>("--rules", "-r")
         {
-            Description = "BPA rule files or URLs, as JSON",
+            Description = "BPA rule files or URLs (JSON). Repeatable.",
             AllowMultipleArgumentsPerToken = true
-        };
+        }.In("Rule options");
 
         var rulesetOption = new Option<string?>("--ruleset")
         {
             Description = $"Standard BPA ruleset to use ({string.Join(", ", BpaRuleLoader.KnownRulesets)})"
-        };
+        }.In("Rule options");
 
         var noModelRulesOption = new Option<bool>("--no-model-rules")
         {
             Description = "Skip rules embedded in the model's annotations"
-        };
+        }.In("Rule options");
 
         var noDefaultsOption = new Option<bool>("--no-defaults")
         {
             Description = "Exclude the selected standard BPA ruleset"
-        };
+        }.In("Rule options");
 
         var failOnOption = new Option<string?>("--fail-on")
         {
-            Description = "Failure threshold: error (default) or warning. Rules that cannot be evaluated count as error-severity findings"
-        };
+            Description = "Failure threshold: error or warning (default: error). Rules that cannot be evaluated count as error-severity findings."
+        }.In("CI options");
 
         var fixOption = new Option<bool>("--fix")
         {
@@ -103,59 +103,59 @@ internal sealed class BpaCommand : ICommandModule
 
         var ruleOption = new Option<string[]>("--rule")
         {
-            Description = "Run only specific rule(s) by ID",
+            Description = "Run only this rule. Repeatable.",
             AllowMultipleArgumentsPerToken = true
-        };
+        }.In("Rule options");
 
         var ciOption = new Option<string?>("--ci")
         {
             Description = "Print CI log-group commands to stderr for the given system: vsts or github"
-        };
+        }.In("CI options");
 
         var trxOption = new Option<string?>("--trx")
         {
             Description = "Write results to a .trx test-run file at this path"
-        };
+        }.In("CI options");
 
         var allowExternalRulesOption = new Option<bool>("--allow-external-rules")
         {
             Description = "Allow rule URLs found in model annotations to be fetched"
-        };
+        }.In("Rule options");
 
         var pathOption = new Option<string?>("--path")
         {
             Description = "Limit analysis to matched objects (literal names, wildcards, or paths)"
-        };
+        }.In("Display options");
 
         var noMultilineOption = new Option<bool>("--no-multiline")
         {
             Description = "Show each rule's guidance on one line"
-        };
+        }.In("Display options");
 
         var detailsOption = new Option<bool>("--details")
         {
-            Description = "Show full guidance and affected objects per rule (default is a compact list)"
-        };
+            Description = "Show full guidance and affected objects per rule instead of a compact list"
+        }.In("Display options");
 
         var fullOption = new Option<bool>("--full")
         {
             Description = "Detail view listing every affected object (implies --details)"
-        };
+        }.In("Display options");
 
         var errorsOption = new Option<bool>("--errors")
         {
             Description = "Show only error-severity rules (combinable with --warnings/--info)"
-        };
+        }.In("Display options");
 
         var warningsOption = new Option<bool>("--warnings")
         {
             Description = "Show only warning-severity rules (combinable with --errors/--info)"
-        };
+        }.In("Display options");
 
         var infoOption = new Option<bool>("--info")
         {
             Description = "Show only info-severity rules (combinable with --errors/--warnings)"
-        };
+        }.In("Display options");
 
         var runCommand = new Command("run", "Run best-practice rules against a model")
         {

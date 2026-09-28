@@ -41,7 +41,7 @@ internal sealed class FindCommand : ICommandModule
             "all", "names", "expressions", "descriptions", "formatStrings", "displayFolders", "annotations");
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Only search objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}."
+            Description = $"Only search objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}"
         };
         typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")

@@ -8,6 +8,8 @@ Desktop instance running on your machine.
 Semantic models are code. They deserve tooling that works where code lives:
 in a terminal, in scripts, in CI, in a diff.
 
+![tx connecting to a PBIP model, searching expressions, and tracing a measure's dependencies](assets/media/explore.gif)
+
 ```console
 $ tx connect ./samples/basic-tmdl
 Model: basic-tmdl

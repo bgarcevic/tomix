@@ -10,14 +10,14 @@ internal sealed class CompletionCommand : ICommandModule
     {
         var shellArgument = new Argument<string>("shell")
         {
-            Description = "Target shell: bash, zsh, fish, or powershell.",
+            Description = "Target shell: bash, zsh, fish, or powershell",
             Arity = ArgumentArity.ZeroOrOne
         };
         // Completion scripts are always text. This local option intentionally shadows the
         // recursive global option so a configured JSON default cannot corrupt shell code.
         var formatOption = OutputFormats.CreateOption(OutputFormats.Text);
 
-        var command = new Command("completion", "Generate a shell completion script.")
+        var command = new Command("completion", "Generate a shell completion script")
         {
             shellArgument,
             formatOption

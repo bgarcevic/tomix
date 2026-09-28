@@ -64,7 +64,7 @@ internal static class UnknownOptionGuard
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        var help = command is RootCommand ? "tx --help" : $"tx {command.Name} --help";
+        var help = UsageErrors.HelpCommand(command);
         var escape = $"Run '{help}' to see options, or put '--' before " +
                      "positional values that start with '-'.";
         var suggestion = DidYouMean.Suggest(token, known);

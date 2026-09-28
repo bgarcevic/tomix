@@ -45,7 +45,7 @@ internal sealed class ReplaceCommand : ICommandModule
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Only replace in objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}."
+            Description = $"Only replace in objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}"
         };
         typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")

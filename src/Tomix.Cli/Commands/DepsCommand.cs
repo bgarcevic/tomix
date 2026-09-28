@@ -63,7 +63,7 @@ internal sealed class DepsCommand : ICommandModule
         });
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Type to pick when the path matches several objects under a table."
+            Description = "Type to pick when the path matches several objects under a table"
         };
         typeOption.Aliases.Add("-t");
 

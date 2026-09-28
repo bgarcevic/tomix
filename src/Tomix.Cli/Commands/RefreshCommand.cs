@@ -55,17 +55,17 @@ internal sealed class RefreshCommand : ICommandModule
 
         var skipRefreshPolicyOption = new Option<bool>("--skip-refresh-policy")
         {
-            Description = "Shorthand for --apply-refresh-policy false."
+            Description = "Shorthand for --apply-refresh-policy false"
         };
 
         var effectiveDateOption = new Option<DateOnly?>("--effective-date")
         {
-            Description = "Evaluate incremental refresh policies as if today were this date (yyyy-MM-dd)."
+            Description = "Evaluate incremental refresh policies as if today were this date (yyyy-MM-dd)"
         };
 
         var maxParallelismOption = new Option<int?>("--max-parallelism")
         {
-            Description = "Maximum parallel refresh operations."
+            Description = "Maximum parallel refresh operations"
         };
 
         var policyOnlyOption = new Option<bool>("--policy-only")
@@ -75,21 +75,21 @@ internal sealed class RefreshCommand : ICommandModule
 
         var dryRunOption = new Option<bool>("--dry-run")
         {
-            Description = "Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only."
+            Description = "Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only"
         };
 
         var noProgressOption = new Option<bool>("--no-progress")
         {
-            Description = "Turn off live progress tracking (useful in CI and when piping)."
+            Description = "Turn off live progress tracking (useful in CI and when piping)"
         };
 
         var traceOption = new Option<string?>("--trace")
         {
-            Description = "Write raw XMLA trace events: with no value to stderr, with a value to that log file.",
+            Description = "Write raw XMLA trace events: with no value to stderr, with a value to that log file",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var command = new Command("refresh", "Refresh data on a deployed model (--refresh-type full|auto|calculate|...)")
+        var command = new Command("refresh", "Refresh data on a deployed model")
         {
             typeOption,
             tableOption,

@@ -10,6 +10,34 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed
+
+- Help is reorganized and wraps to the terminal. It wraps at the terminal width (up to
+  100 columns) with descriptions indented under their column, instead of letting the
+  terminal break lines mid-word. Root help lists commands first. A command's page
+  names the global options on one line instead of repeating all of them, groups long
+  option lists (`Save options:`, `Rule options:`, `Compatibility options:`, ...), and
+  shows short value names (`--save-to <path>`). The help option is listed as
+  `-h, --help`; `-?`, `/?`, and `/h` still work.
+- `tx help <command>` shows a command's help, the same as `tx <command> --help`.
+  Bare `tx` shows just the command list.
+- Command descriptions are now short one-liners; details such as `diff`'s exit codes
+  moved to the command's own help page.
+
+### Fixed
+
+- A mistyped command (`tx lss`) prints one error with a suggestion on stderr and exits
+  `2`, instead of three messages in the wrong order followed by the full help on stdout.
+  It carries the new code `TOMIX_UNKNOWN_COMMAND`; other parse errors (a missing
+  argument or option value) carry `TOMIX_USAGE` and also no longer print the help page.
+- A command group run without a subcommand (`tx bpa`, `tx config`) shows its help and
+  exits `0` instead of failing with "Required command was not provided."
+- The unknown-option hint names the full command, e.g. `tx bpa run --help` rather
+  than `tx run --help`.
+- For a model file, the `bpa run` hint about collecting VertiPaq statistics now
+  lists the two commands on separate lines. It used to be one long sentence that
+  wrapped in a normal-width terminal.
+
 ## [0.4.1] - 2026-09-28
 
 ### Fixed

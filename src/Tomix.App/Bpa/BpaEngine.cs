@@ -158,9 +158,12 @@ public sealed class BpaEngine
     /// </summary>
     public const string VertipaqAnnotateCommand = "tx vertipaq --annotate --save";
 
+    /// <summary>Connects a plain model file to a deployed copy (workspace mode) so statistics can be read.</summary>
+    public const string VertipaqWorkspaceConnectCommand = "tx connect <path> -w <workspace> <model>";
+
     /// <summary>How a plain model file gets statistics: connect it to a deployed copy first.</summary>
     public const string VertipaqFileModelGuidance =
-        "connect it to a deployed copy in workspace mode (tx connect <path> -w <workspace> <model>), then run " + VertipaqAnnotateCommand;
+        "connect it to a deployed copy in workspace mode (" + VertipaqWorkspaceConnectCommand + "), then run " + VertipaqAnnotateCommand;
 
     private const string VertipaqAnnotationPrefix = "Annotation:Vertipaq_";
 

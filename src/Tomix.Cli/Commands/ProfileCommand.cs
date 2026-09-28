@@ -14,7 +14,7 @@ internal sealed class ProfileCommand : ICommandModule
 
     public Command Build()
     {
-        var command = new Command("profile", "Manage named connection profiles for switching between environments");
+        var command = new Command("profile", "Manage named connection profiles");
         command.Subcommands.Add(BuildList());
         command.Subcommands.Add(BuildRemove());
         command.Subcommands.Add(BuildSet());

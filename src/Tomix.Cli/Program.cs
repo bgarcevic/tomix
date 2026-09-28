@@ -79,10 +79,11 @@ internal static class Program
 
         if (args.Length == 0)
         {
-            root.Parse(["--help"]).Invoke();
+            SpectreHelpAction.Write(root, concise: true, SpectreHelpAction.TerminalWidth());
             return 0;
         }
 
+        args = RewriteHelpCommand(args);
         var parseResult = root.Parse(args);
         if (parseResult.Errors.Count > 0)
             return UsageErrors.Report(parseResult, args);
@@ -175,7 +176,7 @@ internal static class Program
         string? configLoadError = null)
     {
         analyzer ??= new VpaxVertipaqAnalyzer(tokenProvider: null, version);
-        var root = new RootCommand("tx - inspect, validate, query, test, and deploy tabular semantic models");
+        var root = new RootCommand("browse, edit, lint, diff, and deploy tabular semantic models");
         foreach (var option in GlobalOptions.All())
             root.Options.Add(option);
 
@@ -260,14 +261,27 @@ internal static class Program
                 leaf.Equals("init", StringComparison.OrdinalIgnoreCase) && args.Contains("--force"));
     }
 
-    private static void ApplySpectreHelp(Command command)
+    /// <summary>
+    /// <c>tx help [command...]</c> is <c>tx [command...] --help</c>, the git/uv/cargo spelling.
+    /// It is not a registered command, so it never appears in the command list or completion.
+    /// </summary>
+    internal static string[] RewriteHelpCommand(string[] args)
+        => args is ["help", .. var rest] ? [.. rest, "--help"] : args;
+
+    private static void ApplySpectreHelp(RootCommand root)
+    {
+        HelpPlaceholders.Apply(root);
+        ApplySpectreHelpAction(root);
+    }
+
+    private static void ApplySpectreHelpAction(Command command)
     {
         var helpOption = command.Options.OfType<HelpOption>().FirstOrDefault();
         if (helpOption is not null)
             helpOption.Action = new SpectreHelpAction();
 
         foreach (var sub in command.Subcommands)
-            ApplySpectreHelp(sub);
+            ApplySpectreHelpAction(sub);
     }
 
     /// <summary>No-op workspace catalog for contexts that never prompt (e.g. help-only test roots).</summary>
