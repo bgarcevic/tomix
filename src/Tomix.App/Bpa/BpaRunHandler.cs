@@ -141,6 +141,20 @@ public sealed class BpaRunHandler
                         : null
                 };
 
+                // Judge the exit code on what the fixes left behind, as the deploy gate does:
+                // re-evaluate the mutated model so unfixable findings and fixes that did not
+                // resolve their target still block (#297).
+                if (fixResult.FixesApplied > 0)
+                {
+                    var postFixSnapshot = await session.GetSnapshotAsync(cancellationToken);
+                    var postFix = engine.Evaluate(postFixSnapshot, new BpaEngineOptions(
+                        rules,
+                        request.PathFilter,
+                        request.RuleIds,
+                        userDisabled));
+                    runResult = runResult with { RemainingViolations = postFix.Violations };
+                }
+
                 if (fixResult.FixesApplied > 0 && context.Mode is MutationMode.Save or MutationMode.Stage)
                 {
                     MutationOutcome outcome;
@@ -159,12 +173,12 @@ public sealed class BpaRunHandler
                     if (context.Force && outcome.Validation is { NewErrorCount: > 0 } delta)
                         return TomixResult<BpaRunResult>.Ok(
                             runResult,
-                            exitCode: BpaFailOn.Blocking(runResult.Violations, failOnSeverity).Count > 0 ? 1 : 0,
+                            exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0,
                             diagnostics: SaveValidation.ForcedNotice(delta));
                 }
             }
 
-            return TomixResult<BpaRunResult>.Ok(runResult, exitCode: BpaFailOn.Blocking(runResult.Violations, failOnSeverity).Count > 0 ? 1 : 0);
+            return TomixResult<BpaRunResult>.Ok(runResult, exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0);
         });
     }
 

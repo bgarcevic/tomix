@@ -94,7 +94,9 @@ findings and shows how many of the evaluated rules passed; rules that were not
 checked for lack of VertiPaq statistics are counted separately. Next-step commands are
 printed ready to copy on stderr, reusing your model path and rule options. After
 `--fix`, the output shows how many findings were fixed and remain, and whether the
-result was saved, staged, or kept in memory only.
+result was saved, staged, or kept in memory only. The rules are evaluated again after
+fixing, and the exit code and `--fail-on` apply to the findings that remain, so a run
+that fixes every blocking finding exits `0`. JSON reports this as `remaining`.
 
 `bpa run --fix --allow-delete` deletes model objects, so it asks for
 confirmation; `--revert` (drops staged work) asks too. Pass `--yes` to skip

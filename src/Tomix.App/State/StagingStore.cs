@@ -51,7 +51,7 @@ public sealed class StagingStore
         {
             var existing = TryLoadManifest(source);
             if (existing is not null)
-                return new StagingHandle(this, ManifestFile(source), existing, modelLock);
+                return new StagingHandle(this, ManifestFile(source), existing, modelLock, created: false);
 
             var serialization = ResolveSerialization(source, connection);
             var modelDirectory = ModelDirectory(source);
@@ -89,7 +89,7 @@ public sealed class StagingStore
                 Ops: []);
 
             WriteManifest(source, manifest);
-            return new StagingHandle(this, ManifestFile(source), manifest, modelLock);
+            return new StagingHandle(this, ManifestFile(source), manifest, modelLock, created: true);
         }
         catch
         {
@@ -372,12 +372,14 @@ public sealed class StagingHandle : IDisposable
     private readonly StagingStore _store;
     private readonly string _manifestFile;
     private readonly IDisposable _modelLock;
+    private readonly bool _created;
 
-    internal StagingHandle(StagingStore store, string manifestFile, StagingManifest manifest, IDisposable modelLock)
+    internal StagingHandle(StagingStore store, string manifestFile, StagingManifest manifest, IDisposable modelLock, bool created = false)
     {
         _store = store;
         _manifestFile = manifestFile;
         _modelLock = modelLock;
+        _created = created;
         Manifest = manifest;
     }
 
@@ -401,5 +403,36 @@ public sealed class StagingHandle : IDisposable
         return Task.CompletedTask;
     }
 
-    public void Dispose() => _modelLock.Dispose();
+    /// <summary>
+    /// Releases the model lock. A working copy this handle materialized that never recorded an op
+    /// (the mutation failed or changed nothing) is discarded first, so a failed <c>--stage</c>
+    /// leaves staging as it found it (#289). Existing staged work is never touched.
+    /// </summary>
+    public void Dispose()
+    {
+        try
+        {
+            if (_created && Manifest.Ops.Count == 0)
+                DeleteModelDirectory();
+        }
+        finally
+        {
+            _modelLock.Dispose();
+        }
+    }
+
+    private void DeleteModelDirectory()
+    {
+        // The lock file sits beside the model directory, so the directory can go while the lock is held.
+        var modelDirectory = Path.GetDirectoryName(_manifestFile)!;
+        try
+        {
+            if (Directory.Exists(modelDirectory))
+                Directory.Delete(modelDirectory, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best effort: an undeletable empty copy is the pre-fix behavior, not a new failure.
+        }
+    }
 }

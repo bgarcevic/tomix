@@ -10,6 +10,16 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Fixed
+
+- `bpa run --fix` evaluates the rules again after fixing, and the exit code and
+  `--fail-on` now apply to the findings that remain. A run that fixes every blocking
+  finding exits `0`. JSON adds a `remaining` count (#297).
+- `bpa run --output-format json` includes `objectPath` and `description` for each
+  result, so a finding can be addressed from a script (#258).
+- A failed `--stage` mutation no longer leaves an empty staged working copy behind.
+  Earlier staged work is kept (#289).
+
 ## [0.4.0] - 2026-09-28
 
 ### Added

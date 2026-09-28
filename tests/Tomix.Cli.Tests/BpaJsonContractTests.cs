@@ -57,6 +57,8 @@ public sealed class BpaJsonContractTests
         // The CompilationError sentinel for BROKEN_RULE is projected as an error-severity finding
         // (issue #253), so it counts as a violation in addition to AVOID_FLOATS.
         Assert.Equal(2, root.GetProperty("violations").GetInt32());
+        // No post-fix evaluation on this result, so remaining falls back to the run's violations.
+        Assert.Equal(2, root.GetProperty("remaining").GetInt32());
         Assert.Equal(1, root.GetProperty("ruleErrors").GetInt32());
         Assert.Equal(1, root.GetProperty("ignoredRules").GetInt32());
         Assert.Equal(1, root.GetProperty("disabledRules").GetInt32());
@@ -76,6 +78,16 @@ public sealed class BpaJsonContractTests
     }
 
     [Fact]
+    public void RunJson_Remaining_CountsPostFixViolations()
+    {
+        var result = SampleRunResult() with { RemainingViolations = [] };
+        var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(result))).RootElement;
+
+        Assert.Equal(2, root.GetProperty("violations").GetInt32());
+        Assert.Equal(0, root.GetProperty("remaining").GetInt32());
+    }
+
+    [Fact]
     public void RunJson_ResultItems_UseSeverityIntAndLabel()
     {
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;
@@ -92,12 +104,15 @@ public sealed class BpaJsonContractTests
         Assert.Equal("Error", item.GetProperty("severityLabel").GetString());
         Assert.Equal("Sales[Amount]", item.GetProperty("objectName").GetString());
         Assert.Equal("Column", item.GetProperty("objectType").GetString());
+        Assert.Equal("model/tables/Sales[Amount]", item.GetProperty("objectPath").GetString());
+        Assert.Equal("Do not use floating point.\nReference: https://example.test", item.GetProperty("description").GetString());
         Assert.True(item.GetProperty("canFix").GetBoolean());
 
         var ruleError = results[1];
         Assert.Equal("BROKEN_RULE", ruleError.GetProperty("ruleId").GetString());
         Assert.Equal("Error", ruleError.GetProperty("severityLabel").GetString());
         Assert.Equal(string.Empty, ruleError.GetProperty("objectName").GetString());
+        Assert.Equal(string.Empty, ruleError.GetProperty("objectPath").GetString());
         Assert.False(ruleError.GetProperty("canFix").GetBoolean());
     }
 

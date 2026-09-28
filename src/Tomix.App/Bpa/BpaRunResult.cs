@@ -27,6 +27,18 @@ public sealed record BpaRunResult(
     public MutationOutcome FixOutcome { get; init; } = MutationOutcome.Unchanged;
 
     /// <summary>
+    /// Visible violations after <c>--fix</c> edits were applied, from a second evaluation of the
+    /// mutated model; null when no fix was applied. <see cref="Violations"/> stays the pre-fix list.
+    /// </summary>
+    public IReadOnlyList<BpaViolation>? RemainingViolations { get; init; }
+
+    /// <summary>
+    /// The findings gates and exit codes judge: what remains after fixes, otherwise the run's
+    /// violations — so a run that fixed every blocking finding does not fail (#297).
+    /// </summary>
+    public IReadOnlyList<BpaViolation> BlockingCandidates => RemainingViolations ?? Violations;
+
+    /// <summary>
     /// Unevaluable rules projected as error-severity findings ("rule could not be evaluated:
     /// reason"). A rule that cannot be compiled or evaluated is itself a finding — otherwise a
     /// typo would silently disable the rule for every consumer of the gate — regardless of the
