@@ -27,15 +27,23 @@ public sealed class ConnectHandlerLocalInstanceTests : IDisposable
     /// Stands in for the live-instance check so these tests need no listening socket. Defaults to
     /// "the cached name is still valid".
     /// </param>
+    /// <param name="isListening">Stands in for the listener probe. Defaults to "still running".</param>
+    /// <param name="findInstance">Stands in for discovery. Defaults to "nothing found".</param>
     private static void WithStore(
         Action<CliStateStore, ConnectHandler> test,
-        Func<string?, string?, bool>? stillServes = null)
+        Func<string?, string?, bool>? stillServes = null,
+        Func<string?, bool>? isListening = null,
+        Func<string, PowerBiDesktopInstance?>? findInstance = null)
     {
         var dir = Directory.CreateTempSubdirectory("tomix-connect-local-tests-").FullName;
         try
         {
             var store = new CliStateStore(dir);
-            test(store, new ConnectHandler(store, stillServes ?? ((_, _) => true)));
+            test(store, new ConnectHandler(
+                store,
+                stillServes ?? ((_, _) => true),
+                isListening ?? (_ => true),
+                findInstance ?? (_ => null)));
         }
         finally
         {
@@ -133,6 +141,74 @@ public sealed class ConnectHandlerLocalInstanceTests : IDisposable
                 Assert.Equal("localhost:61696", shown.Server); // the connection itself is untouched
             },
             stillServes: (_, _) => false);
+    }
+
+    [Fact]
+    public void Show_ReportsAClosedDesktopInstance_WithItsLastKnownReport()
+    {
+        WithStore(
+            (_, handler) =>
+            {
+                handler.Set(LocalRequest("localhost:61696", "31ca6303-3048-4be7-91a9-ff5d2a6750d4") with
+                {
+                    ReportName = "B4 - Bonustimer",
+                    ReportPortFile = WritePortFile("61696")
+                });
+
+                var shown = handler.Show().Data!;
+                Assert.False(shown.Reachable);
+                Assert.Equal("B4 - Bonustimer", shown.LastReportName);
+                Assert.Null(shown.Connection!.ReportName); // never presented as the live report
+                Assert.Equal("localhost:61696", shown.Connection.Server);
+            },
+            isListening: _ => false);
+    }
+
+    [Fact]
+    public void Show_LooksUpTheReport_WhenNoneWasCached()
+    {
+        // Connecting by endpoint (`tx connect -s localhost:<port>`) caches no name.
+        var portFile = WritePortFile("61696");
+
+        WithStore(
+            (_, handler) =>
+            {
+                handler.Set(LocalRequest("localhost:61696"));
+
+                var shown = handler.Show().Data!;
+                Assert.True(shown.Reachable);
+                Assert.Equal("B4 - Bonustimer", shown.Connection!.ReportName);
+            },
+            findInstance: endpoint => new PowerBiDesktopInstance(endpoint, "B4 - Bonustimer", portFile));
+    }
+
+    [Fact]
+    public void Show_DoesNotProbe_NonDesktopConnections()
+    {
+        WithStore(
+            (_, handler) =>
+            {
+                handler.Set(new ConnectSetRequest(
+                    "powerbi://api.powerbi.com/v1.0/myorg/ws", "Sales", Model: null, Auth: null, Local: false, Profile: null));
+
+                var shown = handler.Show().Data!;
+                Assert.Null(shown.Reachable);
+                Assert.DoesNotContain("reachable", JsonSerializer.Serialize(shown), StringComparison.Ordinal);
+            },
+            isListening: _ => throw new InvalidOperationException("must not probe a remote endpoint"),
+            findInstance: _ => throw new InvalidOperationException("must not discover for a remote endpoint"));
+    }
+
+    [Fact]
+    public void ShowJson_ReportsReachability_ForDesktopSessions()
+    {
+        WithStore(
+            (_, handler) =>
+            {
+                handler.Set(LocalRequest("localhost:61696"));
+                Assert.Contains("\"Reachable\":false", JsonSerializer.Serialize(handler.Show().Data), StringComparison.Ordinal);
+            },
+            isListening: _ => false);
     }
 
     [Theory]

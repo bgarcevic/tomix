@@ -7,7 +7,7 @@ your own TMDL folder or `.bim` file.
 
 ## 1. Connect to a model
 
-`connect` sets the **active connection** for your terminal session, so you
+`connect` sets the **active connection** for the repository or folder you are in, so you
 don't have to repeat the model path on every command:
 
 ```console

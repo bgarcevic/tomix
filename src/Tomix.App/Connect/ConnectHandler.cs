@@ -8,29 +8,68 @@ public sealed class ConnectHandler
 {
     private readonly CliStateStore _store;
     private readonly Func<string?, string?, bool> _stillServes;
+    private readonly Func<string?, bool> _isListening;
+    private readonly Func<string, PowerBiDesktopInstance?> _findInstance;
 
     /// <param name="stillServes">
     /// Validates a cached Desktop report name against the live instance; defaults to
     /// <see cref="PowerBiDesktopDiscovery.StillServes(string?, string?)"/>. Injectable so tests do
     /// not depend on a real listener.
     /// </param>
-    public ConnectHandler(CliStateStore store, Func<string?, string?, bool>? stillServes = null)
+    /// <param name="isListening">
+    /// Whether a <c>localhost:&lt;port&gt;</c> endpoint still has a listener; defaults to
+    /// <see cref="PowerBiDesktopDiscovery.IsListening(string?)"/>.
+    /// </param>
+    /// <param name="findInstance">
+    /// Looks up the live Desktop instance on an endpoint when no report name is cached; defaults to
+    /// <see cref="PowerBiDesktopDiscovery.FindInstance(string)"/>.
+    /// </param>
+    public ConnectHandler(
+        CliStateStore store,
+        Func<string?, string?, bool>? stillServes = null,
+        Func<string?, bool>? isListening = null,
+        Func<string, PowerBiDesktopInstance?>? findInstance = null)
     {
         _store = store;
         _stillServes = stillServes ?? PowerBiDesktopDiscovery.StillServes;
+        _isListening = isListening ?? PowerBiDesktopDiscovery.IsListening;
+        _findInstance = findInstance ?? PowerBiDesktopDiscovery.FindInstance;
     }
 
     public TomixResult<ConnectShowResult> Show()
     {
         var state = _store.LoadCurrentSession();
+        bool? reachable = null;
+        string? lastReportName = null;
+
+        if (state is { Model: null, Server: { } server } && ModelReference.IsLocalInstanceEndpoint(server))
+        {
+            // A Desktop session outlives the Desktop window: once the report is closed the saved
+            // `localhost:<port>` and GUID database name are all that is left, and neither says
+            // which report it was. Say the instance is gone, and keep the last-known name to
+            // display so the user can tell what they were connected to.
+            reachable = _isListening(server);
+            if (reachable == false)
+            {
+                lastReportName = state.ReportName;
+                state = state.WithoutReportCache();
+            }
+            else if (state.ReportName is null && _findInstance(server) is { } instance)
+            {
+                // Connected by endpoint rather than through the --local picker, so nothing was
+                // cached. Look the report up now rather than show a bare port.
+                state = state with { ReportName = instance.ReportName, ReportPortFile = instance.PortFile };
+            }
+        }
 
         // Drop a cached Desktop report name that no longer describes the live instance on that port —
         // Desktop may have restarted onto a different report, or exited and left its port file
         // behind — so no caller can display a stale name.
         if (state?.ReportName is not null && !_stillServes(state.ReportPortFile, state.Server))
-            state = state with { ReportName = null, ReportPortFile = null };
+            state = state.WithoutReportCache();
 
-        return TomixResult<ConnectShowResult>.Ok(new ConnectShowResult(state is not null, state));
+        return TomixResult<ConnectShowResult>.Ok(
+            new ConnectShowResult(state is not null, state, reachable, lastReportName));
     }
 
     public TomixResult<ConnectClearResult> Clear()

@@ -122,7 +122,8 @@ internal sealed class TestCommand : ICommandModule
                 parseResult,
                 request.Model,
                 () => new ActiveModelResolver(_loadCurrentSession)
-                    .ResolveReference(request.Model, request.Database, request.Server));
+                    .ResolveReference(request.Model, request.Database, request.Server),
+                _loadCurrentSession);
 
             var result = await CliSpinner.RunAsync(
                 "Running tests...",

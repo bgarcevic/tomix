@@ -9,7 +9,10 @@ public sealed record SessionShowResult(
     string Path,
     bool Exists,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    CliConnectionState? Active);
+    CliConnectionState? Active,
+    /// <summary>The directory a <c>directory</c>-kind session is bound to; null for named sessions.</summary>
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Scope = null);
 
 public sealed record SessionListResult(IReadOnlyList<SessionFileInfo> Sessions);
 

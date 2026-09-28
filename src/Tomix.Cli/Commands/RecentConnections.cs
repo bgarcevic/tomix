@@ -117,7 +117,7 @@ internal static class RecentConnections
 
         reference = CreateResolver(source, store).ResolveReference(source.Model, source.Database, source.Server);
         if (source.IsImplicit)
-            ConnectionBanner.Announce(parseResult, reference);
+            ConnectionBanner.Announce(parseResult, reference, store.LoadCurrentSession());
         return true;
     }
 

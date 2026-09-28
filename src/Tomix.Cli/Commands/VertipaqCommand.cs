@@ -178,6 +178,8 @@ internal sealed class VertipaqCommand : ICommandModule
                 // an explicit unrelated source must not be read from the session's mirror.
                 var resolver = RecentConnections.CreateResolver(source, _state);
                 reference = resolver.ResolveReference(source.Model, source.Database, server);
+                if (source.IsImplicit)
+                    ConnectionBanner.Announce(parseResult, reference, _state.LoadCurrentSession());
                 syncTarget = resolver.ResolveSyncTarget(reference);
             }
             else

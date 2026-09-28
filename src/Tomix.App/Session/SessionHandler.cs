@@ -17,7 +17,9 @@ public sealed class SessionHandler
             _store.CurrentSessionKind,
             _store.CurrentSessionFile,
             state is not null,
-            state));
+            // Same public projection as `connect`: the report-label cache holds a profile path.
+            state?.WithoutReportCache(),
+            _store.CurrentSessionScope));
     }
 
     public TomixResult<SessionListResult> List()

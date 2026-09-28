@@ -1,5 +1,7 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App.Connect;
+using Tomix.App.State;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -20,11 +22,15 @@ internal static class ConnectionBanner
     /// <c>--server</c> addresses something other than the model (e.g. deploy) gate on their own
     /// explicitness and call <see cref="Announce"/> directly.
     /// </summary>
-    public static void AnnounceIfImplicit(ParseResult parseResult, string? explicitModel, Func<ModelReference> resolve)
+    public static void AnnounceIfImplicit(
+        ParseResult parseResult,
+        string? explicitModel,
+        Func<ModelReference> resolve,
+        Func<CliConnectionState?>? loadSession = null)
     {
         if (string.IsNullOrWhiteSpace(explicitModel)
             && string.IsNullOrWhiteSpace(parseResult.GetValue(GlobalOptions.Server)))
-            Announce(parseResult, resolve());
+            Announce(parseResult, resolve(), loadSession?.Invoke());
     }
 
     /// <summary>
@@ -32,7 +38,12 @@ internal static class ConnectionBanner
     /// implicit; this method owns the suppression rules and rendering. Blank references
     /// (no active session) print nothing.
     /// </summary>
-    public static void Announce(ParseResult parseResult, ModelReference reference)
+    /// <param name="session">
+    /// The saved connection the reference came from, when the caller has it. For a Power BI
+    /// Desktop session it lets the banner name the report instead of a bare port and GUID, and
+    /// say when that Desktop window has been closed.
+    /// </param>
+    public static void Announce(ParseResult parseResult, ModelReference reference, CliConnectionState? session = null)
     {
         if (parseResult.GetValue(GlobalOptions.Quiet))
             return;
@@ -41,12 +52,36 @@ internal static class ConnectionBanner
         if (OutputFormats.IsJson(format) || OutputFormats.IsCsv(format))
             return;
 
+        if (string.IsNullOrWhiteSpace(reference.Value))
+            return;
+
+        StdErr.MarkupLine(Render(reference, session, PowerBiDesktopDiscovery.IsListening, PowerBiDesktopDiscovery.StillServes));
+    }
+
+    /// <summary>The styled banner line; probes injectable so tests need no listener.</summary>
+    internal static string Render(
+        ModelReference reference,
+        CliConnectionState? session,
+        Func<string?, bool> isListening,
+        Func<string?, string?, bool> stillServes)
+    {
         var label = reference.IsRemote && !string.IsNullOrWhiteSpace(reference.Database)
             ? $"{reference.Value} / {reference.Database}"
             : reference.Value;
-        if (string.IsNullOrWhiteSpace(label))
-            return;
 
-        StdErr.MarkupLine(Styling.Muted($"Connected to: {label}"));
+        // Only a Desktop endpoint that is the session's own server gets the Desktop treatment.
+        var desktop = session is { Model: null }
+            && ModelReference.IsLocalInstanceEndpoint(reference.Value)
+            && string.Equals(session.Server, reference.Value, StringComparison.OrdinalIgnoreCase);
+        if (!desktop)
+            return Styling.Muted($"Connected to: {label}");
+
+        if (!isListening(reference.Value))
+            return Styling.Warning(
+                $"Connected to: {session!.ReportName ?? label} (not running) — Power BI Desktop has closed this report; run `tx connect --local`.");
+
+        return session!.ReportName is { } report && stillServes(session.ReportPortFile, session.Server)
+            ? Styling.Muted($"Connected to: {report}  ({reference.Value})")
+            : Styling.Muted($"Connected to: {label}");
     }
 }

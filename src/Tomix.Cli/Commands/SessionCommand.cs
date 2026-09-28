@@ -123,6 +123,8 @@ internal sealed class SessionCommand : ICommandModule
     {
         AnsiConsole.MarkupLine(Styling.KeyValue("sessionId: ", result.SessionId));
         AnsiConsole.MarkupLine(Styling.KeyValue("kind:      ", result.Kind));
+        if (result.Scope is not null)
+            AnsiConsole.MarkupLine(Styling.KeyValue("scope:     ", result.Scope));
         AnsiConsole.MarkupLine(Styling.KeyValue("path:      ", result.Path));
         AnsiConsole.MarkupLine(Styling.KeyValue("exists:    ", result.Exists.ToString()));
         if (result.Active is not null)

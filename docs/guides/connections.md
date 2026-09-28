@@ -6,7 +6,7 @@ provide one, in order of precedence:
 1. **Explicitly, per command** — a trailing `[model]` argument or `-m/--model`
    for a local path, or `-s/--server` + `-d/--database` for a deployed model.
 2. **The active connection** — set once with `tx connect`, used by every
-   subsequent command in the same terminal session.
+   subsequent command run in the same repository or folder (see [Sessions](#sessions)).
 3. **Recents** — `--recent` reconnects to a recently used model (no value =
    interactive picker, `N` = Nth most recent).
 
@@ -69,19 +69,38 @@ tx connect --recent           # pick from recently used models
 
 ## Sessions
 
-The active connection is scoped to your terminal session, so two terminals can
-work against two different models without interfering:
+The active connection is scoped to the directory you run `tx` from: the
+enclosing git repository root (each git worktree counts as its own root), or
+the current folder when you are not inside a repository. Every terminal and
+agent working in the same repository shares one connection. A different
+repository or worktree starts with no connection, so it never picks up a model
+you connected to somewhere else.
+
+To share one connection across directories, or to keep two terminals in the
+same repository apart, name the session explicitly:
 
 ```sh
-tx session          # show session ID, file path, active state
+export TOMIX_SESSION=sales     # PowerShell: $env:TOMIX_SESSION = "sales"
+```
+
+Whenever a command picks up its model from the active connection rather than
+an argument, it names that model on stderr (hidden by `--quiet` and in JSON/CSV
+output), so you always see what you are operating on:
+
+```text
+Connected to: Sales Overview  (localhost:50987)
+```
+
+```sh
+tx session          # show session ID, kind, scope directory, file path, active state
 tx session clear    # clear active state for this session
 tx session prune    # delete session files for dead shells
 ```
 
 The default prune is conservative: only dead, well-formed `pid-<number>`
-sessions are removed. Named, malformed-PID, live-PID, and current sessions are
-kept. Use `--all` to remove every non-current session; add `--dry-run` to inspect
-the exact candidate count without deleting anything.
+sessions are removed. Directory, named, malformed-PID, live-PID, and current
+sessions are kept. Use `--all` to remove every non-current session; add
+`--dry-run` to inspect the exact candidate count without deleting anything.
 
 ## Authentication
 

@@ -92,6 +92,56 @@ public sealed partial class ConnectionBannerTests
         Assert.DoesNotContain("Connected to:", captured.Stderr);
     }
 
+    // --- Power BI Desktop sessions --------------------------------------------------------------
+
+    private static CliConnectionState DesktopSession(string? reportName = "Sales Overview")
+        => new("localhost:65034", "31ca6303", Model: null, Auth: null, Local: true, Profile: null,
+            ReportName: reportName, ReportPortFile: reportName is null ? null : "port.txt");
+
+    private static readonly ModelReference DesktopReference = new("localhost:65034", "31ca6303");
+
+    [Fact]
+    public void Render_DesktopSession_NamesTheReport()
+    {
+        var line = StripMarkup(ConnectionBanner.Render(DesktopReference, DesktopSession(), _ => true, (_, _) => true));
+
+        Assert.Equal("Connected to: Sales Overview  (localhost:65034)", line);
+    }
+
+    [Fact]
+    public void Render_DesktopSession_StaleReportName_FallsBackToTheEndpoint()
+    {
+        var line = StripMarkup(ConnectionBanner.Render(DesktopReference, DesktopSession(), _ => true, (_, _) => false));
+
+        Assert.Equal("Connected to: localhost:65034 / 31ca6303", line);
+    }
+
+    [Theory]
+    [InlineData("Sales Overview", "Connected to: Sales Overview (not running)")]
+    [InlineData(null, "Connected to: localhost:65034 / 31ca6303 (not running)")]
+    public void Render_ClosedDesktopInstance_SaysSoAndHowToRecover(string? reportName, string expectedStart)
+    {
+        var line = StripMarkup(ConnectionBanner.Render(
+            DesktopReference, DesktopSession(reportName), _ => false, (_, _) => true));
+
+        Assert.StartsWith(expectedStart, line, StringComparison.Ordinal);
+        Assert.Contains("tx connect --local", line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_NonDesktopTarget_NeverProbes()
+    {
+        var line = ConnectionBanner.Render(
+            new ModelReference(SampleTmdl),
+            new CliConnectionState(null, null, SampleTmdl, null, true, null),
+            _ => throw new InvalidOperationException("must not probe"),
+            (_, _) => throw new InvalidOperationException("must not probe"));
+
+        Assert.Equal($"Connected to: {SampleTmdl}", StripMarkup(line));
+    }
+
+    private static string StripMarkup(string markup) => Spectre.Console.Markup.Remove(markup);
+
     private static (RootCommand Root, CliStateStore State) CreateRoot(bool withSessionModel)
     {
         var services = TestServices.Create();

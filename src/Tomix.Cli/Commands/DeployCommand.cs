@@ -183,7 +183,7 @@ internal sealed class DeployCommand : ICommandModule
                 // make the source explicit: without a model path the source came from the
                 // active session and the banner names it.
                 if (string.IsNullOrWhiteSpace(explicitModel))
-                    ConnectionBanner.Announce(parseResult, reference);
+                    ConnectionBanner.Announce(parseResult, reference, _state.LoadCurrentSession());
             }
 
             var server = parseResult.GetValue(GlobalOptions.Server);

@@ -204,7 +204,7 @@ internal sealed class StageCommand : ICommandModule
         // --server does not make the target explicit here: stage resolution ignores it (above),
         // so without a model path or --recent the target still comes from the active session.
         if (string.IsNullOrWhiteSpace(source.Model) && source.RecentEntry is null)
-            ConnectionBanner.Announce(parseResult, reference);
+            ConnectionBanner.Announce(parseResult, reference, _state.LoadCurrentSession());
         return true;
     }
 }

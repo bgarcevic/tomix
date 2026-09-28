@@ -120,14 +120,37 @@ public static class PowerBiDesktopDiscovery
         Func<string, int?> readPort,
         Func<int, bool> isPortListening)
     {
-        if (string.IsNullOrWhiteSpace(portFile) || string.IsNullOrWhiteSpace(endpoint))
-            return false;
-
-        var separator = endpoint.LastIndexOf(':');
-        if (separator < 0 || !int.TryParse(endpoint.AsSpan(separator + 1), out var expected))
+        if (string.IsNullOrWhiteSpace(portFile) || TryParseEndpointPort(endpoint) is not { } expected)
             return false;
 
         return readPort(portFile) == expected && isPortListening(expected);
+    }
+
+    /// <summary>
+    /// Whether anything is still listening on a <c>localhost:&lt;port&gt;</c> endpoint. A saved
+    /// Desktop session outlives the Desktop window it points at, so this is what tells a live
+    /// connection apart from one whose report has been closed. An endpoint without a parseable
+    /// port is treated as listening — there is nothing to probe, so do not claim it is gone.
+    /// </summary>
+    public static bool IsListening(string? endpoint)
+        => TryParseEndpointPort(endpoint) is not { } port || IsPortListening(port);
+
+    /// <summary>
+    /// The running Desktop instance on <paramref name="endpoint"/>, or null when none is found.
+    /// Pays for full discovery (including the ~220ms WMI lookup), so use it only when no cached
+    /// report name is available.
+    /// </summary>
+    public static PowerBiDesktopInstance? FindInstance(string endpoint)
+        => DiscoverInstances().FirstOrDefault(i =>
+            TryParseEndpointPort(i.Endpoint) is { } port && port == TryParseEndpointPort(endpoint));
+
+    private static int? TryParseEndpointPort(string? endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return null;
+
+        var separator = endpoint.LastIndexOf(':');
+        return separator >= 0 && int.TryParse(endpoint.AsSpan(separator + 1), out var port) ? port : null;
     }
 
     // Bounded probe. The port file lives at

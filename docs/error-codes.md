@@ -336,7 +336,7 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 |----------|-------------|
 | `TOMIX_AUTH_CLIENT_ID` | Azure AD client id for service principal auth. |
 | `TOMIX_AUTH_TENANT` | Azure AD tenant id for service principal auth. |
-| `TOMIX_SESSION` | Session id for persisting the active model connection. |
+| `TOMIX_SESSION` | Session id for persisting the active model connection. Unset, the session is scoped to the git repository/worktree root or the current folder. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
 | `TOMIX_NO_UPDATE_CHECK` | Set (any value) to disable the throttled update check and notice. |
 

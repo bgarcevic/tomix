@@ -10,7 +10,19 @@ namespace Tomix.App.Connect;
 public sealed record ConnectShowResult(
     bool Active,
     [property: JsonIgnore]
-    CliConnectionState? Connection)
+    CliConnectionState? Connection,
+    /// <summary>
+    /// For a Power BI Desktop (<c>localhost:&lt;port&gt;</c>) session, whether that instance is
+    /// still listening; null for every other kind of connection.
+    /// </summary>
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    bool? Reachable = null,
+    /// <summary>
+    /// The report an unreachable Desktop session was last known to serve, for display only. Not
+    /// serialized, matching the rest of the report-label cache.
+    /// </summary>
+    [property: JsonIgnore]
+    string? LastReportName = null)
 {
     [JsonPropertyName("connection")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

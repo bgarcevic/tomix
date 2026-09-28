@@ -10,8 +10,10 @@ model itself — sessions, profiles, workspace mode — is explained in
 tx connect [server] [database] [options]
 ```
 
-No arguments shows the current connection. The first argument can be a
-workspace name, an endpoint, or a local model path.
+No arguments shows the current connection. For a Power BI Desktop session it
+shows the report name, and flags the session as `(not running)` — with the
+last-known report — once that Desktop window has been closed. The first
+argument can be a workspace name, an endpoint, or a local model path.
 
 | Option | Description |
 |--------|-------------|
@@ -254,7 +256,7 @@ tx auth status
 tx auth logout
 ```
 
-## `session` — terminal session state
+## `session` — active-connection session state
 
 ```
 tx session [show|clear|list|prune]
@@ -262,7 +264,7 @@ tx session [show|clear|list|prune]
 
 | Subcommand | Description |
 |------------|-------------|
-| `session show` | Print this session's details (ID, file path, active state). |
+| `session show` | Print this session's details (ID, kind, scope directory, file path, active state). Sessions are scoped to the git repository or worktree root, else the current folder; `TOMIX_SESSION` names one explicitly. |
 | `session clear` | Clear this session's active marker. |
 | `session list` | List saved session files. |
 | `session prune` | Remove session files whose shell has exited. |

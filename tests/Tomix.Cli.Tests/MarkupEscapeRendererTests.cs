@@ -27,6 +27,21 @@ public sealed partial class MarkupEscapeRendererTests
     }
 
     [Fact]
+    public void ConnectShow_FlagsAClosedDesktopInstance_WithItsLastKnownReport()
+    {
+        var connection = new Tomix.App.State.CliConnectionState(
+            "localhost:65034", "31ca6303", Model: null, Auth: null, Local: true, Profile: null);
+
+        var captured = Capture(() => ConnectRenderer.RenderShow(
+            new Tomix.App.Connect.ConnectShowResult(true, connection, Reachable: false, LastReportName: "[Sales]")));
+
+        AssertLiteral(captured.Stdout,
+            "Active: localhost:65034 / 31ca6303  (not running)",
+            "Power BI Desktop is no longer serving '[Sales]' on localhost:65034.",
+            "tx connect --local");
+    }
+
+    [Fact]
     public void BpaRules_UsesLiteralRuleAndSyncNames()
     {
         var captured = Capture(() =>

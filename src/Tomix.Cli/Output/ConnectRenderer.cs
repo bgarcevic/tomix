@@ -136,10 +136,25 @@ internal static class ConnectRenderer
                 ? $"{report}  ({connection.Server ?? ""})"
                 : connection.Server ?? "";
 
-            AnsiConsole.MarkupLine(Styling.Success(
-                string.IsNullOrWhiteSpace(connection.Database)
-                    ? $"Active: {target}"
-                    : $"Active: {target} / {connection.Database}"));
+            var active = string.IsNullOrWhiteSpace(connection.Database)
+                ? $"Active: {target}"
+                : $"Active: {target} / {connection.Database}";
+
+            if (result.Reachable == false)
+            {
+                // The Desktop window this session pointed at has been closed; the port and GUID
+                // alone would read as a healthy connection to something unidentifiable.
+                AnsiConsole.MarkupLine(Styling.Warning($"{active}  (not running)"));
+                AnsiConsole.MarkupLine(Styling.Guidance(result.LastReportName is { } last
+                    ? $"Power BI Desktop is no longer serving '{last}' on {connection.Server}."
+                    : $"Nothing is listening on {connection.Server}; the Power BI Desktop report it pointed at has been closed."));
+                AnsiConsole.MarkupLine(Styling.Guidance(
+                    "Run `tx connect --local` to pick an open report, or `tx connect --clear` to forget this one."));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine(Styling.Success(active));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(connection.Workspace))

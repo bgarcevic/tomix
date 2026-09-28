@@ -154,7 +154,8 @@ internal sealed class RefreshCommand : ICommandModule
                 ConnectionBanner.Announce(
                     parseResult,
                     RecentConnections.CreateResolver(source, _state)
-                        .ResolveReference(source.Model, source.Database, source.Server));
+                        .ResolveReference(source.Model, source.Database, source.Server),
+                    _state.LoadCurrentSession());
 
             var request = new RefreshModelRequest(
                 Model: source.Model,

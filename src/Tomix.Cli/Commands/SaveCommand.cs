@@ -102,6 +102,8 @@ internal sealed class SaveCommand : ICommandModule
             // could push the recent model to the wrong workspace mirror.
             var resolver = RecentConnections.CreateResolver(source, _state);
             var reference = resolver.ResolveReference(source.Model, source.Database, source.Server);
+            if (source.IsImplicit)
+                ConnectionBanner.Announce(parseResult, reference, _state.LoadCurrentSession());
 
             // The mirror only applies when the model being saved is the session's primary —
             // a one-shot save of an explicit -s/-d source must not deploy over the mirror.

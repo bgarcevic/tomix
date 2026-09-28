@@ -8,12 +8,20 @@ public sealed class CliStateStore
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private readonly string _configDirectory;
-    private readonly string? _currentSessionId;
+    private readonly Lazy<(string Id, string? Scope)> _session;
 
-    public CliStateStore(string configDirectory, string? currentSessionId = null)
+    /// <param name="currentSessionId">An explicit session id; overrides every other source.</param>
+    /// <param name="workingDirectory">
+    /// Where to resolve the directory scope from when no session is named; defaults to the
+    /// process working directory. Injectable so tests do not depend on where they run.
+    /// </param>
+    public CliStateStore(string configDirectory, string? currentSessionId = null, string? workingDirectory = null)
     {
         _configDirectory = configDirectory;
-        _currentSessionId = currentSessionId;
+
+        // Resolved once: a store must keep addressing the same session file even if the process
+        // working directory changes mid-command.
+        _session = new Lazy<(string, string?)>(() => ResolveSession(currentSessionId, workingDirectory));
     }
 
     public const int MaxRecentConnections = 20;
@@ -24,26 +32,38 @@ public sealed class CliStateStore
 
     public string SessionsDirectory => Path.Combine(_configDirectory, "sessions");
 
-    public string CurrentSessionId
+    /// <summary>
+    /// The session this process reads and writes. Precedence: an explicit id, then
+    /// <c>TOMIX_SESSION</c> (or legacy <c>TE_SESSION</c>), then the directory scope — the enclosing
+    /// git repository or worktree root, else the working directory (<see cref="SessionScope"/>).
+    /// </summary>
+    public string CurrentSessionId => _session.Value.Id;
+
+    /// <summary>
+    /// The directory the current session is bound to, or null when the session is named
+    /// explicitly and therefore not tied to a directory.
+    /// </summary>
+    public string? CurrentSessionScope => _session.Value.Scope;
+
+    public string CurrentSessionKind
+        => CurrentSessionScope is not null ? "directory"
+            : CurrentSessionId.StartsWith("pid-", StringComparison.OrdinalIgnoreCase) ? "pid"
+            : "named";
+
+    private static (string Id, string? Scope) ResolveSession(string? explicitId, string? workingDirectory)
     {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(_currentSessionId))
-                return _currentSessionId.Trim();
+        if (!string.IsNullOrWhiteSpace(explicitId))
+            return (explicitId.Trim(), null);
 
-            var named = Environment.GetEnvironmentVariable("TOMIX_SESSION");
-            if (string.IsNullOrWhiteSpace(named))
-                named = Environment.GetEnvironmentVariable("TE_SESSION");
+        var named = Environment.GetEnvironmentVariable("TOMIX_SESSION");
+        if (string.IsNullOrWhiteSpace(named))
+            named = Environment.GetEnvironmentVariable("TE_SESSION");
+        if (!string.IsNullOrWhiteSpace(named))
+            return (named.Trim(), null);
 
-            return string.IsNullOrWhiteSpace(named)
-                ? "default"
-                : named.Trim();
-        }
+        var scope = SessionScope.FindRoot(workingDirectory ?? Environment.CurrentDirectory);
+        return (SessionScope.SessionIdFor(scope), scope);
     }
-
-    public string CurrentSessionKind => CurrentSessionId.StartsWith("pid-", StringComparison.OrdinalIgnoreCase)
-        ? "pid"
-        : "named";
 
     public string CurrentSessionFile => Path.Combine(SessionsDirectory, $"{SafeFileName(CurrentSessionId)}.json");
 

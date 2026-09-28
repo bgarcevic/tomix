@@ -204,7 +204,8 @@ internal sealed class QueryCommand : ICommandModule
                 parseResult,
                 request.Model,
                 () => new ActiveModelResolver(_loadCurrentSession)
-                    .ResolveReference(request.Model, request.Database, request.Server));
+                    .ResolveReference(request.Model, request.Database, request.Server),
+                _loadCurrentSession);
 
             // The raw-event dump reuses the shared trace-writer plumbing (file, or "-" for stderr).
             using var rawTraceWriter = TraceWriter.Open(rawTracePath, quiet);
