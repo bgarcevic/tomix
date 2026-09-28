@@ -270,7 +270,11 @@ internal sealed class BpaCommand : ICommandModule
                 Errors: parseResult.GetValue(errorsOption),
                 Warnings: parseResult.GetValue(warningsOption),
                 Info: parseResult.GetValue(infoOption),
-                CommandTokens: parseResult.Tokens.Select(t => t.Value).ToList());
+                CommandTokens: parseResult.Tokens.Select(t => t.Value).ToList(),
+                // Statistics come from a live engine: the model itself, or the remote mirror of a
+                // workspace-mode local primary. A plain file has neither, so the hint differs.
+                CanCollectVertipaqStats: model.IsRemote
+                    || new ActiveModelResolver(_state).ResolveSyncTarget(model) is { IsRemote: true });
 
             return CommandOutput.Render(
                 parseResult,

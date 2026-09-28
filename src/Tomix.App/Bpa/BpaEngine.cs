@@ -34,9 +34,10 @@ public sealed class BpaEngine
         if (options.DisabledRuleIds is { Count: > 0 })
             disabledRuleIds.UnionWith(options.DisabledRuleIds);
         var results = new List<BpaResult>();
+        var hasVertipaqStats = HasVertipaqStats(snapshot);
 
         foreach (var rule in activeRules)
-            EvaluateRule(rule, model, snapshot, disabledRuleIds, options.PathFilter, results);
+            EvaluateRule(rule, model, snapshot, disabledRuleIds, hasVertipaqStats, options.PathFilter, results);
 
         return new BpaRunResult(results, snapshot.Name, activeRules.Count);
     }
@@ -46,6 +47,7 @@ public sealed class BpaEngine
         BpaModel model,
         ModelSnapshot snapshot,
         IReadOnlySet<string> disabledRuleIds,
+        bool hasVertipaqStats,
         string? pathFilter,
         List<BpaResult> results)
     {
@@ -69,6 +71,18 @@ public sealed class BpaEngine
 
         if (string.IsNullOrWhiteSpace(rule.Expression))
             return;
+
+        // A missing annotation reads as 0, so a statistics rule on a model that was never
+        // annotated would report clean without having checked anything (#266). Skip it with a
+        // reason instead, so the gap is visible rather than a silent pass.
+        if (!hasVertipaqStats && ReadsVertipaqStats(rule.Expression))
+        {
+            results.Add(BpaResult.Sentinel(
+                BpaResultKind.MissingVertipaqStats,
+                rule,
+                MissingVertipaqStatsMessage));
+            return;
+        }
 
         // Evaluate the rule only over objects whose actual ObjectType is one of the rule's
         // scope tokens — e.g. a rule scoped to CalculatedColumn must not see DataColumns. Clean
@@ -132,6 +146,42 @@ public sealed class BpaEngine
                 rule,
                 outcome.ErrorMessage,
                 scopeLabel));
+    }
+
+    /// <summary>The reason recorded on a rule skipped for missing VertiPaq statistics.</summary>
+    public const string MissingVertipaqStatsMessage =
+        "Needs VertiPaq statistics (Vertipaq_* annotations), which this model does not have.";
+
+    /// <summary>
+    /// The command that writes the statistics these rules read. It needs a live engine: a
+    /// connected model, or a local model in workspace mode (statistics come from its mirror).
+    /// </summary>
+    public const string VertipaqAnnotateCommand = "tx vertipaq --annotate --save";
+
+    /// <summary>How a plain model file gets statistics: connect it to a deployed copy first.</summary>
+    public const string VertipaqFileModelGuidance =
+        "connect it to a deployed copy in workspace mode (tx connect <path> -w <workspace> <model>), then run " + VertipaqAnnotateCommand;
+
+    private const string VertipaqAnnotationPrefix = "Annotation:Vertipaq_";
+
+    /// <summary>Whether a rule expression reads a <c>Vertipaq_*</c> statistics annotation.</summary>
+    internal static bool ReadsVertipaqStats(string expression)
+        => expression.Contains("\"Vertipaq_", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether any object in the snapshot (or the model itself) carries a <c>Vertipaq_*</c>
+    /// annotation. <c>tx vertipaq --annotate</c> writes them model-wide in one pass, so one
+    /// present annotation means the statistics were collected.
+    /// </summary>
+    private static bool HasVertipaqStats(ModelSnapshot snapshot)
+    {
+        return HasStat(snapshot.Properties) || snapshot.Objects.Any(Walk);
+
+        static bool Walk(ModelObject obj) => HasStat(obj.Properties) || obj.Children.Any(Walk);
+
+        static bool HasStat(IReadOnlyDictionary<string, string>? properties)
+            => properties is not null
+                && properties.Keys.Any(k => k.StartsWith(VertipaqAnnotationPrefix, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool MatchesScope(IReadOnlyList<string> scope, BpaObject obj)

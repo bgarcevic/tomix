@@ -51,6 +51,14 @@ public sealed record BpaRunResult(
     /// <summary>Number of rules skipped because the model compatibility level is too low.</summary>
     public int InvalidCompatibilityRules => Results.Count(r => r.Kind == BpaResultKind.InvalidCompatibilityLevel);
 
+    /// <summary>
+    /// Rules skipped because they read <c>Vertipaq_*</c> statistics the model does not have.
+    /// Not violations — missing statistics are the normal state of a fresh model — but always
+    /// named, so a statistics rule never passes silently.
+    /// </summary>
+    public IReadOnlyList<BpaResult> MissingVertipaqStatsRules { get; } =
+        Results.Where(r => r.Kind == BpaResultKind.MissingVertipaqStats).ToList();
+
     /// <summary>Number of object-level violations suppressed by an ignore annotation.</summary>
     public int IgnoredViolations => Results.Count(r => r.Kind == BpaResultKind.Violation && r.IsIgnored);
 

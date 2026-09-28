@@ -537,6 +537,37 @@ public sealed class DeployModelHandlerTests
         Assert.False(session.DeployCalled);
     }
 
+    [Fact]
+    public async Task HandleAsync_UnannotatedModel_DeploysWithWarningNamingStatisticsRules()
+    {
+        // #266: the gate passes a model without VertiPaq statistics (warn by default), but the
+        // deploy result names the rules it could not check and how to collect the statistics.
+        var handler = new DeployModelHandler(
+            [new DirectionalDeployProvider(_ => new ModelSnapshot("m", 1601, []))], TestState);
+
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: false,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Force: false,
+                Ci: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("created", result.Data!.Status);
+        var warning = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_BPA_VERTIPAQ_STATS_MISSING", warning.Code);
+        Assert.Contains("FIX_REFERENTIAL_INTEGRITY_VIOLATIONS", warning.Message);
+        Assert.Contains("tx vertipaq --annotate --save", warning.Hint);
+    }
+
     [Theory]
     [InlineData("fatal")]
     [InlineData("info")]

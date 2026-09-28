@@ -57,6 +57,32 @@ public sealed partial class StdoutStderrSplitTests
         Assert.Contains(resultLine, stdout);
     }
 
+    [Theory]
+    // #266: `tx vertipaq` needs a live engine, so a plain model file gets the workspace-mode route.
+    [InlineData(true, "Collect them: tx vertipaq --annotate --save")]
+    [InlineData(false, "statistics come from a deployed model; connect it to a deployed copy in workspace mode")]
+    public void MissingVertipaqStats_NamesRulesOnStdout_AndHintFitsTheModel(bool canCollect, string hint)
+    {
+        var rule = new BpaRule("STATS_RULE", "Stats rule", "Performance", BpaSeverity.Warning, ["Table"]);
+        var captured = ConsoleCapture.Run(
+            () =>
+            {
+                BpaRunRenderer.Render(
+                    new BpaRunResult(
+                        [BpaResult.Sentinel(BpaResultKind.MissingVertipaqStats, rule, BpaEngine.MissingVertipaqStatsMessage)],
+                        "basic-tmdl", RulesEvaluated: 1),
+                    new BpaRunView.RunOptions(false, false, false, false, false, false,
+                        CanCollectVertipaqStats: canCollect));
+                return 0;
+            },
+            captureAnsiConsole: true);
+
+        var stdout = Plain(captured.Stdout);
+        Assert.Contains("0 of 1 rule passed · 1 not checked", stdout);
+        Assert.Contains("Not checked (1): the model has no VertiPaq statistics STATS_RULE", stdout);
+        Assert.Contains(hint, Plain(captured.Stderr));
+    }
+
     private static void Render(string command)
     {
         switch (command)

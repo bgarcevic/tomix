@@ -85,6 +85,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | `TOMIX_BPA_RULE_ID_REQUIRED` | 2 | `bpa rules ignore/unignore` called without a rule id. |
 | `TOMIX_BPA_RULE_NOT_FOUND` | 2 | `bpa rules show`, `disable`, or `ignore` was given an ID that no loaded rule has. The hint names up to three IDs that contain the input; `disable` and `ignore` accept `--allow-unknown` to use the ID anyway. |
 | `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog. |
+| `TOMIX_BPA_VERTIPAQ_STATS_MISSING` | 0 | Warning, not a failure. The deploy BPA gate did not check rules that read `Vertipaq_*` statistics, because the model has none. The message names the rules. Collect the statistics with `tx vertipaq --annotate --save` on a deployed model, or on a local model connected to one in workspace mode. |
 | `TOMIX_BPA_VIOLATIONS` | 1 | BPA gate blocked the operation: violations at or above the configured threshold were found (with `deploy --fix-bpa`, they remained after auto-fix). Rules that could not be evaluated count as error-severity violations and are named in the message. Use `--skip-bpa` to bypass. |
 
 ## Staging Codes (`TOMIX_STAGE_*`)

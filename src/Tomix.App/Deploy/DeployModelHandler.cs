@@ -4,6 +4,7 @@ using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
 using Tomix.Core.Bpa;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -87,12 +88,19 @@ public sealed class DeployModelHandler
 
         await using var session = await provider.OpenAsync(request.Model, cancellationToken);
 
+        // Non-fatal gate findings (rules the gate could not check) ride along on every
+        // successful outcome, so a deploy never looks fully gated when it was not.
+        IReadOnlyList<TomixDiagnostic> warnings = [];
         if (!request.SkipBpa)
         {
-            var bpaResult = await RunBpaGate(session, request, bpaFailOn, cancellationToken);
+            var (bpaResult, notChecked) = await RunBpaGate(session, request, bpaFailOn, cancellationToken);
             if (bpaResult is not null)
                 return bpaResult;
+            warnings = MissingVertipaqStatsWarning(notChecked);
         }
+
+        TomixResult<DeployModelResult> Ok(DeployModelResult data)
+            => TomixResult<DeployModelResult>.Ok(data, diagnostics: warnings);
 
         if (session is not IModelDeploySession deployer)
             return TomixResult<DeployModelResult>.Fail(
@@ -154,7 +162,7 @@ public sealed class DeployModelHandler
                 }
             }
 
-            return TomixResult<DeployModelResult>.Ok(new DeployModelResult(
+            return Ok(new DeployModelResult(
                 server, database ?? request.Model.Value, "dry-run", null, null, null, diff, diffError,
                 createsDatabase));
         }
@@ -185,7 +193,7 @@ public sealed class DeployModelHandler
             var scriptPath = request.XmlaOutput;
 
             if (scriptPath == "-")
-                return TomixResult<DeployModelResult>.Ok(new DeployModelResult(
+                return Ok(new DeployModelResult(
                     server, database ?? request.Model.Value, "script", null, "-", script));
 
             var fullPath = Path.GetFullPath(scriptPath);
@@ -194,14 +202,14 @@ public sealed class DeployModelHandler
                 Directory.CreateDirectory(dir);
 
             await File.WriteAllTextAsync(fullPath, script, cancellationToken).ConfigureAwait(false);
-            return TomixResult<DeployModelResult>.Ok(new DeployModelResult(
+            return Ok(new DeployModelResult(
                 server, database ?? request.Model.Value, "script", null, fullPath, null));
         }
 
         try
         {
             var result = await deployer.DeployAsync(deployRequest, cancellationToken);
-            return TomixResult<DeployModelResult>.Ok(new DeployModelResult(
+            return Ok(new DeployModelResult(
                 result.Server, result.Database, result.Status, result.DurationMs, null, null));
         }
         catch (AuthenticationRequiredException ex)
@@ -223,7 +231,25 @@ public sealed class DeployModelHandler
         }
     }
 
-    private async Task<TomixResult<DeployModelResult>?> RunBpaGate(
+    /// <summary>
+    /// The deploy-side face of #266: rules that read VertiPaq statistics the model does not
+    /// have are skipped, not passed. Warn by default — missing statistics are the normal state
+    /// of a fresh model — but name the rules and the command that collects the statistics.
+    /// </summary>
+    internal static IReadOnlyList<TomixDiagnostic> MissingVertipaqStatsWarning(IReadOnlyList<BpaResult> notChecked)
+        => notChecked.Count == 0
+            ? []
+            :
+            [
+                new TomixDiagnostic(
+                    "TOMIX_BPA_VERTIPAQ_STATS_MISSING",
+                    DiagnosticSeverity.Warning,
+                    $"BPA gate did not check {notChecked.Count} rule(s) that need VertiPaq statistics, which this model does not have: "
+                        + string.Join(", ", notChecked.Select(r => r.RuleId)) + ".",
+                    Hint: $"Statistics come from a deployed model: run '{BpaEngine.VertipaqAnnotateCommand}' against it, or for a model file, {BpaEngine.VertipaqFileModelGuidance}.")
+            ];
+
+    private async Task<(TomixResult<DeployModelResult>? Failure, IReadOnlyList<BpaResult> NotChecked)> RunBpaGate(
         IModelSession session,
         DeployModelRequest request,
         BpaSeverity failOn,
@@ -252,10 +278,10 @@ public sealed class DeployModelHandler
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException)
         {
-            return TomixResult<DeployModelResult>.Fail(
+            return (TomixResult<DeployModelResult>.Fail(
                 "TOMIX_BPA_RULES_LOAD_FAILED",
                 ex.Message,
-                exitCode: 2);
+                exitCode: 2), []);
         }
 
         var snapshot = await session.GetSnapshotAsync(cancellationToken);
@@ -268,16 +294,16 @@ public sealed class DeployModelHandler
         var result = engine.Evaluate(snapshot, options);
 
         if (result.Violations.Count == 0)
-            return null;
+            return (null, result.MissingVertipaqStatsRules);
 
         BpaRunResult? postFixResult = null;
         if (request.FixBpa)
         {
             if (session is not IModelMutationSession mutationSession)
-                return TomixResult<DeployModelResult>.Fail(
+                return (TomixResult<DeployModelResult>.Fail(
                     "TOMIX_DEPLOY_FIX_UNSUPPORTED",
                     $"Provider cannot apply BPA fixes for model: {request.Model.Value}. Use --skip-bpa to bypass.",
-                    exitCode: 2);
+                    exitCode: 2), []);
 
             var fixer = new BpaFixer();
             fixer.ApplyFixes(mutationSession, result.Violations, rules);
@@ -292,8 +318,10 @@ public sealed class DeployModelHandler
         // above), so the active phase — the one the blocking count comes from — supplies the
         // unevaluable-rule findings named in the block message.
         var activeResult = request.FixBpa ? postFixResult : result;
-        return EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa, failOn,
-            ruleErrors: activeResult!.RuleErrorViolations);
+        var failure = EvaluateBpaGate(result.Violations, postFixResult?.Violations, request.FixBpa, failOn,
+            ruleErrors: activeResult!.RuleErrorViolations,
+            notChecked: activeResult.MissingVertipaqStatsRules);
+        return (failure, activeResult.MissingVertipaqStatsRules);
     }
 
     /// <summary>
@@ -304,14 +332,16 @@ public sealed class DeployModelHandler
     /// (findings below the threshold are tolerated). Returns <c>null</c> when the deploy may
     /// proceed. <paramref name="ruleErrors"/> is the active phase's unevaluable-rule findings
     /// (already part of <paramref name="violations"/>); naming them in the message makes the
-    /// block actionable instead of an anonymous count.
+    /// block actionable instead of an anonymous count. <paramref name="notChecked"/> names the
+    /// rules skipped for missing VertiPaq statistics, so a block never implies they passed.
     /// </summary>
     internal static TomixResult<DeployModelResult>? EvaluateBpaGate(
         IReadOnlyList<BpaViolation> violations,
         IReadOnlyList<BpaViolation>? postFixViolations,
         bool fixBpa,
         BpaSeverity failOn,
-        IReadOnlyList<BpaViolation>? ruleErrors = null)
+        IReadOnlyList<BpaViolation>? ruleErrors = null,
+        IReadOnlyList<BpaResult>? notChecked = null)
     {
         if (violations.Count == 0)
             return null;
@@ -328,10 +358,13 @@ public sealed class DeployModelHandler
         var ruleErrorNotes = ruleErrors is { Count: > 0 }
             ? " " + string.Join(" ", ruleErrors.Select(e => $"{e.Description} ('{e.RuleName}' [{e.RuleId}])."))
             : string.Empty;
+        var notCheckedNote = notChecked is { Count: > 0 }
+            ? $" Not checked (no VertiPaq statistics): {string.Join(", ", notChecked.Select(r => r.RuleId))}."
+            : string.Empty;
 
         return TomixResult<DeployModelResult>.Fail(
             "TOMIX_BPA_VIOLATIONS",
-            $"BPA check found {blocking.Count} {severityLabel} violation(s){phase}.{ruleErrorNotes} {hint}",
+            $"BPA check found {blocking.Count} {severityLabel} violation(s){phase}.{ruleErrorNotes}{notCheckedNote} {hint}",
             exitCode: 1);
     }
 

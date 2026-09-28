@@ -197,4 +197,39 @@ public sealed class DeployBpaGateTests
         Assert.NotNull(result);
         Assert.DoesNotContain("could not be evaluated", result!.Diagnostics[0].Message);
     }
+
+    [Fact]
+    public void Block_NamesRulesNotCheckedForMissingVertipaqStats()
+    {
+        // #266: a block must not imply the statistics rules passed; it names them with the fix.
+        var notChecked = new[] { StatsSentinel("LARGE_TABLES_SHOULD_BE_PARTITIONED") };
+
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: false, BpaSeverity.Error,
+            notChecked: notChecked);
+
+        Assert.NotNull(result);
+        Assert.Contains("Not checked (no VertiPaq statistics): LARGE_TABLES_SHOULD_BE_PARTITIONED.",
+            result!.Diagnostics[0].Message);
+    }
+
+    [Fact]
+    public void MissingVertipaqStatsWarning_NamesRulesWithHint_AndIsEmptyWhenAllChecked()
+    {
+        Assert.Empty(DeployModelHandler.MissingVertipaqStatsWarning([]));
+
+        var warning = Assert.Single(DeployModelHandler.MissingVertipaqStatsWarning(
+            [StatsSentinel("RULE_A"), StatsSentinel("RULE_B")]));
+
+        Assert.Equal("TOMIX_BPA_VERTIPAQ_STATS_MISSING", warning.Code);
+        Assert.Equal(Tomix.Core.Diagnostics.DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("2 rule(s)", warning.Message);
+        Assert.Contains("RULE_A, RULE_B", warning.Message);
+        Assert.Contains("tx vertipaq --annotate --save", warning.Hint);
+        // A plain model file cannot run `tx vertipaq`; the hint must say how it gets statistics.
+        Assert.Contains("workspace mode", warning.Hint);
+    }
+
+    private static BpaResult StatsSentinel(string id)
+        => BpaResult.Sentinel(BpaResultKind.MissingVertipaqStats,
+            new BpaRule(id, id, "Performance", BpaSeverity.Warning, ["Table"]));
 }

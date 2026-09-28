@@ -23,7 +23,8 @@ internal static class BpaRunView
         bool Errors,
         bool Warnings,
         bool Info,
-        IReadOnlyList<string>? CommandTokens = null);
+        IReadOnlyList<string>? CommandTokens = null,
+        bool CanCollectVertipaqStats = false);
 
     /// <summary>One rule and every object that violated it, in display order.</summary>
     internal sealed record RuleGroup(
@@ -102,14 +103,18 @@ internal static class BpaRunView
 
     /// <summary>
     /// The one-line run summary, e.g. <c>3 errors · 32 warnings in 5 of 27 rules · 22 passed · 326ms</c>
-    /// or <c>All 27 rules passed · 326ms</c>. Zero severity counts are left out.
+    /// or <c>All 27 rules passed · 326ms</c>. Zero severity counts are left out. Rules that were
+    /// <paramref name="notChecked"/> (no VertiPaq statistics) are never counted as passed.
     /// </summary>
     internal static string SummaryLine(
-        int errors, int warnings, int info, int failedRules, int rulesEvaluated, long durationMs)
+        int errors, int warnings, int info, int failedRules, int rulesEvaluated, long durationMs, int notChecked = 0)
     {
         var duration = durationMs > 0 ? $" · {durationMs}ms" : "";
+        var skipped = notChecked > 0 ? $" · {notChecked} not checked" : "";
         if (failedRules == 0)
-            return $"All {rulesEvaluated} {Plural(rulesEvaluated, "rule")} passed{duration}";
+            return notChecked == 0
+                ? $"All {rulesEvaluated} {Plural(rulesEvaluated, "rule")} passed{duration}"
+                : $"{Math.Max(0, rulesEvaluated - notChecked)} of {Count(rulesEvaluated, "rule")} passed{skipped}{duration}";
 
         var counts = new List<string>(3);
         if (errors > 0) counts.Add(Count(errors, "error"));
@@ -118,7 +123,8 @@ internal static class BpaRunView
 
         // Rule-error findings can come from rules outside the evaluated count; never go negative.
         var total = Math.Max(rulesEvaluated, failedRules);
-        return $"{string.Join(" · ", counts)} in {failedRules} of {Count(total, "rule")} · {total - failedRules} passed{duration}";
+        var passed = Math.Max(0, total - failedRules - notChecked);
+        return $"{string.Join(" · ", counts)} in {failedRules} of {Count(total, "rule")} · {passed} passed{skipped}{duration}";
     }
 
     /// <summary>

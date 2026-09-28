@@ -19,5 +19,11 @@ public enum BpaResultKind
     CompilationError,
 
     /// <summary>The rule expression compiled but threw while evaluating a scope.</summary>
-    EvaluationError
+    EvaluationError,
+
+    /// <summary>
+    /// The rule reads <c>Vertipaq_*</c> statistics annotations and the model has none; it was
+    /// not evaluated, because every comparison against a missing statistic would pass silently.
+    /// </summary>
+    MissingVertipaqStats
 }

@@ -76,6 +76,27 @@ public sealed class BpaStandardRulesetSampleTests
         Assert.DoesNotContain(violations, v => v.RuleId == "DAX_MEASURES_UNQUALIFIED");
     }
 
+    [Fact]
+    public async Task Standard_UnannotatedSample_NamesEveryStatisticsRuleAsNotChecked()
+    {
+        // #266: the sample has no Vertipaq_* annotations, so every bundled rule that reads them
+        // must be reported as not checked rather than silently passing.
+        var rules = await BpaRuleLoader.LoadDefaultRulesAsync(CancellationToken.None);
+        await using var session = await new TmdlModelProvider()
+            .OpenAsync(new ModelReference(SampleModel.Locate("basic-tmdl")), CancellationToken.None);
+        var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
+
+        var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
+
+        var expected = rules
+            .Where(r => r.Expression?.Contains("GetAnnotation(\"Vertipaq_", StringComparison.Ordinal) == true)
+            .Select(r => r.Id)
+            .Order()
+            .ToList();
+        Assert.NotEmpty(expected);
+        Assert.Equal(expected, result.MissingVertipaqStatsRules.Select(r => r.RuleId).Order());
+    }
+
     private static async Task<IReadOnlyList<BpaViolation>> EvaluateStandardAsync(string sample)
     {
         var rules = await BpaRuleLoader.LoadDefaultRulesAsync(CancellationToken.None);

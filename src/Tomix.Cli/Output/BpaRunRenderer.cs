@@ -58,7 +58,8 @@ internal static class BpaRunRenderer
         var warnings = result.Violations.Count(v => v.Severity == BpaSeverity.Warning);
         var info = result.Violations.Count(v => v.Severity == BpaSeverity.Info);
 
-        var text = BpaRunView.SummaryLine(errors, warnings, info, failedRules, result.RulesEvaluated, result.DurationMs);
+        var text = BpaRunView.SummaryLine(
+            errors, warnings, info, failedRules, result.RulesEvaluated, result.DurationMs, result.MissingVertipaqStatsRules.Count);
         var line = failedRules == 0 ? Styling.Success($"✓ {text}")
             : errors > 0 ? Styling.Error($"✗ {text}")
             : warnings > 0 ? Styling.Warning($"✗ {text}")
@@ -254,6 +255,8 @@ internal static class BpaRunRenderer
                 err.MarkupLine($"    {Styling.MarkupEscape(diag)}");
         }
 
+        RenderMissingVertipaqStats(result, view);
+
         var parts = new List<string>(4);
         if (result.RuleErrors > 0) parts.Add($"{result.RuleErrors} rule errors");
         if (result.DisabledRules > 0) parts.Add($"{result.DisabledRules} disabled");
@@ -284,6 +287,7 @@ internal static class BpaRunRenderer
                 BpaResultKind.EvaluationError => "evaluate",
                 BpaResultKind.InvalidCompatibilityLevel => "compat",
                 BpaResultKind.DisabledRule => "disabled",
+                BpaResultKind.MissingVertipaqStats => "no stats",
                 _ => diag.Kind.ToString()
             };
 
@@ -299,6 +303,28 @@ internal static class BpaRunRenderer
     }
 
     /// <summary>
+    /// Names the rules skipped for missing VertiPaq statistics outside <c>--details</c>: they
+    /// did not check anything, so hiding them behind a count would read as a clean pass (#266).
+    /// </summary>
+    private static void RenderMissingVertipaqStats(BpaRunResult result, BpaRunView.RunOptions view)
+    {
+        if (result.MissingVertipaqStatsRules.Count == 0)
+            return;
+
+        AnsiConsole.MarkupLine(
+            $"  {Styling.Warning($"Not checked ({result.MissingVertipaqStatsRules.Count}):")} "
+            + Styling.Muted("the model has no VertiPaq statistics"));
+        foreach (var skipped in result.MissingVertipaqStatsRules)
+            AnsiConsole.MarkupLine($"    {Styling.MarkupEscape(skipped.RuleId)}");
+
+        // `tx vertipaq` needs a live engine; for a plain model file the command alone would fail.
+        HintConsole().MarkupLine(view.CanCollectVertipaqStats
+            ? "  " + Styling.Guidance("Collect them:") + " " + Styling.Option(BpaEngine.VertipaqAnnotateCommand)
+            : "  " + Styling.Guidance("Collect them:") + " "
+                + Styling.MarkupEscape("statistics come from a deployed model; " + BpaEngine.VertipaqFileModelGuidance));
+    }
+
+    /// <summary>
     /// JSON projection for <c>bpa run</c>. Property names and order are the output contract —
     /// keep stable (guarded by BpaJsonContractTests).
     /// </summary>
@@ -311,6 +337,7 @@ internal static class BpaRunRenderer
             ignoredRules = result.IgnoredViolations,
             disabledRules = result.DisabledRules,
             invalidCompatibilityRules = result.InvalidCompatibilityRules,
+            missingVertipaqStatsRules = result.MissingVertipaqStatsRules.Select(r => r.RuleId),
             fixesApplied = result.FixesApplied,
             fixesSkipped = result.FixesSkipped,
             destructiveFixesSkipped = result.DestructiveFixesSkipped,

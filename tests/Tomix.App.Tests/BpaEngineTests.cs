@@ -360,6 +360,59 @@ public sealed class BpaEngineTests
     }
 
     [Fact]
+    public void Evaluate_VertipaqRuleOnUnannotatedModel_IsSkippedNotPassed()
+    {
+        // #266: with no statistics anywhere, every comparison reads 0 and the rule would report
+        // clean without having checked anything. It must be named as not checked instead.
+        var snapshot = CreateSnapshotWithColumn(
+            new ModelObject("Col", ModelObjectKind.Column, "Table/Col",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: "Col",
+                Children: [],
+                Properties: new Dictionary<string, string> { ["ObjectType"] = "DataColumn" }));
+
+        var rules = new List<BpaRule>
+        {
+            // "<= 100000" would match every column if the rule ran against the missing value (0).
+            new("LOW_CARDINALITY", "Low cardinality", "Performance", BpaSeverity.Warning, ["Column"],
+                Expression: "Convert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) <= 100000"),
+            new("PLAIN", "Plain", "Test", BpaSeverity.Warning, ["Column"], Expression: "not IsHidden")
+        };
+
+        var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
+
+        var skipped = Assert.Single(result.MissingVertipaqStatsRules);
+        Assert.Equal("LOW_CARDINALITY", skipped.RuleId);
+        Assert.Equal(BpaEngine.MissingVertipaqStatsMessage, skipped.ErrorMessage);
+        // Skipped rules are not findings and not rule errors; other rules still run.
+        Assert.Equal("PLAIN", Assert.Single(result.Violations).RuleId);
+        Assert.Equal(0, result.RuleErrors);
+    }
+
+    [Fact]
+    public void Evaluate_VertipaqRuleOnModelLevelAnnotatedModel_Runs()
+    {
+        // `tx vertipaq --annotate` also writes model-level statistics; those alone mark the
+        // model as annotated, and objects without their own annotation then read 0 as usual.
+        var snapshot = CreateSnapshotWithColumn(
+            new ModelObject("Col", ModelObjectKind.Column, "Table/Col",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: "Col",
+                Children: [],
+                Properties: new Dictionary<string, string> { ["ObjectType"] = "DataColumn" }),
+            modelAnnotations: new Dictionary<string, string> { ["Annotation:Vertipaq_TotalSize"] = "1024" });
+
+        var rules = new List<BpaRule>
+        {
+            new("LOW_CARDINALITY", "Low cardinality", "Performance", BpaSeverity.Warning, ["Column"],
+                Expression: "Convert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) <= 100000")
+        };
+
+        var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
+
+        Assert.Empty(result.MissingVertipaqStatsRules);
+        Assert.Equal("Table/Col", Assert.Single(result.Violations).ObjectPath);
+    }
+
+    [Fact]
     public void Evaluate_FormatStringRule_HonorsFormatStringExpression()
     {
         // A measure with a dynamic format string satisfies the format-string rule even though

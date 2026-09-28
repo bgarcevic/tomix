@@ -134,6 +134,16 @@ public class BpaRenderTests
         int errors, int warnings, int info, int failed, int evaluated, long durationMs, string expected)
         => Assert.Equal(expected, BpaRunView.SummaryLine(errors, warnings, info, failed, evaluated, durationMs));
 
+    [Theory]
+    // #266: rules skipped for missing VertiPaq statistics are never counted as passed.
+    [InlineData(0, 27, 3, "24 of 27 rules passed · 3 not checked · 326ms")]
+    [InlineData(5, 27, 3, "3 errors · 32 warnings in 5 of 27 rules · 19 passed · 3 not checked · 326ms")]
+    public void SummaryLine_NotCheckedRules_AreNotCountedAsPassed(int failed, int evaluated, int notChecked, string expected)
+    {
+        var (errors, warnings) = failed == 0 ? (0, 0) : (3, 32);
+        Assert.Equal(expected, BpaRunView.SummaryLine(errors, warnings, 0, failed, evaluated, 326, notChecked));
+    }
+
     [Fact]
     public void PackSegments_NeverSplitsASegment()
     {

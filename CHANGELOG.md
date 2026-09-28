@@ -94,6 +94,14 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- BPA rules that read VertiPaq statistics no longer pass silently on a model that has
+  none. A missing statistic read as 0, so the high-cardinality relationship,
+  large-table partitioning, and referential-integrity rules reported clean without
+  checking anything. `bpa run` now lists them as "Not checked", keeps them out of the
+  passed count, and reports them in JSON as `missingVertipaqStatsRules`. `deploy`
+  proceeds with a `TOMIX_BPA_VERTIPAQ_STATS_MISSING` warning that names them. Both say
+  how to collect the statistics: `tx vertipaq --annotate --save` on a deployed model, or
+  on a local model connected to one in workspace mode (#266).
 - `tx connect --local` and `tx connect localhost:<port>` now look up and save the Desktop
   instance's database (a GUID) and open the model to validate it, so `tx vertipaq --export`
   works without `-d`. VertiPaq also resolves the database when an older saved session has none (#299).

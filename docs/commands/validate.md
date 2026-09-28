@@ -33,10 +33,16 @@ sort-by or hierarchy columns hidden from MDX. Everything else in `standard` is
 a warning or info that `bpa run` reports without blocking a deploy
 (`deploy --bpa-fail-on warning` blocks on warnings too).
 
-A few rules — high-cardinality bi-directional relationships, long high-
-cardinality columns, and referential-integrity violations — read VertiPaq
-statistics and stay silent on a model without them, so an offline `standard`
-run is a metadata check.
+A few rules — high-cardinality bi-directional relationships, large unpartitioned
+tables, and referential-integrity violations — read VertiPaq statistics. On a
+model without them (no `Vertipaq_*` annotations), these rules are not run: `bpa run`
+lists them under "Not checked" and doesn't count them as passed. In JSON they
+appear in `missingVertipaqStatsRules` and as `MissingVertipaqStats` diagnostics.
+They don't fail the run. To check them, write the statistics into the model first
+with `tx vertipaq --annotate --save`. Statistics only exist on a deployed model, so this
+works on a connected model, or on a local model connected in workspace mode (the
+statistics are read from its deployed mirror). A model file with no deployed copy
+can't be checked by these rules.
 
 The bundled catalog is embedded in the application and cannot be overridden by
 placing a file beside the executable. Use `--rules`, model rule annotations, or
@@ -84,7 +90,8 @@ tx bpa run --fix --save
 Text output groups findings by severity. Each rule shows its object count, its name,
 and a line with its ID, its category and whether it is `fixable`. `--details` adds the
 guidance and lists the affected objects one per line. The summary line counts the
-findings and shows how many of the evaluated rules passed. Next-step commands are
+findings and shows how many of the evaluated rules passed; rules that were not
+checked for lack of VertiPaq statistics are counted separately. Next-step commands are
 printed ready to copy on stderr, reusing your model path and rule options. After
 `--fix`, the output shows how many findings were fixed and remain, and whether the
 result was saved, staged, or kept in memory only.

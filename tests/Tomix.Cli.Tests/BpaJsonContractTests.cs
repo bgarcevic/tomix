@@ -35,7 +35,8 @@ public sealed class BpaJsonContractTests
             BpaResult.ForViolation(SampleRule(), SampleViolation()),
             BpaResult.ForViolation(SampleRule(), SampleViolation("Sales[Tax]"), isIgnored: true),
             BpaResult.Sentinel(BpaResultKind.CompilationError, SampleRule("BROKEN_RULE"), "boom", "model"),
-            BpaResult.Sentinel(BpaResultKind.DisabledRule, SampleRule("OFF_RULE"))
+            BpaResult.Sentinel(BpaResultKind.DisabledRule, SampleRule("OFF_RULE")),
+            BpaResult.Sentinel(BpaResultKind.MissingVertipaqStats, SampleRule("STATS_RULE"), "needs stats")
         ],
         ModelName: "MyModel",
         RulesEvaluated: 4,
@@ -60,6 +61,7 @@ public sealed class BpaJsonContractTests
         Assert.Equal(1, root.GetProperty("ignoredRules").GetInt32());
         Assert.Equal(1, root.GetProperty("disabledRules").GetInt32());
         Assert.Equal(0, root.GetProperty("invalidCompatibilityRules").GetInt32());
+        Assert.Equal(["STATS_RULE"], root.GetProperty("missingVertipaqStatsRules").EnumerateArray().Select(e => e.GetString()));
         Assert.Equal(1, root.GetProperty("fixesApplied").GetInt32());
         Assert.Equal(2, root.GetProperty("fixesSkipped").GetInt32());
         Assert.Equal(3, root.GetProperty("destructiveFixesSkipped").GetInt32());
@@ -105,12 +107,14 @@ public sealed class BpaJsonContractTests
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;
         var diagnostics = root.GetProperty("diagnostics");
 
-        Assert.Equal(2, diagnostics.GetArrayLength());
+        Assert.Equal(3, diagnostics.GetArrayLength());
         Assert.Equal("CompilationError", diagnostics[0].GetProperty("kind").GetString());
         Assert.Equal("BROKEN_RULE", diagnostics[0].GetProperty("ruleId").GetString());
         Assert.Equal("model", diagnostics[0].GetProperty("scope").GetString());
         Assert.Equal("boom", diagnostics[0].GetProperty("message").GetString());
         Assert.Equal("DisabledRule", diagnostics[1].GetProperty("kind").GetString());
+        Assert.Equal("MissingVertipaqStats", diagnostics[2].GetProperty("kind").GetString());
+        Assert.Equal("STATS_RULE", diagnostics[2].GetProperty("ruleId").GetString());
     }
 
     [Fact]
