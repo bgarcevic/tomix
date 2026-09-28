@@ -85,7 +85,6 @@ public sealed class QueryModelHandler
                     request.Parameters,
                     request.Limit,
                     Trace: request.Trace,
-                    Plan: request.Plan,
                     ClearCache: request.Cold,
                     Runs: request.Runs < 1 ? 1 : request.Runs),
                 traceWriter,
@@ -100,7 +99,6 @@ public sealed class QueryModelHandler
                 result.Truncated,
                 result.DurationMs,
                 Timings: result.Runs is { Count: > 0 } ? result.Runs[0].Timings : null,
-                Plans: result.Plans,
                 Benchmark: QueryBenchmark.Compute(result.Runs)));
         }
         catch (ModelConnectionException ex)

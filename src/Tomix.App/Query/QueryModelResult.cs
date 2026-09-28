@@ -7,9 +7,9 @@ namespace Tomix.App.Query;
 /// contract (additive changes only). Cell values follow <see cref="ModelQueryResult"/>'s
 /// primitive restrictions; blank serializes as JSON <c>null</c>.
 /// <para>
-/// <see cref="Timings"/> (server timings for the first run), <see cref="Plans"/> (logical/physical
-/// query plans), and <see cref="Benchmark"/> (multi-run statistics) are null unless the matching
-/// perf option (<c>--trace</c>/<c>--plan</c>/<c>--runs</c>) was requested and honored.
+/// <see cref="Timings"/> (server timings for the first run) and <see cref="Benchmark"/> (multi-run
+/// statistics) are null unless the matching perf option (<c>--trace</c>/<c>--runs</c>) was
+/// requested and honored.
 /// </para>
 /// </summary>
 public sealed record QueryModelResult(
@@ -21,5 +21,4 @@ public sealed record QueryModelResult(
     bool Truncated,
     long DurationMs,
     QueryTimings? Timings = null,
-    IReadOnlyList<QueryPlan>? Plans = null,
     QueryBenchmark? Benchmark = null);

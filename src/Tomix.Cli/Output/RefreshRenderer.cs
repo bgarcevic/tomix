@@ -1,13 +1,16 @@
 using System.Globalization;
 using Spectre.Console;
 using Tomix.App.Refresh;
+using RefreshPartitionResult = Tomix.Core.Models.RefreshPartitionResult;
+using RefreshPhaseResult = Tomix.Core.Models.RefreshPhaseResult;
 using RefreshTableResult = Tomix.Core.Models.RefreshTableResult;
 
 namespace Tomix.Cli.Output;
 
 /// <summary>
-/// Rendering for the <c>refresh</c> command: header + per-table statistics table (text),
-/// CSV rows, and the <c>--dry-run</c> TMSL script pretty-print.
+/// Rendering for the <c>refresh</c> command: header + per-table statistics table with partition
+/// sub-rows and a model-phase table (text), CSV rows, and the <c>--dry-run</c> TMSL script
+/// pretty-print.
 /// </summary>
 internal static class RefreshRenderer
 {
@@ -52,7 +55,7 @@ internal static class RefreshRenderer
             return;
         }
 
-        var table = Styling.NewTable("Table", "Rows", "Query", "Read", "Total", "Rows/s");
+        var table = Styling.NewTable("Table", "Rows", "Query", "Read", "Process", "Total", "Rows/s");
         foreach (var column in table.Columns)
             column.Alignment = Justify.Left;
         table.Columns[1].Alignment = Justify.Right;
@@ -61,7 +64,15 @@ internal static class RefreshRenderer
         table.Columns[0].Padding = new Padding(1, 0, 1, 0);
 
         foreach (var t in result.Tables.OrderBy(t => t.TotalMs))
+        {
             table.AddRow(BuildRowMarkup(t));
+            // A single-partition table's partition row would repeat the table row.
+            if (t.Partitions is { Count: > 1 } partitions)
+            {
+                foreach (var p in partitions)
+                    table.AddRow(BuildPartitionRowMarkup(p));
+            }
+        }
 
         if (result.Totals is { } total)
         {
@@ -74,12 +85,38 @@ internal static class RefreshRenderer
                 Styling.Number(total.Rows),
                 Styling.Muted(""),
                 Styling.Muted(""),
+                DurationMarkup(total.ProcessMs),
                 $"[{slate}]{totalSeconds}[/]",
                 Styling.Muted(""));
         }
 
         AnsiConsole.Write(table);
+
+        if (result.Phases is { Count: > 0 } phases)
+        {
+            var phaseTable = Styling.NewTable("Phase", "Objects", "Time");
+            phaseTable.Columns[1].Alignment = Justify.Right;
+            phaseTable.Columns[2].Alignment = Justify.Right;
+            phaseTable.Columns[0].Padding = new Padding(1, 0, 1, 0);
+            foreach (var phase in phases)
+                phaseTable.AddRow(Styling.MarkupEscape(PhaseLabel(phase.Phase)), Styling.Number(phase.Count), DurationMarkup(phase.DurationMs));
+            AnsiConsole.WriteLine();
+            AnsiConsole.Write(phaseTable);
+        }
     }
+
+    /// <summary>Display label for a <see cref="RefreshPhaseResult.Phase"/> name.</summary>
+    internal static string PhaseLabel(string phase) => phase switch
+    {
+        "load" => "Data load",
+        "hierarchies" => "Hierarchies",
+        "calculatedColumns" => "Calculated columns",
+        "relationships" => "Relationships",
+        "calculationScript" => "Calculation script",
+        "sequencePoint" => "Sequence point",
+        "commit" => "Commit",
+        _ => phase,
+    };
 
     private static string[] BuildRowMarkup(RefreshTableResult t)
     {
@@ -90,10 +127,23 @@ internal static class RefreshRenderer
             Styling.Number(t.Rows),
             DurationMarkup(t.QueryMs),
             DurationMarkup(t.ReadMs),
+            DurationMarkup(t.ProcessMs),
             DurationMarkup(t.TotalMs),
             rate > 0 ? Styling.Number(rate) : ""
         ];
     }
+
+    private static string[] BuildPartitionRowMarkup(RefreshPartitionResult p)
+        =>
+        [
+            Styling.Muted("  └ " + p.Partition),
+            Styling.Muted(p.Rows.ToString("N0", CultureInfo.InvariantCulture)),
+            DurationMarkup(p.QueryMs),
+            DurationMarkup(p.ReadMs),
+            "",
+            DurationMarkup(p.TotalMs),
+            ""
+        ];
 
     private static string DurationMarkup(long ms)
         => ms > 0 ? Styling.Muted((ms / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + "s") : Styling.Muted("0s");

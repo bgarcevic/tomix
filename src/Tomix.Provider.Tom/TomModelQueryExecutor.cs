@@ -14,8 +14,8 @@ namespace Tomix.Provider.Tom;
 /// so a fresh <see cref="AdomdConnection"/> is opened per query using the same endpoint
 /// and token plumbing as <see cref="TomServerModelProvider.OpenAsync"/>.
 /// <para>
-/// Perf options: with <c>Trace</c>/<c>Plan</c> a <see cref="TomQueryTraceSink"/> captures
-/// server timings and query plans; with <c>ClearCache</c> the model cache is flushed (and warmed)
+/// Perf options: with <c>Trace</c> a <see cref="TomQueryTraceSink"/> captures
+/// server timings; with <c>ClearCache</c> the model cache is flushed (and warmed)
 /// before each run; with <c>Runs &gt; 1</c> the query is repeated for benchmarking. All perf
 /// features are best-effort — the rowset is always returned even when tracing/clear-cache is
 /// unavailable (they need admin rights on the endpoint).
@@ -23,6 +23,13 @@ namespace Tomix.Provider.Tom;
 /// </summary>
 public static class TomModelQueryExecutor
 {
+    /// <summary>
+    /// How long to wait for a run's <c>QueryEnd</c> trace event. Fabric XMLA delivers trace events
+    /// in batches several seconds after the query finishes (~8 s observed), so this is generous;
+    /// the wait ends as soon as the event lands and only runs out when tracing is broken.
+    /// </summary>
+    private static readonly TimeSpan RunEventTimeout = TimeSpan.FromSeconds(30);
+
     public static async Task<ModelQueryResult> ExecuteAsync(
         string connectionString,
         ModelReference reference,
@@ -34,6 +41,13 @@ public static class TomModelQueryExecutor
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        // A unique Application Name lets the trace filter and correlate this query's events even
+        // where the service reports a SessionID other than the one ADOMD holds (see TomQueryTraceSink).
+        var traced = request.Trace;
+        var applicationName = $"tomix-query-{Guid.NewGuid():N}";
+        if (traced)
+            connectionString = $"{connectionString};Application Name={applicationName}";
 
         using var connection = new AdomdConnection(connectionString);
 
@@ -80,10 +94,10 @@ public static class TomModelQueryExecutor
                 connection.Open();
                 command.Connection = connection;
 
-                // Attach a trace only when timings or plans are requested. Best-effort: a null sink
+                // Attach a trace only when timings are requested. Best-effort: a null sink
                 // (no admin rights) means the query still runs, just without server timings.
-                using var sink = request.Trace || request.Plan
-                    ? TomQueryTraceSink.Attach(connectionString, tokenFactory, connection.SessionID, request.Plan, traceWriter)
+                using var sink = traced
+                    ? TomQueryTraceSink.Attach(connection, connectionString, applicationName, tokenFactory, traceWriter)
                     : null;
 
                 List<QueryColumn> columns = [];
@@ -91,6 +105,7 @@ public static class TomModelQueryExecutor
                 var truncated = false;
                 var runResults = new List<QueryRun>(runs);
                 var coldWarned = false;
+                var timingsWarned = false;
 
                 for (var run = 1; run <= runs; run++)
                 {
@@ -125,12 +140,23 @@ public static class TomModelQueryExecutor
                     runStopwatch.Stop();
 
                     var timings = sink is { Active: true }
-                        ? sink.WaitForRun(TimeSpan.FromSeconds(5))
+                        // After one miss the trace is evidently not delivering; don't stall every run.
+                        ? sink.WaitForRun(timingsWarned ? TimeSpan.FromSeconds(2) : RunEventTimeout)
                         : null;
+                    if (sink is { Active: true } && timings is null && !timingsWarned)
+                    {
+                        // The trace is live but this run's QueryEnd never arrived: say so rather
+                        // than leave the timings silently null.
+                        timingsWarned = true;
+                        TomQueryTraceSink.Warn(
+                            $"no QueryEnd trace event arrived for run {run}; server timings are unavailable" +
+                            (sink.ForeignEventCount > 0
+                                ? $" ({sink.ForeignEventCount} trace event(s) from other sessions were ignored)."
+                                : "."));
+                    }
                     runResults.Add(new QueryRun(run, cold, runStopwatch.ElapsedMilliseconds, timings));
                 }
 
-                var plans = sink?.BuildPlans();
                 return new ModelQueryResult(
                     reference.Value,
                     databaseName,
@@ -138,8 +164,7 @@ public static class TomModelQueryExecutor
                     rows,
                     truncated,
                     runResults[0].ClientMs,
-                    runResults,
-                    plans);
+                    runResults);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (AdomdException ex) when (cancellationToken.IsCancellationRequested)

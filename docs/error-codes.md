@@ -151,10 +151,11 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | `TOMIX_QUERY_UNSUPPORTED` | 2 | The provider session does not implement `IModelQuerySession` (e.g. a local TMDL/BIM model). |
 | `TOMIX_QUERY_FAILED` | 1 | The query was rejected or failed on the server (DAX error, no permissions, timeout, etc.). |
 
-The performance options are **best-effort** and do not have dedicated error codes: `--trace`,
-`--plan`, and `--cold` all require admin rights on the endpoint (and are unavailable on
-shared-capacity Power BI). When they cannot be honored, `tx query` prints a one-line warning to
-stderr, still returns the rowset, and exits `0`.
+The performance options are **best-effort** and do not have dedicated error codes: `--trace` and
+`--cold` require admin rights on the endpoint (and are unavailable on shared-capacity Power BI).
+When they cannot be honored, `tx query` prints a one-line warning to stderr, still returns the
+rowset, and exits `0`. When `--trace` was requested, a `null` `timings` field is always accompanied
+by such a warning.
 
 ## Regression Test Codes (`TOMIX_TEST_*`)
 

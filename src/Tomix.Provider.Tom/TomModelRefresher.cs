@@ -26,6 +26,9 @@ public static class TomModelRefresher
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    /// <summary>How long to wait for the session trace to deliver the refresh's commit event.</summary>
+    private static readonly TimeSpan TraceDrainTimeout = TimeSpan.FromSeconds(30);
+
     private static string J(string value) => SystemTextJson.Serialize(value, JsonOptions);
 
     /// <summary>
@@ -126,7 +129,8 @@ public static class TomModelRefresher
     /// <summary>
     /// Executes a refresh on the connected server. When <paramref name="progress"/> and/or
     /// <paramref name="traceWriter"/> are non-null, attaches an XMLA SessionTrace to capture
-    /// ProgressReport events and feed live per-table row counts and final Query/Read/Total splits.
+    /// ProgressReport events and feed live per-table phases and row counts, the final per-table and
+    /// per-partition Query/Read/Total splits, and the model-level phase timings.
     /// </summary>
     public static async Task<ModelRefreshResult> RefreshAsync(
         TabularServer server,
@@ -154,10 +158,9 @@ public static class TomModelRefresher
         using var traceSink = RefreshTraceSink.Attach(server, knownTables, progress, traceWriter)
             ?? RefreshTraceSink.AttachSummaryOnly(server, knownTables);
 
-        // server.Execute is synchronous and blocks while ProgressReport events fire on the
-        // same thread, which is what feeds the live display. Wrap in Task.Run only if needed.
+        // server.Execute is synchronous; ProgressReport events arrive on the trace's own thread
+        // while it runs (and, on Power BI / Fabric, in batches that can trail it by seconds).
         var results = await Task.Run(() => server.Execute(tmsl), cancellationToken).ConfigureAwait(false);
-
         sw.Stop();
 
         // AMO's Execute returns a result collection that may contain errors/warnings even
@@ -170,6 +173,13 @@ public static class TomModelRefresher
         {
             foreach (var description in serverWarnings)
                 traceWriter!.WriteLine($"warning: {description}");
+        }
+
+        if (serverErrors.Count == 0)
+        {
+            // The trace lags the refresh on Power BI / Fabric; let it deliver the commit before
+            // summarizing. Not on failure: a failed refresh never commits.
+            traceSink?.WaitForCommit(TraceDrainTimeout);
         }
 
         if (serverErrors.Count > 0)
@@ -189,7 +199,7 @@ public static class TomModelRefresher
             BuildTableResultsFromRequest(database, request));
 
         var totals = Aggregate(tables);
-        return new ModelRefreshResult(server.Name, dbName, type, sw.ElapsedMilliseconds, tables, totals);
+        return new ModelRefreshResult(server.Name, dbName, type, sw.ElapsedMilliseconds, tables, totals, traceSink?.BuildPhases());
     }
 
     private static List<RefreshTableResult> MergeTableResults(
@@ -238,7 +248,8 @@ public static class TomModelRefresher
             Rows: tables.Sum(t => t.Rows),
             QueryMs: tables.Sum(t => t.QueryMs),
             ReadMs: tables.Sum(t => t.ReadMs),
-            TotalMs: tables.Sum(t => t.TotalMs));
+            TotalMs: tables.Sum(t => t.TotalMs),
+            ProcessMs: tables.Sum(t => t.ProcessMs));
     }
 
     /// <summary>

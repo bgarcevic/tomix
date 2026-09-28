@@ -16,12 +16,34 @@ and the API surface that major versions protect.
   endpoint without connecting (name, compatibility level, last update). It works
   non-interactively and with `--output-format json`, so scripts and agents can
   discover models on a workspace that hosts more than one.
+- `tx refresh` reports refresh progress in detail: a live panel shows overall progress and each
+  in-progress table's step (querying, reading, compressing, hierarchies, calculated columns),
+  partition, rows, and running time, then the model-level steps (relationships, calculation
+  script, commit). It replaces the single status line, which on large models was cut off at the
+  terminal width and kept showing the same few tables. The summary adds a `Process`
+  column, a row per partition for multi-partition tables, and a phase table; JSON gains
+  `tables[].processMs`, `tables[].partitions`, and `phases`.
 
 ### Changed
 
 - Opening a workspace that hosts several models without naming one now fails with
   `TOMIX_DATABASE_REQUIRED` (exit 2) and a hint to run `tx connect <workspace> --list`,
   instead of `TOMIX_CONNECT_FAILED` / `TOMIX_QUERY_FAILED` (exit 1).
+
+### Removed
+
+- **Breaking:** `tx query --plan` and the `plans` field of `tx query --output-format json`. Power BI /
+  Fabric XMLA endpoints never deliver query-plan trace events, so the option could not return a plan.
+
+### Fixed
+
+- `tx refresh` reported only the last partition's rows and timings for tables with several
+  partitions, and on Power BI / Fabric could summarize before the trace arrived, reporting zeros
+  (typically with `--output-format json`).
+- `tx query --trace` returns server timings on Power BI / Fabric XMLA endpoints. The trace was
+  rejected for an unsupported column, and events that arrived were then silently discarded; timings
+  (and `benchmark` storage-engine stats) came back `null`. A missing timing now always comes with a
+  warning on stderr.
 
 ## [0.4.3] - 2026-09-28
 

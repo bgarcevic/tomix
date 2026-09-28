@@ -2,47 +2,66 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using Microsoft.AnalysisServices;
-using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Models;
 using AsTraceEventClass = Microsoft.AnalysisServices.TraceEventClass;
 using AsTraceEventSubclass = Microsoft.AnalysisServices.TraceEventSubclass;
 using TabularServer = Microsoft.AnalysisServices.Tabular.Server;
-using TabularTrace = Microsoft.AnalysisServices.Tabular.Trace;
 using TabularTraceEventArgs = Microsoft.AnalysisServices.Tabular.TraceEventArgs;
 using TabularTraceEventHandler = Microsoft.AnalysisServices.Tabular.TraceEventHandler;
 
 namespace Tomix.Provider.Tom;
 
 /// <summary>
-/// Subscribes to <see cref="TabularServer.SessionTrace"/> for the duration of a refresh,
-/// parses ProgressReport events into per-table accumulators, and forwards live snapshots
-/// to an <see cref="IProgress{RefreshProgress}"/>. Also mirrors raw events to a
+/// Subscribes to <see cref="TabularServer.SessionTrace"/> for the duration of a refresh and turns
+/// its ProgressReport events into per-table and per-partition load statistics, per-table post-load
+/// processing, and model-level phases (relationships, calculation script, commit), forwarding
+/// live snapshots to an <see cref="IProgress{RefreshProgress}"/>. Also mirrors raw events to a
 /// <see cref="TextWriter"/> when --trace is set.
+/// <para>
+/// Events are attributed by <c>ObjectPath</c> (<c>&lt;db&gt;.Model.&lt;Table&gt;.&lt;Child&gt;</c>)
+/// and <c>ObjectType</c> when the server supplies them, as Power BI / Fabric does; otherwise by
+/// <c>ObjectName</c> and the table name embedded in <c>TextData</c>.
+/// </para>
 /// </summary>
 internal sealed class RefreshTraceSink : IDisposable
 {
+    // AS ObjectType codes carried on refresh progress events (observed on Power BI / Fabric).
+    internal const int ObjectTypeCalculatedColumn = 802013;
+    internal const int ObjectTypeAttributeHierarchy = 802014;
+    internal const int ObjectTypePartition = 802015;
+    internal const int ObjectTypeRelationship = 802016;
+    internal const int ObjectTypeUserHierarchy = 802018;
+
+    private static readonly string[] PhaseOrder =
+        ["load", "hierarchies", "calculatedColumns", "relationships", "calculationScript", "sequencePoint", "commit"];
+
     private readonly TabularServer? _server;
     private readonly IReadOnlyList<string> _knownTables;
     private readonly IProgress<RefreshProgress>? _progress;
     private readonly TextWriter? _traceWriter;
-    private readonly ConcurrentDictionary<string, TableAccumulator> _tables = new(StringComparer.Ordinal);
+    private readonly object _lock = new();
+    private readonly Dictionary<string, TableAccumulator> _tables = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PhaseAccumulator> _phases = new(StringComparer.Ordinal);
     // Per-table error messages captured from ProgressReportError events. Keyed by resolved table
     // name; values are the error texts (typically the engine's localized message). When the table
     // can't be resolved, the special key "" holds the unmatched errors.
     private readonly ConcurrentDictionary<string, List<string>> _errors = new(StringComparer.Ordinal);
     private TabularTraceEventHandler? _handler;
+    // Set by the TabularCommit end, the last event of a successful refresh.
+    private readonly ManualResetEventSlim _committed = new(false);
 
     private RefreshTraceSink(TabularServer? server, IReadOnlyList<string> knownTables, IProgress<RefreshProgress>? progress, TextWriter? traceWriter)
     {
         _server = server;
-        _knownTables = knownTables;
+        // Longest first, so "Sales Detail" wins over "Sales" when matching paths and text.
+        _knownTables = knownTables.OrderByDescending(t => t.Length).ToList();
         _progress = progress;
         _traceWriter = traceWriter;
     }
 
     /// <summary>
     /// Test-only constructor: builds a sink without an AMO server so unit tests can drive
-    /// <see cref="HandleProgress(RefreshTraceEvent)"/> with synthetic events. The session trace
+    /// <see cref="Process(RefreshTraceEvent)"/> with synthetic events. The session trace
     /// is never attached in this mode.
     /// </summary>
     internal RefreshTraceSink(IReadOnlyList<string> knownTables, IProgress<RefreshProgress>? progress = null, TextWriter? traceWriter = null)
@@ -53,7 +72,7 @@ internal sealed class RefreshTraceSink : IDisposable
     /// <summary>Attaches a session trace to <paramref name="server"/> and returns a sink whose
     /// <see cref="BuildTableResults"/> yields per-table rollups after the refresh completes.
     /// <paramref name="knownTables"/> is the set of tables being refreshed, used to map child-object
-    /// events (hierarchies, columns, relationships) back to their parent table.</summary>
+    /// events (partitions, hierarchies, columns) back to their parent table.</summary>
     public static RefreshTraceSink? Attach(TabularServer server, IReadOnlyList<string> knownTables, IProgress<RefreshProgress>? progress, TextWriter? traceWriter)
     {
         if (progress is null && traceWriter is null)
@@ -103,18 +122,20 @@ internal sealed class RefreshTraceSink : IDisposable
     {
         try
         {
-            // Project the AMO event into our testfriendly record, then forward. The projection
-            // is the only place that touches TabularTraceEventArgs; downstream code (WriteTrace,
-            // HandleProgress, ResolveTableName, CaptureError) is AMO-free and unit-testable.
+            // Every column goes through the string indexer: AMO's typed getters (Duration,
+            // IntegerData, StartTime, ...) throw when an event carries no value — Begin events
+            // have no Duration — and that throw used to discard every event but the End ones.
             var ev = new RefreshTraceEvent(
-                e.StartTime,
+                ParseTime(Column(e, TraceColumn.StartTime)) ?? ParseTime(Column(e, TraceColumn.CurrentTime)) ?? DateTime.UtcNow,
                 e.EventClass,
                 e.EventSubclass,
-                e.Duration,
-                e.IntegerData,
-                e.ObjectName,
-                e.TextData,
-                e.Error);
+                ParseLong(Column(e, TraceColumn.Duration)),
+                ParseLong(Column(e, TraceColumn.IntegerData)),
+                Column(e, TraceColumn.ObjectName) ?? "",
+                Column(e, TraceColumn.TextData),
+                Column(e, TraceColumn.Error),
+                Column(e, TraceColumn.ObjectPath),
+                (int)ParseLong(Column(e, TraceColumn.ObjectType)));
             Process(ev);
         }
         catch
@@ -122,6 +143,39 @@ internal sealed class RefreshTraceSink : IDisposable
             // Trace handler must never throw into the AMO event loop.
         }
     }
+
+    private static string? Column(TabularTraceEventArgs e, TraceColumn column)
+    {
+        try { return e[column]; }
+        catch { return null; }
+    }
+
+    internal static long ParseLong(string? value)
+        => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
+
+    private static DateTime? ParseTime(string? value)
+        => DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsed)
+            ? parsed
+            : null;
+
+    /// <summary>
+    /// Blocks until the refresh's commit event has arrived, or <paramref name="timeout"/> elapses.
+    /// Power BI / Fabric deliver session-trace events in batches seconds after the work they
+    /// describe, so <c>server.Execute</c> returns before the trace has caught up; summarizing
+    /// straight away reported zeros. Returns immediately when no trace is attached.
+    /// </summary>
+    public bool WaitForCommit(TimeSpan timeout)
+    {
+        if (_handler is null)
+            return false;
+        if (!_committed.Wait(timeout))
+            return false;
+        // The commit's second phase and any stragglers ride in the same or the next batch.
+        Thread.Sleep(CommitSettle);
+        return true;
+    }
+
+    private static readonly TimeSpan CommitSettle = TimeSpan.FromMilliseconds(250);
 
     /// <summary>
     /// Single entry point for an already-projected event: traces it (when --trace is set) then
@@ -148,125 +202,289 @@ internal sealed class RefreshTraceSink : IDisposable
             line.Append('\t').Append(e.TextData.Replace('\n', ' ').Replace('\r', ' ').Trim());
         if (!string.IsNullOrEmpty(e.Error))
             line.Append('\t').Append("error=").Append(e.Error.Replace('\n', ' ').Trim());
-        _traceWriter.WriteLine(line.ToString());
+        // Appended last so the leading columns stay positional.
+        if (!string.IsNullOrEmpty(e.ObjectPath))
+            line.Append('\t').Append("path=").Append(e.ObjectPath);
+        if (e.ObjectType != 0)
+            line.Append('\t').Append("type=").Append(e.ObjectType);
+        lock (_traceWriter)
+            _traceWriter.WriteLine(line.ToString());
     }
 
     /// <summary>
-    /// Routes a refresh trace event into the per-table accumulators. Power BI Service emits only
-    /// <c>ProgressReportEnd</c> events during refresh (verified against AMO 19.114 trace dumps);
-    /// <c>ProgressReportCurrent</c> is rare there but common on on-prem AS, so we keep handling
-    /// it defensively for live row-count updates.
+    /// Routes one refresh trace event into the accumulators and reports a live snapshot.
+    /// Partition-level events (<c>ExecuteSql</c>, <c>ReadData</c>, compression, the partition's
+    /// <c>TabularRefresh</c>) feed per-partition load stats; hierarchy and calculated-column
+    /// <c>TabularRefresh</c> ends feed the table's post-load time; relationships, the calculation
+    /// script, the sequence point, and the commit feed model-level phases.
     /// </summary>
     internal void HandleProgress(RefreshTraceEvent e)
     {
-        // Always process events: even when _progress is null (summary-only mode), we need to
-        // populate _tables for the final per-table summary.
-        if (e.EventClass is not (AsTraceEventClass.ProgressReportBegin
-            or AsTraceEventClass.ProgressReportCurrent
-            or AsTraceEventClass.ProgressReportEnd
-            or AsTraceEventClass.ProgressReportError))
-            return;
-
-        // Capture per-table errors before any subclass filtering: ProgressReportError events
-        // carry the failing object/table context that server.Execute's XmlaError messages lack.
-        // The error text is preferred over TextData (the former is the localized message).
         if (e.EventClass == AsTraceEventClass.ProgressReportError)
         {
+            // Capture per-table errors before any other routing: ProgressReportError events carry
+            // the failing object/table context that server.Execute's XmlaError messages lack.
             CaptureError(e);
             return;
         }
 
-        // Only End events carry useful durations; Current events may carry live row counts.
-        var isEnd = e.EventClass == AsTraceEventClass.ProgressReportEnd;
-        var isCurrent = e.EventClass == AsTraceEventClass.ProgressReportCurrent;
-
-        // Commit marks the overall refresh as done — mark every tracked table completed.
-        if (isEnd && e.EventSubclass == AsTraceEventSubclass.TabularCommit)
+        if (e.EventClass is AsTraceEventClass.ExecuteMdxScriptBegin or AsTraceEventClass.ExecuteMdxScriptEnd)
         {
-            foreach (var entry in _tables.Values)
-                entry.Completed = true;
+            if (e.EventSubclass == AsTraceEventSubclass.MdxScript)
+                ModelPhase(e, "calculationScript", "running calculation script");
+            return;
+        }
+
+        if (e.EventClass is not (AsTraceEventClass.ProgressReportBegin
+            or AsTraceEventClass.ProgressReportCurrent
+            or AsTraceEventClass.ProgressReportEnd))
+            return;
+
+        switch (e.EventSubclass)
+        {
+            case AsTraceEventSubclass.TabularCommit or AsTraceEventSubclass.Commit:
+                Commit(e);
+                return;
+            case AsTraceEventSubclass.TabularSequencePoint:
+                ModelPhase(e, "sequencePoint", "finalizing");
+                return;
+            case AsTraceEventSubclass.RelationshipBuildPrepare:
+                // Only a Begin fires; the relationship's TabularRefresh end carries the duration.
+                ModelPhase(e, "relationships", "building relationships", recordEnd: false);
+                return;
+        }
+
+        if (e.ObjectType == ObjectTypeRelationship && e.EventSubclass == AsTraceEventSubclass.TabularRefresh)
+        {
+            ModelPhase(e, "relationships", "building relationships");
+            return;
+        }
+
+        var (table, child) = Resolve(e);
+        if (table is null)
+            return;
+        if (IsPartitionEvent(e, table, child))
+            PartitionEvent(e, table, child ?? table);
+        else if (IsPostLoadEvent(e))
+            PostLoadEvent(e, table);
+    }
+
+    private static bool IsPostLoadEvent(RefreshTraceEvent e)
+        => e.EventSubclass == AsTraceEventSubclass.TabularRefresh
+           && e.ObjectType is ObjectTypeAttributeHierarchy or ObjectTypeUserHierarchy or ObjectTypeCalculatedColumn;
+
+    /// <summary>
+    /// Partition-level work. With an <c>ObjectType</c> that is simply "is it a partition"; without
+    /// one (older servers, synthetic fixtures) load subclasses always are, and a
+    /// <c>TabularRefresh</c> only when it names the table itself — child hierarchies and columns
+    /// also emit <c>TabularRefresh</c> and must not overwrite the partition total.
+    /// </summary>
+    private static bool IsPartitionEvent(RefreshTraceEvent e, string table, string? child)
+    {
+        if (e.ObjectType != 0)
+            return e.ObjectType == ObjectTypePartition;
+
+        return e.EventSubclass switch
+        {
+            AsTraceEventSubclass.ExecuteSql or AsTraceEventSubclass.ReadData => true,
+            AsTraceEventSubclass.TabularRefresh => string.Equals(child, table, StringComparison.Ordinal),
+            _ => false,
+        };
+    }
+
+    private void PartitionEvent(RefreshTraceEvent e, string table, string partitionName)
+    {
+        RefreshProgress? report;
+        lock (_lock)
+        {
+            var acc = Table(table);
+            var partition = acc.Partition(partitionName);
+            var isEnd = e.EventClass == AsTraceEventClass.ProgressReportEnd;
+            var key = $"{partitionName}/{e.EventSubclass}";
+
+            if (e.EventClass == AsTraceEventClass.ProgressReportBegin)
+                acc.Active.Add(key);
+            else if (isEnd)
+                acc.Active.Remove(key);
+
+            switch (e.EventSubclass)
+            {
+                case AsTraceEventSubclass.ExecuteSql when isEnd:
+                    // Source query (SQL or M) end: this is the "Query" column. Carries no row count.
+                    partition.QueryMs = e.Duration;
+                    break;
+                case AsTraceEventSubclass.ReadData when isEnd:
+                    // Data read end: this is the "Read" column. IntegerData is the partition's
+                    // authoritative row count.
+                    partition.ReadMs = e.Duration;
+                    if (e.IntegerData > 0) partition.Rows = e.IntegerData;
+                    break;
+                case AsTraceEventSubclass.TabularRefresh when isEnd:
+                    // The partition's whole refresh, including commit/lock overhead. Kept as the
+                    // Total fallback when neither ExecuteSql nor ReadData fired.
+                    partition.RefreshMs = e.Duration;
+                    partition.Completed = true;
+                    AddInterval("load", e);
+                    // The partition is done even if a sub-step's End never arrived; a leftover
+                    // Begin must not hold the table "in progress" for the rest of the refresh.
+                    acc.Active.RemoveWhere(k => k.StartsWith(partitionName + "/", StringComparison.Ordinal));
+                    break;
+            }
+
+            // Live row count while data streams in (ProgressReportCurrent; common on-prem).
+            if (e.EventClass == AsTraceEventClass.ProgressReportCurrent && e.IntegerData > 0)
+                partition.Rows = e.IntegerData;
+
+            acc.Phase = PartitionPhase(e.EventSubclass) ?? acc.Phase;
+            report = _progress is null ? null : Snapshot(acc, partitionName);
+        }
+
+        if (report is not null)
+            _progress!.Report(report);
+    }
+
+    private static string? PartitionPhase(AsTraceEventSubclass subclass) => subclass switch
+    {
+        AsTraceEventSubclass.ExecuteSql => "query",
+        AsTraceEventSubclass.ReadData => "read",
+        AsTraceEventSubclass.Process or AsTraceEventSubclass.VertiPaq or AsTraceEventSubclass.CompressSegment
+            or AsTraceEventSubclass.AnalyzeEncodeData => "compress",
+        _ => null,
+    };
+
+    private void PostLoadEvent(RefreshTraceEvent e, string table)
+    {
+        var calculated = e.ObjectType == ObjectTypeCalculatedColumn;
+        RefreshProgress? report;
+        lock (_lock)
+        {
+            var acc = Table(table);
+            var key = $"{e.ObjectType}/{e.ObjectName}";
+            if (e.EventClass == AsTraceEventClass.ProgressReportBegin)
+            {
+                acc.Active.Add(key);
+            }
+            else if (e.EventClass == AsTraceEventClass.ProgressReportEnd)
+            {
+                acc.Active.Remove(key);
+                acc.ProcessMs += e.Duration;
+                AddInterval(calculated ? "calculatedColumns" : "hierarchies", e);
+            }
+
+            acc.Phase = calculated ? "calculated columns" : "hierarchies";
+            report = _progress is null ? null : Snapshot(acc, partition: null);
+        }
+
+        if (report is not null)
+            _progress!.Report(report);
+    }
+
+    private void ModelPhase(RefreshTraceEvent e, string phase, string label, bool recordEnd = true)
+    {
+        var isEnd = e.EventClass is AsTraceEventClass.ProgressReportEnd or AsTraceEventClass.ExecuteMdxScriptEnd;
+        if (isEnd && recordEnd)
+        {
+            lock (_lock)
+                AddInterval(phase, e);
+        }
+
+        _progress?.Report(new RefreshProgress(Table: null, RowsRead: null, Phase: label, Completed: false));
+    }
+
+    private void Commit(RefreshTraceEvent e)
+    {
+        if (e.EventClass == AsTraceEventClass.ProgressReportEnd && e.EventSubclass == AsTraceEventSubclass.TabularCommit)
+        {
+            // Commit marks the overall refresh as done — mark every tracked table completed.
+            lock (_lock)
+            {
+                AddInterval("commit", e);
+                _committed.Set();
+                foreach (var acc in _tables.Values)
+                {
+                    acc.Active.Clear();
+                    foreach (var partition in acc.Partitions.Values)
+                        partition.Completed = true;
+                }
+            }
             _progress?.Report(new RefreshProgress(Table: "", RowsRead: null, Phase: "commit", Completed: true));
             return;
         }
 
-        var subclass = e.EventSubclass;
-        var isPhaseEvent = subclass == AsTraceEventSubclass.ExecuteSql
-            || subclass == AsTraceEventSubclass.ReadData
-            || subclass == AsTraceEventSubclass.TabularRefresh;
-        if (!isPhaseEvent)
-            return;
+        _progress?.Report(new RefreshProgress(Table: null, RowsRead: null, Phase: "committing", Completed: false));
+    }
 
-        var table = ResolveTableName(e);
-        if (string.IsNullOrEmpty(table))
-        {
-            // Some phase events (e.g. CompressSegment for a column) resolve to a child name
-            // that's not in _knownTables; only attach to a single active table to avoid noise.
-            table = FindActiveTable();
-            if (string.IsNullOrEmpty(table))
-                return;
-        }
+    // Caller holds _lock.
+    private static RefreshProgress Snapshot(TableAccumulator acc, string? partition)
+    {
+        var rows = acc.Partitions.Values.Sum(p => p.Rows);
+        var completed = acc.Active.Count == 0 && acc.Partitions.Values.Any(p => p.Completed);
+        return new RefreshProgress(
+            Table: acc.Name,
+            RowsRead: rows > 0 ? rows : null,
+            Phase: completed ? "done" : acc.Phase ?? "processing",
+            Completed: completed,
+            Partition: acc.Partitions.Count > 1 ? partition : null);
+    }
 
-        var acc = _tables.GetOrAdd(table, _ => new TableAccumulator(table));
+    // Caller holds _lock.
+    private TableAccumulator Table(string name)
+    {
+        if (!_tables.TryGetValue(name, out var acc))
+            _tables[name] = acc = new TableAccumulator(name);
+        return acc;
+    }
 
-        if (isEnd)
-        {
-            switch (subclass)
-            {
-                case AsTraceEventSubclass.ExecuteSql:
-                    // Source query (SQL or M) end: this is the "Query" column. Carries no row count.
-                    acc.QueryMs = e.Duration;
-                    break;
-                case AsTraceEventSubclass.ReadData:
-                    // Data read end: this is the "Read" column. IntegerData is the authoritative
-                    // row count for the table (replaces the previous post-refresh DMV query).
-                    acc.ReadMs = e.Duration;
-                    if (e.IntegerData > 0) acc.Rows = e.IntegerData;
-                    break;
-                case AsTraceEventSubclass.TabularRefresh:
-                    // Partition-level refresh end. ObjectName is the partition name, which equals
-                    // the table name for single-partition tables. This duration is the total
-                    // processing time INCLUDING commit/lock overhead; we keep it as a fallback
-                    // for tables where neither ExecuteSql nor ReadData fired (defensive — never
-                    // observed in real traces). The previously-buggy fallback that set
-                    // QueryMs = TotalMs is gone.
-                    if (string.Equals(e.ObjectName, table, StringComparison.Ordinal))
-                    {
-                        acc.TabularRefreshMs = e.Duration;
-                        acc.Completed = true;
-                    }
-                    break;
-            }
-        }
-        else if (isCurrent && e.IntegerData > 0)
-        {
-            // Live row count during SQL execution. Power BI Service does not emit these, but
-            // on-prem AS / Fabric may; capture defensively so the spinner ticks during long reads.
-            acc.Rows = e.IntegerData;
-        }
-
-        if (_progress is not null)
-        {
-            var phase = subclass switch
-            {
-                AsTraceEventSubclass.ExecuteSql => "query",
-                AsTraceEventSubclass.ReadData => "read",
-                AsTraceEventSubclass.TabularRefresh => acc.Completed ? "done" : "processing",
-                _ => "processing"
-            };
-            _progress.Report(new RefreshProgress(
-                Table: table,
-                RowsRead: acc.Rows > 0 ? acc.Rows : null,
-                Phase: phase,
-                Completed: acc.Completed));
-        }
+    // Caller holds _lock. End events carry their start time and duration.
+    private void AddInterval(string phase, RefreshTraceEvent e)
+    {
+        if (!_phases.TryGetValue(phase, out var acc))
+            _phases[phase] = acc = new PhaseAccumulator();
+        acc.Count++;
+        acc.Intervals.Add((e.StartTime, e.StartTime.AddMilliseconds(Math.Max(e.Duration, 0))));
     }
 
     /// <summary>
-    /// Resolves the table name for an event. <see cref="RefreshTraceEvent.ObjectName"/> is the
-    /// object being processed — for table-level events it IS the table; for child-object events
-    /// (hierarchies, columns, relationships) it's the child name, so we match against the known
-    /// table list by checking TextData (which embeds the table name in localized descriptions).
+    /// Resolves the table (and the child object — partition, column, hierarchy) an event belongs
+    /// to. <c>ObjectPath</c> is authoritative when present; otherwise <c>ObjectName</c> is tried as a
+    /// table name, then the known table names are searched for in <c>TextData</c> (localized
+    /// descriptions like "Processing of hierarchy 'X' in table 'Datoer' completed" embed it).
     /// </summary>
+    private (string? Table, string? Child) Resolve(RefreshTraceEvent e)
+    {
+        if (!string.IsNullOrEmpty(e.ObjectPath))
+        {
+            var fromPath = ResolvePath(e.ObjectPath);
+            if (fromPath.Table is not null)
+                return fromPath;
+        }
+
+        var table = ResolveTableName(e);
+        return table.Length == 0 ? (null, null) : (table, e.ObjectName.Length > 0 ? e.ObjectName : null);
+    }
+
+    /// <summary>
+    /// Splits <c>&lt;db&gt;.Model.&lt;Table&gt;[.&lt;Child&gt;]</c> against the known tables. Table
+    /// names may contain dots, so it matches a known name rather than splitting on the dot.
+    /// </summary>
+    internal (string? Table, string? Child) ResolvePath(string objectPath)
+    {
+        const string marker = ".Model.";
+        var at = objectPath.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0)
+            return (null, null);
+
+        var rest = objectPath[(at + marker.Length)..];
+        foreach (var known in _knownTables)
+        {
+            if (string.Equals(rest, known, StringComparison.Ordinal))
+                return (known, null);
+            if (rest.Length > known.Length + 1 && rest.StartsWith(known, StringComparison.Ordinal) && rest[known.Length] == '.')
+                return (known, rest[(known.Length + 1)..]);
+        }
+        return (null, null);
+    }
+
     private string ResolveTableName(RefreshTraceEvent e)
     {
         // Fast path: ObjectName is a known table.
@@ -279,36 +497,41 @@ internal sealed class RefreshTraceSink : IDisposable
             }
         }
 
-        // Fallback: scan TextData for any known table name. Events carry localized descriptions
-        // like "Processing of hierarchy 'X' in table 'Datoer' completed (TableTMID='13')" which
-        // embed the table name. Matching the longest known table name first avoids partial matches.
+        // Fallback: scan TextData for any known table name, longest first to avoid partial matches.
         var text = e.TextData;
         if (string.IsNullOrEmpty(text))
             return "";
 
-        var match = _knownTables
-            .Where(t => text.Contains(t, StringComparison.Ordinal))
-            .OrderByDescending(t => t.Length)
-            .FirstOrDefault();
-        return match ?? "";
-    }
-
-    private string FindActiveTable()
-    {
-        var candidates = _tables.Values
-            .Where(a => !a.Completed)
-            .Take(2)
-            .ToList();
-        return candidates.Count == 1 ? candidates[0].Name : "";
+        return _knownTables.FirstOrDefault(t => text.Contains(t, StringComparison.Ordinal)) ?? "";
     }
 
     public IReadOnlyList<RefreshTableResult> BuildTableResults()
     {
-        return _tables.Values
-            .Select(a => a.ToResult())
-            .OrderBy(t => t.TotalMs > 0 ? t.TotalMs : long.MaxValue)
-            .ThenBy(t => t.Table, StringComparer.Ordinal)
-            .ToList();
+        lock (_lock)
+        {
+            return _tables.Values
+                .Where(a => a.Partitions.Count > 0)
+                .Select(a => a.ToResult())
+                .OrderBy(t => t.TotalMs > 0 ? t.TotalMs : long.MaxValue)
+                .ThenBy(t => t.Table, StringComparer.Ordinal)
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Model-level phases in processing order, each with its wall-clock duration (overlapping
+    /// events merged). Null when the trace captured no phase at all.
+    /// </summary>
+    public IReadOnlyList<RefreshPhaseResult>? BuildPhases()
+    {
+        lock (_lock)
+        {
+            var phases = PhaseOrder
+                .Where(_phases.ContainsKey)
+                .Select(name => new RefreshPhaseResult(name, _phases[name].Count, _phases[name].WallClockMs()))
+                .ToList();
+            return phases.Count > 0 ? phases : null;
+        }
     }
 
     /// <summary>
@@ -332,10 +555,9 @@ internal sealed class RefreshTraceSink : IDisposable
         if (string.IsNullOrWhiteSpace(msg))
             return;
 
-        var table = ResolveTableName(e);
         // An empty key means we couldn't associate the error with a known table. The caller
         // surfaces these separately so they still appear in the failure message.
-        var key = string.IsNullOrEmpty(table) ? "" : table;
+        var key = Resolve(e).Table ?? "";
         var list = _errors.GetOrAdd(key, _ => new List<string>());
         lock (list)
         {
@@ -347,6 +569,7 @@ internal sealed class RefreshTraceSink : IDisposable
 
     public void Dispose()
     {
+        _committed.Dispose();
         if (_handler is null || _server is null) return;
         try
         {
@@ -364,24 +587,83 @@ internal sealed class RefreshTraceSink : IDisposable
     {
         public TableAccumulator(string name) => Name = name;
         public string Name { get; }
+        public Dictionary<string, PartitionAccumulator> Partitions { get; } = new(StringComparer.Ordinal);
+        // Begun-but-not-ended work (per partition subclass or post-load object); empty = idle.
+        public HashSet<string> Active { get; } = new(StringComparer.Ordinal);
+        public long ProcessMs;
+        public string? Phase;
+
+        public PartitionAccumulator Partition(string name)
+        {
+            if (!Partitions.TryGetValue(name, out var partition))
+                Partitions[name] = partition = new PartitionAccumulator(name);
+            return partition;
+        }
+
+        public RefreshTableResult ToResult()
+        {
+            var partitions = Partitions.Values
+                .OrderBy(p => p.Name, StringComparer.Ordinal)
+                .Select(p => p.ToResult())
+                .ToList();
+            return new RefreshTableResult(
+                Name,
+                partitions.Sum(p => p.Rows),
+                partitions.Sum(p => p.QueryMs),
+                partitions.Sum(p => p.ReadMs),
+                partitions.Sum(p => p.TotalMs),
+                ProcessMs,
+                partitions);
+        }
+    }
+
+    private sealed class PartitionAccumulator
+    {
+        public PartitionAccumulator(string name) => Name = name;
+        public string Name { get; }
         public long Rows;
         public long QueryMs;
         public long ReadMs;
-        // TabularRefresh partition-end duration. Used as a Total fallback when neither ExecuteSql
-        // nor ReadData fired (defensive — never observed in real traces).
-        public long TabularRefreshMs;
+        // TabularRefresh partition-end duration. Total fallback when neither ExecuteSql nor
+        // ReadData fired (defensive — never observed in real traces).
+        public long RefreshMs;
         public bool Completed;
 
         /// <summary>
         /// Total = Query + Read (matches the reference CLI's arithmetic for the majority of
-        /// tables). Falls back to TabularRefreshMs when neither phase event fired.
+        /// partitions). Falls back to RefreshMs when neither phase event fired.
         /// </summary>
-        public RefreshTableResult ToResult()
+        public RefreshPartitionResult ToResult()
         {
-            var total = (QueryMs > 0 || ReadMs > 0)
-                ? QueryMs + ReadMs
-                : TabularRefreshMs;
-            return new RefreshTableResult(Name, Rows, QueryMs, ReadMs, total);
+            var total = (QueryMs > 0 || ReadMs > 0) ? QueryMs + ReadMs : RefreshMs;
+            return new RefreshPartitionResult(Name, Rows, QueryMs, ReadMs, total);
+        }
+    }
+
+    private sealed class PhaseAccumulator
+    {
+        public int Count;
+        public List<(DateTime Start, DateTime End)> Intervals { get; } = [];
+
+        /// <summary>Union of the event intervals, so parallel work is counted once.</summary>
+        public long WallClockMs()
+        {
+            var total = TimeSpan.Zero;
+            DateTime? start = null, end = null;
+            foreach (var (s, e) in Intervals.OrderBy(i => i.Start))
+            {
+                if (end is null || s > end)
+                {
+                    if (start is not null) total += end!.Value - start.Value;
+                    (start, end) = (s, e);
+                }
+                else if (e > end)
+                {
+                    end = e;
+                }
+            }
+            if (start is not null) total += end!.Value - start.Value;
+            return (long)Math.Round(total.TotalMilliseconds);
         }
     }
 }
@@ -390,6 +672,8 @@ internal sealed class RefreshTraceSink : IDisposable
 /// AMO-free projection of <see cref="TabularTraceEventArgs"/>. Introduced so the sink's
 /// event-handling logic can be unit-tested with synthetic events instead of a live server.
 /// </summary>
+/// <param name="ObjectPath">Dotted path <c>&lt;db&gt;.Model.&lt;Table&gt;.&lt;Child&gt;</c>, when supplied.</param>
+/// <param name="ObjectType">AS object-type code (see <see cref="RefreshTraceSink"/> constants); 0 when absent.</param>
 internal sealed record RefreshTraceEvent(
     DateTime StartTime,
     AsTraceEventClass EventClass,
@@ -398,4 +682,6 @@ internal sealed record RefreshTraceEvent(
     long IntegerData,
     string ObjectName,
     string? TextData,
-    string? Error);
+    string? Error,
+    string? ObjectPath = null,
+    int ObjectType = 0);

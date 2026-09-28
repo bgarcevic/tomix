@@ -136,7 +136,8 @@ public sealed class RefreshModelHandler
             var result = await refresher.RefreshAsync(sessionRequest, progress, traceWriter, cancellationToken).ConfigureAwait(false);
 
             return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(
-                result.Server, result.Database, result.RefreshType, result.DurationMs, result.Tables, result.Totals, Script: null));
+                result.Server, result.Database, result.RefreshType, result.DurationMs, result.Tables, result.Totals, Script: null,
+                Phases: result.Phases));
         }
         catch (ModelConnectionException ex)
         {

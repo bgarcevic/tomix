@@ -94,24 +94,6 @@ internal static class QueryResultRenderer
         e.WriteLine($"  SE cache hits  {timings.StorageEngineCacheHits}");
     }
 
-    /// <summary>Writes the logical/physical query plans (from <c>--plan</c>) to stderr.</summary>
-    public static void WritePlans(IReadOnlyList<QueryPlan>? plans)
-    {
-        if (plans is null || plans.Count == 0)
-            return;
-
-        var e = Console.Error;
-        foreach (var plan in plans)
-        {
-            e.WriteLine();
-            var kind = plan.Kind.Length > 0
-                ? char.ToUpperInvariant(plan.Kind[0]) + plan.Kind[1..]
-                : plan.Kind;
-            e.WriteLine($"{kind} plan:");
-            e.WriteLine(plan.Text.TrimEnd());
-        }
-    }
-
     /// <summary>Writes the multi-run benchmark summary (from <c>--runs</c>) to stderr.</summary>
     public static void WriteBenchmark(QueryBenchmark? benchmark)
     {

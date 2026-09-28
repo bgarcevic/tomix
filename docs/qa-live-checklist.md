@@ -53,7 +53,7 @@ you compare against. A check with no expected value recorded is not a check.
 - [ ] `query` against the fixture returns the manifest values (`Total Sales`
       = 896.49; row counts and ordering per the `dax-tests` files); JSON and
       CSV stdout parse with an independent parser.
-- [ ] `query --trace` / `--plan` / `--cold` with an admin identity: expected
+- [ ] `query --trace` / `--cold` with an admin identity: expected
       column sets (#94). With a non-admin identity: warning plus a successful
       rowset, never a failure.
 - [ ] Repeated and concurrent reads are stable; no read changes server

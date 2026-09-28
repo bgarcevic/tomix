@@ -215,13 +215,12 @@ public sealed class QueryModelHandlerTests
         var writer = new StringWriter();
 
         var result = await handler.HandleAsync(
-            Request(query: "EVALUATE 'Sales'", trace: true, plan: true, cold: true, runs: 3),
+            Request(query: "EVALUATE 'Sales'", trace: true, cold: true, runs: 3),
             writer,
             CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.True(session.LastRequest!.Trace);
-        Assert.True(session.LastRequest.Plan);
         Assert.True(session.LastRequest.ClearCache);
         Assert.Equal(3, session.LastRequest.Runs);
         Assert.Same(writer, session.LastTraceWriter);
@@ -239,26 +238,24 @@ public sealed class QueryModelHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_SurfacesTimingsPlansAndBenchmark_FromRuns()
+    public async Task HandleAsync_SurfacesTimingsAndBenchmark_FromRuns()
     {
         var runs = new List<QueryRun>
         {
             new(1, Cold: true, ClientMs: 100, Timings: new QueryTimings(90, 120, 30, 60, 80, 2, 1)),
             new(2, Cold: true, ClientMs: 80, Timings: new QueryTimings(70, 100, 20, 50, 70, 2, 0))
         };
-        var plans = new List<QueryPlan> { new("logical", "AddColumns: ..."), new("physical", "Spool: ...") };
-        var session = new QueryStubs.Session { Runs = runs, Plans = plans };
+        var session = new QueryStubs.Session { Runs = runs };
         var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
 
         var result = await handler.HandleAsync(
-            Request(query: "EVALUATE 'Sales'", trace: true, plan: true, runs: 2),
+            Request(query: "EVALUATE 'Sales'", trace: true, runs: 2),
             null,
             CancellationToken.None);
 
         Assert.True(result.Success);
         var data = result.Data!;
         Assert.Equal(90, data.Timings!.TotalMs);          // first run's server timings
-        Assert.Equal(plans, data.Plans);
         Assert.NotNull(data.Benchmark);
         Assert.Equal(2, data.Benchmark!.Runs.Count);
         Assert.Equal(80, data.Benchmark.TotalStats.Avg);  // (90 + 70) / 2
@@ -300,7 +297,6 @@ public sealed class QueryModelHandlerTests
         int? limit = null,
         bool noValidate = false,
         bool trace = false,
-        bool plan = false,
         bool cold = false,
         int runs = 1) =>
         new(Model: null,
@@ -313,7 +309,6 @@ public sealed class QueryModelHandlerTests
             NoValidate: noValidate,
             Trace: trace,
             TracePath: null,
-            Plan: plan,
             Cold: cold,
             Runs: runs);
 }

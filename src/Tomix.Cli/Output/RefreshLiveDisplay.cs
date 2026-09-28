@@ -1,4 +1,7 @@
+using System.Diagnostics;
+using System.Globalization;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 using Tomix.App.Refresh;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -6,22 +9,36 @@ using Tomix.Core.Results;
 namespace Tomix.Cli.Output;
 
 /// <summary>
-/// Live refresh display using <c>AnsiConsole.Status()</c>: a spinner whose status label updates
-/// in real time as trace events fire. <c>Status()</c> runs its own render timer, so we just set
-/// <c>ctx.Status</c> from the trace thread — no <c>Refresh()</c> calls needed and no cross-thread
-/// rendering issues like with <c>AnsiConsole.Live()</c>. The final summary table renders after
-/// the refresh completes.
+/// Live refresh panel: a header with the elapsed time and overall progress, then one line per
+/// in-progress table (its current step, partition, rows, and how long it has been running),
+/// oldest first and capped, then the model-level step once the tables are done.
+/// <para>
+/// Trace events arrive on the trace thread and only update shared state under a lock; the panel
+/// is redrawn by a loop on the <see cref="AnsiConsole.Live"/> context, so Spectre is never
+/// touched from the trace thread. The panel clears when the refresh ends and the summary table
+/// renders in its place.
+/// </para>
 /// </summary>
 internal sealed class RefreshLiveDisplay : IDisposable
 {
-    private readonly Dictionary<string, (long Rows, string? Phase, bool Completed)> _rows = new(StringComparer.Ordinal);
-    private readonly object _rowsLock = new();
-    private StatusContext? _ctx;
+    /// <summary>How many in-progress tables the panel lists; the rest are counted.</summary>
+    internal const int MaxListedTables = 6;
+
+    private static readonly TimeSpan RenderInterval = TimeSpan.FromMilliseconds(125);
+
+    private readonly Dictionary<string, TableView> _tables = new(StringComparer.Ordinal);
+    private readonly object _lock = new();
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    // Latest model-level step (relationships, calculation script, commit); shown once no table is active.
+    private string? _modelPhase;
+
+    /// <summary>A table as the panel shows it. <see cref="Started"/> is when its current run of work began.</summary>
+    internal sealed record TableView(string Name, string? Partition, string? Phase, long Rows, bool Completed, TimeSpan Started);
 
     public RefreshLiveDisplay()
     {
-        // SynchronousProgress calls OnReport directly on the trace thread during server.Execute,
-        // so the status label updates immediately when ProgressReportEnd events fire.
+        // SynchronousProgress calls OnReport directly on the trace thread, so state is current
+        // the moment an event arrives; the render loop picks it up on its next frame.
         Progress = new SynchronousProgress(OnReport);
     }
 
@@ -29,72 +46,134 @@ internal sealed class RefreshLiveDisplay : IDisposable
 
     private void OnReport(RefreshProgress p)
     {
-        if (!string.IsNullOrEmpty(p.Table))
+        lock (_lock)
         {
-            lock (_rowsLock)
+            if (p.Table is null)
             {
-                if (_rows.TryGetValue(p.Table, out var existing))
-                {
-                    existing.Rows = p.RowsRead ?? existing.Rows;
-                    existing.Phase = p.Phase ?? existing.Phase;
-                    existing.Completed = p.Completed;
-                    _rows[p.Table] = existing;
-                }
-                else
-                {
-                    _rows[p.Table] = (p.RowsRead ?? 0, p.Phase ?? "", p.Completed);
-                }
+                _modelPhase = p.Phase;
+                return;
             }
-        }
+            if (p.Table.Length == 0)
+                return;
 
-        UpdateStatus();
+            var now = _clock.Elapsed;
+            _tables.TryGetValue(p.Table, out var existing);
+            // A finished table that starts post-load work (hierarchies) begins a new run.
+            var started = existing is null || (existing.Completed && !p.Completed) ? now : existing.Started;
+            _tables[p.Table] = new TableView(
+                p.Table,
+                p.Partition,
+                p.Phase ?? existing?.Phase,
+                p.RowsRead ?? existing?.Rows ?? 0,
+                p.Completed,
+                started);
+        }
     }
 
-    private void UpdateStatus()
+    private IRenderable Render(string label)
     {
-        if (_ctx is null) return;
-
-        List<(string Name, long Rows, string? Phase, bool Completed)> snapshot;
-        lock (_rowsLock)
+        List<TableView> tables;
+        string? modelPhase;
+        lock (_lock)
         {
-            snapshot = _rows
-                .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => (kv.Key, kv.Value.Rows, kv.Value.Phase, kv.Value.Completed))
-                .ToList();
+            tables = _tables.Values.ToList();
+            modelPhase = _modelPhase;
         }
-
-        var active = snapshot.Where(s => !s.Completed)
-            .Select(s => (s.Name, s.Rows, s.Phase))
-            .ToList();
-        if (active.Count == 0) return;
-
-        _ctx.Status = BuildStatus(active);
+        var lines = BuildLines(label, _clock.Elapsed, tables, modelPhase);
+        return new Rows(lines.Select(l => new Markup(l)));
     }
 
     /// <summary>
-    /// Composes the status line from the still-active tables. The status label is parsed as
-    /// Spectre markup, so names are escaped here: a raw <c>Sales [EUR]</c> would throw in the
-    /// <see cref="StatusContext.Status"/> setter and, swallowed by the trace sink's catch-all,
-    /// silently freeze the display. Pure so the escaping is directly unit-testable.
+    /// Composes the panel as markup lines. Pure so ordering, capping, formatting, and escaping are
+    /// unit-testable: every name is escaped, since a raw <c>Sales [EUR]</c> is invalid markup.
     /// </summary>
-    internal static string BuildStatus(IReadOnlyList<(string Name, long Rows, string? Phase)> active)
-        => string.Join("  |  ", active.Select(s =>
+    internal static IReadOnlyList<string> BuildLines(
+        string label, TimeSpan elapsed, IReadOnlyList<TableView> tables, string? modelPhase, int maxListed = MaxListedTables)
+    {
+        var frames = Spectre.Console.Spinner.Known.Dots.Frames;
+        var frame = frames[(int)(elapsed.TotalMilliseconds / Spectre.Console.Spinner.Known.Dots.Interval.TotalMilliseconds) % frames.Count];
+        var lines = new List<string>
         {
-            var detail = s.Rows > 0 ? $" {s.Rows:N0} rows" : "";
-            var phaseStr = s.Phase ?? "processing";
-            return Styling.MarkupEscape($"{s.Name}{detail} {phaseStr}".Trim());
-        }));
+            $"[{Palette.Sage.ToMarkup()}]{Styling.MarkupEscape(frame)}[/] {Styling.MarkupEscape(label.TrimEnd('.'))} {Styling.Muted("· " + Clock(elapsed))}",
+        };
+
+        // Oldest first: the order is stable, and long-running tables stay in view.
+        var active = tables.Where(t => !t.Completed).OrderBy(t => t.Started).ThenBy(t => t.Name, StringComparer.Ordinal).ToList();
+        var done = tables.Count(t => t.Completed);
+        var rows = tables.Sum(t => t.Rows);
+
+        if (tables.Count == 0)
+        {
+            lines.Add("  " + Styling.Muted(modelPhase is null ? "Waiting for the server..." : Sentence(modelPhase)));
+            return lines;
+        }
+
+        var summary = $"{Styling.Number(done)} {(done == 1 ? "table" : "tables")} done · {Styling.Number(active.Count)} in progress";
+        if (rows > 0)
+            summary += $" · {Styling.Number(rows)} rows";
+        lines.Add("  " + Styling.Muted(summary));
+
+        if (active.Count == 0)
+        {
+            if (modelPhase is not null)
+                lines.Add("  " + Sentence(modelPhase));
+            return lines;
+        }
+
+        var listed = active.Take(maxListed).ToList();
+        var names = listed.Select(t => t.Partition is null ? t.Name : $"{t.Name} › {t.Partition}").ToList();
+        var nameWidth = Math.Min(names.Max(n => n.Length), 48);
+        for (var i = 0; i < listed.Count; i++)
+        {
+            var t = listed[i];
+            var name = Fit(names[i], nameWidth);
+            var count = t.Rows > 0 ? $"{Styling.Number(t.Rows)} rows" : "";
+            lines.Add(
+                $"  [{Palette.Harbor.ToMarkup()}]{Styling.MarkupEscape(Verb(t.Phase).PadRight(13))}[/]" +
+                $"{Styling.MarkupEscape(name.PadRight(nameWidth))}  " +
+                $"{Styling.MarkupEscape(count.PadLeft(16))}  " +
+                Styling.Muted(Clock(elapsed - t.Started)));
+        }
+        if (active.Count > listed.Count)
+            lines.Add("  " + Styling.Muted($"+ {Styling.Number(active.Count - listed.Count)} more in progress"));
+        return lines;
+    }
+
+    private static string Verb(string? phase) => phase switch
+    {
+        "query" => "Querying",
+        "read" => "Reading",
+        "compress" => "Compressing",
+        "hierarchies" => "Hierarchies",
+        "calculated columns" => "Calc columns",
+        _ => "Processing",
+    };
+
+    private static string Sentence(string phase) => char.ToUpperInvariant(phase[0]) + phase[1..] + "...";
+
+    private static string Clock(TimeSpan t)
+        => t.TotalHours >= 1
+            ? t.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : t.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
+
+    private static string Fit(string text, int width)
+        => text.Length <= width ? text : text[..(width - 1)] + "…";
 
     public async Task<TomixResult<RefreshModelResult>> RunAsync(string label, Func<Task<TomixResult<RefreshModelResult>>> action)
     {
         TomixResult<RefreshModelResult>? captured = null;
-        await AnsiConsole.Status()
-            .Spinner(Spectre.Console.Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse(Palette.Sage.ToMarkup()))
-            .StartAsync(label, async ctx =>
+        await AnsiConsole.Live(Render(label))
+            .AutoClear(true)
+            .Overflow(VerticalOverflow.Ellipsis)
+            .StartAsync(async ctx =>
             {
-                _ctx = ctx;
-                captured = await action().ConfigureAwait(false);
+                var work = action();
+                while (!work.IsCompleted)
+                {
+                    ctx.UpdateTarget(Render(label));
+                    await Task.WhenAny(work, Task.Delay(RenderInterval)).ConfigureAwait(false);
+                }
+                captured = await work.ConfigureAwait(false);
             })
             .ConfigureAwait(false);
         return captured!;
@@ -106,8 +185,7 @@ internal sealed class RefreshLiveDisplay : IDisposable
 /// <summary>
 /// Synchronous <see cref="IProgress{T}"/> adapter: calls the handler immediately on the
 /// reporting thread instead of posting to the thread pool like <see cref="Progress{T}"/>.
-/// Used by <see cref="RefreshLiveDisplay"/> so trace events during server.Execute update the
-/// live table in real time.
+/// Used by <see cref="RefreshLiveDisplay"/> so trace events update its state in order.
 /// </summary>
 internal sealed class SynchronousProgress : IProgress<RefreshProgress>
 {

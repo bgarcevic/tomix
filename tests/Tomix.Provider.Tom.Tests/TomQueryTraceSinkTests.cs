@@ -72,31 +72,6 @@ public sealed class TomQueryTraceSinkTests
     }
 
     [Fact]
-    public void Process_CapturesLogicalAndPhysicalPlans()
-    {
-        var sink = new TomQueryTraceSink();
-        sink.StartRun();
-
-        sink.Process(new QueryTraceEvent(TraceEventClass.DAXQueryPlan, TraceEventSubclass.DAXVertiPaqLogicalPlan, 0, 0, 0, "LOGICAL-TREE"));
-        sink.Process(new QueryTraceEvent(TraceEventClass.DAXQueryPlan, TraceEventSubclass.DAXVertiPaqPhysicalPlan, 0, 0, 0, "PHYSICAL-TREE"));
-
-        var plans = sink.BuildPlans()!;
-        Assert.Collection(plans,
-            p => { Assert.Equal("logical", p.Kind); Assert.Equal("LOGICAL-TREE", p.Text); },
-            p => { Assert.Equal("physical", p.Kind); Assert.Equal("PHYSICAL-TREE", p.Text); });
-    }
-
-    [Fact]
-    public void BuildPlans_ReturnsNull_WhenNoPlanEvents()
-    {
-        var sink = new TomQueryTraceSink();
-        sink.StartRun();
-        sink.Process(QueryEnd(dur: 10, cpu: 10));
-
-        Assert.Null(sink.BuildPlans());
-    }
-
-    [Fact]
     public void StartRun_ResetsAccumulatorsBetweenRuns()
     {
         var sink = new TomQueryTraceSink();
@@ -113,4 +88,94 @@ public sealed class TomQueryTraceSinkTests
         Assert.Equal(30, second.FormulaEngineMs);
         Assert.Equal(0, second.StorageEngineQueryCount);
     }
+
+    // ── Trace definition (issue #94: Fabric rejected the trace, then delivered no events) ──
+
+    private static string Event(TraceEventClass id, params TraceColumn[] columns)
+        => $"<EVENT><ID>{(int)id}</ID><EVENTCOLUMNLIST>" +
+           string.Concat(columns.Select(c => $"<EVENTCOLUMN><ID>{(int)c}</ID></EVENTCOLUMN>")) +
+           "</EVENTCOLUMNLIST></EVENT>";
+
+    // Shaped like a DISCOVER_TRACE_EVENT_CATEGORIES row; DirectQueryEnd lacks EventSubclass, as on Fabric.
+    private static readonly string Categories =
+        "<EVENTCATEGORY><NAME>Queries Events</NAME><EVENTLIST>" +
+        Event(TraceEventClass.QueryEnd, TraceColumn.EventClass, TraceColumn.EventSubclass, TraceColumn.Duration,
+            TraceColumn.ApplicationName, TraceColumn.SessionID) +
+        Event(TraceEventClass.DirectQueryEnd, TraceColumn.EventClass, TraceColumn.Duration, TraceColumn.SessionID) +
+        "</EVENTLIST></EVENTCATEGORY>";
+
+    [Fact]
+    public void ParseSupportedColumns_ReadsEventAndColumnIds_AndSkipsMalformedDocuments()
+    {
+        var supported = TomQueryTraceSink.ParseSupportedColumns([Categories, "<not-xml"]);
+
+        Assert.Equal(2, supported.Count);
+        Assert.Equal(
+            new[] { TraceColumn.EventClass, TraceColumn.EventSubclass, TraceColumn.Duration, TraceColumn.ApplicationName, TraceColumn.SessionID }.Order(),
+            supported[TraceEventClass.QueryEnd].Order());
+        Assert.DoesNotContain(TraceColumn.EventSubclass, supported[TraceEventClass.DirectQueryEnd]);
+    }
+
+    [Fact]
+    public void BuildEventColumns_WithDiscoveredColumns_NarrowsEachEventToWhatTheServerSupports()
+    {
+        var supported = TomQueryTraceSink.ParseSupportedColumns([Categories]);
+
+        var events = TomQueryTraceSink.BuildEventColumns(supported).ToDictionary(e => e.Event, e => e.Columns);
+
+        // The exact pair Fabric rejected: DirectQueryEnd (99) with EventSubclass (1).
+        Assert.DoesNotContain(TraceColumn.EventSubclass, events[TraceEventClass.DirectQueryEnd]);
+        Assert.Equal(
+            new[] { TraceColumn.EventClass, TraceColumn.EventSubclass, TraceColumn.Duration, TraceColumn.SessionID, TraceColumn.ApplicationName },
+            events[TraceEventClass.QueryEnd]);
+        // Events the server does not list are not subscribed (it would reject the trace).
+        Assert.DoesNotContain(TraceEventClass.VertiPaqSEQueryEnd, events.Keys);
+    }
+
+    [Fact]
+    public void BuildEventColumns_WithoutDiscovery_DropsKnownRejectedColumns()
+    {
+        var events = TomQueryTraceSink.BuildEventColumns(supported: null).ToDictionary(e => e.Event, e => e.Columns);
+
+        Assert.DoesNotContain(TraceColumn.EventSubclass, events[TraceEventClass.DirectQueryEnd]);
+        Assert.DoesNotContain(TraceColumn.ApplicationName, events[TraceEventClass.VertiPaqSEQueryEnd]);
+        Assert.Contains(TraceColumn.ApplicationName, events[TraceEventClass.QueryEnd]);
+        Assert.Contains(TraceEventClass.DiscoverBegin, events.Keys);   // start-up heartbeat
+    }
+
+    [Fact]
+    public void BuildFilterXml_OrsSessionIdAndApplicationName_Escaped()
+    {
+        var doc = new System.Xml.XmlDocument();
+        doc.LoadXml(TomQueryTraceSink.BuildFilterXml("S<1>", "tomix-query-&"));
+
+        var ns = new System.Xml.XmlNamespaceManager(doc.NameTable);
+        ns.AddNamespace("e", "http://schemas.microsoft.com/analysisservices/2003/engine");
+        var equals = doc.SelectNodes("/e:Or/e:Equal", ns)!;
+        Assert.Equal(2, equals.Count);
+        Assert.Equal(((int)TraceColumn.SessionID).ToString(), equals[0]!["ColumnID"]!.InnerText);
+        Assert.Equal("S<1>", equals[0]!["Value"]!.InnerText);
+        Assert.Equal(((int)TraceColumn.ApplicationName).ToString(), equals[1]!["ColumnID"]!.InnerText);
+        Assert.Equal("tomix-query-&", equals[1]!["Value"]!.InnerText);
+    }
+
+    [Theory]
+    [InlineData("S1", "app", true)]      // same session
+    [InlineData("S2", "app", true)]      // session rewritten by the service, application matches
+    [InlineData("S2", "APP", true)]      // application match is case-insensitive
+    [InlineData(null, null, true)]       // event carries neither column
+    [InlineData("S2", null, false)]      // another session, no application to vouch for it
+    [InlineData("S2", "other", false)]   // another session and another application
+    public void IsOwnEvent_MatchesOnSessionOrApplication(string? eventSession, string? eventApp, bool expected)
+        => Assert.Equal(expected, TomQueryTraceSink.IsOwnEvent("S1", "app", eventSession, eventApp));
+
+    // Fabric sends events with empty numeric columns (QueryEnd has no IntegerData, cache matches no
+    // Duration); AMO's typed getters throw on those, which silently discarded every event.
+    [Theory]
+    [InlineData("94", 94)]
+    [InlineData("", 0)]
+    [InlineData(null, 0)]
+    [InlineData("n/a", 0)]
+    public void ParseLong_TreatsMissingOrNonNumericColumnsAsZero(string? raw, long expected)
+        => Assert.Equal(expected, TomQueryTraceSink.ParseLong(raw));
 }

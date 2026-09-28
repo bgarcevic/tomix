@@ -78,7 +78,6 @@ public sealed class QueryResultJsonContractTests
         var root = JsonDocument.Parse(JsonOutput.Serialize(SampleResult())).RootElement;
 
         Assert.Equal(JsonValueKind.Null, root.GetProperty("timings").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("plans").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("benchmark").ValueKind);
     }
 
@@ -88,7 +87,6 @@ public sealed class QueryResultJsonContractTests
         var result = SampleResult() with
         {
             Timings = new QueryTimings(231, 300, 40, 191, 250, 3, 1),
-            Plans = [new QueryPlan("logical", "tree"), new QueryPlan("physical", "tree2")],
             Benchmark = new QueryBenchmark(
                 [new QueryBenchmarkRun(1, Cold: true, TotalMs: 231, SeMs: 191)],
                 new QueryStat(231, 231, 231, 0),
@@ -103,9 +101,8 @@ public sealed class QueryResultJsonContractTests
         Assert.Equal(3, timings.GetProperty("storageEngineQueryCount").GetInt32());
         Assert.Equal(1, timings.GetProperty("storageEngineCacheHits").GetInt32());
 
-        var plans = root.GetProperty("plans");
-        Assert.Equal("logical", plans[0].GetProperty("kind").GetString());
-        Assert.Equal("tree", plans[0].GetProperty("text").GetString());
+        // --plan was removed (Fabric XMLA never emits DAXQueryPlan events); so was its field.
+        Assert.False(root.TryGetProperty("plans", out _));
 
         var benchmark = root.GetProperty("benchmark");
         Assert.Equal(1, benchmark.GetProperty("runs").GetArrayLength());

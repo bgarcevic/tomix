@@ -46,8 +46,6 @@ public static class QueryStubs
 
         public IReadOnlyList<QueryRun>? Runs { get; init; }
 
-        public IReadOnlyList<QueryPlan>? Plans { get; init; }
-
         public ModelQueryRequest? LastRequest { get; private set; }
 
         public TextWriter? LastTraceWriter { get; private set; }
@@ -73,7 +71,7 @@ public static class QueryStubs
                 throw Throw;
 
             var result = OnQuery is not null ? OnQuery(request) : Result;
-            return Task.FromResult(result with { Runs = Runs ?? result.Runs, Plans = Plans ?? result.Plans });
+            return Task.FromResult(result with { Runs = Runs ?? result.Runs });
         }
     }
 

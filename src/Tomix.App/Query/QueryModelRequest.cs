@@ -10,7 +10,6 @@ namespace Tomix.App.Query;
 /// <param name="NoValidate">--no-validate: skip the leading-keyword pre-check.</param>
 /// <param name="Trace">--trace: capture server timings (formula- vs storage-engine).</param>
 /// <param name="TracePath">Raw XMLA trace dump target: null = off, "-" = stderr, path = file.</param>
-/// <param name="Plan">--plan: capture the logical and physical DAX query plans.</param>
 /// <param name="Cold">--cold: clear the model cache before each run.</param>
 /// <param name="Runs">--runs: number of executions (>= 1); &gt; 1 produces a benchmark summary.</param>
 public sealed record QueryModelRequest(
@@ -24,6 +23,5 @@ public sealed record QueryModelRequest(
     bool NoValidate,
     bool Trace = false,
     string? TracePath = null,
-    bool Plan = false,
     bool Cold = false,
     int Runs = 1);

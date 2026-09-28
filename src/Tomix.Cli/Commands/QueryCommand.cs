@@ -78,11 +78,6 @@ internal sealed class QueryCommand : ICommandModule
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var planOption = new Option<bool>("--plan")
-        {
-            Description = "Show the logical and physical DAX query plans. Needs admin rights."
-        };
-
         var coldOption = new Option<bool>("--cold")
         {
             Description = "Clear the model cache before each run so timings reflect a cold cache. Needs admin rights."
@@ -108,7 +103,6 @@ internal sealed class QueryCommand : ICommandModule
             outputFileOption,
             noValidateOption,
             traceOption,
-            planOption,
             coldOption,
             runsOption
         };
@@ -194,7 +188,6 @@ internal sealed class QueryCommand : ICommandModule
                 NoValidate: parseResult.GetValue(noValidateOption),
                 Trace: traceEnabled,
                 TracePath: rawTracePath,
-                Plan: parseResult.GetValue(planOption),
                 Cold: parseResult.GetValue(coldOption),
                 Runs: parseResult.GetValue(runsOption) ?? 1);
 
@@ -215,7 +208,7 @@ internal sealed class QueryCommand : ICommandModule
                 () => new QueryModelHandler(_providers, _loadCurrentSession).HandleAsync(request, rawTraceWriter, cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || rawTracePath == "-");
 
-            // Timings/plans/benchmark are diagnostics (stderr); they are embedded in the result when
+            // Timings/benchmark are diagnostics (stderr); they are embedded in the result when
             // the primary sink is JSON, so avoid duplicating them there.
             var emitsJson = OutputFormats.IsJson(format)
                 || (fileFormat is not null && OutputFormats.IsJson(fileFormat));
@@ -248,7 +241,6 @@ internal sealed class QueryCommand : ICommandModule
             if (!quiet && !emitsJson && result.Success && result.Data is { } data)
             {
                 QueryResultRenderer.WriteTimings(data.Timings);
-                QueryResultRenderer.WritePlans(data.Plans);
                 QueryResultRenderer.WriteBenchmark(data.Benchmark);
             }
 

@@ -29,15 +29,14 @@ tx ls --type column --output-format json |
 ## Querying live models
 
 `query` runs DAX or DMV against a live model, with DAX Studio-style
-performance options: `--trace` (formula- vs storage-engine timings), `--plan`
-(logical and physical query plans), `--cold` (clear the cache first), and
-`--runs N` (benchmark with Avg/Min/Max/StdDev). Timings and plans print to
-stderr, so the rowset on stdout stays pipeable; with `--output-format json`
+performance options: `--trace` (formula- vs storage-engine timings), `--cold`
+(clear the cache first), and `--runs N` (benchmark with Avg/Min/Max/StdDev).
+Timings print to stderr, so the rowset on stdout stays pipeable; with `--output-format json`
 they are folded into the result document instead.
 
 ```sh
-# Server timings + query plan for a measure (needs workspace/server admin)
-tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
+# Server timings for a measure (needs workspace/server admin)
+tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace
 
 # Benchmark a heavy query cold, five runs
 tx query --file heavy.dax --cold --runs 5

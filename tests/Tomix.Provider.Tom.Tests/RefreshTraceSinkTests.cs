@@ -23,8 +23,24 @@ public sealed class RefreshTraceSinkTests
         string objectName = "",
         string? textData = null,
         string? error = null,
-        DateTime? startTime = null)
-        => new(startTime ?? T0, eventClass, subclass, duration, integerData, objectName, textData, error);
+        DateTime? startTime = null,
+        string? objectPath = null,
+        int objectType = 0)
+        => new(startTime ?? T0, eventClass, subclass, duration, integerData, objectName, textData, error, objectPath, objectType);
+
+    // Power BI / Fabric events: attributed by ObjectPath + ObjectType.
+
+    private const string Db = "00000000-0000-4000-8000-000000000001";
+
+    private static RefreshTraceEvent Partition(
+        AsTraceEventClass eventClass, AsTraceEventSubclass subclass, string table, string partition,
+        long duration = 0, long rows = 0, DateTime? start = null)
+        => Ev(eventClass, subclass, duration, rows, objectName: partition, startTime: start,
+            objectPath: $"{Db}.Model.{table}.{partition}", objectType: RefreshTraceSink.ObjectTypePartition);
+
+    private static RefreshTraceEvent Child(string table, string child, int objectType, long duration)
+        => Ev(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, duration, objectName: child,
+            objectPath: $"{Db}.Model.{table}.{child}", objectType: objectType);
 
     private static RefreshTraceSink NewSink(IReadOnlyList<string> knownTables, IProgress<RefreshProgress>? progress = null)
         => new(knownTables, progress);
@@ -310,6 +326,159 @@ public sealed class RefreshTraceSinkTests
         Assert.Equal("obj=T", cols[4]);
         Assert.Contains("let __AS_Query__", cols[5]);
     }
+
+    /// <summary>
+    /// Regression: a table with several partitions reported only the last partition's rows and
+    /// timings, because each partition overwrote the table's accumulator (two 2-row partitions
+    /// showed as 2 rows). Rows and durations now sum across partitions, which are also listed.
+    /// </summary>
+    [Fact]
+    public void MultiPartitionTable_SumsPartitions_AndListsThem()
+    {
+        var sink = NewSink(["Events"]);
+
+        foreach (var (partition, query, read) in new[] { ("2026Q308", 10L, 20L), ("2026Q309", 30L, 40L) })
+        {
+            sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.ExecuteSql, "Events", partition, duration: query));
+            sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.ReadData, "Events", partition, duration: read, rows: 2));
+            sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "Events", partition, duration: 99));
+        }
+
+        var table = Assert.Single(sink.BuildTableResults());
+        Assert.Equal(4, table.Rows);
+        Assert.Equal(40, table.QueryMs);
+        Assert.Equal(60, table.ReadMs);
+        Assert.Equal(100, table.TotalMs);
+        Assert.Collection(table.Partitions!,
+            p => { Assert.Equal("2026Q308", p.Partition); Assert.Equal(2, p.Rows); Assert.Equal(30, p.TotalMs); },
+            p => { Assert.Equal("2026Q309", p.Partition); Assert.Equal(2, p.Rows); Assert.Equal(70, p.TotalMs); });
+    }
+
+    /// <summary>
+    /// Begin events (which carry no duration) used to be dropped, so the live display only ever
+    /// saw a table once it finished. They now drive the phase, and a table only reports
+    /// completed once every partition it began has ended.
+    /// </summary>
+    [Fact]
+    public void BeginEvents_DriveLivePhase_AndTableCompletesAfterItsLastPartition()
+    {
+        var reports = new List<RefreshProgress>();
+        var sink = new RefreshTraceSink(["Metrics"], new SynchronousProgress(reports.Add));
+
+        sink.Process(Partition(AsTraceEventClass.ProgressReportBegin, AsTraceEventSubclass.TabularRefresh, "Metrics", "H1"));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportBegin, AsTraceEventSubclass.TabularRefresh, "Metrics", "H2"));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportBegin, AsTraceEventSubclass.ExecuteSql, "Metrics", "H1"));
+        Assert.Equal(("query", "H1", false), (reports[^1].Phase, reports[^1].Partition, reports[^1].Completed));
+
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.ExecuteSql, "Metrics", "H1", duration: 5));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "Metrics", "H1", duration: 5));
+        Assert.False(reports[^1].Completed);             // H2 still running
+
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "Metrics", "H2", duration: 5));
+        Assert.True(reports[^1].Completed);
+        Assert.Equal("Metrics", reports[^1].Table);
+    }
+
+    /// <summary>
+    /// A sub-step whose End never arrives must not keep the table "in progress" once its
+    /// partition has finished — that pinned tables on the live status for the whole refresh.
+    /// </summary>
+    [Fact]
+    public void PartitionEnd_ClearsUnpairedSubSteps_SoTheTableCompletes()
+    {
+        var reports = new List<RefreshProgress>();
+        var sink = new RefreshTraceSink(["Sales"], new SynchronousProgress(reports.Add));
+
+        sink.Process(Partition(AsTraceEventClass.ProgressReportBegin, AsTraceEventSubclass.TabularRefresh, "Sales", "Sales"));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportBegin, AsTraceEventSubclass.ExecuteSql, "Sales", "Sales"));
+        // No ExecuteSql End.
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "Sales", "Sales", duration: 5));
+
+        Assert.True(reports[^1].Completed);
+    }
+
+    /// <summary>
+    /// Hierarchy and calculated-column TabularRefresh events are post-load work: they add to the
+    /// table's ProcessMs and their phases, and never touch the partition's load numbers.
+    /// </summary>
+    [Fact]
+    public void PostLoadEvents_FeedProcessMs_AndPhases_NotLoadTotals()
+    {
+        var sink = NewSink(["Customer"]);
+
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.ExecuteSql, "Customer", "Customer", duration: 16));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "Customer", "Customer", duration: 16));
+        sink.Process(Child("Customer", "Country", RefreshTraceSink.ObjectTypeAttributeHierarchy, duration: 7));
+        sink.Process(Child("Customer", "Geography", RefreshTraceSink.ObjectTypeUserHierarchy, duration: 3));
+        sink.Process(Child("Customer", "NameLength", RefreshTraceSink.ObjectTypeCalculatedColumn, duration: 5));
+
+        var table = Assert.Single(sink.BuildTableResults());
+        Assert.Equal(16, table.TotalMs);
+        Assert.Equal(15, table.ProcessMs);
+        Assert.Equal("Customer", Assert.Single(table.Partitions!).Partition);
+
+        var phases = sink.BuildPhases()!.ToDictionary(p => p.Phase);
+        Assert.Equal(2, phases["hierarchies"].Count);
+        Assert.Equal(1, phases["calculatedColumns"].Count);
+    }
+
+    [Fact]
+    public void ModelLevelEvents_BecomePhases_InProcessingOrder()
+    {
+        var sink = NewSink(["Sales"]);
+
+        sink.Process(Ev(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularCommit, duration: 219));
+        sink.Process(Ev(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, duration: 4,
+            objectName: "Sales_Customer", objectPath: $"{Db}.Model.Sales_Customer", objectType: RefreshTraceSink.ObjectTypeRelationship));
+        sink.Process(Ev(AsTraceEventClass.ExecuteMdxScriptEnd, AsTraceEventSubclass.MdxScript, duration: 12));
+        sink.Process(Ev(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularSequencePoint, duration: 781));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "Sales", "Sales", duration: 313));
+
+        Assert.Equal(
+            ["load", "relationships", "calculationScript", "sequencePoint", "commit"],
+            sink.BuildPhases()!.Select(p => p.Phase));
+        // A relationship is not a table.
+        Assert.Equal("Sales", Assert.Single(sink.BuildTableResults()).Table);
+    }
+
+    /// <summary>
+    /// Phase time is wall-clock: partitions loading in parallel overlap, and summing their
+    /// durations would overstate the phase.
+    /// </summary>
+    [Fact]
+    public void PhaseDuration_MergesOverlappingIntervals()
+    {
+        var sink = NewSink(["A", "B", "C"]);
+
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "A", "A", duration: 100, start: T0));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "B", "B", duration: 100, start: T0.AddMilliseconds(50)));
+        sink.Process(Partition(AsTraceEventClass.ProgressReportEnd, AsTraceEventSubclass.TabularRefresh, "C", "C", duration: 10, start: T0.AddMilliseconds(500)));
+
+        var load = Assert.Single(sink.BuildPhases()!);
+        Assert.Equal(3, load.Count);
+        Assert.Equal(160, load.DurationMs);             // [0,150] + [500,510]
+    }
+
+    [Theory]
+    [InlineData("db.Model.Sales.Sales-2024", "Sales", "Sales-2024")]
+    [InlineData("db.Model.Sales.v2.Sales-2024", "Sales.v2", "Sales-2024")]   // dotted table name
+    [InlineData("db.Model.Sales Detail.P1", "Sales Detail", "P1")]          // longest match wins
+    [InlineData("db.Model.Sales", "Sales", null)]
+    [InlineData("db.Model.Sales_Customer", null, null)]                     // relationship
+    [InlineData("db", null, null)]
+    public void ResolvePath_MatchesKnownTables(string path, string? table, string? child)
+        => Assert.Equal((table, child), NewSink(["Sales", "Sales.v2", "Sales Detail"]).ResolvePath(path));
+
+    [Fact]
+    public void WaitForCommit_ReturnsImmediately_WithoutAnAttachedTrace()
+        => Assert.False(NewSink(["T"]).WaitForCommit(TimeSpan.FromSeconds(30)));
+
+    [Theory]
+    [InlineData("94", 94)]
+    [InlineData("", 0)]
+    [InlineData(null, 0)]
+    public void ParseLong_TreatsMissingColumnsAsZero(string? raw, long expected)
+        => Assert.Equal(expected, RefreshTraceSink.ParseLong(raw));
 
     /// <summary>
     /// Minimal synchronous IProgress adapter mirroring <c>RefreshLiveDisplay.SynchronousProgress</c>

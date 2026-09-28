@@ -186,7 +186,7 @@ public sealed class QueryCommandParseTests
     public void Query_PerfFlags_Bind()
     {
         // Bare --trace (ZeroOrOne) placed last so it doesn't swallow a following option as its value.
-        var result = Parse("query", "--query", "EVALUATE x", "--plan", "--cold", "--runs", "3", "--trace");
+        var result = Parse("query", "--query", "EVALUATE x", "--cold", "--runs", "3", "--trace");
 
         Assert.Empty(result.Errors);
     }

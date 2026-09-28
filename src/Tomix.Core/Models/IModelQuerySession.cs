@@ -20,7 +20,6 @@ public interface IModelQuerySession
 /// <param name="MaxRows">Client-side row cap. Implementations read one extra row to detect truncation.</param>
 /// <param name="Trace">Capture server timings (formula- vs storage-engine) via an XMLA trace. Requires admin
 /// rights on the endpoint; degrades best-effort (rowset still returned) when tracing is unavailable.</param>
-/// <param name="Plan">Capture the logical and physical DAX query plans. Implies a trace.</param>
 /// <param name="ClearCache">Clear the model cache (and warm it up) before each run so timings reflect a cold cache.</param>
 /// <param name="Runs">Number of times to execute the query (>= 1). Values &gt; 1 yield per-run timings for benchmarking.</param>
 public sealed record ModelQueryRequest(
@@ -28,7 +27,6 @@ public sealed record ModelQueryRequest(
     IReadOnlyDictionary<string, string>? Parameters = null,
     int? MaxRows = null,
     bool Trace = false,
-    bool Plan = false,
     bool ClearCache = false,
     int Runs = 1);
 
@@ -50,11 +48,6 @@ public sealed record QueryTimings(
     int StorageEngineQueryCount,
     int StorageEngineCacheHits);
 
-/// <summary>A DAX query plan captured from a <c>DAXQueryPlan</c> trace event.</summary>
-/// <param name="Kind">Either <c>"logical"</c> or <c>"physical"</c>.</param>
-/// <param name="Text">The verbatim, tab-indented plan text.</param>
-public sealed record QueryPlan(string Kind, string Text);
-
 /// <summary>
 /// One execution within a (possibly multi-run) query. <see cref="ClientMs"/> is wall-clock as
 /// measured by the client; <see cref="Timings"/> is the server-measured breakdown, present only
@@ -66,8 +59,7 @@ public sealed record QueryRun(int Index, bool Cold, long ClientMs, QueryTimings?
 /// Query rowset. Cell values are restricted to <see cref="string"/>, <see cref="long"/>,
 /// <see cref="double"/>, <see cref="decimal"/>, <see cref="bool"/>, <see cref="DateTime"/>,
 /// or null (DAX BLANK); implementations must map anything else to a string.
-/// <see cref="Runs"/> and <see cref="Plans"/> are null unless the corresponding perf option was
-/// requested and honored (append-only additions preserve the layering contract).
+/// <see cref="Runs"/> is null unless a perf option was requested and honored (append-only additions preserve the layering contract).
 /// </summary>
 public sealed record ModelQueryResult(
     string Server,
@@ -76,5 +68,4 @@ public sealed record ModelQueryResult(
     IReadOnlyList<IReadOnlyList<object?>> Rows,
     bool Truncated,
     long DurationMs,
-    IReadOnlyList<QueryRun>? Runs = null,
-    IReadOnlyList<QueryPlan>? Plans = null);
+    IReadOnlyList<QueryRun>? Runs = null);

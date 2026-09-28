@@ -142,12 +142,11 @@ flag and is never query text; `query -q "EVALUATE …"` fails with
 | `--limit <n>` | Maximum rows to return. |
 | `-o, --output-file <file>` | Write results to a file as json or csv. |
 | `--trace [path]` | Server timings (formula vs storage engine); optional path dumps raw trace events. Needs admin rights. |
-| `--plan` | Show logical and physical DAX query plans. Needs admin rights. |
-| `--cold` | Clear the model cache before each run. Needs admin rights. |
+| `--cold` | Clear the model cache (and run a warm-up query) before each run. Needs admin rights. On Power BI / Fabric this empties the query caches but does not evict column data already in memory, so only the first run pays that load cost. |
 | `--runs <n>` | Execute N times and report Avg/Min/Max/StdDev. |
 | `--no-validate` | Skip the EVALUATE/DEFINE/SELECT keyword pre-check. |
 
 ```sh
-tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace --plan
+tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace
 tx query --file heavy.dax --cold --runs 5
 ```
