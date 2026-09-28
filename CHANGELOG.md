@@ -10,6 +10,14 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-09-28
+
+### Changed
+
+- Release archives contain only the `tx` executable. The native libraries it needs
+  (`msalruntime.dll`, `msasxpress.dll`) are embedded and unpacked to the .NET bundle
+  cache on first run instead of shipping next to `tx.exe`.
+
 ## [0.4.2] - 2026-09-28
 
 ### Changed
@@ -882,7 +890,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.3.0...v0.4.0

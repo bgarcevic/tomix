@@ -71,6 +71,7 @@ jobs:
           --self-contained true
           --output artifacts/publish/${{ matrix.rid }}
           -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None
           -p:DebugSymbols=false
 
