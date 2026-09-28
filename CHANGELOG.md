@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-28
+
 ### Added
 
 - `bpa rules show <rule-id>` prints one rule in full: its description and reference
@@ -29,6 +31,18 @@ and the API surface that major versions protect.
 - `tx connect --local --list` lists running Power BI Desktop instances (report name,
   `localhost:<port>` endpoint, database id) without connecting, so scripts and agents can
   choose one without the picker. JSON via `--output-format json` (#299).
+- `set` accepts `translation:<culture>/<property>` assignments, where the property is
+  `caption` (alias `name`), `description`, or `displayFolder`, on tables, columns,
+  measures, hierarchies, levels, and the model root (`.`). An empty value removes the
+  translation. A missing culture fails and tells you to add it; it is never created
+  implicitly. `get` lists translations after annotations under the same keys, in text
+  and JSON, and `--query translation:da-DK/caption` finds them (#227).
+- DAX syntax checks now use the parser, so grammar errors that used to pass are reported
+  with their position: `validate` reports `DAX0007` (unexpected token), `DAX0008`
+  (missing expression), and `DAX0009` (malformed `VAR` block), and `format -e` for DAX
+  shows the same structured `syntaxErrors` and caret as M. Only the first grammar error
+  is reported. Queries and `Name := expr` scripts are not flagged for trailing text
+  (#203).
 
 ### Changed
 
@@ -79,7 +93,25 @@ and the API surface that major versions protect.
   `format --lang m` run over a model formatted with a previous release may rewrite
   partitions. M that does not parse is left unchanged and reported with its line and column
   (#196).
-
+- **Breaking:** `format` syntax errors are structured (#197). `TOMIX_FORMAT_FAILED` errors
+  gain `line`, `column`, `objectPath`, and `syntaxErrors` (`stage`, `code`, start and end
+  positions), and inline `-e` failures show the source line with a caret in text mode. In a
+  whole-model run, each failed row's `error` is now an object (`message` plus the optional
+  position fields) instead of a string, and any failure exits `1` with
+  `TOMIX_FORMAT_FAILED` and applies nothing (it used to exit `0`). `--path` failures report
+  `TOMIX_FORMAT_FAILED` instead of `TOMIX_MUTATION_FAILED`. `InlineFormatResult` drops its
+  always-empty `errors` field. DAX errors now say `on line X, column Y:` like M.
+- **Breaking:** without `TOMIX_SESSION`, the active connection is scoped to the enclosing
+  git repository or worktree root (else the current folder) instead of one global
+  `default` session, so a connection no longer follows you into another repo. Subfolders
+  share their repo's session; `TOMIX_SESSION` still names a session explicitly. The old
+  `default` session is no longer read: run `tx connect` once per repository, and
+  `tx session prune --all` removes the orphaned `default.json`. `tx session` shows
+  `kind: directory` and its `scope` (#307).
+- `tx connect` marks a Power BI Desktop session whose report has closed as `(not running)`,
+  names the report, and suggests `tx connect --local` or `--clear`; JSON adds `reachable`
+  for Desktop sessions. The `Connected to:` banner names the Desktop report, warns when it
+  has closed, and is now also shown for `save` and `vertipaq` (#307).
 - The `standard` BPA ruleset (the `bpa run` default and the deploy gate) is re-curated so
   error severity means a broken model. Six style and convention rules drop from error to
   warning, so they no longer block `deploy`. Five noisy or heuristic rules move to `full`,
@@ -124,6 +156,14 @@ and the API surface that major versions protect.
   workspace sync warnings. Result lines, tables, and counts stay on stdout (#255).
 - Refresh scripts with `--effective-date` now explicitly include `applyRefreshPolicy`,
   as required by the XMLA endpoint. Verified with the inline refresh-policy QA sample.
+- Usage errors give one suggestion, aimed at what was mistyped: `tx auth lgin` suggests
+  `login` instead of repeating `auth`, an unknown option such as `--forse` suggests
+  `--force` (`TOMIX_UNKNOWN_OPTION` in JSON), and model paths and extra arguments no
+  longer get unrelated command guesses (#180).
+- `--set name=` (an explicit empty value) no longer reads stdin, so clearing a property
+  from a script or CI job with redirected stdin doesn't hang. Only `-` reads stdin.
+- `tx session --output-format json` no longer includes the Desktop report's port-file
+  path (#307).
 
 ## [0.3.0] - 2026-09-25
 
@@ -800,7 +840,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.1.0...v0.2.0
