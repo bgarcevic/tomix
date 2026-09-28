@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-28
+
 ### Fixed
 
 - `bpa run --fix` evaluates the rules again after fixing, and the exit code and
@@ -850,7 +852,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/bgarcevic/tomix-cli/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bgarcevic/tomix-cli/compare/v0.2.0...v0.2.1
