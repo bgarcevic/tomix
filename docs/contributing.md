@@ -48,6 +48,11 @@ conventions — read the one for the area you're changing before you start.
 - **Tests accompany behavior.**
 - **Scope** — small, focused PRs merge fast; open an issue first for
   anything larger than a single command or fix.
+- **A conventional PR title** — `fix(bpa): ...`, `feat: ...`, `docs: ...`. The
+  title becomes the commit subject and decides the next version. A breaking
+  change (`feat!: ...`) needs the `breaking-approved` label from a maintainer.
+- **A changelog entry** — changes under `src/` add a line under `[Unreleased]`
+  in `CHANGELOG.md`, written for users. That section is the release notes.
 
 ## Working on these docs
 

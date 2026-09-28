@@ -9,6 +9,9 @@
   <PropertyGroup>
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+    <!-- Untagged commits (the previews published from main) build as
+         X.Y.Z-preview.0.N: the next patch, N commits past the last tag. -->
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 

@@ -218,8 +218,19 @@ than a missing-key error. **Scripts wanting a command's own diagnostics must rea
   Tag format: `v<major>.<minor>.<patch>` (e.g. `v1.2.3`). Pre-release tags:
   `v1.2.3-alpha.1`, `v1.2.3-beta.2`. Between tags, MinVer auto-increments
   pre-release identifiers based on commit count since the last tag.
-- Bump by tagging — no file edits required. Push the tag to trigger the
-  release workflow:
+- Releases are automated (`.github/workflows/release-pr.yml`, `release.yml`):
+  - Every merge to `main` publishes a NuGet preview, `X.Y.Z-preview.0.N`,
+    after the archives pass on native runners. Install with
+    `dotnet tool update -g Tomix.Cli --prerelease`.
+  - A bot keeps one `chore(release): prepare X.Y.Z` PR open. Merging it tags
+    `vX.Y.Z` and publishes the GitHub Release and the NuGet package.
+  - The bump comes from the PR titles since the last release: `feat` is minor,
+    everything else patch, `!` or `BREAKING CHANGE:` major. While the major
+    version is 0, breaking changes bump the minor instead.
+  - Release candidates and 1.0.0 are manual tags (`git tag v0.5.0-rc.1`).
+    A new major version waits for approval in the `major-release`
+    environment.
+- The bump levels:
   - **Patch** (`v1.0.1`): bug fixes, no new flags/fields/exit codes.
   - **Minor** (`v1.1.0`): new commands, flags, JSON fields — backward-compatible.
   - **Major** (`v2.0.0`): removed/renamed a flag, changed a JSON field name or

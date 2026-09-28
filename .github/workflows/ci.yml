@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Dispatched by release-pr.yml: its GITHUB_TOKEN pushes to the release branch
+  # do not trigger pull_request, and the build legs are required checks.
+  workflow_dispatch:
 
 permissions:
   contents: read

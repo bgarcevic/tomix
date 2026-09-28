@@ -1,3 +1,5 @@
+<!-- Title: a conventional commit, e.g. "fix(bpa): ..." or "feat: ...". It decides the next version. -->
+
 ## Summary
 
 <!-- What changes and why? Link the issue ("Closes #NNN") when there is one. -->

@@ -1,0 +1,75 @@
+name: pr checks
+
+# PR titles become the squash-merge subject, and release-pr.yml derives the
+# version bump from those subjects, so the title is part of the release.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: conventional title
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      # Title, body and labels arrive through env, never inline in the script:
+      # a PR title is attacker-controlled text.
+      - name: Check title and breaking-change approval
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          types='feat|fix|perf|refactor|docs|test|build|ci|chore|revert|style'
+          pattern="^(${types})(\([a-z0-9._/,-]+\))?!?: [^ ]"
+          if [[ ! "${TITLE}" =~ ${pattern} ]]; then
+            echo "::error::PR title '${TITLE}' is not a conventional commit title, for example 'fix(bpa): ...' or 'feat: ...'. Allowed types: ${types//|/, }."
+            exit 1
+          fi
+          breaking=false
+          [[ "${TITLE}" =~ ^[a-z]+(\([^\)]*\))?!: ]] && breaking=true
+          grep -qE '^BREAKING[ -]CHANGE:' <<<"${BODY}" && breaking=true
+          if [[ "${breaking}" == true && ",${LABELS}," != *",breaking-approved,"* ]]; then
+            echo "::error::This PR is marked as a breaking change ('!' in the title or a BREAKING CHANGE: line). A maintainer must add the 'breaking-approved' label. See the versioning policy in docs/cli-ux-guidelines.md."
+            exit 1
+          fi
+
+  changelog:
+    name: changelog entry
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Source changes need an [Unreleased] entry: it is what the release PR
+      # publishes. Internal-only changes opt out with the skip-changelog label.
+      - name: Require an [Unreleased] entry for source changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          if [[ ",${LABELS}," == *",skip-changelog,"* ]]; then
+            echo "skip-changelog label set."
+            exit 0
+          fi
+          changed="$(git diff --name-only "${BASE}...${HEAD}")"
+          if ! grep -qE '^src/' <<<"${changed}"; then
+            echo "No changes under src/."
+            exit 0
+          fi
+          if ! grep -qx 'CHANGELOG.md' <<<"${changed}"; then
+            echo "::error::This PR changes src/ but not CHANGELOG.md. Add an entry under [Unreleased], or have a maintainer add the 'skip-changelog' label for changes users cannot see."
+            exit 1
+          fi
