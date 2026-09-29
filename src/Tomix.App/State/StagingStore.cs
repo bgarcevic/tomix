@@ -20,7 +20,6 @@ namespace Tomix.App.State;
 /// </summary>
 public sealed class StagingStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private readonly string _configDirectory;
     private readonly string _sessionId;
@@ -159,11 +158,11 @@ public sealed class StagingStore
     internal void WriteManifest(ModelReference source, StagingManifest manifest)
     {
         Directory.CreateDirectory(ModelDirectory(source));
-        AtomicFile.WriteAllText(ManifestFile(source), JsonSerializer.Serialize(manifest, SerializerOptions));
+        AtomicFile.WriteAllText(ManifestFile(source), JsonSerializer.Serialize(manifest, AppJsonContext.Default.StagingManifest));
     }
 
     internal void WriteManifest(string manifestFile, StagingManifest manifest)
-        => AtomicFile.WriteAllText(manifestFile, JsonSerializer.Serialize(manifest, SerializerOptions));
+        => AtomicFile.WriteAllText(manifestFile, JsonSerializer.Serialize(manifest, AppJsonContext.Default.StagingManifest));
 
     private StagingManifest? TryLoadManifest(ModelReference source)
     {
@@ -180,7 +179,7 @@ public sealed class StagingStore
         StagingManifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<StagingManifest>(json);
+            manifest = JsonSerializer.Deserialize(json, AppJsonContext.Default.StagingManifest);
         }
         catch (JsonException ex)
         {

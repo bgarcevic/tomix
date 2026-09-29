@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Tomix.Core.Authentication;
 using Tomix.Platform.Configuration;
 
@@ -15,14 +16,8 @@ namespace Tomix.Auth;
 /// <c>--save false</c> opts out entirely. Load refuses a Unix file whose permissions
 /// allow group/other access, mirroring ssh's strictness.
 /// </summary>
-internal sealed class CredentialStore
+internal sealed partial class CredentialStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        WriteIndented = false,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     private const UnixFileMode OwnerOnlyFile = UnixFileMode.UserRead | UnixFileMode.UserWrite;
     private const UnixFileMode OwnerOnlyDirectory = OwnerOnlyFile | UnixFileMode.UserExecute;
 
@@ -46,7 +41,7 @@ internal sealed class CredentialStore
             options.CertificatePath,
             options.CertificatePassword);
 
-        var json = JsonSerializer.Serialize(payload, SerializerOptions);
+        var json = JsonSerializer.Serialize(payload, CredentialJsonContext.Default.CredentialPayload);
         var plaintext = Encoding.UTF8.GetBytes(json);
 
         var directory = Path.GetDirectoryName(_path);
@@ -115,7 +110,7 @@ internal sealed class CredentialStore
                 json = File.ReadAllText(_path);
             }
 
-            var payload = JsonSerializer.Deserialize<CredentialPayload>(json, SerializerOptions);
+            var payload = JsonSerializer.Deserialize(json, CredentialJsonContext.Default.CredentialPayload);
 
             if (payload is null || string.IsNullOrWhiteSpace(payload.ClientId) || string.IsNullOrWhiteSpace(payload.Tenant))
                 return null;
@@ -164,4 +159,8 @@ internal sealed class CredentialStore
         string? ClientSecret,
         string? CertificatePath,
         string? CertificatePassword);
+
+    [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSerializable(typeof(CredentialPayload))]
+    private sealed partial class CredentialJsonContext : JsonSerializerContext;
 }

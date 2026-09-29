@@ -4,7 +4,7 @@ using Tomix.Core.Bpa;
 
 namespace Tomix.App.Bpa;
 
-public sealed class BpaRuleLoader
+public sealed partial class BpaRuleLoader
 {
     public const string StandardRuleset = "standard";
     public const string FullRuleset = "full";
@@ -18,12 +18,6 @@ public sealed class BpaRuleLoader
     private static readonly HttpClient SharedHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(30)
-    };
-
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
     };
 
     public static IReadOnlyList<string> KnownRulesets { get; } =
@@ -156,7 +150,7 @@ public sealed class BpaRuleLoader
 
     private static IReadOnlyList<BpaRule> ParseRules(string json)
     {
-        var raw = JsonSerializer.Deserialize<List<JsonRule>>(json, Options);
+        var raw = JsonSerializer.Deserialize(json, RuleJsonContext.Default.ListJsonRule);
         if (raw is null)
             return [];
 
@@ -232,4 +226,8 @@ public sealed class BpaRuleLoader
         [JsonPropertyName("FixExpression")] public string? FixExpression { get; set; }
         [JsonPropertyName("CompatibilityLevel")] public int CompatibilityLevel { get; set; }
     }
+
+    [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSerializable(typeof(List<JsonRule>))]
+    private sealed partial class RuleJsonContext : JsonSerializerContext;
 }

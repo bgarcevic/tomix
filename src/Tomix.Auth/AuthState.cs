@@ -18,14 +18,8 @@ public sealed record AuthState(
     string? Endpoint,
     DateTimeOffset? ExpiresOn);
 
-internal sealed class AuthStateStore
+internal sealed partial class AuthStateStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() }
-    };
-
     private readonly string _path;
 
     public AuthStateStore(string path) => _path = path;
@@ -38,7 +32,7 @@ internal sealed class AuthStateStore
         var json = File.ReadAllText(_path);
         return string.IsNullOrWhiteSpace(json)
             ? null
-            : JsonSerializer.Deserialize<AuthState>(json, SerializerOptions);
+            : JsonSerializer.Deserialize(json, AuthStateJsonContext.Default.AuthState);
     }
 
     public void Save(AuthState state)
@@ -47,7 +41,7 @@ internal sealed class AuthStateStore
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(state, SerializerOptions));
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(state, AuthStateJsonContext.Default.AuthState));
     }
 
     public bool Delete()
@@ -58,4 +52,8 @@ internal sealed class AuthStateStore
         File.Delete(_path);
         return true;
     }
+
+    [JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true)]
+    [JsonSerializable(typeof(AuthState))]
+    private sealed partial class AuthStateJsonContext : JsonSerializerContext;
 }

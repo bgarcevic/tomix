@@ -193,7 +193,7 @@ public sealed class DoctorHandler
                 try
                 {
                     var json = File.ReadAllText(session.Path);
-                    var state = JsonSerializer.Deserialize<CliConnectionState>(json);
+                    var state = JsonSerializer.Deserialize(json, AppJsonContext.Default.CliConnectionState);
                     if (state is null ||
                         string.IsNullOrWhiteSpace(state.Server) &&
                         string.IsNullOrWhiteSpace(state.Model) &&

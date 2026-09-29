@@ -29,8 +29,6 @@ internal sealed class PowerQueryEngine : IDisposable
 
     private const int EngineThreadStackSize = 256 * 1024 * 1024;
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private readonly Func<string> _loadBundle;
     private readonly TimeSpan _timeout;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -53,20 +51,14 @@ internal sealed class PowerQueryEngine : IDisposable
         CancellationToken cancellationToken)
     {
         var request = JsonSerializer.Serialize(
-            new
-            {
-                text,
-                indentationLiteral = options.IndentationLiteral,
-                newlineLiteral = options.NewlineLiteral,
-                maxWidth = options.MaxWidth
-            },
-            JsonOptions);
+            new PowerQueryFormatRequest(text, options.IndentationLiteral, options.NewlineLiteral, options.MaxWidth),
+            PowerQueryJsonContext.Default.PowerQueryFormatRequest);
 
         var (json, failure) = await CallAsync(runtime => runtime.Invoke(runtime.Format, request), cancellationToken);
         if (failure is not null)
             return new PowerQueryFormatResult(false, null, failure);
 
-        var result = JsonSerializer.Deserialize<PowerQueryFormatResult>(json!, JsonOptions);
+        var result = JsonSerializer.Deserialize(json!, PowerQueryJsonContext.Default.PowerQueryFormatResult);
         return result is { Ok: true, Text: not null } or { Ok: false, Error: not null }
             ? result
             : new PowerQueryFormatResult(false, null, UnexpectedResponse(json!));
@@ -74,13 +66,13 @@ internal sealed class PowerQueryEngine : IDisposable
 
     public async Task<PowerQueryDiagnoseResult> DiagnoseAsync(string text, CancellationToken cancellationToken)
     {
-        var request = JsonSerializer.Serialize(new { text }, JsonOptions);
+        var request = JsonSerializer.Serialize(new PowerQueryDiagnoseRequest(text), PowerQueryJsonContext.Default.PowerQueryDiagnoseRequest);
 
         var (json, failure) = await CallAsync(runtime => runtime.Invoke(runtime.Diagnose, request), cancellationToken);
         if (failure is not null)
             return new PowerQueryDiagnoseResult([failure]);
 
-        var result = JsonSerializer.Deserialize<PowerQueryDiagnoseResult>(json!, JsonOptions);
+        var result = JsonSerializer.Deserialize(json!, PowerQueryJsonContext.Default.PowerQueryDiagnoseResult);
         return result?.Errors is not null
             ? result
             : new PowerQueryDiagnoseResult([UnexpectedResponse(json!)]);
@@ -91,7 +83,7 @@ internal sealed class PowerQueryEngine : IDisposable
     {
         var (json, failure) = await CallAsync(runtime => runtime.Version, cancellationToken);
         return failure is null
-            ? JsonSerializer.Deserialize<PowerQueryEngineVersion>(json!, JsonOptions)
+            ? JsonSerializer.Deserialize(json!, PowerQueryJsonContext.Default.PowerQueryEngineVersion)
             : null;
     }
 
@@ -276,3 +268,19 @@ internal sealed record PowerQueryFormatResult(bool Ok, string? Text, PowerQueryE
 internal sealed record PowerQueryDiagnoseResult(IReadOnlyList<PowerQueryEngineError> Errors);
 
 internal sealed record PowerQueryEngineVersion(string Formatter, string Parser);
+
+internal sealed record PowerQueryFormatRequest(string Text, string IndentationLiteral, string NewlineLiteral, int MaxWidth);
+
+internal sealed record PowerQueryDiagnoseRequest(string Text);
+
+/// <summary>
+/// Source-generated JSON metadata for the engine's request and response shapes, so the
+/// bridge needs no runtime reflection (and works in trimmed and Native AOT builds).
+/// </summary>
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(PowerQueryFormatRequest))]
+[JsonSerializable(typeof(PowerQueryDiagnoseRequest))]
+[JsonSerializable(typeof(PowerQueryFormatResult))]
+[JsonSerializable(typeof(PowerQueryDiagnoseResult))]
+[JsonSerializable(typeof(PowerQueryEngineVersion))]
+internal sealed partial class PowerQueryJsonContext : JsonSerializerContext;

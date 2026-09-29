@@ -5,8 +5,6 @@ namespace Tomix.App.State;
 
 public sealed class CliStateStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
-
     private readonly string _configDirectory;
     private readonly Lazy<(string Id, string? Scope)> _session;
 
@@ -79,7 +77,7 @@ public sealed class CliStateStore
         Dictionary<string, CliProfile>? profiles;
         try
         {
-            profiles = JsonSerializer.Deserialize<Dictionary<string, CliProfile>>(json);
+            profiles = JsonSerializer.Deserialize(json, AppJsonContext.Default.DictionaryStringCliProfile);
         }
         catch (JsonException ex)
         {
@@ -103,7 +101,7 @@ public sealed class CliStateStore
     public void SaveProfiles(IDictionary<string, CliProfile> profiles)
     {
         Directory.CreateDirectory(_configDirectory);
-        AtomicFile.WriteAllText(ProfilesFile, JsonSerializer.Serialize(profiles, SerializerOptions));
+        AtomicFile.WriteAllText(ProfilesFile, JsonSerializer.Serialize(profiles, AppJsonContext.Default.DictionaryStringCliProfile));
     }
 
     public IReadOnlyList<RecentConnection> LoadRecentConnections()
@@ -118,7 +116,7 @@ public sealed class CliStateStore
         List<RecentConnection>? entries;
         try
         {
-            entries = JsonSerializer.Deserialize<List<RecentConnection>>(json);
+            entries = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListRecentConnection);
         }
         catch (JsonException)
         {
@@ -150,7 +148,7 @@ public sealed class CliStateStore
             entries.RemoveRange(MaxRecentConnections, entries.Count - MaxRecentConnections);
 
         Directory.CreateDirectory(_configDirectory);
-        AtomicFile.WriteAllText(RecentConnectionsFile, JsonSerializer.Serialize(entries, SerializerOptions));
+        AtomicFile.WriteAllText(RecentConnectionsFile, JsonSerializer.Serialize(entries, AppJsonContext.Default.ListRecentConnection));
     }
 
     internal static string RecentKey(CliConnectionState state)
@@ -172,7 +170,7 @@ public sealed class CliStateStore
 
         try
         {
-            return JsonSerializer.Deserialize<CliConnectionState>(json);
+            return JsonSerializer.Deserialize(json, AppJsonContext.Default.CliConnectionState);
         }
         catch (JsonException)
         {
@@ -185,7 +183,7 @@ public sealed class CliStateStore
     public void SaveCurrentSession(CliConnectionState state)
     {
         Directory.CreateDirectory(SessionsDirectory);
-        AtomicFile.WriteAllText(CurrentSessionFile, JsonSerializer.Serialize(state, SerializerOptions));
+        AtomicFile.WriteAllText(CurrentSessionFile, JsonSerializer.Serialize(state, AppJsonContext.Default.CliConnectionState));
     }
 
     public void ClearCurrentSession()

@@ -14,15 +14,13 @@ namespace Tomix.Core.Bpa;
 /// the historical misspelled key; writes always emit the correct key and drop the misspelled one.
 /// Malformed JSON is treated as an empty list rather than throwing.
 /// </summary>
-public static class BpaIgnoreStore
+public static partial class BpaIgnoreStore
 {
     /// <summary>The correctly-spelled annotation key.</summary>
     public const string Key = "BestPracticeAnalyzer_IgnoreRules";
 
     /// <summary>The historical misspelled key, still read for backward compatibility.</summary>
     public const string LegacyKey = "BestPractizeAnalyzer_IgnoreRules";
-
-    private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = false };
 
     /// <summary>Parses the ignored rule IDs from a raw annotation value (case-insensitive).</summary>
     public static IReadOnlySet<string> ParseRuleIds(string? annotationValue)
@@ -33,7 +31,7 @@ public static class BpaIgnoreStore
 
         try
         {
-            var parsed = JsonSerializer.Deserialize<IgnorePayload>(annotationValue);
+            var parsed = JsonSerializer.Deserialize(annotationValue, IgnoreJsonContext.Default.IgnorePayload);
             if (parsed?.RuleIDs is { } ids)
                 foreach (var id in ids)
                     if (!string.IsNullOrWhiteSpace(id))
@@ -93,11 +91,14 @@ public static class BpaIgnoreStore
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList()
             },
-            WriteOptions);
+            IgnoreJsonContext.Default.IgnorePayload);
 
     private sealed class IgnorePayload
     {
         [JsonPropertyName("RuleIDs")]
         public List<string>? RuleIDs { get; set; }
     }
+
+    [JsonSerializable(typeof(IgnorePayload))]
+    private sealed partial class IgnoreJsonContext : JsonSerializerContext;
 }

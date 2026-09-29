@@ -18,6 +18,7 @@ GitHub automation and project metadata.
 - `release.yml`: plan → test + build archives + pack → verify every archive on a native runner → publish. Pushes to `main` publish a NuGet preview only (no GitHub Release, so `tx update` never sees it). Major bumps wait on the `major-release` environment, which must have required reviewers.
 - `pr-checks.yml` enforces conventional PR titles (the bump source), a `breaking-approved` label for breaking changes, and a `CHANGELOG.md` entry for `src/` changes (`skip-changelog` label opts out).
 - The release workflow pushes the `Tomix.Cli` tool package to nuget.org via Trusted Publishing (OIDC): `NuGet/login` exchanges the job's GitHub OIDC token for a short-lived API key, authorized by a policy on nuget.org (owner `bgarcevic`, repo `tomix-cli`, workflow file `release.yml`). The push steps run only when the `NUGET_USER` secret (nuget.org profile name) is set and skip silently when it is not (forks).
+- `aot-preview.yml` is an experiment, not a release path: it builds a Native AOT `tx` (win-x64, linux-x64), smoke-tests offline commands against `/samples`, times startup against the single-file build, and uploads the binary as an artifact. It runs on manual dispatch or when the workflow file itself changes, and never fails on smoke results.
 - Workflows may reference `/samples` for smoke tests.
 - Workflows should not require integration-test secrets for normal PR validation.
 

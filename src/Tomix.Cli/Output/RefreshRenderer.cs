@@ -197,12 +197,17 @@ internal static class RefreshRenderer
         try
         {
             using var doc = System.Text.Json.JsonDocument.Parse(script);
-            var options = new System.Text.Json.JsonSerializerOptions
+            var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+            using (var writer = new System.Text.Json.Utf8JsonWriter(buffer, new System.Text.Json.JsonWriterOptions
             {
-                WriteIndented = true,
+                Indented = true,
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            };
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(doc.RootElement, options));
+            }))
+            {
+                doc.RootElement.WriteTo(writer);
+            }
+
+            Console.WriteLine(System.Text.Encoding.UTF8.GetString(buffer.WrittenSpan));
         }
         catch
         {

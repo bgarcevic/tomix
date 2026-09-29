@@ -10,10 +10,9 @@ namespace Tomix.App.Bpa;
 /// skipped for that user across all models, independent of any model-level ignore annotation.
 /// Rule IDs are compared case-insensitively.
 /// </summary>
-public sealed class BpaUserRuleState
+public sealed partial class BpaUserRuleState
 {
     private const string FileName = "bpa-disabled.json";
-    private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
     private readonly string _path;
 
@@ -29,7 +28,7 @@ public sealed class BpaUserRuleState
 
         try
         {
-            var payload = JsonSerializer.Deserialize<Payload>(File.ReadAllText(_path));
+            var payload = JsonSerializer.Deserialize(File.ReadAllText(_path), PayloadJsonContext.Default.Payload);
             if (payload?.DisabledRuleIDs is { } ids)
                 foreach (var id in ids)
                     if (!string.IsNullOrWhiteSpace(id))
@@ -68,7 +67,7 @@ public sealed class BpaUserRuleState
         {
             DisabledRuleIDs = ids.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()
         };
-        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(payload, WriteOptions));
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(payload, PayloadJsonContext.Default.Payload));
     }
 
     private sealed class Payload
@@ -76,4 +75,8 @@ public sealed class BpaUserRuleState
         [JsonPropertyName("DisabledRuleIDs")]
         public List<string>? DisabledRuleIDs { get; set; }
     }
+
+    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSerializable(typeof(Payload))]
+    private sealed partial class PayloadJsonContext : JsonSerializerContext;
 }

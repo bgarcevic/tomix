@@ -47,6 +47,14 @@ and the API surface that major versions protect.
 
 - `tx bpa rules list` shows each rule's scope, and lists the rules in your config-dir
   `bpa-rules.json` (source `user`), matching what `bpa run` loads (#232).
+- Config, profiles, recent connections, session, staging, update-check, auth, BPA, and
+  test-snapshot files are now read and written with source-generated JSON instead of runtime
+  reflection, as groundwork for a faster-starting Native AOT build. The files' format is
+  unchanged, so existing ones keep working.
+- Release binaries and the `dotnet tool` package no longer include `msalruntime` and
+  `msasxpress`, two native libraries tx never uses for sign-in (the release binary is about
+  3 MB smaller). The `dotnet tool` package now talks to XMLA endpoints uncompressed, as the
+  release binaries already did.
 
 ## [0.6.0] - 2026-09-29
 

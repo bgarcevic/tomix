@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Test;
@@ -24,17 +25,9 @@ public sealed record TestSnapshot(
 /// (indented camelCase, "\n" line endings, BOM-less UTF-8, trailing newline) so an unchanged
 /// re-record is a no-op write and snapshot diffs are minimal.
 /// </summary>
-public static class TestSnapshotFile
+public static partial class TestSnapshotFile
 {
     public const int CurrentVersion = 1;
-
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = true,
-        NewLine = "\n",
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
-    };
 
     public static TestSnapshot FromResult(ModelQueryResult result, string queryHash)
         => new(
@@ -48,7 +41,7 @@ public static class TestSnapshotFile
         => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(query.ReplaceLineEndings("\n").Trim())));
 
     public static string Serialize(TestSnapshot snapshot)
-        => JsonSerializer.Serialize(snapshot, Options) + "\n";
+        => JsonSerializer.Serialize(snapshot, SnapshotJsonContext.Default.TestSnapshot) + "\n";
 
     /// <summary>
     /// Loads a snapshot; null with a non-null <paramref name="error"/> when the file is
@@ -59,7 +52,7 @@ public static class TestSnapshotFile
     {
         try
         {
-            var snapshot = JsonSerializer.Deserialize<TestSnapshot>(File.ReadAllText(path), Options);
+            var snapshot = JsonSerializer.Deserialize(File.ReadAllText(path), SnapshotJsonContext.Default.TestSnapshot);
             if (snapshot is null || snapshot.Columns is null || snapshot.Rows is null)
             {
                 error = "Snapshot file is empty or incomplete.";
@@ -114,4 +107,12 @@ public static class TestSnapshotFile
         File.WriteAllText(path, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return true;
     }
+
+    [JsonSourceGenerationOptions(
+        WriteIndented = true,
+        NewLine = "\n",
+        PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true)]
+    [JsonSerializable(typeof(TestSnapshot))]
+    private sealed partial class SnapshotJsonContext : JsonSerializerContext;
 }

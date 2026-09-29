@@ -130,7 +130,7 @@ public static class BpaModelRuleLoader
         string[]? entries;
         try
         {
-            entries = JsonSerializer.Deserialize<string[]>(json);
+            entries = JsonSerializer.Deserialize(json, AppJsonContext.Default.StringArray);
         }
         catch (JsonException ex)
         {

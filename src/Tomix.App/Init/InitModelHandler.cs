@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Init;
@@ -176,11 +177,11 @@ public sealed class InitModelHandler
 
     private static string CreateBimJson(string name, string compatibilityMode, int compatibilityLevel)
     {
-        var model = new Dictionary<string, object?>
+        var model = new JsonObject
         {
-            ["annotations"] = new[]
+            ["annotations"] = new JsonArray
             {
-                new Dictionary<string, string>
+                new JsonObject
                 {
                     ["name"] = "__TEdtr",
                     ["value"] = "1"
@@ -191,7 +192,7 @@ public sealed class InitModelHandler
         if (compatibilityMode == "PowerBI")
             model["defaultPowerBIDataSourceVersion"] = "powerBI_V3";
 
-        var database = new Dictionary<string, object?>
+        var database = new JsonObject
         {
             ["name"] = name,
             ["id"] = "SemanticModel",
@@ -199,7 +200,7 @@ public sealed class InitModelHandler
             ["model"] = model
         };
 
-        return JsonSerializer.Serialize(database, IndentedLfJsonOptions);
+        return database.ToJsonString(IndentedLfJsonOptions);
     }
 
     private static string PbipJson(string projectName)

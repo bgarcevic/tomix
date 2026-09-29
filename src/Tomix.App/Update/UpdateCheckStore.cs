@@ -10,7 +10,6 @@ namespace Tomix.App.Update;
 /// </summary>
 public sealed class UpdateCheckStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private readonly string _configDirectory;
     private readonly TimeProvider _clock;
@@ -34,7 +33,7 @@ public sealed class UpdateCheckStore
             if (string.IsNullOrWhiteSpace(json))
                 return null;
 
-            var state = JsonSerializer.Deserialize<UpdateCheckState>(json);
+            var state = JsonSerializer.Deserialize(json, AppJsonContext.Default.UpdateCheckState);
             return string.IsNullOrWhiteSpace(state?.LatestVersion) ? null : state;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
@@ -47,7 +46,7 @@ public sealed class UpdateCheckStore
     {
         Directory.CreateDirectory(_configDirectory);
         var state = new UpdateCheckState(_clock.GetUtcNow(), latestVersion);
-        AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(state, SerializerOptions));
+        AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(state, AppJsonContext.Default.UpdateCheckState));
     }
 
     public bool IsStale(TimeSpan ttl)

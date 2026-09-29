@@ -1,0 +1,217 @@
+name: aot preview
+
+# Experimental: builds tx with Native AOT so it can be downloaded and tried.
+# The shipped release is a JIT single-file binary, which spends ~300ms in
+# startup before Main on Windows; AOT is the one way to keep a single binary
+# and start fast. Whether TOM/AMO, ADOMD, Jint, and MSAL survive AOT is
+# unknown, so this workflow never fails on smoke results: it builds, runs a
+# set of offline commands against /samples, times them next to the regular
+# single-file build, and reports everything in the job summary.
+#
+# Download: the run's "tx-<rid>-aot" artifact, a single tx executable (the
+# native libraries AOT cannot embed are unused by tx and left out; see
+# ExcludeUnusedNativeLibrariesFromAot in src/Tomix.Cli/Tomix.Cli.csproj).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/aot-preview.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aot-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  aot:
+    name: aot ${{ matrix.rid }}
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, rid: win-x64, exe: tx.exe }
+          - { os: ubuntu-latest, rid: linux-x64, exe: tx }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # Native AOT links with the platform toolchain: MSVC is preinstalled on
+      # windows-latest; Linux needs clang and zlib.
+      - name: Install AOT prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      # TreatWarningsAsErrors is off because the codebase is not AOT-clean yet:
+      # persisted files use source-generated JSON, but command output
+      # (--output-format json) still serializes loosely typed projections by
+      # reflection. JsonSerializerIsReflectionEnabledByDefault keeps that
+      # working under AOT; the remaining warnings are reported below.
+      - name: Publish (AOT)
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet publish src/Tomix.Cli/Tomix.Cli.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --output artifacts/aot \
+            -p:PublishAot=true \
+            -p:JsonSerializerIsReflectionEnabledByDefault=true \
+            -p:TreatWarningsAsErrors=false \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            | tee artifacts-aot.log
+
+      - name: Publish (single-file, for comparison)
+        shell: bash
+        run: |
+          dotnet publish src/Tomix.Cli/Tomix.Cli.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            --output artifacts/jit \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=None \
+            -p:DebugSymbols=false
+
+      - name: Stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          for dir in artifacts/aot artifacts/jit; do
+            rm -f "$dir"/*.pdb "$dir"/*.dbg
+            if [[ -f "$dir/Tomix.Cli.exe" ]]; then mv "$dir/Tomix.Cli.exe" "$dir/tx.exe"; fi
+            if [[ -f "$dir/Tomix.Cli" ]]; then mv "$dir/Tomix.Cli" "$dir/tx"; fi
+          done
+          # The point of AOT here is one self-contained binary: fail if
+          # anything ships beside it.
+          extra="$(ls artifacts/aot | grep -vx '${{ matrix.exe }}' || true)"
+          if [[ -n "$extra" ]]; then
+            echo "::error::AOT output is not a single binary; also found: $extra"
+            exit 1
+          fi
+          cp LICENSE README.md artifacts/aot/
+
+      - name: Smoke and timing
+        shell: bash
+        env:
+          TOMIX_NO_UPDATE_CHECK: "1"
+        run: |
+          # GitHub runs bash with -e; a crashing command must be recorded, not end the step.
+          set +e -uo pipefail
+          aot="artifacts/aot/${{ matrix.exe }}"
+          jit="artifacts/jit/${{ matrix.exe }}"
+          model=samples/basic-tmdl
+          out="$RUNNER_TEMP/aot-smoke"
+          mkdir -p "$out"
+          summary="$GITHUB_STEP_SUMMARY"
+
+          ms() { date +%s%N | cut -c1-13; }
+
+          {
+            echo "## Native AOT preview (${{ matrix.rid }})"
+            echo
+            echo "| | AOT | single-file |"
+            echo "|---|---|---|"
+            echo "| size | $(du -h "$aot" | cut -f1) | $(du -h "$jit" | cut -f1) |"
+            echo "| files in output | $(ls artifacts/aot | wc -l) | $(ls artifacts/jit | wc -l) |"
+            echo "| trim/AOT warnings | $(grep -oE 'warning IL[0-9]+' artifacts-aot.log | wc -l) | |"
+          } >> "$summary"
+
+          # Warm both binaries (first run pays disk/AV/extraction costs).
+          "$aot" --version >/dev/null 2>&1 || true
+          "$jit" --version >/dev/null 2>&1 || true
+
+          {
+            echo
+            echo "### Startup (median of 5 warm runs)"
+            echo
+            echo "| command | AOT | single-file |"
+            echo "|---|---|---|"
+          } >> "$summary"
+          median() {
+            local bin=$1; shift
+            local times=()
+            for _ in 1 2 3 4 5; do
+              local s; s=$(ms)
+              "$bin" "$@" >/dev/null 2>&1 </dev/null
+              times+=($(( $(ms) - s )))
+            done
+            printf '%s\n' "${times[@]}" | sort -n | sed -n 3p
+          }
+          for args in "--version" "--help" "ls $model" "validate $model"; do
+            # shellcheck disable=SC2086
+            echo "| \`tx $args\` | $(median "$aot" $args)ms | $(median "$jit" $args)ms |" >> "$summary"
+          done
+
+          # command | allowed exit codes. Offline only: no server, no auth.
+          cases=(
+            "--version|0"
+            "--help|0"
+            "doctor|0 1"
+            "config paths|0"
+            "load $model|0"
+            "ls $model|0"
+            "ls $model --output-format json|0"
+            "find Sales -m $model|0"
+            "deps --unused -m $model|0"
+            "validate $model|0"
+            "bpa -m $model|0 1"
+            "diff $model samples/basic-tmdl.bim|0 1"
+            "save $model --output-file $out/model.bim --serialization bim --overwrite|0"
+            "save $out/model.bim --output-file $out/tmdl --serialization tmdl --overwrite|0"
+            "ls $out/tmdl|0"
+            "format --expression SUM(Sales[Amount]) --lang dax|0"
+            "format --expression let^Source=1^in^Source --lang m|0"
+          )
+          {
+            echo
+            echo "### Offline commands (AOT build)"
+            echo
+            echo "| result | command | exit | first stderr line |"
+            echo "|---|---|---|---|"
+          } >> "$summary"
+          failed=0
+          for case in "${cases[@]}"; do
+            args="${case%%|*}"
+            allowed="${case##*|}"
+            # '^' stands in for spaces inside a single argument.
+            read -ra argv <<< "$args"
+            argv=("${argv[@]//^/ }")
+            "$aot" "${argv[@]}" >"$out/stdout" 2>"$out/stderr" </dev/null
+            code=$?
+            first=$(grep -m1 -v '^\s*$' "$out/stderr" | tr -d '\r|' | cut -c1-160)
+            if [[ " $allowed " == *" $code "* ]]; then mark="✅"; else mark="❌"; failed=$((failed + 1)); fi
+            echo "| $mark | \`tx $args\` | $code | ${first} |" >> "$summary"
+            echo "::group::$mark tx $args (exit $code)"
+            cat "$out/stdout" "$out/stderr" | head -40
+            echo "::endgroup::"
+          done
+          echo >> "$summary"
+          echo "**$failed of ${#cases[@]} offline commands failed under AOT.**" >> "$summary"
+
+          {
+            echo
+            echo "<details><summary>AOT warnings by file</summary>"
+            echo
+            echo '```'
+            grep -E 'warning IL[0-9]+' artifacts-aot.log | grep -oE '[A-Za-z0-9_.]+\.cs' | sort | uniq -c | sort -rn
+            echo '```'
+            echo "</details>"
+          } >> "$summary"
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: tx-${{ matrix.rid }}-aot
+          path: artifacts/aot/
+          if-no-files-found: error

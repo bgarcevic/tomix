@@ -11,7 +11,6 @@ namespace Tomix.App.Config;
 /// </summary>
 public sealed class TomixConfigStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private readonly string _path;
 
@@ -41,7 +40,7 @@ public sealed class TomixConfigStore
         Dictionary<string, string>? data;
         try
         {
-            data = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            data = JsonSerializer.Deserialize(json, AppJsonContext.Default.DictionaryStringString);
         }
         catch (JsonException ex)
         {
@@ -69,7 +68,7 @@ public sealed class TomixConfigStore
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(values, SerializerOptions));
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(values, AppJsonContext.Default.DictionaryStringString));
     }
 
     private static Dictionary<string, string> NewMap()
