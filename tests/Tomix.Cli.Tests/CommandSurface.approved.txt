@@ -269,6 +269,7 @@ Show the structural differences between two models
 # tx doctor
 Check whether the local environment is ready
   opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
+  opt --show-details  Include account, server, model, and session names and full paths (hidden by default so the report is safe to share)
 
 # tx find
 Search model objects for matching text

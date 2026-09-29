@@ -402,17 +402,42 @@ The replacement schema and release timing will be decided in that later work.
 
 ```
 tx doctor
+tx doctor --show-details
 ```
 
 Checks whether the local tomix environment is ready. When filing a bug,
 attach its output.
 
+The report is safe to share by default: your home directory is shown as `~`,
+and account, server, database, model, profile, and session names are replaced
+by what kind of thing they are (for example `directory session: Power BI /
+Fabric workspace`). Add `--show-details` to include them, for your own
+troubleshooting.
+
 `doctor` is strictly local and deterministic: it checks config-directory
-read/write access, configuration validity, profiles, sessions, cached
-authentication metadata, registered providers, terminal capabilities, and the
-cached update record. It never opens the OS keystore, refreshes credentials, or
-contacts a model/release service. Terminal capabilities are included in both
-text and JSON output. Warnings exit `0`; any failed health check exits `1`.
+read/write access, configuration validity, profiles, sessions (and suggests
+`tx session prune` for sessions of shells that have exited), the current
+session's connection, cached sign-in metadata (and, on Windows, that the
+matching token cache file exists), and the cached update record. It never
+opens the OS keystore, refreshes credentials, or contacts a model/release
+service. It does not create the config directory: on a machine where tx has
+not run yet, it reports that the directory will be created on first use. In an
+existing config directory it writes and deletes one temporary file to test
+write access. The version, how tx was installed, OS, .NET runtime, and terminal
+capabilities are reported in the header in both text and JSON output. A newer
+release is a `WARN` only when `tx update` can install it; a source build
+(`./tx`) reports it as `INFO`.
+
+Each check reports one status:
+
+| Status | JSON `status` | Meaning |
+|--------|---------------|---------|
+| `OK` | `Pass` | Healthy. |
+| `INFO` | `Info` | A normal optional state, such as no profiles, not signed in, or no update check yet. |
+| `WARN` | `Warning` | Works, but needs attention, such as an available update or a missing token cache. |
+| `FAIL` | `Fail` | Broken; `doctor` exits `1`. |
+
+`OK`, `INFO`, and `WARN` exit `0`; any failed health check exits `1`.
 
 It remains runnable when `config.json` is corrupt so the report can identify
 the failure and direct recovery with `tx config init --force`.

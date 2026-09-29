@@ -33,8 +33,7 @@ public sealed class OutputFormatRejectionTests
             "diff" => new DiffCommand(NoProviders),
             "doctor" => new DoctorCommand(
                 "0.0.0-test", services.ConfigDirectory, services.ConfigStore, services.State,
-                services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth", "auth-state.json"),
-                ["FakeProvider"]),
+                services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth")),
             "format" => new FormatCommand(NoProviders, new CompositeExpressionFormatterClient([]), services.State, mutations),
             "get" => new GetCommand(NoProviders, services.State),
             "init" => new InitCommand(),

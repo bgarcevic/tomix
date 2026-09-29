@@ -17,8 +17,8 @@ namespace Tomix.Auth;
 /// </summary>
 public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
 {
-    private const string UserCacheFileName = "tomix-msal-user.cache";
-    private const string AppCacheFileName = "tomix-msal-app.cache";
+    private const string UserCacheFileName = TomixPaths.AuthUserCacheFileName;
+    private const string AppCacheFileName = TomixPaths.AuthAppCacheFileName;
 
     private readonly MsalAuthSettings _settings;
     private readonly string _cacheDirectory;

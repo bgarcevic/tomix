@@ -42,7 +42,7 @@ internal static class UpdateNotice
                 configOptOut: configOptOut,
                 kind: InstallationInspector.Detect(),
                 version: version,
-                invokedUpdate: IsUpdateInvocation(parseResult)))
+                reportsUpdateStatus: ReportsUpdateStatus(parseResult)))
             {
                 return;
             }
@@ -89,15 +89,20 @@ internal static class UpdateNotice
     }
 
     /// <summary>
-    /// True when the invoked command is <c>update</c> (including <c>update --check</c>). That
-    /// command renders its own authoritative result — "Updated X -> Y", "tx is up to date", or
-    /// the check preview — so the throttled notice is redundant there, and worse than redundant
-    /// after a successful apply: the running assembly's version is stale (the binary on disk is
-    /// new, but this process still reports the old one) while the check step has just cached
-    /// the new version, so the notice would announce the very update that just happened.
+    /// True when the invoked command reports the update status itself, so the notice would
+    /// only repeat it (or contradict it):
+    /// <list type="bullet">
+    /// <item><c>update</c> (including <c>update --check</c>) renders its own authoritative result —
+    /// "Updated X -> Y", "tx is up to date", or the check preview. After a successful apply the
+    /// running assembly's version is stale (the binary on disk is new, but this process still
+    /// reports the old one) while the check step has just cached the new version, so the notice
+    /// would announce the very update that just happened.</item>
+    /// <item><c>doctor</c> reports the cached update record as its <c>update-cache</c> check, and
+    /// promises never to contact a release service, which the stale-cache refresh would do.</item>
+    /// </list>
     /// </summary>
-    internal static bool IsUpdateInvocation(ParseResult parseResult)
-        => string.Equals(parseResult.CommandResult.Command.Name, "update", StringComparison.OrdinalIgnoreCase);
+    internal static bool ReportsUpdateStatus(ParseResult parseResult)
+        => parseResult.CommandResult.Command.Name.ToLowerInvariant() is "update" or "doctor";
 
     internal static bool ShouldShow(
         string outputFormat,
@@ -108,7 +113,7 @@ internal static class UpdateNotice
         bool configOptOut,
         InstallKind kind,
         string version,
-        bool invokedUpdate = false)
+        bool reportsUpdateStatus = false)
     {
         if (!OutputFormats.IsTextLike(outputFormat))
             return false;
@@ -118,7 +123,7 @@ internal static class UpdateNotice
             return false;
         if (version == "0.0.0")
             return false;
-        if (invokedUpdate)
+        if (reportsUpdateStatus)
             return false;
 
         return true;

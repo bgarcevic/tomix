@@ -17,8 +17,8 @@ public sealed class UpdateNoticeGateTests
         bool configOptOut = false,
         InstallKind kind = InstallKind.Standalone,
         string version = "0.2.0",
-        bool invokedUpdate = false)
-        => UpdateNotice.ShouldShow(outputFormat, quiet, stderrRedirected, ciEnv, envOptOut, configOptOut, kind, version, invokedUpdate);
+        bool reportsUpdateStatus = false)
+        => UpdateNotice.ShouldShow(outputFormat, quiet, stderrRedirected, ciEnv, envOptOut, configOptOut, kind, version, reportsUpdateStatus);
 
     [Fact]
     public void DefaultInteractiveTextRun_Shows()
@@ -62,33 +62,37 @@ public sealed class UpdateNoticeGateTests
     [Fact]
     public void MissingVersionSuppresses() => Assert.False(ShouldShow(version: "0.0.0"));
 
-    // ── The invoked `update` command ────────────────────────────────────────
+    // ── Commands that report the update status themselves ───────────────────
     // A successful in-process update leaves the running assembly's version stale
     // while the check step has just cached the new one, so the end-of-command
     // notice announced the very update that had just been applied (seen on the
-    // 0.1.0 -> 0.2.0 binary swap).
+    // 0.1.0 -> 0.2.0 binary swap). `doctor` already reports the cached update as a
+    // check, so the notice would print the same news twice.
 
     [Fact]
-    public void InvokedUpdateCommandSuppresses() => Assert.False(ShouldShow(invokedUpdate: true));
+    public void SelfReportingCommandSuppresses() => Assert.False(ShouldShow(reportsUpdateStatus: true));
 
     [Theory]
     [InlineData("update")]
     [InlineData("update", "--check")]
-    public void UpdateInvocation_IsDetected(params string[] args)
+    [InlineData("doctor")]
+    public void SelfReportingInvocation_IsDetected(params string[] args)
     {
-        var root = TestRoot.With(new Command("update"), new Command("doctor"));
+        var root = TestRoot.With(UpdateWithCheck(), new Command("doctor"), new Command("session"));
 
-        Assert.True(UpdateNotice.IsUpdateInvocation(root.Parse(args)));
+        Assert.True(UpdateNotice.ReportsUpdateStatus(root.Parse(args)));
     }
 
     [Fact]
-    public void NonUpdateInvocation_IsNotDetected()
+    public void OtherInvocation_IsNotDetected()
     {
-        var root = TestRoot.With(new Command("update"), new Command("doctor"));
+        var root = TestRoot.With(UpdateWithCheck(), new Command("doctor"), new Command("session"));
 
-        Assert.False(UpdateNotice.IsUpdateInvocation(root.Parse(["doctor"])));
-        Assert.False(UpdateNotice.IsUpdateInvocation(root.Parse([])));
+        Assert.False(UpdateNotice.ReportsUpdateStatus(root.Parse(["session"])));
+        Assert.False(UpdateNotice.ReportsUpdateStatus(root.Parse([])));
     }
+
+    private static Command UpdateWithCheck() => new("update") { new Option<bool>("--check") };
 
     // ── Output-format resolution ────────────────────────────────────────────
     // Commands define their own local --output-format which shadows the recursive
@@ -100,8 +104,7 @@ public sealed class UpdateNoticeGateTests
         var services = TestServices.Create();
         var root = TestRoot.With(new DoctorCommand(
             "0.1.0", services.ConfigDirectory, services.ConfigStore, services.State,
-            services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth", "auth-state.json"),
-            ["FakeProvider"]).Build());
+            services.UpdateCheck, Path.Combine(services.ConfigDirectory, "auth")).Build());
         return root.Parse(args);
     }
 

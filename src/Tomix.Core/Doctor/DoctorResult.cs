@@ -1,3 +1,5 @@
+using Tomix.Core.Update;
+
 namespace Tomix.Core.Doctor;
 
 public sealed record DoctorResult(
@@ -7,7 +9,8 @@ public sealed record DoctorResult(
     string ConfigDirectory,
     DoctorTerminalCapabilities Terminal,
     IReadOnlyList<DoctorCheck> Checks,
-    string? LatestVersion = null);
+    string? LatestVersion = null,
+    InstallKind InstallKind = InstallKind.Unknown);
 
 public sealed record DoctorTerminalCapabilities(
     bool Interactive,

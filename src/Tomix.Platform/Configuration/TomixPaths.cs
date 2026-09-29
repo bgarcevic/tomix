@@ -33,5 +33,14 @@ public static class TomixPaths
     public static string AuthDirectory => Path.Combine(ConfigDirectory, "auth");
 
     /// <summary>Sidecar metadata for the cached login (method/account/tenant), <c>~/.tomix/auth/auth-state.json</c>.</summary>
-    public static string AuthStateFile => Path.Combine(AuthDirectory, "auth-state.json");
+    public static string AuthStateFile => Path.Combine(AuthDirectory, AuthStateFileName);
+
+    /// <summary>File name of the login sidecar metadata inside the auth directory.</summary>
+    public const string AuthStateFileName = "auth-state.json";
+
+    /// <summary>File name of the MSAL token cache for user sign-ins (interactive, device code).</summary>
+    public const string AuthUserCacheFileName = "tomix-msal-user.cache";
+
+    /// <summary>File name of the MSAL token cache for app sign-ins (service principals).</summary>
+    public const string AuthAppCacheFileName = "tomix-msal-app.cache";
 }

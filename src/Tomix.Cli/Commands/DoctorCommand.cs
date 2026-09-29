@@ -6,6 +6,7 @@ using Tomix.App.State;
 using Tomix.App.Update;
 using Tomix.Cli.Output;
 using Tomix.Core.Doctor;
+using Tomix.Core.Update;
 
 namespace Tomix.Cli.Commands;
 
@@ -20,21 +21,25 @@ internal sealed class DoctorCommand : ICommandModule
         TomixConfigStore configStore,
         CliStateStore state,
         UpdateCheckStore updateStore,
-        string authMetadataFile,
-        IReadOnlyList<string> providerNames,
+        string authDirectory,
         string? configLoadError = null)
     {
         _version = version;
         _handler = new DoctorHandler(
-            configDirectory, configStore, state, updateStore, authMetadataFile, providerNames, configLoadError);
+            configDirectory, configStore, state, updateStore, authDirectory, configLoadError);
     }
 
     public Command Build()
     {
         var format = OutputFormats.CreateOption(GlobalOptions.DefaultOutputFormat);
+        var showDetails = new Option<bool>("--show-details")
+        {
+            Description = "Include account, server, model, and session names and full paths (hidden by default so the report is safe to share)"
+        };
         var command = new Command("doctor", "Check whether the local environment is ready")
         {
-            format
+            format,
+            showDetails
         };
 
         command.SetAction(parseResult =>
@@ -46,7 +51,8 @@ internal sealed class DoctorCommand : ICommandModule
             var caps = AnsiConsole.Profile.Capabilities;
             var result = _handler.Handle(
                 _version,
-                new DoctorTerminalCapabilities(caps.Interactive, caps.Ansi, caps.ColorSystem.ToString()));
+                new DoctorTerminalCapabilities(caps.Interactive, caps.Ansi, caps.ColorSystem.ToString()),
+                parseResult.GetValue(showDetails));
             return CommandOutput.Render(parseResult, result, formatValue, Render);
         });
 
@@ -58,6 +64,13 @@ internal sealed class DoctorCommand : ICommandModule
         AnsiConsole.MarkupLine(Styling.Title("tx doctor"));
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(Styling.KeyValue("Version:          ", result.Version));
+        AnsiConsole.MarkupLine(Styling.KeyValue("Installed as:     ", result.InstallKind switch
+        {
+            InstallKind.DotnetTool => ".NET global tool",
+            InstallKind.Standalone => "standalone binary",
+            InstallKind.Development => "source build",
+            _ => "unknown"
+        }));
         if (result.LatestVersion is not null)
             AnsiConsole.MarkupLine(Styling.KeyValue("Latest version:   ", result.LatestVersion));
         AnsiConsole.MarkupLine(Styling.KeyValue("Operating system: ", result.OperatingSystem));
@@ -73,10 +86,11 @@ internal sealed class DoctorCommand : ICommandModule
         {
             var statusMarkup = check.Status switch
             {
-                DoctorCheckStatus.Pass => Styling.Success("OK"),
+                DoctorCheckStatus.Pass => Styling.Success("OK  "),
                 DoctorCheckStatus.Warning => Styling.Warning("WARN"),
                 DoctorCheckStatus.Fail => Styling.Error("FAIL"),
-                _ => Styling.Muted("UNKNOWN")
+                DoctorCheckStatus.Info => Styling.Muted("INFO"),
+                _ => Styling.Muted("????")
             };
             AnsiConsole.MarkupLine($"{statusMarkup} {Styling.MarkupEscape(check.Name)}: {Styling.MarkupEscape(check.Message)}");
         }
