@@ -1,4 +1,5 @@
 using Tomix.App.Bpa;
+using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -104,6 +105,70 @@ public sealed class BpaRunHandlerTests
         Assert.DoesNotContain(result.Data.RemainingViolations!, v => v.RuleId == "FIXABLE");
         Assert.Equal(expectedExit, result.ExitCode);
     }
+
+    [Fact]
+    public async Task HandleAsync_FixDryRun_ListsPendingFixesAndLeavesTheModelByteIdentical()
+    {
+        // #268: --dry-run previews --fix; --save is suppressed and nothing reaches disk.
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+        var rulesPath = root.WriteFile("rules.json", $"[{FixableRuleJson}]");
+        var before = HashFiles(model);
+
+        var result = await RunAsync(config, model, r => r with
+        {
+            RulesFiles = [rulesPath],
+            NoDefaults = true,
+            Fix = true,
+            Save = true,
+            DryRun = true,
+            FailOn = "warning"
+        });
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        var data = result.Data!;
+        Assert.True(data.DryRun);
+        Assert.Equal(0, data.FixesApplied);
+        Assert.Equal(MutationStatus.DryRun, data.FixOutcome.Status);
+        Assert.False(data.FixOutcome.Saved);
+        Assert.NotEmpty(data.FixChanges);
+        Assert.All(data.FixChanges, c =>
+        {
+            Assert.Equal("FIXABLE", c.RuleId);
+            Assert.Equal(BpaFixAction.Set, c.Action);
+            Assert.Equal("Description", c.Property);
+            Assert.NotEqual("ok", c.Before);
+            Assert.Equal("ok", c.After);
+        });
+        Assert.DoesNotContain(data.ProjectedViolations!, v => v.RuleId == "FIXABLE");
+        Assert.Null(data.RemainingViolations);
+        // Nothing changed, so --fail-on judges the model as it is.
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(before, HashFiles(model));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task HandleAsync_DryRunWithoutFixOrWithRevert_FailsWithUsageError(bool fix, bool revert)
+    {
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+
+        var result = await RunAsync(config, model, r => r with { NoDefaults = true, Fix = fix, Revert = revert, DryRun = true });
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_DRY_RUN_REQUIRES_FIX", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+    }
+
+    private static Dictionary<string, string> HashFiles(string folder)
+        => Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+            .ToDictionary(
+                f => Path.GetRelativePath(folder, f),
+                f => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(f))));
 
     private static async Task<TomixResult<BpaRunResult>> RunAsync(
         TempConfigDir config, string model, Func<BpaRunRequest, BpaRunRequest> configure)

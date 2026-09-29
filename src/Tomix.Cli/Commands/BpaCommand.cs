@@ -86,6 +86,11 @@ internal sealed class BpaCommand : ICommandModule
             Description = "With --fix: also apply destructive Delete() fixes that remove model objects"
         };
 
+        var dryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "With --fix: list each fix as \"Would fix:\" with before/after values, and apply, save, or stage nothing"
+        };
+
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
 
@@ -167,6 +172,7 @@ internal sealed class BpaCommand : ICommandModule
             failOnOption,
             fixOption,
             allowDeleteOption,
+            dryRunOption,
             forceOption,
             overwriteOption,
             saveOption,
@@ -209,13 +215,15 @@ internal sealed class BpaCommand : ICommandModule
             // --allow-delete opts into Delete() fixes that remove model objects, and --revert
             // drops staged work; both confirm before running. Plain --fix applies property
             // fixes only and asks nothing unless it persists (--save/--stage paths gate there).
+            // --dry-run discards every fix, so a destructive preview needs no confirmation.
+            var dryRun = parseResult.GetValue(dryRunOption);
             if (parseResult.GetValue(revertOption))
             {
                 if (!ConfirmationHelper.ConfirmOrAbort(
                         "Revert staged changes", $"for {model.Value}", parseResult, format))
                     return 1;
             }
-            else if (parseResult.GetValue(fixOption) && parseResult.GetValue(allowDeleteOption)
+            else if (parseResult.GetValue(fixOption) && parseResult.GetValue(allowDeleteOption) && !dryRun
                 && !ConfirmationHelper.ConfirmOrAbort(
                     "Apply destructive BPA fixes", $"on {model.Value}", parseResult, format))
                 return 1;
@@ -243,7 +251,8 @@ internal sealed class BpaCommand : ICommandModule
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         NoSync: parseResult.GetValue(noSyncOption),
-                        Overwrite: parseResult.GetValue(overwriteOption)),
+                        Overwrite: parseResult.GetValue(overwriteOption),
+                        DryRun: dryRun),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 

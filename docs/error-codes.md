@@ -81,6 +81,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
+| `TOMIX_BPA_DRY_RUN_REQUIRES_FIX` | 2 | `bpa run --dry-run` was passed without `--fix`, or together with `--revert`. `--dry-run` previews fixes, so it needs `--fix`. |
 | `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` or `--bpa-fail-on` value (expected: error, warning). |
 | `TOMIX_BPA_RULE_ID_REQUIRED` | 2 | `bpa rules ignore/unignore` called without a rule id. |
 | `TOMIX_BPA_RULE_NOT_FOUND` | 2 | `bpa rules show`, `disable`, or `ignore` was given an ID that no loaded rule has. The hint names up to three IDs that contain the input; `disable` and `ignore` accept `--allow-unknown` to use the ID anyway. |

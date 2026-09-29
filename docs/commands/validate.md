@@ -76,6 +76,7 @@ tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i "" --save
 | `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. Rules that cannot be evaluated count as error-severity findings and block under either threshold. |
 | `--fix` | Fix violations whose rules provide a fix expression. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
 | `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
+| `--dry-run` | With `--fix`: list each fix as `Would fix:` (or `Would delete:`) with the property's before and after values, and apply, save, and stage nothing. `--save`, `--save-to`, and `--stage` are ignored, and `--allow-delete` does not ask for confirmation. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. |
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
 | `--no-multiline` | Show each rule's guidance on one line. Text output only. |
@@ -87,6 +88,7 @@ tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i "" --save
 ```sh
 tx bpa run
 tx bpa run --errors
+tx bpa run --fix --dry-run
 tx bpa run --fix --save
 ```
 
@@ -100,6 +102,15 @@ printed ready to copy on stderr, reusing your model path and rule options. After
 result was saved, staged, or kept in memory only. The rules are evaluated again after
 fixing, and the exit code and `--fail-on` apply to the findings that remain, so a run
 that fixes every blocking finding exits `0`. JSON reports this as `remaining`.
+
+`--fix --dry-run` previews the fixes without changing the model. Each pending fix is
+listed with its rule and, for a property fix, the value before and after
+(`IsHidden: "false" → "true"`); the summary says how many findings the fixes would
+leave. Because nothing changed, the exit code and `--fail-on` apply to the model as it
+is. JSON sets `dryRun` and `status: "dryRun"`, keeps `fixesApplied` at `0`, and adds
+`fixesPending`, `wouldRemain`, and a `fixes` array (`ruleId`, `objectType`,
+`objectPath`, `action` of `set` or `delete`, `property`, `before`, `after`), so CI can
+diff a preview. Without `--dry-run`, `fixes` lists the fixes that were applied.
 
 `bpa run --fix --allow-delete` deletes model objects, so it asks for
 confirmation; `--revert` (drops staged work) asks too. Pass `--yes` to skip

@@ -23,7 +23,7 @@ internal static class BpaRunRenderer
         var visible = groups
             .Where(g => BpaRunView.MatchesFilter(g.Severity, view.Errors, view.Warnings, view.Info))
             .ToList();
-        var fixRan = result.FixesApplied > 0 || result.FixesSkipped > 0
+        var fixRan = result.DryRun || result.FixesApplied > 0 || result.FixesSkipped > 0
             || result.DestructiveFixesSkipped > 0 || result.FixErrors is { Count: > 0 };
 
         AnsiConsole.WriteLine();
@@ -44,7 +44,9 @@ internal static class BpaRunRenderer
         RenderSummary(result, groups.Count, view);
         RenderDiagnostics(result, view);
 
-        if (fixRan)
+        if (result.DryRun)
+            RenderDryRun(result, view);
+        else if (fixRan)
             RenderFixOutcome(result, view);
 
         // After --fix the listed findings are pre-fix, so browsing hints would mislead.
@@ -199,6 +201,57 @@ internal static class BpaRunRenderer
         MutationOutput.RenderSync(result.FixOutcome, "  ");
     }
 
+    /// <summary>
+    /// The <c>--fix --dry-run</c> preview: each pending fix as a "Would fix:" line with its
+    /// before/after values, what the fixes would leave, and how to apply them. Nothing ran.
+    /// </summary>
+    private static void RenderDryRun(BpaRunResult result, BpaRunView.RunOptions view)
+    {
+        AnsiConsole.WriteLine();
+
+        foreach (var change in result.FixChanges)
+        {
+            var (headline, detail) = BpaRunView.PendingFix(change);
+            AnsiConsole.MarkupLine($"  {Styling.MarkupEscape(headline)}");
+            if (detail is not null)
+                AnsiConsole.MarkupLine($"    {Styling.Muted(detail)}");
+        }
+
+        if (result.FixChanges.Count > 0)
+            AnsiConsole.WriteLine();
+
+        var total = result.Violations.Count;
+        var parts = new List<string>
+        {
+            $"Would fix {result.FixChanges.Count} of {total} findings",
+            $"{result.ProjectedViolations?.Count ?? total} would remain"
+        };
+        if (result.FixesSkipped > 0)
+            parts.Add($"{result.FixesSkipped} skipped");
+        AnsiConsole.MarkupLine(Styling.Warning(string.Join(" · ", parts)));
+
+        if (result.DestructiveFixesSkipped > 0)
+            AnsiConsole.MarkupLine(
+                $"  {Styling.Warning($"{result.DestructiveFixesSkipped} destructive fixes not previewed")}"
+                + Styling.Muted(" — they delete objects; add --allow-delete to include them"));
+
+        if (result.FixErrors is { Count: > 0 })
+        {
+            AnsiConsole.MarkupLine($"  {Styling.Error("Fix errors:")}");
+            foreach (var err in result.FixErrors)
+                AnsiConsole.MarkupLine("    {0}", Styling.MarkupEscape(err));
+        }
+
+        var hint = HintConsole();
+        hint.MarkupLine("  " + Styling.Muted("Dry run: nothing was applied, saved, or staged."));
+        if (result.FixChanges.Count > 0)
+            hint.MarkupLine("  " + Styling.Guidance("Apply with:") + " "
+                + Styling.Option(BpaRunView.HintCommand(view.CommandTokens,
+                    result.FixChanges.Any(c => c.Action == BpaFixAction.Delete)
+                        ? ["--fix", "--allow-delete", "--save"]
+                        : ["--fix", "--save"])));
+    }
+
     /// <summary>Copy-pasteable next steps, on stderr so piped output stays results-only.</summary>
     private static void RenderHints(
         BpaRunResult result, IReadOnlyList<BpaRunView.RuleGroup> visible, BpaRunView.RunOptions view)
@@ -350,6 +403,11 @@ internal static class BpaRunRenderer
             fixesSkipped = result.FixesSkipped,
             destructiveFixesSkipped = result.DestructiveFixesSkipped,
             fixErrors = result.FixErrors ?? Array.Empty<string>(),
+            // --fix --dry-run: fixesApplied stays 0; the pending fixes are counted and listed
+            // under fixes, and wouldRemain is what they would leave (null outside a dry run).
+            dryRun = result.DryRun,
+            fixesPending = result.DryRun ? result.FixChanges.Count : 0,
+            wouldRemain = result.DryRun ? result.ProjectedViolations?.Count ?? result.Violations.Count : (int?)null,
             ruleLoadDiagnostics = result.RuleLoadDiagnostics ?? Array.Empty<string>(),
             status = result.FixOutcome.Status,
             saved = result.FixOutcome.Saved,
@@ -358,6 +416,16 @@ internal static class BpaRunRenderer
             target = result.FixOutcome.Target,
             sync = result.FixOutcome.Sync ?? SyncOutcome.NotAttempted,
             newValidationErrors = result.FixOutcome.Validation?.NewErrorCount,
+            fixes = result.FixChanges.Select(c => new
+            {
+                ruleId = c.RuleId,
+                objectType = c.ObjectType,
+                objectPath = c.ObjectPath,
+                action = c.Action == BpaFixAction.Delete ? "delete" : "set",
+                property = c.Property,
+                before = c.Before,
+                after = c.After
+            }),
             results = result.Violations.Select(v => new
             {
                 ruleId = v.RuleId,

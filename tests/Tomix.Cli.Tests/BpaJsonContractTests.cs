@@ -88,6 +88,55 @@ public sealed class BpaJsonContractTests
     }
 
     [Fact]
+    public void RunJson_DryRun_ReportsPendingFixesWithoutApplyingThem()
+    {
+        // #268: a preview lists the fixes and what they would leave; fixesApplied stays 0.
+        var result = SampleRunResult() with
+        {
+            FixesApplied = 0,
+            DryRun = true,
+            FixOutcome = MutationOutcome.DryRun,
+            ProjectedViolations = [],
+            FixChanges =
+            [
+                new BpaFixChange("AVOID_FLOATS", "Column", "Sales/Amount", BpaFixAction.Set, "DataType", Before: "Double", After: "Decimal"),
+                new BpaFixChange("UNUSED", "Column", "Sales/Key", BpaFixAction.Delete)
+            ]
+        };
+        var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(result))).RootElement;
+
+        Assert.True(root.GetProperty("dryRun").GetBoolean());
+        Assert.Equal("dryRun", root.GetProperty("status").GetString());
+        Assert.False(root.GetProperty("saved").GetBoolean());
+        Assert.Equal(0, root.GetProperty("fixesApplied").GetInt32());
+        Assert.Equal(2, root.GetProperty("fixesPending").GetInt32());
+        Assert.Equal(0, root.GetProperty("wouldRemain").GetInt32());
+        // Nothing changed, so remaining (what --fail-on judges) is the model as it is.
+        Assert.Equal(2, root.GetProperty("remaining").GetInt32());
+
+        var set = root.GetProperty("fixes")[0];
+        Assert.Equal("AVOID_FLOATS", set.GetProperty("ruleId").GetString());
+        Assert.Equal("Column", set.GetProperty("objectType").GetString());
+        Assert.Equal("Sales/Amount", set.GetProperty("objectPath").GetString());
+        Assert.Equal("set", set.GetProperty("action").GetString());
+        Assert.Equal("DataType", set.GetProperty("property").GetString());
+        Assert.Equal("Double", set.GetProperty("before").GetString());
+        Assert.Equal("Decimal", set.GetProperty("after").GetString());
+        Assert.Equal("delete", root.GetProperty("fixes")[1].GetProperty("action").GetString());
+    }
+
+    [Fact]
+    public void RunJson_WithoutDryRun_OmitsWouldRemain()
+    {
+        var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;
+
+        Assert.False(root.GetProperty("dryRun").GetBoolean());
+        Assert.Equal(0, root.GetProperty("fixesPending").GetInt32());
+        Assert.True(!root.TryGetProperty("wouldRemain", out var wouldRemain) || wouldRemain.ValueKind == JsonValueKind.Null);
+        Assert.Equal(0, root.GetProperty("fixes").GetArrayLength());
+    }
+
+    [Fact]
     public void RunJson_ResultItems_UseSeverityIntAndLabel()
     {
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;

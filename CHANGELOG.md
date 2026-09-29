@@ -12,6 +12,12 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx bpa run --fix --dry-run` previews fixes without changing the model. Each pending fix is
+  listed as `Would fix:` (or `Would delete:` with `--allow-delete`) with the property's value
+  before and after, followed by how many findings would remain. Nothing is applied, saved, or
+  staged, and the exit code still follows `--fail-on` for the model as it is. JSON adds
+  `dryRun`, `fixesPending`, `wouldRemain`, and a `fixes` array with each fix's before and after
+  values; outside a dry run, `fixes` lists the fixes that were applied (#268).
 - `tx connect <workspace> --list` lists the semantic models on a workspace or XMLA
   endpoint without connecting (name, compatibility level, last update). It works
   non-interactively and with `--output-format json`, so scripts and agents can

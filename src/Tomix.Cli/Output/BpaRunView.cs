@@ -1,3 +1,4 @@
+using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 
 namespace Tomix.Cli.Output;
@@ -157,7 +158,7 @@ internal static class BpaRunView
     private static readonly HashSet<string> HintDroppedFlags = new(StringComparer.OrdinalIgnoreCase)
     {
         "--details", "--full", "--no-multiline", "--errors", "--warnings", "--info",
-        "--fix", "--allow-delete", "--save", "--stage", "--revert", "--quiet", "-q",
+        "--fix", "--allow-delete", "--dry-run", "--save", "--stage", "--revert", "--quiet", "-q",
         "--yes", "-y", "--force", "-f", "--overwrite", "--no-sync",
     };
 
@@ -204,6 +205,35 @@ internal static class BpaRunView
         return OperatingSystem.IsWindows()
             ? "'" + token.Replace("'", "''") + "'"
             : "'" + token.Replace("'", "'\\''") + "'";
+    }
+
+    private const int FixValueWidth = 60;
+
+    /// <summary>
+    /// One pending fix for the <c>--fix --dry-run</c> view: the headline
+    /// (<c>Would fix: Column 'Sales/Amount' — RULE_ID</c>, or <c>Would delete:</c>) and, for
+    /// a property set, the change (<c>FormatString: "" → "#,##0"</c>). Values stay on one line
+    /// and are cut at a fixed width, so a rewritten expression cannot flood the preview.
+    /// </summary>
+    internal static (string Headline, string? Change) PendingFix(BpaFixChange change)
+    {
+        var verb = change.Action == BpaFixAction.Delete ? "Would delete:" : "Would fix:";
+        var headline = $"{verb} {change.ObjectType} '{change.ObjectPath}' — {change.RuleId}";
+        if (change.Action == BpaFixAction.Delete || change.Property is null)
+            return (headline, null);
+
+        return (headline, $"{change.Property}: {FixValue(change.Before)} → {FixValue(change.After)}");
+    }
+
+    private static string FixValue(string? value)
+    {
+        if (value is null)
+            return "(unset)";
+
+        var flat = string.Join(" ", value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()));
+        if (flat.Length > FixValueWidth)
+            flat = flat[..(FixValueWidth - 1)] + "…";
+        return $"\"{flat}\"";
     }
 
     private static string Count(int n, string noun) => $"{n} {Plural(n, noun)}";

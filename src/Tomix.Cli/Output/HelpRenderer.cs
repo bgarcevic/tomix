@@ -163,6 +163,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["bpa run"] = [
             "tx bpa run",
             "tx bpa run --errors --details",
+            "tx bpa run --fix --dry-run",
             "tx bpa run --fix --save",
             "tx bpa run --ci github --fail-on warning",
         ],

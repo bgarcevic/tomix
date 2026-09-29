@@ -1,3 +1,4 @@
+using Tomix.App.Bpa;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 
@@ -163,6 +164,8 @@ public class BpaRenderTests
         "tx bpa run m.bim --details")]
     [InlineData(new[] { "bpa", "run", "m.bim", "--save-to=old.bim", "--trx=old.trx", "--fix=true" },
         "tx bpa run m.bim --details")]
+    [InlineData(new[] { "bpa", "run", "m.bim", "--fix", "--dry-run", "--allow-delete" },
+        "tx bpa run m.bim --details")]
     [InlineData(new[] { "bpa", "run", "Sales$(whoami).bim" },
         "tx bpa run 'Sales$(whoami).bim' --details")]
     public void HintCommand_EchoesTheCommandLine(string[]? tokens, string expected)
@@ -181,6 +184,39 @@ public class BpaRenderTests
             : "tx bpa run 'O'\\''Brien.bim' --details";
 
         Assert.Equal(expected, BpaRunView.HintCommand(["bpa", "run", "O'Brien.bim"], "--details"));
+    }
+
+    [Fact]
+    public void PendingFix_PropertySet_ShowsHeadlineAndBeforeAfter()
+    {
+        var (headline, change) = BpaRunView.PendingFix(new BpaFixChange(
+            "FORMAT_RULE", "Measure", "Sales/Total", BpaFixAction.Set, "FormatString", Before: "", After: "#,##0"));
+
+        Assert.Equal("Would fix: Measure 'Sales/Total' — FORMAT_RULE", headline);
+        Assert.Equal("FormatString: \"\" → \"#,##0\"", change);
+    }
+
+    [Fact]
+    public void PendingFix_Delete_HasNoChangeLine()
+    {
+        var (headline, change) = BpaRunView.PendingFix(new BpaFixChange(
+            "UNUSED", "Column", "Sales/Key", BpaFixAction.Delete));
+
+        Assert.Equal("Would delete: Column 'Sales/Key' — UNUSED", headline);
+        Assert.Null(change);
+    }
+
+    [Fact]
+    public void PendingFix_UnsetAndMultilineLongValues_StayOnOneBoundedLine()
+    {
+        var expression = "VAR x =\r\n    1\r\nRETURN\n" + new string('x', 100);
+
+        var (_, change) = BpaRunView.PendingFix(new BpaFixChange(
+            "R", "Measure", "M", BpaFixAction.Set, "Expression", Before: null, After: expression));
+
+        Assert.StartsWith("Expression: (unset) → \"VAR x = 1 RETURN xxx", change);
+        Assert.EndsWith("…\"", change);
+        Assert.DoesNotContain('\n', change!);
     }
 
     [Theory]

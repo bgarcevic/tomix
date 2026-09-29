@@ -39,6 +39,23 @@ public sealed record BpaRunResult(
     public IReadOnlyList<BpaViolation> BlockingCandidates => RemainingViolations ?? Violations;
 
     /// <summary>
+    /// Each fix <c>--fix</c> applied, or under <c>--dry-run</c> would apply, with before/after
+    /// values for property sets. Empty when no fix ran.
+    /// </summary>
+    public IReadOnlyList<BpaFixChange> FixChanges { get; init; } = [];
+
+    /// <summary>
+    /// <c>--fix --dry-run</c>: the fixes were evaluated on an in-memory copy and discarded.
+    /// <see cref="FixChanges"/> lists them, <see cref="FixesApplied"/> stays 0, and
+    /// <see cref="ProjectedViolations"/> holds what the fixes would leave. The exit code judges
+    /// the model as it is, because nothing changed.
+    /// </summary>
+    public bool DryRun { get; init; }
+
+    /// <summary>Visible violations the pending fixes would leave; set only under <see cref="DryRun"/>.</summary>
+    public IReadOnlyList<BpaViolation>? ProjectedViolations { get; init; }
+
+    /// <summary>
     /// Unevaluable rules projected as error-severity findings ("rule could not be evaluated:
     /// reason"). A rule that cannot be compiled or evaluated is itself a finding — otherwise a
     /// typo would silently disable the rule for every consumer of the gate — regardless of the

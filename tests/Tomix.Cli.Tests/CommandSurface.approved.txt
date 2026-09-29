@@ -140,6 +140,7 @@ Run best-practice rules against a model
   opt --fail-on <level>  Failure threshold: error or warning (default: error). Rules that cannot be evaluated count as error-severity findings.
   opt --fix  Fix violations whose rules provide a fix expression
   opt --allow-delete  With --fix: also apply destructive Delete() fixes that remove model objects
+  opt --dry-run  With --fix: list each fix as "Would fix:" with before/after values, and apply, save, or stage nothing
   opt --force, -f  Save despite newly introduced validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
