@@ -35,6 +35,43 @@ public sealed class ReadOnlyCommandHandlerTests
     }
 
     [Fact]
+    public async Task Get_UnknownQueryProperty_FailsWithClosestSuggestion()
+    {
+        var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(
+            new GetModelRequest(new ModelReference("any"), "Sales", Query: "partitons", Type: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        var diagnostic = result.Diagnostics[0];
+        Assert.Equal("TOMIX_PROPERTY_NOT_FOUND", diagnostic.Code);
+        Assert.Equal("Did you mean 'partitions'?", diagnostic.Hint);
+    }
+
+    [Fact]
+    public async Task Get_UnknownQueryPropertyWithNoCloseMatch_ListsProperties()
+    {
+        var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(
+            new GetModelRequest(new ModelReference("any"), "Sales", Query: "zzzzzzzz", Type: null),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.StartsWith("Properties: name, description,", result.Diagnostics[0].Hint);
+    }
+
+    [Theory]
+    [InlineData("annotation:Missing")]
+    [InlineData("translation:da-DK/caption")]
+    public async Task Get_UnsetBagToken_ReadsBackNull(string query)
+    {
+        var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(
+            new GetModelRequest(new ModelReference("any"), "Sales", Query: query, Type: null),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Null(Assert.Single(result.Data!.Properties).Value);
+    }
+
+    [Fact]
     public async Task Get_BareContainerKeyword_FailsWithAccurateMessage()
     {
         var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(

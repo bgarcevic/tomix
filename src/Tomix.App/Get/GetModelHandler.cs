@@ -27,7 +27,7 @@ public sealed class GetModelHandler
             // snapshot's model-level properties so get can read back what set accepts
             // on the root (culture, compatibility level, and friends).
             if (request.Path.Trim().Trim('/') == ".")
-                return TomixResult<GetModelResult>.Ok(Project(ModelRoot(snapshot), request.Query, measureNames));
+                return Project(ModelRoot(snapshot), request.Query, measureNames);
 
             var matches = ModelObjectLookup.Find(snapshot, request.Path, request.Type).ToList();
 
@@ -45,7 +45,7 @@ public sealed class GetModelHandler
                     exitCode: 1,
                     hint: AmbiguousMatchMessage.Hint);
 
-            return TomixResult<GetModelResult>.Ok(Project(matches[0], request.Query, measureNames));
+            return Project(matches[0], request.Query, measureNames);
         }, cancellationToken);
     }
 
@@ -62,31 +62,69 @@ public sealed class GetModelHandler
             Children: [],
             Properties: snapshot.Properties);
 
-    private static GetModelResult Project(ModelObject obj, string? query, IReadOnlySet<string> measureNames)
+    private static TomixResult<GetModelResult> Project(ModelObject obj, string? query, IReadOnlySet<string> measureNames)
     {
         var properties = ModelPropertyCatalog.Project(obj);
+        var kind = ModelObjectProjection.KindLabel(obj.Kind);
 
         if (!string.IsNullOrWhiteSpace(query))
-            properties = ProjectSingleProperty(properties, query);
+        {
+            var match = properties.FirstOrDefault(p =>
+                string.Equals(p.Key, query, StringComparison.OrdinalIgnoreCase));
+            if (match.Key is not null)
+                properties = new Dictionary<string, object?> { [match.Key] = match.Value };
+            // An annotation or translation that was never set reads back as null: the token is
+            // well-formed, the object just carries no value for it.
+            else if (IsBagToken(query))
+                properties = new Dictionary<string, object?> { [query] = null };
+            else
+                return TomixResult<GetModelResult>.Fail(
+                    code: "TOMIX_PROPERTY_NOT_FOUND",
+                    message: $"{kind} '{obj.Path}' has no property '{query}'.",
+                    exitCode: 1,
+                    hint: PropertyHint(query, properties.Keys.Where(k => !IsBagToken(k)).ToList()));
+        }
 
-        return new GetModelResult(
-            ModelObjectProjection.KindLabel(obj.Kind),
+        return TomixResult<GetModelResult>.Ok(new GetModelResult(
+            kind,
             obj.Path,
             properties,
             obj,
-            measureNames);
+            measureNames));
     }
 
-    private static IReadOnlyDictionary<string, object?> ProjectSingleProperty(
-        IReadOnlyDictionary<string, object?> properties,
-        string query)
-    {
-        var match = properties.FirstOrDefault(p =>
-            string.Equals(p.Key, query, StringComparison.OrdinalIgnoreCase));
+    private static bool IsBagToken(string key)
+        => key.StartsWith("annotation:", StringComparison.OrdinalIgnoreCase)
+           || key.StartsWith("translation:", StringComparison.OrdinalIgnoreCase);
 
-        return match.Key is null
-            ? new Dictionary<string, object?> { [query] = null }
-            : new Dictionary<string, object?> { [match.Key] = match.Value };
+    private static string PropertyHint(string query, IReadOnlyList<string> keys)
+    {
+        var closest = keys
+            .Select(key => (Key: key, Distance: EditDistance(query.ToLowerInvariant(), key.ToLowerInvariant())))
+            .Where(candidate => candidate.Distance <= Math.Max(2, query.Length / 3))
+            .OrderBy(candidate => candidate.Distance)
+            .Select(candidate => candidate.Key)
+            .FirstOrDefault();
+        return closest is null
+            ? $"Properties: {string.Join(", ", keys)}."
+            : $"Did you mean '{closest}'?";
+    }
+
+    private static int EditDistance(string a, string b)
+    {
+        var previous = Enumerable.Range(0, b.Length + 1).ToArray();
+        for (var i = 1; i <= a.Length; i++)
+        {
+            var current = new int[b.Length + 1];
+            current[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+                current[j] = Math.Min(
+                    Math.Min(current[j - 1] + 1, previous[j] + 1),
+                    previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+            previous = current;
+        }
+
+        return previous[b.Length];
     }
 
 }

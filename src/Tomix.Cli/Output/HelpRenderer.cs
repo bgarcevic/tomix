@@ -62,6 +62,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["get"] = [
             "tx get \"Table[Measure]\"",
             "tx get Revenue -t measure",
+            "tx get Sales --all",
             "tx get Sales/Measures/Revenue --output-format json",
         ],
         ["find"] = [

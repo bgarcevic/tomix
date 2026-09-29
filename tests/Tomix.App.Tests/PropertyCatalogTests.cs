@@ -22,6 +22,39 @@ public sealed class PropertyCatalogTests
         }
     }
 
+    [Theory]
+    [InlineData(ModelObjectKind.Measure, "formatString", "", true)]
+    [InlineData(ModelObjectKind.Measure, "formatString", "0.0", false)]
+    [InlineData(ModelObjectKind.Measure, "isHidden", false, true)]
+    [InlineData(ModelObjectKind.Measure, "isHidden", true, false)]
+    [InlineData(ModelObjectKind.Column, "encodingHint", "Default", true)]
+    [InlineData(ModelObjectKind.Column, "encodingHint", "Hash", false)]
+    [InlineData(ModelObjectKind.Column, "displayOrdinal", 0, true)]
+    // Declared engine defaults win over the empty-value rule.
+    [InlineData(ModelObjectKind.Column, "isNullable", true, true)]
+    [InlineData(ModelObjectKind.Column, "isNullable", false, false)]
+    [InlineData(ModelObjectKind.Column, "tableDetailPosition", -1, true)]
+    [InlineData(ModelObjectKind.Column, "tableDetailPosition", 0, false)]
+    [InlineData(ModelObjectKind.Relationship, "crossFilteringBehavior", "OneDirection", true)]
+    [InlineData(ModelObjectKind.Relationship, "crossFilteringBehavior", "BothDirections", false)]
+    [InlineData(ModelObjectKind.Relationship, "isActive", false, false)]
+    [InlineData(ModelObjectKind.Relationship, "securityFilteringBehavior", "", true)]
+    public void IsDefault_RecognizesEmptyAndDeclaredDefaults(ModelObjectKind kind, string key, object value, bool expected)
+    {
+        var descriptor = ModelPropertyCatalog.For(kind).Single(d => d.JsonKey == key);
+
+        Assert.Equal(expected, descriptor.IsDefault(value));
+    }
+
+    [Fact]
+    public void IsDefault_EmptyListIsDefault()
+    {
+        var descriptor = ModelPropertyCatalog.For(ModelObjectKind.RefreshPolicy).Single(d => d.JsonKey == "policyPartitions");
+
+        Assert.True(descriptor.IsDefault(Array.Empty<string>()));
+        Assert.False(descriptor.IsDefault(new[] { "2024" }));
+    }
+
     [Fact]
     public void For_EveryKind_HeadersAreUnique()
     {

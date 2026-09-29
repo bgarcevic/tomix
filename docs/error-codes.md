@@ -76,6 +76,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 |------|------|---------|
 | `TOMIX_OBJECT_NOT_FOUND` | 1 | The object path matched zero objects. Includes a hint. |
 | `TOMIX_OBJECT_AMBIGUOUS` | 1 | The object path matched more than one object. |
+| `TOMIX_PROPERTY_NOT_FOUND` | 1 | `get --query` named a property the object does not have. The hint suggests the closest property, or lists the valid ones when nothing is close. An `annotation:` or `translation:` token that is simply unset is not an error; it reads back empty. |
 
 ## BPA Codes (`TOMIX_BPA_*`)
 

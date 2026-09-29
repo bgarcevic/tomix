@@ -46,6 +46,14 @@ and the API surface that major versions protect.
   network, keeping its promise to stay local.
 - `tx doctor` no longer creates `~/.tomix` on a machine where tx has not run yet; it reports
   that the directory will be created on first use.
+- `tx get` text output shows only the properties that are set, aligned under the object's path
+  and kind, with annotations and translations in their own sections and multi-line expressions
+  as indented blocks. Unset settable properties fold into one `Not set:` line, followed by a
+  `tx set` hint. The new `--all` option lists every property, with a "N of M set" count, a dim
+  `—` for empty values, and a `read-only` tag. JSON and CSV output are unchanged.
+- `tx get --query` with an unknown property now fails with `TOMIX_PROPERTY_NOT_FOUND` and
+  suggests the closest property name, or lists the valid ones when nothing is close. An unset
+  `annotation:` or `translation:` token reads back as null.
 
 ### Changed
 

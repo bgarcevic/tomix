@@ -36,6 +36,10 @@ internal sealed class GetCommand : ICommandModule
             Description = "Read just one property (for example --query expression)"
         };
 
+        var allOption = new Option<bool>("--all")
+        {
+            Description = "List every property, including unset ones (text output; JSON and CSV always carry all)"
+        };
 
         var typeOption = new Option<string?>("--type")
         {
@@ -48,7 +52,8 @@ internal sealed class GetCommand : ICommandModule
             pathArgument,
             modelArgument,
             queryOption,
-            typeOption
+            typeOption,
+            allOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -60,6 +65,7 @@ internal sealed class GetCommand : ICommandModule
                 return 2;
             var query = parseResult.GetValue(queryOption);
             var typeValue = parseResult.GetValue(typeOption);
+            var all = parseResult.GetValue(allOption);
 
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "get", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv, OutputFormats.Tmdl, OutputFormats.Bim, OutputFormats.Tmsl))
                 return 2;
@@ -95,7 +101,12 @@ internal sealed class GetCommand : ICommandModule
             return CommandOutput.Render(
                 result,
                 formatValue,
-                data => GetRenderer.Render(data, formatValue),
+                data =>
+                {
+                    GetRenderer.Render(data, formatValue, all);
+                    if (!quiet && OutputFormats.IsTextLike(formatValue))
+                        GetRenderer.RenderHint(data, all);
+                },
                 GetRenderer.ToReferenceJson,
                 renderCsv: GetRenderer.RenderCsv,
                 errorFormat: errorFormat);

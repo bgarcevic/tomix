@@ -2,6 +2,7 @@ using System.Text.Json;
 using Tomix.App.Get;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 
 namespace Tomix.Cli.Tests;
 
@@ -61,8 +62,9 @@ public sealed class GetRendererTests
         Assert.Contains(Lav + "each", output);
         Assert.Contains(Moss + "[X]", output);
         // Only the expression highlights; other values (the mode) stay plain.
-        Assert.Contains("mode: import", output);
-        Assert.Contains("expression: " + m, System.Text.RegularExpressions.Regex.Replace(output, "\x1b\\[[0-9;]*m", ""));
+        var visible = StripAnsi(output);
+        Assert.Contains("mode        import", visible);
+        Assert.Contains("expression  " + m, visible);
     }
 
     [Fact]
@@ -82,7 +84,8 @@ public sealed class GetRendererTests
     private static string Render(
         ModelObject obj,
         (string Key, object? Value)[]? properties = null,
-        IReadOnlySet<string>? measureNames = null)
+        IReadOnlySet<string>? measureNames = null,
+        bool all = false)
     {
         var dictionary = properties is { Length: > 0 }
             ? properties.ToDictionary(entry => entry.Key, entry => entry.Value)
@@ -95,10 +98,99 @@ public sealed class GetRendererTests
         var result = new GetModelResult(obj.Kind.ToString(), obj.Path, dictionary, obj, measureNames);
 
         return ConsoleCapture.Run(
-            () => { GetRenderer.Render(result, "text"); return 0; },
+            () => { GetRenderer.Render(result, "text", all); return 0; },
             captureAnsiConsole: true,
             forceAnsi: true).Stdout;
     }
+
+    [Fact]
+    public void DefaultView_FoldsUnsetSettableProperties_AndDropsReadOnlyDefaults()
+    {
+        var visible = StripAnsi(Render(Cost("SUM('Sales'[Cost])"), Catalog(Cost("SUM('Sales'[Cost])"))));
+
+        Assert.StartsWith("Sales/Cost  Measure", visible);
+        Assert.Contains("expression  SUM('Sales'[Cost])", visible);
+        // The title names the object, so the redundant name row is gone.
+        Assert.DoesNotContain("name ", visible);
+        // Writable defaults fold into the Not set line; read-only defaults (kpi) are dropped.
+        Assert.Contains("Not set: description, isHidden, formatString", visible);
+        Assert.DoesNotContain("kpi", visible);
+        Assert.DoesNotContain("False", visible);
+    }
+
+    [Fact]
+    public void AllView_ListsEveryProperty_WithoutNotSetLine()
+    {
+        var measure = Cost("SUM('Sales'[Cost])");
+
+        var visible = StripAnsi(Render(measure, Catalog(measure), all: true));
+
+        // name and expression are the only non-default values of the 17 measure properties.
+        Assert.StartsWith("Sales/Cost  Measure  · 2 of 17 set", visible);
+        var lines = visible.ReplaceLineEndings("\n").Split('\n');
+        // Settable rows carry no tag.
+        Assert.Contains("  name                    Cost", lines);
+        Assert.Contains("  isHidden                False", lines);
+        Assert.Contains("kpiTargetExpression     —  read-only", visible);
+        Assert.DoesNotContain("Not set", visible);
+    }
+
+    [Fact]
+    public void AnnotationsAndTranslations_RenderInTheirOwnSections()
+    {
+        var measure = Cost("1") with
+        {
+            Properties = new Dictionary<string, string>
+            {
+                [PropertyBagKeys.AnnotationPrefix + "PBI_FormatHint"] = "{}",
+                [PropertyBagKeys.TranslationPrefix + "da-DK/Caption"] = "Omkostning",
+            }
+        };
+
+        var visible = StripAnsi(Render(measure, Catalog(measure))).ReplaceLineEndings("\n");
+
+        Assert.Contains("  Annotations\n    PBI_FormatHint  {}", visible);
+        Assert.Contains("  Translations\n    da-DK/caption  Omkostning", visible);
+    }
+
+    [Fact]
+    public void MultiLineExpression_RendersAsIndentedBlockUnderItsKey()
+    {
+        var measure = Cost("VAR x = 1\r\nRETURN\r\n    x");
+
+        var visible = StripAnsi(Render(measure, Catalog(measure))).ReplaceLineEndings("\n");
+
+        Assert.Contains("\n  expression\n    VAR x = 1\n    RETURN\n        x\n", visible);
+    }
+
+    [Fact]
+    public void RelationshipName_IsKeptWhenItDiffersFromThePath()
+    {
+        var relationship = new ModelObject("Sales[Key] -> Customer[Key]", ModelObjectKind.Relationship,
+            "Relationships/0a1b", Detail: null, Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [],
+            Properties: new Dictionary<string, string>
+            {
+                [PropertyBagKeys.IsActive] = "true",
+                [PropertyBagKeys.CrossFilteringBehavior] = "OneDirection",
+            });
+
+        var visible = StripAnsi(Render(relationship, Catalog(relationship)));
+
+        Assert.Contains("name  Sales[Key] -> Customer[Key]", visible);
+        // Declared engine defaults fold like empty values.
+        Assert.Contains("Not set: fromCardinality, toCardinality, crossFilteringBehavior, isActive,", visible);
+    }
+
+    private static ModelObject Cost(string expression)
+        => new("Cost", ModelObjectKind.Measure, "Sales/Cost", Detail: null, Expression: expression,
+            Description: null, Hidden: false, SourceColumn: null, Children: []);
+
+    private static (string Key, object? Value)[] Catalog(ModelObject obj)
+        => ModelPropertyCatalog.Project(obj).Select(p => (p.Key, p.Value)).ToArray();
+
+    private static string StripAnsi(string text)
+        => System.Text.RegularExpressions.Regex.Replace(text, "\x1b\\[[0-9;]*m", "");
 
     [Fact]
     public void CalculatedColumn_Tmdl_ShowsInlineExpression()

@@ -104,15 +104,15 @@ public static class ModelPropertyCatalog
         new("sourceLineageTag", "SourceLineageTag", o => Bag(o, PropertyBagKeys.SourceLineageTag), Writable: true, Diffable: true),
         new("dataCategory", "DataCategory", o => Bag(o, PropertyBagKeys.DataCategory), Writable: true, Diffable: true),
         new("isKey", "IsKey", o => BoolBag(o, PropertyBagKeys.IsKey), Writable: true, Diffable: true),
-        new("isNullable", "IsNullable", o => BoolBag(o, PropertyBagKeys.IsNullable), Writable: true, Diffable: true),
+        new("isNullable", "IsNullable", o => BoolBag(o, PropertyBagKeys.IsNullable), Writable: true, Diffable: true, Default: true),
         new("isUnique", "IsUnique", o => BoolBag(o, PropertyBagKeys.IsUnique), Writable: true, Diffable: true),
-        new("isAvailableInMDX", "IsAvailableInMDX", o => BoolBag(o, PropertyBagKeys.IsAvailableInMDX), Writable: true, Diffable: true),
+        new("isAvailableInMDX", "IsAvailableInMDX", o => BoolBag(o, PropertyBagKeys.IsAvailableInMDX), Writable: true, Diffable: true, Default: true),
         new("keepUniqueRows", "KeepUniqueRows", o => BoolBag(o, PropertyBagKeys.KeepUniqueRows), Writable: true, Diffable: true),
         new("encodingHint", "EncodingHint", o => Bag(o, PropertyBagKeys.EncodingHint), Writable: true, Diffable: true),
         // Display/plumbing properties below are writable for parity but not diffable: they carry
         // no model semantics diff should report on.
         new("alignment", "Alignment", o => Bag(o, PropertyBagKeys.Alignment), Writable: true),
-        new("tableDetailPosition", "TableDetailPosition", o => IntBag(o, PropertyBagKeys.TableDetailPosition), Writable: true),
+        new("tableDetailPosition", "TableDetailPosition", o => IntBag(o, PropertyBagKeys.TableDetailPosition), Writable: true, Default: -1),
         new("isDefaultLabel", "IsDefaultLabel", o => BoolBag(o, PropertyBagKeys.IsDefaultLabel), Writable: true),
         new("isDefaultImage", "IsDefaultImage", o => BoolBag(o, PropertyBagKeys.IsDefaultImage), Writable: true),
         new("displayOrdinal", "DisplayOrdinal", o => IntBag(o, PropertyBagKeys.DisplayOrdinal), Writable: true),
@@ -179,13 +179,13 @@ public static class ModelPropertyCatalog
         new("toColumn", "ToColumn", o => Bag(o, PropertyBagKeys.ToColumn)),
         new("fromCardinality", "FromCardinality", o => Bag(o, PropertyBagKeys.FromCardinality), Writable: true),
         new("toCardinality", "ToCardinality", o => Bag(o, PropertyBagKeys.ToCardinality), Writable: true),
-        new("crossFilteringBehavior", "CrossFilteringBehavior", o => Bag(o, PropertyBagKeys.CrossFilteringBehavior), Writable: true, Diffable: true),
-        new("isActive", "IsActive", o => Bag(o, PropertyBagKeys.IsActive) == "true", Writable: true),
+        new("crossFilteringBehavior", "CrossFilteringBehavior", o => Bag(o, PropertyBagKeys.CrossFilteringBehavior), Writable: true, Diffable: true, Default: "OneDirection"),
+        new("isActive", "IsActive", o => Bag(o, PropertyBagKeys.IsActive) == "true", Writable: true, Default: true),
         // RelyOnReferentialIntegrity is documented "Unused; reserved for future use" in TOM but
         // is a real settable bool, so it stays in the writable surface.
-        new("securityFilteringBehavior", "SecurityFilteringBehavior", o => Bag(o, PropertyBagKeys.SecurityFilteringBehavior), Writable: true, Diffable: true),
+        new("securityFilteringBehavior", "SecurityFilteringBehavior", o => Bag(o, PropertyBagKeys.SecurityFilteringBehavior), Writable: true, Diffable: true, Default: "OneDirection"),
         new("relyOnReferentialIntegrity", "RelyOnReferentialIntegrity", o => BoolBag(o, PropertyBagKeys.RelyOnReferentialIntegrity), Writable: true, Diffable: true),
-        new("joinOnDateBehavior", "JoinOnDateBehavior", o => Bag(o, PropertyBagKeys.JoinOnDateBehavior), Writable: true, Diffable: true)
+        new("joinOnDateBehavior", "JoinOnDateBehavior", o => Bag(o, PropertyBagKeys.JoinOnDateBehavior), Writable: true, Diffable: true, Default: "DateAndTime")
     ];
 
     private static readonly IReadOnlyList<PropertyDescriptor> Role =
@@ -316,10 +316,10 @@ public static class ModelPropertyCatalog
         // compatibility sentinel (Int32.MaxValue), so no real model can ever set it;
         // it stays a read-only field.
         new("discourageReportMeasures", "DiscourageReportMeasures", o => BoolBag(o, PropertyBagKeys.DiscourageReportMeasures)),
-        new("defaultMode", "DefaultMode", o => Bag(o, PropertyBagKeys.DefaultMode), Writable: true, Diffable: true),
-        new("defaultDataView", "DefaultDataView", o => Bag(o, PropertyBagKeys.DefaultDataView), Writable: true, Diffable: true),
+        new("defaultMode", "DefaultMode", o => Bag(o, PropertyBagKeys.DefaultMode), Writable: true, Diffable: true, Default: "Import"),
+        new("defaultDataView", "DefaultDataView", o => Bag(o, PropertyBagKeys.DefaultDataView), Writable: true, Diffable: true, Default: "Full"),
         new("maxParallelismPerQuery", "MaxParallelismPerQuery", o => IntBag(o, PropertyBagKeys.MaxParallelismPerQuery), Writable: true, Diffable: true),
-        new("maxParallelismPerRefresh", "MaxParallelismPerRefresh", o => IntBag(o, PropertyBagKeys.MaxParallelismPerRefresh), Writable: true, Diffable: true),
+        new("maxParallelismPerRefresh", "MaxParallelismPerRefresh", o => IntBag(o, PropertyBagKeys.MaxParallelismPerRefresh), Writable: true, Diffable: true, Default: -1),
         new("sourceQueryCulture", "SourceQueryCulture", o => Bag(o, PropertyBagKeys.SourceQueryCulture), Writable: true, Diffable: true),
         new("forceUniqueNames", "ForceUniqueNames", o => BoolBag(o, PropertyBagKeys.ForceUniqueNames), Writable: true, Diffable: true)
     ];

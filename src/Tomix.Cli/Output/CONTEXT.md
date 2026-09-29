@@ -30,6 +30,7 @@ Shared output wiring for all commands.
 - `TraceWriter` / `NonDisposingTextWriter` — shared `--trace` destination plumbing for `refresh` and `query`: resolves the option value (bare/`-` → stderr, otherwise file) and opens the writer; the wrapper keeps `using` scopes from disposing the process-shared `Console.Error`.
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--runs` server-timings and benchmark summaries written to stderr).
+- `GetView` — pure layout for the `get` text view: authored properties, annotation/translation sections, and the folded `Not set:` list of writable defaults (`PropertyDescriptor.IsDefault`); `--all` lists everything.
 - `GetRenderer`, `DepsRenderer`, `DeployRenderer`, `ScriptRenderer`, and `ValidateRenderer` —
   complex command-specific text/table rendering and machine-output projections.
 - `VertipaqView` / `VertipaqRenderer` — pure layout logic and Spectre rendering for the `vertipaq` command.

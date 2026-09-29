@@ -39,6 +39,29 @@ tx get <path> [model] [options]
 |--------|-------------|
 | `--query <property>` | Read just one property (e.g. `--query expression`). |
 | `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
+| `--all` | List every property, including unset ones. Text output only; JSON and CSV always carry all. |
+
+The text view shows what was authored. Properties still at their default are
+left out, so a column reads as its data type, source, and the few settings
+someone changed instead of 25 lines of `False` and blanks. Unset properties you
+can change with `tx set` are listed on one `Not set:` line, and read-only
+defaults are dropped. Multi-line DAX and M print as an indented block under
+their key, and annotations and translations get their own sections:
+
+```text
+Sales/Profit  Measure
+
+  description    Sales minus Cost.
+  expression     [Sales] - [Cost]
+  formatString   "$"#,0;("$"#,0);"$"#,0
+  displayFolder  Core
+  lineageTag     c892c8ee-eab9-4d1b-b4e8-80e9a996ea2e
+
+  Not set: isHidden, dataCategory, isSimpleMeasure, sourceLineageTag
+```
+
+Pass `--all` to list every property: the header counts how many are set, defaults are dimmed (`—` for empty), and properties `tx set` cannot change are tagged `read-only`. `--output-format json`
+and `csv` are unchanged by this: they always carry the full per-kind property set.
 
 Each object kind has its own property set: measures include `expression`,
 `formatString`, `detailRowsExpression`, and the KPI expressions; relationships
@@ -54,6 +77,7 @@ output, followed by translations as `translation:<culture>/<property>`
 
 ```sh
 tx get "Sales/Total Sales"
+tx get "Sales/Total Sales" --all
 tx get "Sales/Total Sales" --query expression
 tx get "Sales/Total Sales" --query annotation:PBI_FormatHint
 tx get "Sales/Total Sales" --query translation:da-DK/caption
@@ -64,7 +88,9 @@ tx get Sales --output-format tmdl    # the object as TMDL
 ```
 
 `-q` is the global `--quiet` flag, not a property shortcut — always pass the
-property through `--query`.
+property through `--query`. A `--query` that names no property of the object
+fails with `TOMIX_PROPERTY_NOT_FOUND` and suggests the closest one; an unset
+`annotation:` or `translation:` token reads back empty.
 
 ## `find` — search across the model
 
