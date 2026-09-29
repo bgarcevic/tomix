@@ -248,6 +248,7 @@
     "Severity": 2,
     "Scope": "Measure, KPI, TablePermission, CalculationItem",
     "Expression": "DependsOn.Any(Key.ObjectType = \"Column\" and Value.Any(not FullyQualified))",
+    "FixExpression": "QualifyColumnReferences()",
     "CompatibilityLevel": 1200
   },
   {
@@ -258,6 +259,7 @@
     "Severity": 2,
     "Scope": "Measure, CalculatedColumn, KPI, CalculationItem",
     "Expression": "DependsOn.Any(Key.ObjectType = \"Measure\" and Value.Any(FullyQualified))",
+    "FixExpression": "UnqualifyMeasureReferences()",
     "CompatibilityLevel": 1200
   },
   {

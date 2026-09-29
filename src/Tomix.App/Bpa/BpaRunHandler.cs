@@ -142,7 +142,7 @@ public sealed class BpaRunHandler
                 // --dry-run applies the fixes to the in-memory model too, so the preview shows
                 // the values the provider would really write and what would remain; the
                 // lifecycle then discards them instead of saving or staging.
-                var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules, request.AllowDelete);
+                var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules, request.AllowDelete, snapshot);
 
                 runResult = runResult with
                 {

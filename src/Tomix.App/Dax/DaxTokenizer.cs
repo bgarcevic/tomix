@@ -33,6 +33,21 @@ internal readonly record struct DaxToken(DaxTokenKind Kind, string Text, int Sta
 internal static class DaxTokenizer
 {
     public static List<DaxToken> Tokenize(string expression)
+        => Scan(expression, literals: null);
+
+    /// <summary>
+    /// The unescaped contents of every string literal in <paramref name="expression"/> (comments
+    /// excluded) — e.g. the names <c>ADDCOLUMNS</c>/<c>SELECTCOLUMNS</c> give query-scoped
+    /// columns, which a bracketed reference can resolve to instead of a model object.
+    /// </summary>
+    public static List<string> StringLiterals(string expression)
+    {
+        var literals = new List<string>();
+        Scan(expression, literals);
+        return literals;
+    }
+
+    private static List<DaxToken> Scan(string expression, List<string>? literals)
     {
         var tokens = new List<DaxToken>();
         var i = 0;
@@ -47,7 +62,10 @@ internal static class DaxTokenizer
             }
             else if (c == '"')
             {
-                i = SkipDelimited(expression, i, '"');
+                if (literals is null)
+                    i = SkipDelimited(expression, i, '"');
+                else
+                    literals.Add(ReadDelimited(expression, ref i, '"', DaxTokenKind.Symbol).Text);
             }
             else if (c == '/' && Peek(expression, i + 1) == '/')
             {

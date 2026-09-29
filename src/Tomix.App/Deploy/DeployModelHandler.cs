@@ -306,7 +306,7 @@ public sealed class DeployModelHandler
                     exitCode: 2), []);
 
             var fixer = new BpaFixer();
-            fixer.ApplyFixes(mutationSession, result.Violations, rules);
+            fixer.ApplyFixes(mutationSession, result.Violations, rules, snapshot: snapshot);
 
             // Re-evaluate so the gate reflects the actual post-fix state, catching both
             // unfixable violations and any fixes that did not resolve their target.

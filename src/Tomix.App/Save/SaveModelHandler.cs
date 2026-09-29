@@ -135,7 +135,7 @@ public sealed class SaveModelHandler
             return null;
 
         var fixer = new BpaFixer();
-        var fixResult = fixer.ApplyFixes(mutationSession, result.Violations, rules);
+        var fixResult = fixer.ApplyFixes(mutationSession, result.Violations, rules, snapshot: snapshot);
 
         // Saving never remediates a rule that cannot be evaluated, so remaining rule errors
         // block regardless of other applied fixes (issue #253). Other error-severity findings

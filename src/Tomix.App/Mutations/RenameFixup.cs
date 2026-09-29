@@ -203,9 +203,9 @@ internal static class RenameFixup
 
     // Rewritten references always come out quoted ('Table'[X]) — valid for every table name,
     // even where the original was written bare (Table[X]).
-    private static string QuoteTable(string name)
+    internal static string QuoteTable(string name)
         => $"'{name.Replace("'", "''", StringComparison.Ordinal)}'";
 
-    private static string Bracket(string name)
+    internal static string Bracket(string name)
         => $"[{name.Replace("]", "]]", StringComparison.Ordinal)}]";
 }

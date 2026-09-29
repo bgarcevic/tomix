@@ -15,6 +15,20 @@ tx bpa rules <subcommand>
 by severity; `--fix` applies auto-fixes where the rule provides one
 (`FixExpression`).
 
+Besides property assignments (`IsHidden = true`) and `Delete()`, a fix expression can
+rewrite the object's DAX:
+
+| Fix expression | Rewrite | Used by |
+|----------------|---------|---------|
+| `QualifyColumnReferences()` | `[Amount]` → `'Sales'[Amount]` | `DAX_COLUMNS_FULLY_QUALIFIED` |
+| `UnqualifyMeasureReferences()` | `'Sales'[Total]` → `[Total]` | `DAX_MEASURES_UNQUALIFIED` |
+
+Only the flagged references change; formatting and comments are kept. A reference the
+rewrite cannot resolve for certain leaves the expression untouched and is reported under
+fix errors instead. For example, a column name that exists in more than one table, a
+name that also appears as a string literal (a column the expression builds with
+`ADDCOLUMNS`), or a measure qualified with a table it does not belong to.
+
 ![tx bpa run --fix --save: findings before the fix, then two of three fixed and saved](../assets/media/bpa.png)
 
 When fixes or rule-ignore changes are saved, the shared validation gate blocks

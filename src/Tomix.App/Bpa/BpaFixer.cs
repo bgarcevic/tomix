@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
@@ -9,11 +10,16 @@ namespace Tomix.App.Bpa;
 
 public sealed partial class BpaFixer
 {
+    /// <param name="snapshot">
+    /// The model the violations were found in. DAX-rewrite fixes (<see cref="BpaDaxRewrite"/>)
+    /// resolve references against it; without it they fail with a per-object fix error.
+    /// </param>
     public BpaFixResult ApplyFixes(
         IModelMutationSession session,
         IReadOnlyList<BpaViolation> violations,
         IReadOnlyList<BpaRule> rules,
-        bool allowDelete = false)
+        bool allowDelete = false,
+        ModelSnapshot? snapshot = null)
     {
         var ruleMap = rules.ToDictionary(r => r.Id, StringComparer.OrdinalIgnoreCase);
         var applied = 0;
@@ -21,6 +27,7 @@ public sealed partial class BpaFixer
         var destructiveSkipped = 0;
         var errors = new List<BpaFixError>();
         var changes = new List<BpaFixChange>();
+        var daxRewrites = snapshot is null ? null : new DaxRewriteState(snapshot);
 
         foreach (var violation in violations.Where(v => v.CanFix))
         {
@@ -44,6 +51,12 @@ public sealed partial class BpaFixer
                 }
 
                 ApplyDelete(session, violation, ref applied, ref skipped, errors, changes);
+                continue;
+            }
+
+            if (BpaDaxRewriter.TryParse(fixExpr, out var rewrite))
+            {
+                ApplyDaxRewrite(session, daxRewrites, rewrite, violation, ref applied, ref skipped, errors, changes);
                 continue;
             }
 
@@ -125,6 +138,115 @@ public sealed partial class BpaFixer
         }
     }
 
+    /// <summary>
+    /// Rewrites the violating object's DAX in place. A reference the rewrite cannot resolve with
+    /// certainty fails that object with a fix error and leaves its expression untouched.
+    /// </summary>
+    private static void ApplyDaxRewrite(
+        IModelMutationSession session,
+        DaxRewriteState? state,
+        BpaDaxRewrite rewrite,
+        BpaViolation violation,
+        ref int applied,
+        ref int skipped,
+        List<BpaFixError> errors,
+        List<BpaFixChange> changes)
+    {
+        if (state is null)
+        {
+            errors.Add(new BpaFixError(violation.RuleId, violation.ObjectPath, "DAX rewrite fixes need the model snapshot"));
+            return;
+        }
+
+        if (state.SiteFor(violation) is not { } site)
+        {
+            errors.Add(new BpaFixError(violation.RuleId, violation.ObjectPath, "Object has no DAX expression this fix can rewrite"));
+            return;
+        }
+
+        var before = state.Current(site);
+        var (after, error) = BpaDaxRewriter.Rewrite(before, rewrite, state.Names);
+        if (error is not null)
+        {
+            errors.Add(new BpaFixError(violation.RuleId, violation.ObjectPath, error));
+            return;
+        }
+
+        if (after == before)
+        {
+            skipped++;
+            return;
+        }
+
+        if (session is not IExpressionRewriteSession rewriter)
+        {
+            errors.Add(new BpaFixError(violation.RuleId, violation.ObjectPath, "This provider does not support expression rewriting"));
+            return;
+        }
+
+        try
+        {
+            rewriter.RewriteExpressions([new ModelExpressionEdit(site.Path, site.Kind, "Expression", after!)]);
+        }
+        catch (Exception ex)
+        {
+            errors.Add(new BpaFixError(violation.RuleId, violation.ObjectPath, ex.Message));
+            return;
+        }
+
+        state.Update(site, after!);
+        applied++;
+        changes.Add(new BpaFixChange(
+            violation.RuleId, violation.ObjectType, violation.ObjectPath, BpaFixAction.Set,
+            "Expression", Before: before, After: after)
+        { ObjectKind = violation.ObjectKind });
+    }
+
+    /// <summary>
+    /// The DAX a rewrite fix edits for each violating object, tracking already-rewritten text so a
+    /// second rewrite of the same object (one per qualification rule) builds on the first.
+    /// </summary>
+    private sealed class DaxRewriteState(ModelSnapshot snapshot)
+    {
+        private readonly Dictionary<(string Path, ModelObjectKind Kind), string> _rewritten = [];
+
+        public BpaDaxNames Names { get; } = BpaDaxNames.FromSnapshot(snapshot);
+
+        public DaxSite? SiteFor(BpaViolation violation)
+        {
+            var target = Flatten(snapshot.Objects).FirstOrDefault(o =>
+                string.Equals(o.Path, violation.ObjectPath, StringComparison.Ordinal)
+                && (violation.ObjectKind is null || o.Kind == violation.ObjectKind));
+
+            return target?.Kind switch
+            {
+                ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
+                    or ModelObjectKind.CalculationItem when !string.IsNullOrWhiteSpace(target.Expression)
+                    => new DaxSite(target.Path, target.Kind, target.Expression!),
+
+                // A calculated table's DAX lives on its calculated partition.
+                ModelObjectKind.Table => target.Children
+                    .Where(c => c.Kind == ModelObjectKind.Partition && DaxExpressions.IsCalculated(c)
+                        && !string.IsNullOrWhiteSpace(c.Expression))
+                    .Select(c => (DaxSite?)new DaxSite(c.Path, c.Kind, c.Expression!))
+                    .FirstOrDefault(),
+
+                _ => null,
+            };
+        }
+
+        public string Current(DaxSite site)
+            => _rewritten.GetValueOrDefault((site.Path, site.Kind), site.Expression);
+
+        public void Update(DaxSite site, string expression)
+            => _rewritten[(site.Path, site.Kind)] = expression;
+
+        private static IEnumerable<ModelObject> Flatten(IEnumerable<ModelObject> objects)
+            => objects.SelectMany(o => Flatten(o.Children).Prepend(o));
+    }
+
+    private readonly record struct DaxSite(string Path, ModelObjectKind Kind, string Expression);
+
     public static bool TryParseSimpleAssignment(
         string fixExpression,
         out IReadOnlyList<ModelPropertyAssignment> assignments)
@@ -162,14 +284,14 @@ public sealed partial class BpaFixer
     }
 
     /// <summary>
-    /// Fills each property change's <see cref="BpaFixChange.Before"/> from the pre-fix snapshot,
-    /// read through the property catalog (so <c>IsHidden</c> reads the same value <c>get</c>
+    /// Fills each property change's <see cref="BpaFixChange.Before"/> from the pre-fix snapshot
+    /// (a DAX rewrite already carries the text it rewrote), read through the property catalog (so <c>IsHidden</c> reads the same value <c>get</c>
     /// shows) with the raw property bag as fallback. Render-only: an object or property the
     /// snapshot does not carry leaves <c>Before</c> null.
     /// </summary>
     public static IReadOnlyList<BpaFixChange> WithBefore(IReadOnlyList<BpaFixChange> changes, ModelSnapshot before)
         => changes
-            .Select(c => c.Action == BpaFixAction.Set && c.Property is not null
+            .Select(c => c.Action == BpaFixAction.Set && c.Property is not null && c.Before is null
                 ? c with { Before = ReadValue(before, c.ObjectPath, c.ObjectKind, c.Property) }
                 : c)
             .ToList();

@@ -10,6 +10,14 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx bpa run --fix` now fixes `DAX_COLUMNS_FULLY_QUALIFIED` and `DAX_MEASURES_UNQUALIFIED`
+  by rewriting the object's DAX, through two new fix expressions:
+  `QualifyColumnReferences()` and `UnqualifyMeasureReferences()`. References that cannot be
+  resolved for certain (a column name in several tables, a name that is also a string literal,
+  a measure qualified with the wrong table) are reported as fix errors and left unchanged (#267).
+
 ## [0.6.0] - 2026-09-29
 
 ### Fixed
