@@ -52,7 +52,10 @@ conventions — read the one for the area you're changing before you start.
   title becomes the commit subject and decides the next version. A breaking
   change (`feat!: ...`) needs the `breaking-approved` label from a maintainer.
 - **A changelog entry** — changes under `src/` add a line under `[Unreleased]`
-  in `CHANGELOG.md`, written for users. That section is the release notes.
+  in `CHANGELOG.md`, written for users. That section is the release notes;
+  with no entry there, the merge produces no release. If a release lands while
+  your PR is open, merge `main` in and check that your entry is still under
+  `[Unreleased]`, not the section the release just cut.
 
 ## Working on these docs
 

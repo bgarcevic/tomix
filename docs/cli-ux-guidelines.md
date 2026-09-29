@@ -224,6 +224,9 @@ than a missing-key error. **Scripts wanting a command's own diagnostics must rea
     `dotnet tool update -g Tomix.Cli --prerelease`.
   - A bot keeps one `chore(release): prepare X.Y.Z` PR open. Merging it tags
     `vX.Y.Z` and publishes the GitHub Release and the NuGet package.
+  - The release notes are the `[Unreleased]` section of `CHANGELOG.md`. While
+    it is empty, no release PR is opened (an open one is closed), even when
+    commits have landed.
   - The bump comes from the PR titles since the last release: `feat` is minor,
     everything else patch, `!` or `BREAKING CHANGE:` major. While the major
     version is 0, breaking changes bump the minor instead.

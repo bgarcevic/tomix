@@ -10,6 +10,13 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Fixed
+
+- `tx validate` no longer reports every column reference into a calculated table as missing
+  (`DAX0002`) when its TMDL declares no columns because the table was never evaluated. Columns
+  are inferred from `DATATABLE(...)` and `ROW(...)` expressions, so typos are still caught;
+  references into calculated tables whose columns cannot be inferred offline are not judged (#320).
+
 ## [0.5.0] - 2026-09-29
 
 ### Added
@@ -45,10 +52,6 @@ and the API surface that major versions protect.
 
 ### Fixed
 
-- `tx validate` no longer reports every column reference into a calculated table as missing
-  (`DAX0002`) when its TMDL declares no columns because the table was never evaluated. Columns
-  are inferred from `DATATABLE(...)` and `ROW(...)` expressions, so typos are still caught;
-  references into calculated tables whose columns cannot be inferred offline are not judged (#320).
 - `tx refresh` reported only the last partition's rows and timings for tables with several
   partitions, and on Power BI / Fabric could summarize before the trace arrived, reporting zeros
   (typically with `--output-format json`).
