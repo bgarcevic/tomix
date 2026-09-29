@@ -84,9 +84,6 @@ internal static class GlobalOptions
         Database.Aliases.Add("-d");
         Yes.Aliases.Add("-y");
         Quiet.Aliases.Add("-q");
-        // add and set declare a local -q (the bare compatibility property form, retired at
-        // 1.0); the local option shadows the global alias there, so -q keeps its documented
-        // compat meaning on exactly those two commands and means quiet everywhere else.
         OutputFormat.Recursive = true;
     }
 

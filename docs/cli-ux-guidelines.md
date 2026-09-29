@@ -73,9 +73,7 @@ the bottom for where each concern lives.
   command through `JsonOutput`/`CsvOutput`; `--paths-only`-style flags where a
   plain one-record-per-line form aids piping (clig's `--plain`).
 - On success, print something brief — silence reads as a hang — but err toward
-  less. Support `--quiet` (alias `-q`) to suppress non-essential output. The two
-  exceptions are `add`/`set`, whose local compatibility `-q`/`-i` property form
-  (retired at 1.0) shadows the global alias on exactly those commands.
+  less. Support `--quiet` (alias `-q`) to suppress non-essential output.
 - If you change state, say exactly what changed and what the new state is
   (model object counts, target workspace, file written). Make current state easy
   to inspect (`session`, `stage`, `doctor` are our `git status` equivalents).
@@ -129,7 +127,7 @@ the bottom for where each concern lives.
 - Never *require* interactivity; every prompt has a flag equivalent. Honor
   `--no-input` to forbid all prompting. [tomix: gap — add to `GlobalOptions`.]
 - Confirm before anything destructive or remote-mutating (`rm`, `replace`,
-  `deploy`, `stage commit`/`discard`, `script --save`/`--revert`,
+  `deploy`, `stage commit`/`discard`,
   `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and the
   partition-risky `refresh` variants): mild = y/n, severe = type the
   object/workspace name, catastrophic = require an explicit flag.
@@ -274,11 +272,11 @@ than a missing-key error. **Scripts wanting a command's own diagnostics must rea
 - [x] Grouped sections + Examples blocks in help
 - [x] Help wraps to the terminal, groups long option lists, and fits 80 columns; `tx help <command>`
 - [x] `NO_COLOR` / `TERM=dumb` handling verified or added
-- [x] Confirmations with `--yes` on `rm`, `replace`, `deploy`, `stage commit`, `script --save`/`--revert`, `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and partition-risky `refresh`; `--dry-run` on `deploy`
+- [x] Confirmations with `--yes` on `rm`, `replace`, `deploy`, `stage commit`, `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and partition-risky `refresh`; `--dry-run` on `deploy`
 - [x] `-q/--quiet` global flag (suppresses spinners, progress, non-essential output)
 - [x] Empty-state messages with next-step hints on `ls`/`find`
 - [x] "Did you mean?" suggestions for unknown subcommands
-- [x] Spinners on slow commands (P0: deploy, bpa, connect, auth; P1: format, save, diff, validate, script, stage commit; P2: conditional for ls/get/find/deps/load/set/add/mv/rm/replace when remote or --save)
+- [x] Spinners on slow commands (P0: deploy, bpa, connect, auth; P1: format, save, diff, validate, stage commit; P2: conditional for ls/get/find/deps/load/set/add/mv/rm/replace when remote or --save)
 - [x] `refresh` command (live per-table steps and rows via XMLA SessionTrace; final summary with partitions and phases)
 - [ ] Ctrl-C handling audit on long-running remote operations
 - [ ] `--no-input` global flag (covered by `--non-interactive`; adding a duplicate is confusing)

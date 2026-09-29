@@ -2,7 +2,7 @@ namespace Tomix.Cli.Commands;
 
 /// <summary>
 /// Resolves a command input value, honouring the <c>-</c> stdin sentinel and an optional
-/// <c>--file</c> source. Shared by the <c>add</c>, <c>set</c>, <c>format</c>, and <c>script</c>
+/// <c>--file</c> source. Shared by the <c>add</c>, <c>set</c>, and <c>format</c>
 /// commands so the sentinel semantics stay identical across them.
 /// </summary>
 internal static class InputValueResolver
@@ -19,9 +19,10 @@ internal static class InputValueResolver
                 : value;
 
     // echo/heredoc pipes always end with a newline the user did not intend as part of the
-    // value; keep interior newlines (multiline DAX/M) but drop the trailing ones.
+    // value; keep interior newlines (multiline DAX/M) but drop the trailing ones. Windows
+    // PowerShell 5.1 prefixes piped text with a BOM, which would otherwise land in the value.
     private static string ReadStdin()
-        => Console.In.ReadToEnd().TrimEnd('\r', '\n');
+        => Console.In.ReadToEnd().TrimStart('﻿').TrimEnd('\r', '\n');
 
     /// <summary>Reads from <paramref name="file"/> when supplied, otherwise falls back to <see cref="Resolve(string?)"/>.</summary>
     public static string? Resolve(string? value, string? file)

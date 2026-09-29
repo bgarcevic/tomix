@@ -5,22 +5,18 @@ namespace Tomix.Cli.Tests;
 
 /// <summary>
 /// Issue #218 audit: <c>-q</c> belongs to the global <c>--quiet</c> flag on every command, so it
-/// keeps exactly one meaning per command. Only <c>add</c>/<c>set</c> may shadow it with their
-/// documented compatibility option (retired at 1.0), and only <c>query</c>/<c>get</c> document
-/// the swallowed-text collision. A new local <c>-q</c> or a new collision rule must be a
-/// deliberate edit to these pins, not an accident.
+/// keeps exactly one meaning per command: no command may shadow it with a local option, and only
+/// <c>query</c>/<c>get</c> document the swallowed-text collision. A new local <c>-q</c> or a new
+/// collision rule must be a deliberate edit to these pins, not an accident.
 /// </summary>
 public sealed class QuietAliasAuditTests
 {
-    private static readonly HashSet<string> CommandsAllowedToLocalQ = new(StringComparer.Ordinal) { "add", "set" };
-
     private static readonly HashSet<string> CommandsWithCollisionRule = new(StringComparer.Ordinal) { "query", "get" };
 
     [Fact]
-    public void NoCommandBeyondAddAndSet_DeclaresALocalQAlias()
+    public void NoCommand_DeclaresALocalQAlias()
     {
         var offenders = TestRoot.Descendants(TestRoot.Full(), includeHidden: true)
-            .Where(d => !CommandsAllowedToLocalQ.Contains(d.Command.Name))
             .Where(d => d.Command.Options.Any(o => o.Name == "-q" || o.Aliases.Contains("-q")))
             .Select(d => $"tx {string.Join(' ', d.Path)}")
             .ToList();

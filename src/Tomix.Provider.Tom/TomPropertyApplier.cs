@@ -839,7 +839,7 @@ internal static class TomPropertyApplier
             case "password":
                 throw new NotSupportedException(
                     $"Setting '{displayName}' is not supported: secrets are never accepted via argv. "
-                    + "Edit the source file or use 'tx script' to change credentials.");
+                    + "Edit the source file to change credentials.");
             default:
                 var excludes = new List<string>();
                 if (dataSource is not ProviderDataSource)

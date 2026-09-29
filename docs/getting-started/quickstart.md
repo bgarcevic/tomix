@@ -30,7 +30,7 @@ tx ls                          # everything, as a table
 tx ls --type table --paths-only
 tx ls Sales/Measures           # children of a container
 tx get "Sales/Total Sales"     # all properties of one object
-tx get "Sales/Total Sales" -q expression
+tx get "Sales/Total Sales" --query expression
 ```
 
 Object paths are slash-separated (`Sales/Total Sales`); DAX-style forms like
@@ -50,10 +50,10 @@ Mutations preview by default; nothing touches disk until you say so:
 
 ```sh
 # Preview: shows the result without saving
-tx add "Sales/Net Sales" -t Measure -i "SUM(Sales[Amount]) - SUM(Sales[Discount])"
+tx add "Sales/Net Sales" -t Measure -e "SUM(Sales[Amount]) - SUM(Sales[Discount])"
 
 # Persist it
-tx add "Sales/Net Sales" -t Measure -i "SUM(Sales[Amount]) - SUM(Sales[Discount])" --save
+tx add "Sales/Net Sales" -t Measure -e "SUM(Sales[Amount]) - SUM(Sales[Discount])" --save
 ```
 
 For multi-step edits, stage mutations and commit them as a batch — see

@@ -62,7 +62,7 @@ OK Deployed basic-tmdl to MyWorkspace (4.1s)
 
 Every command prints JSON with `--output-format json`, so the output of any
 command can become the input of your next script. `ls`, `get`, `query`,
-`refresh`, `save`, `script`, and `vertipaq` also print CSV, and `get` can emit
+`refresh`, `save`, and `vertipaq` also print CSV, and `get` can emit
 the model formats too (`tmdl`, `bim`, `tmsl`).
 The [samples](samples/) folder also contains a full PBIP model if you want
 something more realistic than `basic-tmdl` to explore.
@@ -116,15 +116,15 @@ command and is suppressed in CI and for JSON/CSV output. Opt out entirely with
 
 ## Commands
 
-Discover: `ls`, `get`, `find`, `deps`, `query` (run DAX/DMV queries against
-a live model)
+Discover: `summary` (where a model lives and what it contains), `ls`, `get`,
+`find`, `deps`, `query` (run DAX/DMV queries against a live model)
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
-formatter APIs), `script` (run supported expressions against a model).
+formatter APIs).
 Refresh policies use `get`/`set`/`rm` with `<table>/RefreshPolicy`;
 `refresh --policy-only` applies a saved policy without loading data.
 Connect: `connect` (interactive workspace/model pickers with `--remote`,
 reconnect to a previous target with `--recent`), `deploy`, `refresh`,
-`load`, `save`, `auth`, `session`
+`save`, `auth`, `session`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `test`
 (DAX regression tests against a live model), `vertipaq` (storage statistics,
 `.vpax` export/import), `diff`, `doctor`

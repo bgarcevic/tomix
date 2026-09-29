@@ -77,7 +77,7 @@ Among multiple external files, earlier entries in the annotation win. To detach
 a model from an external rule file, remove the annotation:
 
 ```sh
-tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i "" --save
+tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save
 ```
 
 | Option | Description |

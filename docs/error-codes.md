@@ -54,7 +54,7 @@ All diagnostic codes use uppercase `SNAKE_CASE` prefixed with `TOMIX_`. For exam
 ## Mutation Codes (`TOMIX_MUTATION_*`)
 
 Emitted by `MutationRunner` and handlers that participate in the mutation lifecycle
-(`add`, `rm`, `set`, `mv`, `replace`, `format`, `script`, `bpa run --fix`,
+(`add`, `rm`, `set`, `mv`, `replace`, `format`, `bpa run --fix`,
 `bpa rules ignore/unignore`).
 
 | Code | Exit | Trigger |
@@ -62,7 +62,7 @@ Emitted by `MutationRunner` and handlers that participate in the mutation lifecy
 | `TOMIX_MUTATION_UNSUPPORTED_PROVIDER` | 1 | The model provider does not implement `IModelMutationSession`. |
 | `TOMIX_MUTATION_UNSUPPORTED` | 1 | A `NotSupportedException` was thrown during mutation. |
 | `TOMIX_ADD_OPTION_UNSUPPORTED` | 1 | An `add` option was supplied for an object type that cannot consume it (e.g. `--columns` on a CalcGroup). |
-| `TOMIX_RENAME_BREAKS_REFS` | 1 | `--strict-refs` was set and the rename (`set -q name`, `mv`) would leave DAX expressions referencing the old name. By default renames rewrite referencing DAX automatically, so this only fires for references that cannot be rewritten (role RLS filters, or a bare `'Name'` when a table and a calendar share the renamed name) — or, under `--no-fix-refs`, for any reference. Without `--strict-refs` the rename proceeds with a warning listing the objects left broken. |
+| `TOMIX_RENAME_BREAKS_REFS` | 1 | `--strict-refs` was set and the rename (`set --set name=...`, `mv`) would leave DAX expressions referencing the old name. By default renames rewrite referencing DAX automatically, so this only fires for references that cannot be rewritten (role RLS filters, or a bare `'Name'` when a table and a calendar share the renamed name) — or, under `--no-fix-refs`, for any reference. Without `--strict-refs` the rename proceeds with a warning listing the objects left broken. |
 | `TOMIX_RM_BREAKS_REFS` | 1 | The object being removed (`rm`) is still referenced by DAX expressions. Unlike a rename there is nothing to rewrite, so the removal is blocked and the message lists the referencing objects; `--force` removes anyway and reports the now-broken references. Structural references (relationships, sort-by, hierarchy levels, perspective and translation entries, role permissions) never block — they are cascade-removed with the object. |
 | `TOMIX_MUTATION_INVALID_VALUE` | 1 | An `ArgumentException` was thrown — invalid argument value. |
 | `TOMIX_MUTATION_FAILED` | 1 | An `InvalidOperationException` was thrown — generic mutation failure. |
@@ -152,7 +152,6 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 |------|------|---------|
 | `TOMIX_QUERY_REQUIRED` | 2 | `query` called without query text: pass it positionally, via `--query`, `--file`, or piped stdin. |
 | `TOMIX_QUERY_INPUT_CONFLICT` | 2 | More than one query source was passed: the positional text, `--query`, and `--file` are mutually exclusive; choose one. |
-| `TOMIX_SET_INPUT_CONFLICT` | 2 | `--set` and the compatibility `-q`/`-i` pair were passed together; choose one. |
 | `TOMIX_QUERY_FILE_NOT_FOUND` | 2 | The `--file` path does not exist. |
 | `TOMIX_QUERY_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_QUERY_OUTPUT_FORMAT` | 2 | `-o`/`--output-file` could not resolve a json or csv format (pass `--output-format json\|csv` or use a `.json`/`.csv` extension). |
@@ -233,13 +232,6 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 | `TOMIX_AUTH_SECRET_SOURCE_CONFLICT` | 2 | `--password -` and `--password-file` (or the certificate-password equivalents) were combined; choose one. |
 | `TOMIX_AUTH_SECRET_FILE_NOT_FOUND` | 2 | The `--password-file` / `--certificate-password-file` path does not exist. |
 
-## Script Codes (`TOMIX_SCRIPT_*`)
-
-| Code | Exit | Trigger |
-|------|------|---------|
-| `TOMIX_SCRIPT_FILE_NOT_FOUND` | 1 | The script file was not found. |
-| `TOMIX_SCRIPT_REQUIRED` | 2 | `script` called without a script file or inline script. |
-
 ## Config Codes (`TOMIX_CONFIG_*`)
 
 > **Note:** `TOMIX_CONFIG_DIR` is an environment variable, not a diagnostic code. See below.
@@ -314,8 +306,6 @@ come from structural integrity checks.
 | `TOMIX_PROFILE_TARGET_REQUIRED` | 2 | A new profile has no usable remote, local-model, Desktop, or active-session target. |
 | `TOMIX_INVALID_OUTPUT_FORMAT` | 2 | `--output-format` value is not one of: auto, text, json, csv, tmsl, bim, tmdl. |
 | `TOMIX_INVALID_TYPE` | 2 | `--type` value is not a known object kind; the hint lists the valid types. |
-| `TOMIX_ADD_VALUE_REQUIRED` | 2 | `tx add -q <property>` has no matching `-i <value>`. Pair each `-q` with a following `-i`. |
-| `TOMIX_ADD_INPUT_CONFLICT` | 2 | `--expression` and an unpaired `-i` were both passed; give the new object's value once. |
 | `TOMIX_CONFIRMATION_REQUIRED` | 1 | A destructive action needed confirmation but prompting was unavailable (`--non-interactive`, `--quiet`, json/csv output, or redirected stdin/stderr). Pass `--yes`. |
 | `TOMIX_OPTION_CONFLICT` | 2 | Mutually-exclusive options were combined (e.g. `--recent` with a model path, `--profile` with an explicit server/database). The message names the pair; which options conflict is command-specific, so branch on the code rather than the wording. |
 | `TOMIX_RECENT_INVALID` | 2 | `--recent` was given a value that is not a positive index (`1` = most recently used). |
@@ -377,7 +367,5 @@ Command-specific validation codes (checked before entering `MutationRunner`) are
 
 - `TOMIX_REPLACE_PATTERN_REQUIRED`
 - `TOMIX_SET_PROPERTY_REQUIRED`
-- `TOMIX_SCRIPT_FILE_NOT_FOUND`
-- `TOMIX_SCRIPT_REQUIRED`
 - `TOMIX_BPA_RULE_ID_REQUIRED`
 - `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE`

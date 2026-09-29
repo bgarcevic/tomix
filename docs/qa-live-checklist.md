@@ -49,7 +49,7 @@ you compare against. A check with no expected value recorded is not a check.
 
 ### Read semantics against real data
 
-- [ ] `load`/`ls` counts match the fixture manifest.
+- [ ] `summary`/`ls` counts match the fixture manifest.
 - [ ] `query` against the fixture returns the manifest values (`Total Sales`
       = 896.49; row counts and ordering per the `dax-tests` files); JSON and
       CSV stdout parse with an independent parser.

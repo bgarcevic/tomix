@@ -53,28 +53,6 @@ public sealed class PropertyFlagTests
         Assert.Empty(parsed.Errors);
     }
 
-    [Fact]
-    public void AddExpressionWithUnpairedI_Conflicts()
-    {
-        var captured = ConsoleCapture.Invoke(BuildAddRoot().Parse(
-            ["add", "Sales/M", "-t", "Measure", "--expression", "1", "-i", "2"]));
-
-        Assert.Equal(2, captured.ExitCode);
-        // Text mode renders prose; the code is pinned by the JSON variant below.
-        Assert.Contains("Pass either --expression", captured.Stderr);
-    }
-
-    [Fact]
-    public void AddExpressionWithUnpairedI_ConflictCarriesCodeInJson()
-    {
-        var captured = ConsoleCapture.Invoke(BuildAddRoot().Parse(
-            ["add", "Sales/M", "-t", "Measure", "--expression", "1", "-i", "2", "--error-format", "json"]));
-
-        Assert.Equal(2, captured.ExitCode);
-        Assert.Equal("TOMIX_ADD_INPUT_CONFLICT",
-            System.Text.Json.JsonDocument.Parse(captured.Stderr).RootElement.GetProperty("code").GetString());
-    }
-
     // ── set ─────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -113,7 +91,7 @@ public sealed class PropertyFlagTests
         Console.SetIn(new StringReader("from stdin"));
         try
         {
-            var assignment = Assert.Single(SetCommand.ParseSetAssignments([raw]));
+            var assignment = Assert.Single(AddCommand.ParseSetAssignments([raw]));
 
             Assert.Equal(expected, assignment.Value);
         }
@@ -124,24 +102,20 @@ public sealed class PropertyFlagTests
     }
 
     [Fact]
-    public void SetSetWithCompatibilityQi_Conflicts()
+    public void SetAssignments_StdinDropsWindowsPowerShellBom()
     {
-        var captured = ConsoleCapture.Invoke(BuildSetRoot().Parse(
-            ["set", "Sales/Amount", "--set", "expression=1", "-q", "expression", "-i", "2"]));
+        var original = Console.In;
+        Console.SetIn(new StringReader("﻿\"v2\"\r\n"));
+        try
+        {
+            var assignment = Assert.Single(AddCommand.ParseSetAssignments(["expression=-"]));
 
-        Assert.Equal(2, captured.ExitCode);
-        Assert.Contains("Pass either --set", captured.Stderr);
-    }
-
-    [Fact]
-    public void SetSetWithCompatibilityQi_ConflictCarriesCodeInJson()
-    {
-        var captured = ConsoleCapture.Invoke(BuildSetRoot().Parse(
-            ["set", "Sales/Amount", "--set", "expression=1", "-q", "expression", "-i", "2", "--error-format", "json"]));
-
-        Assert.Equal(2, captured.ExitCode);
-        Assert.Equal("TOMIX_SET_INPUT_CONFLICT",
-            System.Text.Json.JsonDocument.Parse(captured.Stderr).RootElement.GetProperty("code").GetString());
+            Assert.Equal("\"v2\"", assignment.Value);
+        }
+        finally
+        {
+            Console.SetIn(original);
+        }
     }
 
     // ── -q collision on get/query (#218) ────────────────────────────────────

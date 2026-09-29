@@ -40,16 +40,6 @@ internal sealed class AddCommand : ICommandModule
                           "Data sources always require -t (no path keyword infers them)."
         };
         typeOption.Aliases.Add("-t");
-        var valueOption = new Option<string[]?>("-i")
-        {
-            Description = "Compatibility form of --expression / --set: an unpaired -i is the new object's value; pair each -q with a following -i to set a property. Use '-' to read from stdin.",
-            Arity = ArgumentArity.ZeroOrMore
-        }.In(HelpGroups.Compatibility);
-        var queryOption = new Option<string[]?>("-q")
-        {
-            Description = "Compatibility form of --set: property name to set on the newly-created object; pair each -q with a following -i value. Repeatable.",
-            Arity = ArgumentArity.ZeroOrMore
-        }.In(HelpGroups.Compatibility);
         var expressionOption = new Option<string?>("--expression")
         {
             Description = "Expression or value for the new object. Use '-' to read from stdin."
@@ -161,8 +151,6 @@ internal sealed class AddCommand : ICommandModule
             pathArgument,
             modelArgument,
             typeOption,
-            valueOption,
-            queryOption,
             expressionOption,
             setOption,
             fileOption,
@@ -188,41 +176,8 @@ internal sealed class AddCommand : ICommandModule
                 return 2;
 
             var file = parseResult.GetValue(fileOption);
-            var parsed = ParseInterleavedQi(parseResult);
-            var expression = parseResult.GetValue(expressionOption);
-            if (expression is not null && parsed.PrimaryValue is not null)
-            {
-                ErrorOutput.Write(
-                    [new TomixDiagnostic(
-                        "TOMIX_ADD_INPUT_CONFLICT",
-                        DiagnosticSeverity.Error,
-                        "Pass either --expression or an unpaired -i, not both.",
-                        "Give the new object's value once: --expression <value> or a single -i <value>.")],
-                    GlobalOptions.ErrorFormatValue(parseResult, formatValue));
-                return 2;
-            }
-
-            if (parsed.DanglingProperty is not null)
-            {
-                // Was AnsiConsole.MarkupLine, which writes to stdout — so `tx add ... | jq` got
-                // markup on the data stream instead of an empty one. Errors belong on stderr
-                // (docs/cli-ux-guidelines.md), with a code and --error-format support.
-                ErrorOutput.Write(
-                    [new TomixDiagnostic(
-                        "TOMIX_ADD_VALUE_REQUIRED",
-                        DiagnosticSeverity.Error,
-                        $"Option -q '{parsed.DanglingProperty}' has no matching -i value.",
-                        "Pair each -q <property> with a following -i <value>.")],
-                    GlobalOptions.ErrorFormatValue(parseResult, formatValue));
-                return 2;
-            }
-
-            var value = InputValueResolver.Resolve(expression ?? parsed.PrimaryValue, file);
-            IReadOnlyList<ModelPropertyAssignment> properties =
-            [
-                .. parsed.Properties,
-                .. ParseSetAssignments(parseResult.GetValue(setOption)),
-            ];
+            var value = InputValueResolver.Resolve(parseResult.GetValue(expressionOption), file);
+            var properties = ParseSetAssignments(parseResult.GetValue(setOption));
 
             if (!RecentConnections.TryResolveModel(
                     parseResult,
@@ -304,6 +259,8 @@ internal sealed class AddCommand : ICommandModule
         return eq > 0 ? raw[..eq].Trim() : "";
     }
 
+    // "name=" is an explicit empty value (it clears or removes the property), so only "-" reads
+    // stdin. The implicit read on an empty value would block a script whose stdin is redirected.
     internal static IReadOnlyList<ModelPropertyAssignment> ParseSetAssignments(IEnumerable<string?>? raw)
     {
         if (raw is null)
@@ -317,56 +274,11 @@ internal sealed class AddCommand : ICommandModule
             var name = SplitSetName(value);
             if (name.Length == 0)
                 continue; // parse-time validator already rejected it
-            var eq = value.IndexOf('=');
-            assignments.Add(new ModelPropertyAssignment(name, value[(eq + 1)..]));
+            var assigned = value[(value.IndexOf('=') + 1)..];
+            assignments.Add(new ModelPropertyAssignment(
+                name, assigned == "-" ? InputValueResolver.Resolve(assigned) ?? "" : assigned));
         }
 
         return assignments;
-    }
-
-    internal static (string? PrimaryValue, IReadOnlyList<ModelPropertyAssignment> Properties, string? DanglingProperty) ParseInterleavedQi(
-        ParseResult parseResult)
-    {
-        string? primaryValue = null;
-        var properties = new List<ModelPropertyAssignment>();
-        string? pendingQuery = null;
-        string? dangling = null;
-
-        foreach (var (option, value) in OrderedOptionTokens.ReadOptions(parseResult))
-        {
-            if (option == "-q")
-            {
-                dangling ??= pendingQuery;
-                pendingQuery = value;
-                continue;
-            }
-
-            if (option == "-i")
-            {
-                if (value is null)
-                    continue;
-
-                // A value applies to the most recent -q (as that property) or, failing that, as the primary value.
-                if (pendingQuery is not null)
-                {
-                    properties.Add(new ModelPropertyAssignment(pendingQuery, value));
-                    pendingQuery = null;
-                }
-                else
-                {
-                    primaryValue ??= value;
-                }
-
-                continue;
-            }
-
-            // Any other option interrupts a -q that never received its -i value; report it
-            // instead of silently dropping the property.
-            dangling ??= pendingQuery;
-            pendingQuery = null;
-        }
-
-        dangling ??= pendingQuery;
-        return (primaryValue, properties, dangling);
     }
 }

@@ -37,8 +37,8 @@ reminder on stderr after every save to Desktop, and JSON output reports
 
 ### JSON result
 
-Every mutation command (`add`, `mv`, `set`, `rm`, `replace`, `format`, `script`,
-`save`, `vertipaq --annotate`, `bpa run --fix`, `bpa rules ignore`) reports the same
+Every mutation command (`add`, `mv`, `set`, `rm`, `replace`, `format`, `save`,
+`vertipaq --annotate`, `bpa run --fix`, `bpa rules ignore`) reports the same
 persistence fields under `data`:
 
 | Field | Type | Meaning |
@@ -103,8 +103,7 @@ relationships use `Sales[Key]->Product[Key]` (many side → one side).
 |--------|-------------|
 | `-t, --type <type>` | Object type: `Table`, `CalcTable`, `CalcGroup`, `Measure`, `CalcColumn`, `DataColumn`, `Hierarchy`, `Level`, `Calendar`, `CalcItem`, `KPI`, `Partition`, `MPartition`, `EntityPartition`, `PolicyRangePartition`, `Expression`, `Function`, `Perspective`, `Culture`, `ProviderDataSource`, `StructuredDataSource`, `Role`, `TablePermission`, `Member`, `Relationship`. Often inferred from a container keyword in the path; data sources always require `-t`. |
 | `--expression <value>` (`-e`) | Expression or value for the new object. `-` reads from stdin. |
-| `--set <name=value>` | Set a property on the new object, e.g. `--set formatString="#,0"`. Repeatable. |
-| `-i <value>` / `-q <property>` | Compatibility form of `--expression`/`--set`: an unpaired `-i` is the object's value; pair each `-q` with a following `-i` to set a property. |
+| `--set <name=value>` | Set a property on the new object, e.g. `--set formatString="#,0"`. Repeatable; `name=-` reads the value from stdin. |
 | `--file <file>` | Read the expression from a file. |
 | `--columns <names>` | Comma-separated columns to create on a new table (Table type only). |
 | `--if-not-exists` | Do nothing and exit 0 when the object already exists. |
@@ -139,24 +138,23 @@ tx set <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--set <name=value>` / `-p <name=value>` | Property assignment, e.g. `--set expression="SUM(Sales[Amount])"`. Repeatable; all assignments are applied together. |
-| `-q <property>` / `-i <value>` | Compatibility form of `--set`. `-` reads from stdin. |
+| `--set <name=value>` / `-p <name=value>` | Property assignment, e.g. `--set expression="SUM(Sales[Amount])"`. Repeatable; all assignments are applied together. `name=-` reads the value from stdin. |
 | `-t, --type <type>` | Disambiguate when the path matches multiple objects. |
 | `--strict-refs` | Fail when a rename leaves DAX references broken. |
 | `--no-fix-refs` | Do not rewrite DAX references to a renamed object; warn instead. |
 
 ```sh
-tx set "Sales[Total Sales]" -q "CALCULATE(SUM(Sales[Amount]))"    # expression is the default property
+tx set "Sales[Total Sales]" --set expression="CALCULATE(SUM(Sales[Amount]))"
 tx set "Sales[Total Sales]" --set formatString="#,0" --set displayFolder=KPIs --save   # one load, one save
-tx set tables/Sales/Name -i "Sales_v2" --save
-tx set tables/Sales -q excludeFromModelRefresh -i true
-tx set "Sales[Amount]" -q summarizeBy -i Sum
-tx set "Dates[Month]" -q sortByColumn -i MonthNo                  # empty value clears it
-tx set "Sales[OrderId]" -q isKey -i true
-tx set "Sales[Total Sales]" -t kpi -q statusGraphic -i "Cylinder"
-tx set "Sales Territory/'Sales Territories'" -q hideMembers -i HideBlankMembers
-tx set "Sales Territory/'Sales Territories'/Region" -q ordinal -i 2
-tx set Sales/Sales -t partition -q mode -i DirectQuery
+tx set Sales --set name=Sales_v2 --save
+tx set tables/Sales --set excludeFromModelRefresh=true
+tx set "Sales[Amount]" --set summarizeBy=Sum
+tx set "Dates[Month]" --set sortByColumn=MonthNo                  # empty value clears it
+tx set "Sales[OrderId]" --set isKey=true
+tx set "Sales[Total Sales]" -t kpi --set statusGraphic="Cylinder"
+tx set "Sales Territory/'Sales Territories'" --set hideMembers=HideBlankMembers
+tx set "Sales Territory/'Sales Territories'/Region" --set ordinal=2
+tx set Sales/Sales -t partition --set mode=DirectQuery
 ```
 
 Translations use `translation:<culture>/<property>`, where the property is
@@ -218,7 +216,7 @@ and `joinOnDateBehavior` (`DateAndTime`, `DatePartOnly`). Address a
 relationship by its endpoints:
 
 ```sh
-tx set "Sales[OrderId]->Dates[Date]" -q isActive -i false
+tx set "Sales[OrderId]->Dates[Date]" --set isActive=false
 ```
 
 The endpoint columns themselves stay read-only, and cardinality or
@@ -235,8 +233,8 @@ clear error for the provider fields. Table permissions accept
 `filterExpression` and `metadataPermission` (`Default`, `None`, `Read`):
 
 ```sh
-tx set Readers/user@contoso.com -t member -q memberType -i Group
-tx set Readers/Customer -q metadataPermission -i None
+tx set Readers/user@contoso.com -t member --set memberType=Group
+tx set Readers/Customer --set metadataPermission=None
 ```
 
 Shared expressions and functions accept `name`, `description`, and
@@ -244,7 +242,7 @@ Shared expressions and functions accept `name`, `description`, and
 and functions accept `isHidden` — all of them carry lineage tags:
 
 ```sh
-tx set "Expressions/Environment" -q remoteParameterName -i RangeStart
+tx set "Expressions/Environment" --set remoteParameterName=RangeStart
 ```
 
 The model root is addressed with `.`: `compatibilityLevel`,
@@ -257,7 +255,7 @@ The model root is addressed with `.`: `compatibilityLevel`,
 surface back:
 
 ```sh
-tx set . -q culture -i en-US --save
+tx set . --set culture=en-US --save
 tx get . --query defaultMode
 ```
 
@@ -272,10 +270,10 @@ sources only — `impersonationMode` (`Default`, `ImpersonateAccount`,
 `isolation` (`ReadCommitted`, `Snapshot`), and `timeout` (seconds);
 structured sources accept `contextExpression`. Connection strings,
 accounts, and passwords are secrets, so they are never accepted via
-argv — edit the source file or use `tx script` to change credentials:
+argv — edit the source file to change credentials:
 
 ```sh
-tx set DataSources/Import -q maxConnections -i 5
+tx set DataSources/Import --set maxConnections=5
 ```
 
 ## `mv` — move or rename
@@ -472,32 +470,6 @@ tx format --path "Sales/Total Sales" --save
 tx format --save                     # whole model
 ```
 
-## `script` — run C# against the model
-
-```
-tx script [model] [options]
-```
-
-Scripts get a `Model` variable (the TOM model) — the escape hatch for
-anything the built-in commands don't cover.
-
-| Option | Description |
-|--------|-------------|
-| `--file <file>` | Path(s) to `.cs`/`.csx` script file(s). Repeatable (`--script` still accepted). |
-| `-e, --expression <code>` | Inline C# expression(s). `-` reads from stdin. |
-| `--dry-run` | Compile and report errors without executing. |
-
-```sh
-tx script -e "Model.Tables.Count"
-tx script transform.csx --save
-```
-
-`script --save` runs arbitrary C# and then overwrites the source (and syncs
-the workspace mirror), so it asks for confirmation; pass `--yes` to skip the
-prompt in scripts. `--revert` (drops staged work) asks too. Plain `script`
-stays in memory, `--save-to` writes a copy, and `--stage` defers the prompt
-to `tx stage commit`.
-
 ## Refresh policies
 
 Policies are table child objects, inspected and edited with `get`, `set`, and `rm`:
@@ -509,8 +481,7 @@ tx rm 'Sales/RefreshPolicy' --model ./model.tmdl --save
 ```
 
 `-p` is an alias for `--set`; repeat either option to apply multiple assignments
-as one edit. `-q`/`-i` remain available for a single assignment and cannot be mixed
-with `-p`/`--set`.
+as one edit.
 
 | Property | Description |
 |----------|-------------|
@@ -554,5 +525,4 @@ The `incremental-refresh` command has been removed.
 Refresh operates on the policy **already saved on the deployed model**. Save or
 deploy local policy edits first. See [refresh](connect.md#refresh-trigger-a-data-refresh)
 for remote targeting, previews, and confirmation. Tomix does not require an
-`--execute` flag and its limited script evaluator does not support TOM's
-`ApplyRefreshPolicy()` method; use `--policy-only` for empty-partition bootstrap.
+`--execute` flag; use `--policy-only` for empty-partition bootstrap.

@@ -1,7 +1,7 @@
 # Editing & staging
 
-The mutation commands — `add`, `set`, `mv`, `rm`, `replace`, `format`,
-`script` — share one lifecycle. By default they **preview**: the command runs
+The mutation commands — `add`, `set`, `mv`, `rm`, `replace`, and
+`format` — share one lifecycle. By default they **preview**: the command runs
 against the in-memory model and shows you the result, but nothing is written.
 
 You choose what happens next with one of three flags:
@@ -19,7 +19,7 @@ Staging lets you build up a batch of edits and commit (or abandon) them as a
 unit — useful when a change only makes sense as a whole:
 
 ```sh
-tx set "Sales[Total Sales]" -q "SUM(Sales[Amount])" --stage
+tx set "Sales[Total Sales]" --set expression="SUM(Sales[Amount])" --stage
 tx mv "Sales/Old Name" "Sales/New Name" --stage
 tx rm "Sales/Obsolete" --stage
 
@@ -72,11 +72,9 @@ for the whole lifecycle are listed in the
 ## Bulk edits
 
 `replace` applies a find-and-replace across the model (`--dry-run` to
-preview), `format` reformats DAX and M expressions, and `script` runs C#
-against the TOM model for anything the built-in commands don't cover:
+preview), and `format` reformats DAX and M expressions:
 
 ```sh
 tx replace "[OrderDate]" "[ShipDate]" --dry-run
 tx format --save
-tx script transform.csx --save
 ```

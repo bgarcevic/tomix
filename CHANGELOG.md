@@ -68,6 +68,22 @@ and the API surface that major versions protect.
   3 MB smaller). The `dotnet tool` package now talks to XMLA endpoints uncompressed, as the
   release binaries already did.
 
+### Removed
+
+- **Breaking:** `tx script` is removed. Despite its description it never ran C#: it evaluated a
+  handful of fixed read-only expressions (`Model.Tables.Count`, `Model.Tables[0].Name`, ...) and
+  could not change a model. Use `tx ls`, `tx get`, and `tx find` (with `--output-format json`)
+  to read the same information. The `TOMIX_SCRIPT_FILE_NOT_FOUND` and `TOMIX_SCRIPT_REQUIRED`
+  codes are gone with it.
+- **Breaking:** `tx load` is replaced by `tx summary`, which is listed under Discover and reports
+  more: the source (path or workspace endpoint), on-disk format, culture, default storage mode,
+  and partition, calculation group, perspective, and culture counts alongside the old ones.
+- **Breaking:** the compatibility `-q <property>`/`-i <value>` options on `tx add` and `tx set`
+  are removed. Use `--set <property>=<value>` (repeatable; `<property>=-` reads stdin) and, on
+  `add`, `--expression`/`-e` for the new object's value. `-q` now means `--quiet` on every command.
+  The `TOMIX_SET_INPUT_CONFLICT`, `TOMIX_ADD_INPUT_CONFLICT`, and `TOMIX_ADD_VALUE_REQUIRED` codes
+  are gone with them.
+
 ## [0.6.0] - 2026-09-29
 
 ### Fixed

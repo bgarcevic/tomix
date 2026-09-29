@@ -104,16 +104,15 @@ public sealed partial class HelpLayoutTests
     }
 
     [Fact]
-    public void MutationHelp_GroupsSaveFlags_ThenCompatibilityForms()
+    public void MutationHelp_GroupsSaveFlagsLast()
     {
         var help = Render(Command("add"), 100);
 
         var options = help.IndexOf("\nOptions:", StringComparison.Ordinal);
+        var partition = help.IndexOf("\nPartition and data source options:", StringComparison.Ordinal);
         var save = help.IndexOf("\nSave options:", StringComparison.Ordinal);
-        var compat = help.IndexOf("\nCompatibility options:", StringComparison.Ordinal);
-        Assert.True(options >= 0 && options < save && save < compat, help);
-        Assert.Contains("--save-to <path>", help[save..compat]);
-        Assert.Contains("-i <value>", help[compat..]);
+        Assert.True(options >= 0 && options < partition && partition < save, help);
+        Assert.Contains("--save-to <path>", help[save..]);
     }
 
     [Fact]

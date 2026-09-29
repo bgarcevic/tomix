@@ -3,8 +3,9 @@ using Tomix.App.Bpa;
 using Tomix.App.Deploy;
 using Tomix.App.Info;
 using Tomix.App.Mutations;
-using Tomix.App.Script;
+using Tomix.App.Summary;
 using Tomix.App.Test;
+using Tomix.Cli.Commands;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
@@ -24,6 +25,16 @@ public sealed partial class MarkupEscapeRendererTests
             model: null, remoteServer: "[Server]", database: "[Database]", workspace: null));
 
         AssertLiteral(captured.Stdout, "Model: [Model]", "Active: [Server] / [Database]");
+    }
+
+    [Fact]
+    public void Summary_UsesLiteralModelAndSourceNames()
+    {
+        var captured = Capture(() => SummaryRenderer.Render(new SummaryModelResult(
+            "[Model]", "[Database]", "[Server]", Format: null, 1600, Culture: null, DefaultMode: null,
+            new SummaryCounts(1, 1, 1, 0, 0, 1, 0, 0, 0))));
+
+        AssertLiteral(captured.Stdout, "[Model]", "[Server]", "[Database]");
     }
 
     [Fact]
@@ -75,18 +86,6 @@ public sealed partial class MarkupEscapeRendererTests
 
         AssertLiteral(captured.Stderr, "BPA analysis · [Model]");
         AssertLiteral(captured.Stdout, "[Category]", "[Column]", "Synced: [Target]");
-    }
-
-    [Fact]
-    public void Script_UsesLiteralModelAndSyncNames()
-    {
-        var result = ScriptRunResult.Executed(
-            "[Model]", 1, [], [], new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, new SyncOutcome(SyncStatus.Succeeded, "[Target]")));
-
-        var captured = Capture(() => ScriptRenderer.RenderText(result, "text"));
-
-        AssertLiteral(captured.Stderr, "Model: [Model]");
-        AssertLiteral(captured.Stdout, "Synced: [Target]");
     }
 
     [Fact]

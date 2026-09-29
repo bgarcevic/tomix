@@ -11,7 +11,6 @@ namespace Tomix.Cli.Output;
 internal static class HelpGroups
 {
     public const string Save = "Save options";
-    public const string Compatibility = "Compatibility options";
 
     private static readonly ConditionalWeakTable<Option, string> Groups = new();
 

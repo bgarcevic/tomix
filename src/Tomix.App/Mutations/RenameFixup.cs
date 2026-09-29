@@ -19,7 +19,7 @@ public sealed class RenameBrokenReferencesException : Exception
 }
 
 /// <summary>
-/// The DAX rewrites a rename requires, shared by <c>set -q name</c> and <c>mv</c>. Renaming a
+/// The DAX rewrites a rename requires, shared by <c>set --set name=...</c> and <c>mv</c>. Renaming a
 /// table, measure, column, function (UDF), or calendar silently breaks DAX that references the
 /// old name; this plan holds
 /// the splice-rewritten expressions (applied by default) plus the referencing objects whose DAX

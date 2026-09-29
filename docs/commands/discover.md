@@ -5,6 +5,49 @@ Read-only commands for exploring a model. All of them work against the
 and all print JSON with `--output-format json`. `ls`, `get`, and `query` also
 print CSV; `get` additionally emits `tmdl`, `bim`, and `tmsl`.
 
+## `summary` — what is this model
+
+```
+tx summary [model]
+```
+
+Prints where the model lives and what it contains: its source (a file path,
+or the workspace endpoint and model name), the on-disk format (`tmdl` or
+`bim`) for local models, the compatibility level, culture, and default
+storage mode, and object counts (tables, columns, measures, relationships,
+roles, partitions, calculation groups, perspectives, cultures). A good first
+command on an unfamiliar model, and a quick smoke test that it opens.
+
+```
+AdventureWorks Sales  Model
+
+  source              ./samples/AdventureWorks Sales.SemanticModel
+  format              tmdl
+  compatibilityLevel  1606
+  culture             en-US
+  defaultMode         Import
+
+  Contents
+    tables             10
+    columns            62
+    measures           20
+    relationships       9
+    roles               0
+    partitions         10
+    calculationGroups   2
+    perspectives        0
+    cultures            1
+```
+
+The labels are the JSON keys, laid out like the [`get`](#get-properties-of-one-object)
+view; the next-step hint goes to stderr and is hidden by `--quiet`.
+
+```sh
+tx summary                           # the active connection
+tx summary ./model.tmdl
+tx summary --output-format json      # counts under "counts"
+```
+
 ## `ls` — list model objects
 
 Alias: `list`.
@@ -70,7 +113,8 @@ include their endpoint columns, cardinality, `crossFilteringBehavior`, and
 expressions include `expression`, `kind`, and `remoteParameterName`; DAX
 functions include `expression` and `isHidden`. The model root has its own
 path — `tx get .` reports the compatibility level, `culture`,
-`defaultMode`, and the other model-level scalars. Object
+`defaultMode`, and the other model-level scalars (for object counts, see
+[`summary`](#summary-what-is-this-model)). Object
 annotations are appended as `annotation:<name>` entries in text and JSON
 output, followed by translations as `translation:<culture>/<property>`
 (the same token `tx set` takes). CSV keeps the fixed per-kind columns.

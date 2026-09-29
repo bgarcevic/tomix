@@ -226,15 +226,6 @@ tx refresh --table Sales --refresh-type full --skip-refresh-policy -s MyWorkspac
 ```
 
 
-## `load` — load and summarize
-
-```
-tx load [model]
-```
-
-Loads a model and prints a summary — useful as a smoke test or, with
-`--output-format json`, as a machine-readable model inventory.
-
 ## `save` — export a model
 
 ```

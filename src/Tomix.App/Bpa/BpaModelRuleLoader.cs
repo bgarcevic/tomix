@@ -180,7 +180,7 @@ public static class BpaModelRuleLoader
                     diagnostics.Add(
                         $"External rule file not found: {entry} (resolved: {Path.GetFullPath(path)}). "
                         + (hints == BpaRuleHintContext.Run ? "Skip with --no-model-rules, or remove" : "Remove")
-                        + " the reference: tx set . -q annotation:BestPracticeAnalyzer_ExternalRuleFiles -i \"\" --save");
+                        + " the reference: tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save");
                     continue;
                 }
 

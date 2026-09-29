@@ -27,9 +27,9 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 
     internal static readonly (string Heading, string[] Commands)[] RootSections =
     [
-        ("Discover", ["ls", "get", "find", "deps", "query"]),
-        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "script"]),
-        ("Connect", ["connect", "deploy", "refresh", "load", "save", "auth", "session"]),
+        ("Discover", ["summary", "ls", "get", "find", "deps", "query"]),
+        ("Modify", ["add", "set", "mv", "rm", "replace", "format"]),
+        ("Connect", ["connect", "deploy", "refresh", "save", "auth", "session"]),
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
     ];
@@ -58,6 +58,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx ls --type table",
             "tx ls Sa*",
             "tx ls --paths-only --type measure",
+        ],
+        ["summary"] = [
+            "tx summary",
+            "tx summary ./model.tmdl",
+            "tx summary --output-format json",
         ],
         ["get"] = [
             "tx get \"Table[Measure]\"",
@@ -111,11 +116,6 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx format -e \"CALCULATE(sum(sales[amt]))\"",
             "tx format --path \"Table[Measure]\"",
         ],
-        ["script"] = [
-            "tx script -e \"Model.Tables.Count\"",
-            "tx script transform.csx --save",
-            "tx script -e \"Model.Tables[\\\"Sales\\\"].Name\" --output-format json",
-        ],
         ["connect"] = [
             "tx connect",
             "tx connect --remote",
@@ -137,10 +137,6 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx refresh --refresh-type full",
             "tx refresh --table Sales --table Customers",
             "tx refresh --partition Sales.FY2024 --dry-run",
-        ],
-        ["load"] = [
-            "tx load ./model.tmdl",
-            "tx load --output-format json",
         ],
         ["save"] = [
             "tx save ./model.tmdl --serialization bim",
@@ -388,7 +384,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             // Untagged options first, then the command's own groups in first-seen order, then the
             // shared save flags, then the compatibility forms.
             foreach (var group in local.GroupBy(o => HelpGroups.Of(o) ?? "")
-                         .OrderBy(g => g.Key switch { "" => 0, HelpGroups.Save => 2, HelpGroups.Compatibility => 3, _ => 1 }))
+                         .OrderBy(g => g.Key switch { "" => 0, HelpGroups.Save => 2, _ => 1 }))
             {
                 AnsiConsole.MarkupLine(Styling.Title($"{(group.Key.Length == 0 ? "Options" : group.Key)}:"));
                 WriteOptionRows(group.Key == HelpGroups.Save

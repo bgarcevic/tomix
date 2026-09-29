@@ -18,7 +18,7 @@ public sealed class SaveValidationCliTests
         string[] args =
         [
             "add", "Sales/Broken", model.Path,
-            "-t", "Measure", "-i", "SUM('Missing'[Amount])",
+            "-t", "Measure", "--expression", "SUM('Missing'[Amount])",
             "--save", "--output-format", "json"
         ];
 

@@ -6,7 +6,6 @@ using Tomix.App.Mv;
 using Tomix.App.Replace;
 using Tomix.App.Rm;
 using Tomix.App.Save;
-using Tomix.App.Script;
 using Tomix.App.Set;
 using Tomix.App.Vertipaq;
 using Tomix.Cli.Output;
@@ -64,7 +63,6 @@ public sealed class MutationResultContractTests
         yield return ("format", new ObjectFormatResult(true, "Sales/M", "DAX", "formatted", "1") { Outcome = outcome });
         yield return ("format-model", new ModelFormatResult(1, 1, 0, 0, []) { Outcome = outcome });
         yield return ("save", new SaveModelResult("tmdl") { Outcome = outcome });
-        yield return ("script", ScriptRunResult.Executed("model", 1, [], [], outcome));
         yield return ("vertipaq", new VertipaqAnnotateResult(1, 0) { Outcome = outcome });
     }
 
