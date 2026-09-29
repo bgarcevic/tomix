@@ -262,7 +262,7 @@ come from structural integrity checks.
 |------|----------|---------|
 | `DAX0001` | Error | A DAX expression references a table that does not exist in the model. |
 | `DAX0002` | Error | A DAX expression references a column that does not exist on the named table (and no measure by that name exists). |
-| `DAX0003` | Warning | An unqualified `[X]` reference resolves to no measure or column anywhere in the model. Warning-severity because it may be a query-scoped extension column (`ADDCOLUMNS`/`SUMMARIZE`), which offline analysis cannot see. |
+| `DAX0003` | Warning | An unqualified `[X]` reference resolves to no measure or column anywhere in the model, or is a column the expression builds itself (`ADDCOLUMNS`, `SUMMARIZE`, `GENERATESERIES`, ...) used outside the table that has it. Columns the expression builds are not reported where a row of their table is in context (inside `FILTER`, `SUMX`, and other iterators over it, including through a `VAR`). Warning-severity because offline analysis cannot be certain. |
 | `DAX0004` | Error | A DAX expression contains a character that starts no DAX token, or an unbalanced parenthesis/brace. The expression's reference checks are skipped. |
 | `DAX0005` | Error | A DAX expression contains an unterminated string, table name, column reference, or block comment. The expression's reference checks are skipped. |
 | `DAX0006` | Error | A measure or calculated column expression directly references itself. |

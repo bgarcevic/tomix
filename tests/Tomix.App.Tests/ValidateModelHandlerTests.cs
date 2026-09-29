@@ -351,6 +351,9 @@ public sealed class ValidateModelHandlerTests
     // IN { ... } is a list and DATATABLE rows are literals, not a [Value] table.
     [InlineData("IF(1 IN { 1, 2 }, [Value])", "Value")]
     [InlineData("SUMX(DATATABLE(\"N\", INTEGER, {{1}}), [Value])", "Value")]
+    // Built by the expression, but used outside the table that has it.
+    [InlineData("COUNTROWS(FILTER(ADDCOLUMNS(Sales, \"@Required\", 1), TRUE())) + [@Required]", "@Required")]
+    [InlineData("VAR T = ADDCOLUMNS(Sales, \"@Required\", 1) RETURN SUMX(T, [@Required])", null)]
     public async Task HandleAsync_AcceptsQueryScopedColumns(string expression, string? warnedName)
     {
         var result = await ValidateAsync(SalesSnapshot(Measure("Total", expression)));

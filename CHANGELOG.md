@@ -25,6 +25,10 @@ and the API surface that major versions protect.
   `[@Name]` when `"@Name"` is a new column's name in `ADDCOLUMNS`, `SELECTCOLUMNS`,
   `SUMMARIZE`, `SUMMARIZECOLUMNS`, `GROUPBY`, `ROW`, or `DATATABLE`, and `[Value]` from
   `GENERATESERIES` or a `{ ... }` table constructor (not an `IN { ... }` list).
+- `tx validate` now checks where those columns are used: a column an expression builds is
+  accepted only where a row of its table is in context (inside `FILTER`, `SUMX`, and other
+  iterators over it, also through a `VAR`), and a use outside it warns with `DAX0003` "is built
+  by this expression but used outside the table that has it".
 
 ## [0.5.0] - 2026-09-29
 

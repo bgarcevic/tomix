@@ -63,6 +63,7 @@ internal static class ModelValidation
             return;
         }
 
+        IReadOnlyDictionary<int, DaxQueryColumnScope>? queryColumns = null;
         foreach (var reference in DaxReferenceExtractor.Extract(site.Expression))
         {
             // A direct reference to the expression's own measure or calculated column is a
@@ -121,20 +122,27 @@ internal static class ModelValidation
                             LineText(site.Expression, reference.Start)));
                     break;
 
-                // A lone [X] that resolves nowhere may still be a query-scoped extension column
-                // (ADDCOLUMNS/SUMMARIZE), which the extractor cannot see — warn, don't fail, and
-                // stay quiet when the expression itself names such a column.
+                // A lone [X] that resolves nowhere may be a column the expression builds itself
+                // (ADDCOLUMNS, GENERATESERIES, ...): fine where a row of that table is in context,
+                // suspect outside it. Offline analysis can't be certain either way — warn, don't fail.
                 case DaxReferenceShape.Unqualified:
-                    if (!index.MeasureNames.Contains(reference.Object!)
-                        && !index.ColumnNames.Contains(reference.Object!)
-                        && !DaxQueryColumns.Defines(site.Expression, reference.Object!))
-                        issues.Add(new ValidationIssue(
-                            ValidationSeverity.Warning,
-                            "DAX0003",
-                            $"Measure or column [{reference.Object}] cannot be found in the model.",
-                            obj.Path,
-                            Line(site.Expression, reference.Start),
-                            LineText(site.Expression, reference.Start)));
+                    if (index.MeasureNames.Contains(reference.Object!) || index.ColumnNames.Contains(reference.Object!))
+                        break;
+
+                    queryColumns ??= DaxQueryColumns.Analyze(site.Expression);
+                    var scope = queryColumns.GetValueOrDefault(reference.Start, DaxQueryColumnScope.NotDefined);
+                    if (scope == DaxQueryColumnScope.InScope)
+                        break;
+
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Warning,
+                        "DAX0003",
+                        scope == DaxQueryColumnScope.OutOfScope
+                            ? $"Column [{reference.Object}] is built by this expression but used outside the table that has it."
+                            : $"Measure or column [{reference.Object}] cannot be found in the model.",
+                        obj.Path,
+                        Line(site.Expression, reference.Start),
+                        LineText(site.Expression, reference.Start)));
                     break;
 
                 // A bare word only counts as a table when the model has one by that name.
@@ -283,7 +291,7 @@ internal static class ModelValidation
                     c.Kind == ModelObjectKind.Partition && DaxExpressions.IsCalculated(c));
                 if (columns.Count == 0 && calculated is not null)
                 {
-                    if (DaxCalculatedTableColumns.Infer(calculated.Expression) is { } inferred)
+                    if (DaxQueryColumns.CalculatedTableColumns(calculated.Expression) is { } inferred)
                         columns.UnionWith(inferred);
                     else
                         unknownColumnTables.Add(table.Name);
