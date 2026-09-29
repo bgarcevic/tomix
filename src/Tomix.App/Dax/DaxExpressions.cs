@@ -121,7 +121,7 @@ public static class DaxExpressions
         }
     }
 
-    private static bool IsCalculated(ModelObject partition)
+    internal static bool IsCalculated(ModelObject partition)
         => string.Equals(partition.Property("PartitionSourceType"), "Calculated", StringComparison.OrdinalIgnoreCase)
            || string.Equals(partition.Detail, "calculated", StringComparison.OrdinalIgnoreCase);
 }

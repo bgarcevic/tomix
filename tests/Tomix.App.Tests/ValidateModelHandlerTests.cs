@@ -307,6 +307,32 @@ public sealed class ValidateModelHandlerTests
         Assert.Empty(result.Data.Warnings);
     }
 
+    [Theory]
+    [InlineData("DATATABLE(\"Group\", STRING, \"Offset\", INTEGER, {{\"a, b\", 1}, {\"c\", BLANK()}})", "Axis[Group] + Axis[Offset]", null)]
+    [InlineData("DATATABLE(\"Group\", STRING, {{\"a\"}})", "Axis[Missing]", "DAX0002")]
+    [InlineData("-- axis\nROW(\"Group\", \"x\", \"Offset\", 1)", "Axis[Offset]", null)]
+    [InlineData("ROW(\"Group\", \"x\")", "Axis[Missing]", "DAX0002")]
+    // Columns that cannot be inferred offline are not reported either way.
+    [InlineData("SELECTCOLUMNS(Sales, \"Group\", Sales[Amount])", "Axis[Anything]", null)]
+    [InlineData("FILTER(DATATABLE(\"Group\", STRING, {{\"a\"}}), TRUE())", "Axis[Anything]", null)]
+    public async Task HandleAsync_InfersUndeclaredCalculatedTableColumns(
+        string tableExpression, string measureExpression, string? expectedCode)
+    {
+        var partition = new ModelObject("Axis", ModelObjectKind.Partition, "Axis/Axis",
+            Detail: "calculated", Expression: tableExpression, Description: null,
+            Hidden: false, SourceColumn: null, Children: []);
+        var axis = new ModelObject("Axis", ModelObjectKind.Table, "Axis",
+            Detail: "calculated", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [partition]);
+        var snapshot = SalesSnapshot(Measure("Total", measureExpression));
+        var result = await ValidateAsync(snapshot with { Objects = [.. snapshot.Objects, axis] });
+
+        if (expectedCode is null)
+            Assert.Empty(result.Data!.Errors);
+        else
+            Assert.Equal(expectedCode, Assert.Single(result.Data!.Errors).Code);
+    }
+
     [Fact]
     public async Task HandleAsync_ScansSecondaryMeasureExpressions()
     {
