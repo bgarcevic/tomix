@@ -311,6 +311,34 @@ internal static class BpaRulesRenderer
         AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules in file:", result.RuleCount.ToString())}");
     }
 
+    /// <summary><c>bpa rules add/set/remove</c> against a model: what changed, and whether it was kept.</summary>
+    public static void RenderModel(BpaRulesModelResult result)
+    {
+        var id = Styling.Value(result.RuleId);
+        var model = Styling.Value(result.ModelName);
+        switch (result.Action)
+        {
+            case "set" when !result.Changed:
+                AnsiConsole.MarkupLine(Styling.Muted($"Rule '{result.RuleId}' already has those values — no change."));
+                return;
+            case "set":
+                AnsiConsole.MarkupLine($"Updated model rule {id} in {model}.");
+                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Changed:", string.Join(", ", result.ChangedFields ?? []))}");
+                break;
+            case "remove":
+                AnsiConsole.MarkupLine($"Removed model rule {id} from {model}.");
+                break;
+            default:
+                AnsiConsole.MarkupLine($"Added model rule {id} to {model}.");
+                break;
+        }
+
+        if (result.Rule is { } rule)
+            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Applies to:", rule.Scope)}");
+        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules in model:", result.RuleCount.ToString())}");
+        RenderMutationTail(result);
+    }
+
     public static void RenderIgnore(BpaRulesIgnoreResult result)
     {
         var verb = result.Ignored ? "ignored" : "no longer ignored";
@@ -324,7 +352,11 @@ internal static class BpaRulesRenderer
 
         AnsiConsole.MarkupLine($"Rule {Styling.Value(result.RuleId)} is now {verb} for {Styling.Value(result.ModelName)}.");
         AnsiConsole.MarkupLine($"  {Styling.KeyValue("Ignored rules:", result.RuleIds.Count.ToString())}");
+        RenderMutationTail(result);
+    }
 
+    private static void RenderMutationTail(MutationResult result)
+    {
         if (result.Saved)
             MutationOutput.RenderSaved(result.Outcome, "  ");
         else if (result.Status == MutationStatus.Staged)
@@ -383,6 +415,37 @@ internal static class BpaRulesRenderer
         if (result.Rule is not null)
             json["rule"] = ProjectRuleInfo(result.Rule);
 
+        return json;
+    }
+
+    /// <summary>
+    /// JSON projection for <c>bpa rules add/set/remove</c> against a model: the rule fields of
+    /// <see cref="ToFileJson"/> with <c>model</c> in place of <c>path</c>, then the mutation fields.
+    /// </summary>
+    internal static object ToModelJson(BpaRulesModelResult result)
+    {
+        var json = new Dictionary<string, object?>
+        {
+            ["action"] = result.Action,
+            ["model"] = result.ModelName,
+            ["changed"] = result.Changed,
+            ["ruleCount"] = result.RuleCount,
+            ["ruleId"] = result.RuleId
+        };
+
+        if (result.ChangedFields is not null)
+            json["changedFields"] = result.ChangedFields;
+        if (result.Rule is not null)
+            json["rule"] = ProjectRuleInfo(result.Rule);
+
+        json["status"] = result.Status;
+        json["dryRun"] = result.DryRun;
+        json["saved"] = result.Saved;
+        json["savedTo"] = result.SavedTo;
+        json["persistence"] = result.Persistence;
+        json["target"] = result.Target;
+        json["sync"] = result.Sync;
+        json["newValidationErrors"] = result.NewValidationErrors;
         return json;
     }
 

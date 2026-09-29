@@ -38,16 +38,24 @@ public sealed record BpaRulesFileResult(
     IReadOnlyList<string>? ChangedFields = null);
 
 /// <summary>
-/// A BPA rules JSON file edited in place by the rule-authoring commands. The file is handled as a
-/// raw JSON array so fields tx does not model (and the order of existing ones) survive an edit.
-/// The target is the selected <c>--rules-file</c>, or the user's config-dir <c>bpa-rules.json</c>,
-/// which <c>bpa run</c> loads on every run.
+/// A BPA rule array edited in place by the rule-authoring commands: a rules JSON file (the
+/// selected <c>--rules-file</c>, or the user's config-dir <c>bpa-rules.json</c>, which
+/// <c>bpa run</c> loads on every run), or the model's <c>BestPracticeAnalyzer</c> annotation. The
+/// rules are handled as a raw JSON array so fields tx does not model (and the order of existing
+/// ones) survive an edit.
 /// </summary>
 internal sealed class BpaRulesFile
 {
     public const string UserFileName = "bpa-rules.json";
 
+    /// <summary>The source <c>bpa rules list</c> reports for rules in the model annotation.</summary>
+    public const string ModelSource = "model-embedded";
+
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
+
+    /// <summary>The field order the bundled catalog uses; a new rule is written in it.</summary>
+    private static readonly string[] FieldOrder =
+        ["ID", "Name", "Category", "Description", "Severity", "Scope", "Expression", "FixExpression", "CompatibilityLevel"];
 
     /// <summary>
     /// Scope tokens a rule may name: every scope the bundled catalog uses, the engine's broader
@@ -64,13 +72,18 @@ internal sealed class BpaRulesFile
 
     private readonly JsonArray _rules;
 
-    private BpaRulesFile(string path, JsonArray rules)
+    private BpaRulesFile(string path, string source, JsonArray rules)
     {
         Path = path;
+        Source = source;
         _rules = rules;
     }
 
+    /// <summary>The file path, or a description of the annotation for a model's rules.</summary>
     public string Path { get; }
+
+    /// <summary>The rule source <see cref="Describe"/> reports: the path, or <see cref="ModelSource"/>.</summary>
+    public string Source { get; }
 
     public int Count => _rules.Count;
 
@@ -101,7 +114,46 @@ internal sealed class BpaRulesFile
     }
 
     /// <summary>An empty rules file at <paramref name="path"/>, not yet written.</summary>
-    public static BpaRulesFile Empty(string path) => new(path, []);
+    public static BpaRulesFile Empty(string path) => new(path, path, []);
+
+    /// <summary>
+    /// The rules in a model's <c>BestPracticeAnalyzer</c> annotation (<paramref name="json"/>, null
+    /// or blank when the model has none). Returns false with a reason when the annotation is not a
+    /// JSON array of rule objects, so a malformed annotation is never overwritten.
+    /// </summary>
+    public static bool TryFromAnnotation(string? json, out BpaRulesFile file, out string reason)
+    {
+        file = null!;
+        if (!TryParse(json, out var rules, out reason))
+            return false;
+
+        file = new BpaRulesFile($"the model's {BpaModelRuleLoader.EmbeddedKey} annotation", ModelSource, rules);
+        return true;
+    }
+
+    /// <summary>Parses a rule array; blank text is an empty array.</summary>
+    private static bool TryParse(string? text, out JsonArray rules, out string reason)
+    {
+        rules = [];
+        reason = "";
+        try
+        {
+            var node = string.IsNullOrWhiteSpace(text) ? new JsonArray() : JsonNode.Parse(text);
+            if (node is not JsonArray array || array.Any(item => item is not JsonObject))
+            {
+                reason = "expected a JSON array of rule objects.";
+                return false;
+            }
+
+            rules = array;
+            return true;
+        }
+        catch (JsonException ex)
+        {
+            reason = ex.Message;
+            return false;
+        }
+    }
 
     /// <summary>
     /// Resolves and reads the target file, returning a failure (and no file) when it cannot be
@@ -130,37 +182,33 @@ internal sealed class BpaRulesFile
                 hint: "Create it with 'tx bpa rules init', or add a rule with 'tx bpa rules add'.");
         }
 
+        string text;
         try
         {
-            var text = File.ReadAllText(path);
-            var node = string.IsNullOrWhiteSpace(text) ? new JsonArray() : JsonNode.Parse(text);
-            if (node is not JsonArray array || array.Any(item => item is not JsonObject))
-                return LoadFailed(path, "expected a JSON array of rule objects.");
-
-            file = new BpaRulesFile(path, array);
-            return null;
-        }
-        catch (JsonException ex)
-        {
-            return LoadFailed(path, ex.Message);
+            text = File.ReadAllText(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return LoadFailed(path, ex.Message);
+            return LoadFailed($"BPA rules file {path}", ex.Message);
         }
+
+        if (!TryParse(text, out var rules, out var reason))
+            return LoadFailed($"BPA rules file {path}", reason);
+
+        file = new BpaRulesFile(path, path, rules);
+        return null;
     }
 
-    private static TomixResult<BpaRulesFileResult> LoadFailed(string path, string reason)
+    /// <summary><c>TOMIX_BPA_RULES_LOAD_FAILED</c> for rules that cannot be read, and so are not edited.</summary>
+    internal static TomixResult<BpaRulesFileResult> LoadFailed(string what, string reason)
         => TomixResult<BpaRulesFileResult>.Fail(
             "TOMIX_BPA_RULES_LOAD_FAILED",
-            $"Cannot read BPA rules file {path}: {reason}",
+            $"Cannot read {what}: {reason}",
             exitCode: 2);
 
     public JsonObject? Find(string ruleId)
         => _rules.OfType<JsonObject>().FirstOrDefault(
             rule => string.Equals(StringField(rule, "ID"), ruleId, StringComparison.OrdinalIgnoreCase));
-
-    public void Add(JsonObject rule) => _rules.Add(rule);
 
     public void Remove(JsonObject rule) => _rules.Remove(rule);
 
@@ -171,6 +219,60 @@ internal sealed class BpaRulesFile
             Directory.CreateDirectory(directory);
 
         AtomicFile.WriteAllText(Path, _rules.ToJsonString(WriteOptions) + Environment.NewLine);
+    }
+
+    /// <summary>The rules as compact JSON, the form the model annotation holds.</summary>
+    public string ToAnnotationJson() => _rules.ToJsonString();
+
+    /// <summary>
+    /// Validates a new rule and adds it in the catalog's field order. Name, scope, and expression
+    /// are required; category defaults to <c>Custom</c> and severity to warning. An ID the rules
+    /// already have fails, so an add never silently overwrites a rule.
+    /// </summary>
+    /// <param name="setTarget">What follows the rule ID in the suggested <c>set</c> command (the model, for model rules).</param>
+    public TomixResult<BpaRulesFileResult>? TryAdd(
+        string ruleId, BpaRuleFields fields, out JsonObject rule, string setTarget = "")
+    {
+        rule = null!;
+        var missing = new[]
+            {
+                ("--name", fields.Name),
+                ("--scope", fields.Scope),
+                ("--expression", fields.Expression)
+            }
+            .Where(f => string.IsNullOrWhiteSpace(f.Item2))
+            .Select(f => f.Item1)
+            .ToList();
+        if (missing.Count > 0)
+            return TomixResult<BpaRulesFileResult>.Fail(
+                "TOMIX_BPA_RULE_FIELD_REQUIRED",
+                $"A new rule needs {string.Join(", ", missing)}.",
+                exitCode: 2);
+
+        if (Find(ruleId) is not null)
+            return TomixResult<BpaRulesFileResult>.Fail(
+                "TOMIX_BPA_RULE_EXISTS",
+                $"Rule '{ruleId}' already exists in {Path}.",
+                exitCode: 2,
+                hint: $"Change it with 'tx bpa rules set {ruleId}{setTarget}', or remove it first.");
+
+        var draft = new JsonObject
+        {
+            ["ID"] = ruleId,
+            ["Category"] = BpaRulesAddHandler.DefaultCategory,
+            ["Severity"] = 2,
+            ["CompatibilityLevel"] = 1200
+        };
+        if (TryApply(draft, fields, out _) is { } invalid)
+            return invalid;
+
+        rule = new JsonObject();
+        foreach (var field in FieldOrder)
+            if (draft[field] is { } value)
+                rule[field] = value.DeepClone();
+
+        _rules.Add(rule);
+        return null;
     }
 
     /// <summary>
@@ -291,12 +393,12 @@ internal sealed class BpaRulesFile
         return string.Join(", ", tokens);
     }
 
-    /// <summary>The rule as the listing commands describe it, sourced from this file.</summary>
+    /// <summary>The rule as the listing commands describe it, sourced from these rules.</summary>
     public BpaRuleInfo Describe(JsonObject rule)
     {
         var parsed = BpaRuleLoader.LoadFromJson(new JsonArray(rule.DeepClone()).ToJsonString())[0];
         return new BpaRuleInfo(
-            Path,
+            Source,
             Status: "active",
             parsed.Id,
             parsed.Name,

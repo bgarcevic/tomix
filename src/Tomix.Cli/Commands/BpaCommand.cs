@@ -589,18 +589,72 @@ internal sealed class BpaCommand : ICommandModule
             parseResult.GetValue(FixExpression));
     }
 
+    /// <summary>
+    /// The model target and lifecycle options of <c>bpa rules add/set/remove</c>. Without a model
+    /// the commands edit a rules file; naming one (the argument, <c>--model</c>, <c>--recent</c>, or
+    /// <c>--server</c>) edits the model's <c>BestPracticeAnalyzer</c> annotation instead.
+    /// </summary>
+    private sealed class RuleTargetOptions
+    {
+        public Argument<string?> Model { get; } = OptionalModelArgument(
+            "Model whose BestPracticeAnalyzer annotation to edit (default: the rules file)");
+        public Option<bool> Overwrite { get; } = LifecycleOptions.Overwrite();
+        public Option<bool> Save { get; } = LifecycleOptions.Save();
+        public Option<string?> SaveTo { get; } = LifecycleOptions.SaveTo();
+        public Option<string?> Serialization { get; } = LifecycleOptions.Serialization();
+        public Option<bool> Stage { get; } = LifecycleOptions.Stage();
+        public Option<bool> Revert { get; } = LifecycleOptions.Revert();
+        public Option<bool> NoSync { get; } = LifecycleOptions.NoSync();
+        public Option<bool> Force { get; } = LifecycleOptions.Force();
+
+        public void AddTo(Command command)
+        {
+            command.Arguments.Add(Model);
+            foreach (var option in new Option[] { Overwrite, Save, SaveTo, Serialization, Stage, Revert, NoSync, Force })
+                command.Options.Add(option);
+        }
+
+        /// <summary>True when the invocation names a model rather than relying on the rules file.</summary>
+        public bool TargetsModel(ParseResult parseResult)
+            => !string.IsNullOrWhiteSpace(parseResult.GetValue(Model))
+                || !string.IsNullOrWhiteSpace(GlobalOptions.ModelValue(parseResult))
+                || GlobalOptions.RecentSpecified(parseResult)
+                || !string.IsNullOrWhiteSpace(parseResult.GetValue(GlobalOptions.Server));
+
+        public BpaRulesModelRequest Request(
+            ParseResult parseResult, ModelReference model, BpaRulesModelAction action, string ruleId, BpaRuleFields? fields)
+            => new(
+                model,
+                action,
+                ruleId,
+                fields,
+                Save: parseResult.GetValue(Save),
+                SaveTo: parseResult.GetValue(SaveTo),
+                Serialization: parseResult.GetValue(Serialization) ?? "",
+                Overwrite: parseResult.GetValue(Overwrite),
+                Stage: parseResult.GetValue(Stage),
+                Revert: parseResult.GetValue(Revert),
+                NoSync: parseResult.GetValue(NoSync),
+                Force: parseResult.GetValue(Force));
+    }
+
     private Command BuildRulesAddCommand(Option<string?> rulesFileOption)
     {
         var idOption = new Option<string>("--id") { Description = "Rule ID", Required = true };
         var fields = new RuleFieldOptions();
-        var command = new Command("add", "Add a custom rule to a rules file") { idOption };
+        var target = new RuleTargetOptions();
+        var command = new Command("add", "Add a custom rule to a rules file or a model") { idOption };
+        target.AddTo(command);
         fields.AddTo(command);
 
-        command.SetAction(parseResult => RenderRulesFile(parseResult, "bpa rules add", () =>
-            new BpaRulesAddHandler(_configDirectory).Handle(new BpaRulesAddRequest(
+        command.SetAction((parseResult, cancellationToken) => RenderRuleEdit(
+            parseResult, "bpa rules add", rulesFileOption, target, BpaRulesModelAction.Add,
+            parseResult.GetValue(idOption)!, fields.Read(parseResult),
+            () => new BpaRulesAddHandler(_configDirectory).Handle(new BpaRulesAddRequest(
                 parseResult.GetValue(idOption)!,
                 fields.Read(parseResult),
-                parseResult.GetValue(rulesFileOption)))));
+                parseResult.GetValue(rulesFileOption))),
+            cancellationToken));
 
         return command;
     }
@@ -609,14 +663,19 @@ internal sealed class BpaCommand : ICommandModule
     {
         var ruleIdArgument = new Argument<string>("rule-id") { Description = "Rule ID" };
         var fields = new RuleFieldOptions();
-        var command = new Command("set", "Change a custom rule in a rules file") { ruleIdArgument };
+        var target = new RuleTargetOptions();
+        var command = new Command("set", "Change a custom rule in a rules file or a model") { ruleIdArgument };
+        target.AddTo(command);
         fields.AddTo(command);
 
-        command.SetAction(parseResult => RenderRulesFile(parseResult, "bpa rules set", () =>
-            new BpaRulesSetHandler(_configDirectory).Handle(new BpaRulesSetRequest(
+        command.SetAction((parseResult, cancellationToken) => RenderRuleEdit(
+            parseResult, "bpa rules set", rulesFileOption, target, BpaRulesModelAction.Set,
+            parseResult.GetValue(ruleIdArgument)!, fields.Read(parseResult),
+            () => new BpaRulesSetHandler(_configDirectory).Handle(new BpaRulesSetRequest(
                 parseResult.GetValue(ruleIdArgument)!,
                 fields.Read(parseResult),
-                parseResult.GetValue(rulesFileOption)))));
+                parseResult.GetValue(rulesFileOption))),
+            cancellationToken));
 
         return command;
     }
@@ -624,14 +683,67 @@ internal sealed class BpaCommand : ICommandModule
     private Command BuildRulesRemoveCommand(Option<string?> rulesFileOption)
     {
         var ruleIdArgument = new Argument<string>("rule-id") { Description = "Rule ID" };
-        var command = new Command("remove", "Delete a custom rule from a rules file") { ruleIdArgument };
+        var target = new RuleTargetOptions();
+        var command = new Command("remove", "Delete a custom rule from a rules file or a model") { ruleIdArgument };
+        target.AddTo(command);
 
-        command.SetAction(parseResult => RenderRulesFile(parseResult, "bpa rules remove", () =>
-            new BpaRulesRemoveHandler(_configDirectory).Handle(new BpaRulesRemoveRequest(
+        command.SetAction((parseResult, cancellationToken) => RenderRuleEdit(
+            parseResult, "bpa rules remove", rulesFileOption, target, BpaRulesModelAction.Remove,
+            parseResult.GetValue(ruleIdArgument)!, fields: null,
+            () => new BpaRulesRemoveHandler(_configDirectory).Handle(new BpaRulesRemoveRequest(
                 parseResult.GetValue(ruleIdArgument)!,
-                parseResult.GetValue(rulesFileOption)))));
+                parseResult.GetValue(rulesFileOption))),
+            cancellationToken));
 
         return command;
+    }
+
+    /// <summary>
+    /// <c>bpa rules add/set/remove</c>: edits the model's annotation when the invocation names a
+    /// model, else the rules file. A model and <c>--rules-file</c> together are ambiguous and fail.
+    /// </summary>
+    private async Task<int> RenderRuleEdit(
+        ParseResult parseResult,
+        string commandName,
+        Option<string?> rulesFileOption,
+        RuleTargetOptions target,
+        BpaRulesModelAction action,
+        string ruleId,
+        BpaRuleFields? fields,
+        Func<TomixResult<BpaRulesFileResult>> editFile,
+        CancellationToken cancellationToken)
+    {
+        if (!target.TargetsModel(parseResult))
+            return RenderRulesFile(parseResult, commandName, editFile);
+
+        var format = GlobalOptions.OutputFormatValue(parseResult);
+        if (!CommandOutput.TryValidateFormat(parseResult, format, commandName, OutputFormats.Text, OutputFormats.Json))
+            return 2;
+
+        if (!string.IsNullOrWhiteSpace(parseResult.GetValue(rulesFileOption)))
+            return CommandOutput.Render(
+                parseResult,
+                TomixResult<BpaRulesModelResult>.Fail(
+                    "TOMIX_BPA_RULES_TARGET_CONFLICT",
+                    "Pass either a model or --rules-file, not both.",
+                    exitCode: 2,
+                    hint: "A model edits its BestPracticeAnalyzer annotation; --rules-file edits that file."),
+                format,
+                BpaRulesRenderer.RenderModel,
+                BpaRulesRenderer.ToModelJson);
+
+        if (!RecentConnections.TryResolveModel(
+                parseResult,
+                GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(target.Model),
+                _state,
+                out var model,
+                out var recentExit))
+            return recentExit;
+
+        var result = await new BpaRulesModelHandler(_providers, _mutations).HandleAsync(
+            target.Request(parseResult, model, action, ruleId, fields), cancellationToken);
+
+        return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderModel, BpaRulesRenderer.ToModelJson);
     }
 
     private Command BuildRulesInitCommand(Option<string?> rulesFileOption)
@@ -664,10 +776,10 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Accept a rule ID that no loaded rule has (for example, one from a remote rule file)"
         };
 
-    private static Argument<string?> OptionalModelArgument()
+    private static Argument<string?> OptionalModelArgument(string description = "Path to model")
         => new("model")
         {
-            Description = "Path to model",
+            Description = description,
             Arity = ArgumentArity.ZeroOrOne
         };
 }

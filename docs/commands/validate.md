@@ -138,9 +138,9 @@ the prompt in scripts.
 | `bpa rules show <rule-id> [model]` | Show one rule in full: description, reference link, source, scope, expression, and fix expression. Accepts `--ruleset` and `--no-defaults` like `list`. An unknown ID fails with `TOMIX_BPA_RULE_NOT_FOUND` and suggests IDs that contain what you typed. |
 | `bpa rules enable` / `bpa rules disable` | Turn a built-in rule back on, or off, for this user. |
 | `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
-| `bpa rules add --id <id> ...` | Add a custom rule to your rules file. Needs `--name`, `--scope`, and `--expression`; see [Authoring rules](#authoring-rules). |
-| `bpa rules set <rule-id> ...` | Change fields of a rule in your rules file. |
-| `bpa rules remove <rule-id>` | Delete a rule from your rules file. |
+| `bpa rules add [model] --id <id> ...` | Add a custom rule to your rules file, or to the model's rules with a model. Needs `--name`, `--scope`, and `--expression`; see [Authoring rules](#authoring-rules). |
+| `bpa rules set <rule-id> [model] ...` | Change fields of a rule in your rules file or the model's rules. |
+| `bpa rules remove <rule-id> [model]` | Delete a rule from your rules file or the model's rules. |
 | `bpa rules init` | Create an empty rules file. |
 
 `disable` and `ignore` check the rule ID first, so a typo can't silently turn off
@@ -197,6 +197,27 @@ tx bpa rules add --id MEASURE_DESCRIPTIONS --name "Measures need a description" 
 tx bpa rules set MEASURE_DESCRIPTIONS --severity error
 tx bpa rules remove MEASURE_DESCRIPTIONS
 tx bpa rules --rules-file team-rules.json init
+```
+
+#### Rules that ship with the model
+
+Give `add`, `set`, or `remove` a model (as the argument, or with `--model`, `--recent`,
+or `--server`) and they edit the model's `BestPracticeAnalyzer` annotation instead of a
+file. Those rules travel with the model, and `bpa run` and `bpa rules list` pick them up
+as source `model-embedded`. The same field checks apply, and fields tx does not know
+about are kept. A model and `--rules-file` together fail with
+`TOMIX_BPA_RULES_TARGET_CONFLICT`.
+
+The edit is a model mutation, like `bpa rules ignore`: nothing is written until you pass
+`--save` (or `--stage`), and `--save-to`, `--serialization`, `--revert`, `--no-sync`, and
+`--force` work as they do for `set`. Removing the last rule removes the annotation.
+Rules found only under the old misspelled `BestPractizeAnalyzer` key are moved to the
+correct key on the first edit. `init` only creates files.
+
+```sh
+tx bpa rules add . --id MEASURE_DESCRIPTIONS --name "Measures need a description" --scope Measure --expression "string.IsNullOrWhitespace(Description)" --save
+tx bpa rules set MEASURE_DESCRIPTIONS . --severity error --save
+tx bpa rules remove MEASURE_DESCRIPTIONS . --save
 ```
 
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,

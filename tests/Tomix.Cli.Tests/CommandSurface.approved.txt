@@ -79,8 +79,17 @@ Manage BPA rule collections
   opt --rules-file <file>  Path to a BPA rules JSON file
 
 # tx bpa rules add
-Add a custom rule to a rules file
+Add a custom rule to a rules file or a model
+  arg [model]  Model whose BestPracticeAnalyzer annotation to edit (default: the rules file)
   opt --id <id>  Rule ID
+  opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
+  opt --revert  Revert a staged mutation
+  opt --no-sync  Skip workspace sync when workspace mode is active
+  opt --force, -f  Save despite newly introduced validation errors
   opt --name <name>  Rule name shown in results
   opt --category <name>  Rule category (add default: Custom)
   opt --severity <level>  error, warning, or info (add default: warning)
@@ -126,12 +135,30 @@ List rules from every source, with each rule's status
   opt --all  Include disabled and ignored rules in the listing
 
 # tx bpa rules remove
-Delete a custom rule from a rules file
+Delete a custom rule from a rules file or a model
   arg <rule-id>  Rule ID
+  arg [model]  Model whose BestPracticeAnalyzer annotation to edit (default: the rules file)
+  opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
+  opt --revert  Revert a staged mutation
+  opt --no-sync  Skip workspace sync when workspace mode is active
+  opt --force, -f  Save despite newly introduced validation errors
 
 # tx bpa rules set
-Change a custom rule in a rules file
+Change a custom rule in a rules file or a model
   arg <rule-id>  Rule ID
+  arg [model]  Model whose BestPracticeAnalyzer annotation to edit (default: the rules file)
+  opt --overwrite  Allow --save-to to overwrite an existing target
+  opt --save  Write this command's change back to the model's source. Cannot be combined with --revert or --stage.
+  opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
+  opt --serialization <format>  How the model is written: tmdl or bim (tmsl and auto also accepted)
+  opt --stage  Stage this command's mutation instead of saving it (commit with 'tx stage commit')
+  opt --revert  Revert a staged mutation
+  opt --no-sync  Skip workspace sync when workspace mode is active
+  opt --force, -f  Save despite newly introduced validation errors
   opt --name <name>  Rule name shown in results
   opt --category <name>  Rule category (add default: Custom)
   opt --severity <level>  error, warning, or info (add default: warning)

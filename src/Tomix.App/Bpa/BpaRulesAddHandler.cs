@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Bpa;
@@ -17,9 +16,6 @@ public sealed class BpaRulesAddHandler
 {
     public const string DefaultCategory = "Custom";
 
-    private static readonly string[] FieldOrder =
-        ["ID", "Name", "Category", "Description", "Severity", "Scope", "Expression", "FixExpression", "CompatibilityLevel"];
-
     private readonly string _configDirectory;
 
     public BpaRulesAddHandler(string configDirectory) => _configDirectory = configDirectory;
@@ -30,49 +26,13 @@ public sealed class BpaRulesAddHandler
             return TomixResult<BpaRulesFileResult>.Fail(
                 "TOMIX_BPA_RULE_ID_REQUIRED", "A rule id is required.", exitCode: 2);
 
-        var missing = new[]
-            {
-                ("--name", request.Fields.Name),
-                ("--scope", request.Fields.Scope),
-                ("--expression", request.Fields.Expression)
-            }
-            .Where(f => string.IsNullOrWhiteSpace(f.Item2))
-            .Select(f => f.Item1)
-            .ToList();
-        if (missing.Count > 0)
-            return TomixResult<BpaRulesFileResult>.Fail(
-                "TOMIX_BPA_RULE_FIELD_REQUIRED",
-                $"A new rule needs {string.Join(", ", missing)}.",
-                exitCode: 2);
-
         if (BpaRulesFile.TryOpen(_configDirectory, request.RulesFile, createIfMissing: true, out var file) is { } failed)
             return failed;
 
         var ruleId = request.RuleId.Trim();
-        if (file.Find(ruleId) is not null)
-            return TomixResult<BpaRulesFileResult>.Fail(
-                "TOMIX_BPA_RULE_EXISTS",
-                $"Rule '{ruleId}' already exists in {file.Path}.",
-                exitCode: 2,
-                hint: $"Change it with 'tx bpa rules set {ruleId}', or remove it first.");
-
-        var draft = new JsonObject
-        {
-            ["ID"] = ruleId,
-            ["Category"] = DefaultCategory,
-            ["Severity"] = 2,
-            ["CompatibilityLevel"] = 1200
-        };
-        if (BpaRulesFile.TryApply(draft, request.Fields, out _) is { } invalid)
+        if (file.TryAdd(ruleId, request.Fields, out var rule) is { } invalid)
             return invalid;
 
-        // Write the fields in the order the bundled catalog uses.
-        var rule = new JsonObject();
-        foreach (var field in FieldOrder)
-            if (draft[field] is { } value)
-                rule[field] = value.DeepClone();
-
-        file.Add(rule);
         file.Save();
 
         return TomixResult<BpaRulesFileResult>.Ok(new BpaRulesFileResult(

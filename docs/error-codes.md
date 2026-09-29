@@ -83,16 +83,17 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 |------|------|---------|
 | `TOMIX_BPA_DRY_RUN_REQUIRES_FIX` | 2 | `bpa run --dry-run` was passed without `--fix`, or together with `--revert`. `--dry-run` previews fixes, so it needs `--fix`. |
 | `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` or `--bpa-fail-on` value (expected: error, warning). |
-| `TOMIX_BPA_RULE_EXISTS` | 2 | `bpa rules add` was given an ID the rules file already has. Change it with `bpa rules set`, or remove it first. |
+| `TOMIX_BPA_RULE_EXISTS` | 2 | `bpa rules add` was given an ID the rules file (or the model's `BestPracticeAnalyzer` annotation) already has. Change it with `bpa rules set`, or remove it first. |
 | `TOMIX_BPA_RULE_FIELD_REQUIRED` | 2 | `bpa rules add` is missing `--name`, `--scope`, or `--expression` (the message names which); `bpa rules set` was given no field to change; or a name or expression was set to an empty value. |
 | `TOMIX_BPA_RULE_ID_REQUIRED` | 2 | A `bpa rules` subcommand that edits a rule was called without a rule ID. |
 | `TOMIX_BPA_RULE_INVALID_SCOPE` | 2 | `bpa rules add/set --scope` named an unknown object type or no type at all. The hint lists the valid scopes. |
 | `TOMIX_BPA_RULE_INVALID_SEVERITY` | 2 | `bpa rules add/set --severity` was not `error`, `warning`, `info`, `3`, `2`, or `1`. |
-| `TOMIX_BPA_RULE_NOT_FOUND` | 2 | `bpa rules show`, `disable`, or `ignore` was given an ID that no loaded rule has. The hint names up to three IDs that contain the input; `disable` and `ignore` accept `--allow-unknown` to use the ID anyway. `bpa rules set` and `remove` fail with it when the edited rules file has no rule with that ID; for a built-in rule, the hint points to `bpa rules disable`. |
+| `TOMIX_BPA_RULE_NOT_FOUND` | 2 | `bpa rules show`, `disable`, or `ignore` was given an ID that no loaded rule has. The hint names up to three IDs that contain the input; `disable` and `ignore` accept `--allow-unknown` to use the ID anyway. `bpa rules set` and `remove` fail with it when the edited rules file or model annotation has no rule with that ID; for a built-in rule, the hint points to `bpa rules disable`. |
 | `TOMIX_BPA_RULES_FILE_EXISTS` | 2 | `bpa rules init` found an existing rules file. Pass `--force` to replace it with an empty one. |
 | `TOMIX_BPA_RULES_FILE_NOT_FOUND` | 2 | `bpa rules set` or `remove` found no rules file. Create one with `bpa rules init` or `bpa rules add`. |
 | `TOMIX_BPA_RULES_FILE_REMOTE` | 2 | `bpa rules add/set/remove/init` was pointed at a remote `--rules-file` URL, which can't be edited. Download it and pass the local path. |
-| `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog, or a rules file being edited is not a JSON array of rules. |
+| `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog, or a rules file or model `BestPracticeAnalyzer` annotation being edited is not a JSON array of rules. |
+| `TOMIX_BPA_RULES_TARGET_CONFLICT` | 2 | `bpa rules add/set/remove` was given both a model and `--rules-file`. A model edits its `BestPracticeAnalyzer` annotation; `--rules-file` edits that file. Pass one. |
 | `TOMIX_BPA_VERTIPAQ_STATS_MISSING` | 0 | Warning, not a failure. The deploy BPA gate did not check rules that read `Vertipaq_*` statistics, because the model has none. The message names the rules. Collect the statistics with `tx vertipaq --annotate --save` on a deployed model, or on a local model connected to one in workspace mode. |
 | `TOMIX_BPA_VIOLATIONS` | 1 | BPA gate blocked the operation: violations at or above the configured threshold were found (with `deploy --fix-bpa`, they remained after auto-fix). Rules that could not be evaluated count as error-severity violations and are named in the message. Use `--skip-bpa` to bypass. |
 

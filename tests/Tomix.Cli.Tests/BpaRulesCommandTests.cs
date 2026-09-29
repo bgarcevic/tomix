@@ -1,3 +1,7 @@
+using System.Text.Json;
+using Tomix.Cli.Commands;
+using Tomix.Provider.Tmdl;
+
 namespace Tomix.Cli.Tests;
 
 [Collection(ConsoleStateCollection.Name)]
@@ -78,5 +82,50 @@ public sealed class BpaRulesCommandTests
         Assert.Contains("tx bpa rules --rules-file", result.Stderr);
         Assert.Contains("show SELECTED_RULE", result.Stderr);
         Assert.Contains("--no-defaults", result.Stderr);
+    }
+
+    [Fact]
+    public void Authoring_ModelTarget_EditsTheAnnotation_NotTheRulesFile()
+    {
+        using var model = SampleModel.CopyToTemp();
+        var services = TestServices.Create();
+        var root = TestRoot.With(new BpaCommand(
+            [new TmdlModelProvider()], services.State, services.Mutations, services.BpaRules, services.ConfigDirectory).Build());
+
+        var add = ConsoleCapture.Invoke(root.Parse(
+            ["bpa", "rules", "add", model.Path, "--id", "MY_RULE", "--name", "n", "--scope", "Table",
+                "--expression", "true", "--save", "--output-format", "json"]),
+            captureAnsiConsole: true);
+
+        Assert.Equal(0, add.ExitCode);
+        using var json = JsonDocument.Parse(add.Stdout);
+        var data = json.RootElement.GetProperty("data");
+        Assert.Equal("add", data.GetProperty("action").GetString());
+        Assert.Equal("model-embedded", data.GetProperty("rule").GetProperty("source").GetString());
+        Assert.Equal("saved", data.GetProperty("status").GetString());
+        Assert.False(data.TryGetProperty("path", out _));
+        Assert.False(File.Exists(Path.Combine(services.ConfigDirectory, "bpa-rules.json")));
+
+        var removed = ConsoleCapture.Invoke(root.Parse(
+            ["bpa", "rules", "remove", "MY_RULE", model.Path, "--save"]), captureAnsiConsole: true);
+        Assert.Equal(0, removed.ExitCode);
+        Assert.Contains("Removed model rule", removed.Stdout);
+    }
+
+    [Fact]
+    public void Authoring_ModelAndRulesFile_Conflict()
+    {
+        using var model = SampleModel.CopyToTemp();
+        using var dir = new TempDir();
+        var services = TestServices.Create();
+        var root = TestRoot.With(new BpaCommand(
+            [new TmdlModelProvider()], services.State, services.Mutations, services.BpaRules, services.ConfigDirectory).Build());
+
+        var result = ConsoleCapture.Invoke(root.Parse(
+            ["bpa", "rules", "--rules-file", dir.Combine("team.json"), "remove", "MY_RULE", model.Path,
+                "--output-format", "json"]));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("TOMIX_BPA_RULES_TARGET_CONFLICT", result.Stderr);
     }
 }
