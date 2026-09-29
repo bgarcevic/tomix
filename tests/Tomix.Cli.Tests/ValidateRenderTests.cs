@@ -92,6 +92,40 @@ public sealed partial class ValidateRenderTests
         Assert.DoesNotContain("SUM('Sales'[Missing])", output);
     }
 
+    [Theory]
+    [InlineData(false, "[Group]")]
+    [InlineData(true, "[​Group]")]
+    public void Render_CiLog_KeepsFindingsUnwrapped_AndEscapesAzureCommands(bool azureLog, string expectedReference)
+    {
+        var message = "Column [Group] cannot be found on table 'Column Axis (Forecast With A Long Table Name)'.";
+        var result = new ValidateModelResult(
+            ModelName: "basic-tmdl",
+            Valid: false,
+            DurationMs: 1,
+            Errors:
+            [
+                new ValidationIssue(
+                    ValidationSeverity.Error, "DAX0002", message,
+                    "Column Axis (Forecast With A Long Table Name)/Forecast Column Value", "29",
+                    "VAR Grp = SELECTEDVALUE ( 'Column Axis (Forecast With A Long Table Name)'[Group] )")
+            ],
+            Warnings: []);
+
+        var output = StripAnsi(ConsoleCapture.Run(
+            () =>
+            {
+                ValidateRenderer.Render(result, errorsOnly: false, noMultiline: false, includeBanner: false, ciLog: true, azureLog);
+                return 0;
+            },
+            captureAnsiConsole: true,
+            forceAnsi: true).Stdout);
+
+        var lines = output.Split('\n');
+        Assert.Contains(lines, line =>
+            line.Contains(message.Replace("[Group]", expectedReference)) && line.Contains("/Forecast Column Value"));
+        Assert.Contains(lines, line => line.Contains("'Column Axis (Forecast With A Long Table Name)'" + expectedReference));
+    }
+
     [Fact]
     public void Render_StructuralIssue_WithoutExpressionLine_StaysPlain()
     {

@@ -10,7 +10,55 @@ namespace Tomix.Cli.Output;
 /// </summary>
 internal static class ValidateRenderer
 {
+    /// <param name="ciLog">
+    /// Output goes to a CI build log (<see cref="CiAnnotations.IsCiLog"/>), which has no width:
+    /// lift Spectre's 80-column fallback so each finding stays on its own line(s) instead of
+    /// wrapping into a tall, ungreppable block.
+    /// </param>
+    /// <param name="azureLog">
+    /// Output goes to an Azure Pipelines log; formatting-command words such as <c>[Group]</c>
+    /// are escaped (<see cref="CiAnnotations.EscapeAzureLogCommands"/>).
+    /// </param>
     public static void Render(
+        ValidateModelResult result,
+        bool errorsOnly,
+        bool noMultiline,
+        bool includeBanner,
+        bool ciLog = false,
+        bool azureLog = false)
+    {
+        if (azureLog)
+            result = result with
+            {
+                Errors = result.Errors.Select(EscapeAzure).ToList(),
+                Warnings = result.Warnings.Select(EscapeAzure).ToList()
+            };
+
+        if (!ciLog)
+        {
+            RenderCore(result, errorsOnly, noMultiline, includeBanner);
+            return;
+        }
+
+        var width = AnsiConsole.Profile.Width;
+        AnsiConsole.Profile.Width = int.MaxValue;
+        try
+        {
+            RenderCore(result, errorsOnly, noMultiline, includeBanner);
+        }
+        finally
+        {
+            AnsiConsole.Profile.Width = width;
+        }
+    }
+
+    private static ValidationIssue EscapeAzure(ValidationIssue issue) => issue with
+    {
+        Message = CiAnnotations.EscapeAzureLogCommands(issue.Message),
+        ExpressionLine = issue.ExpressionLine is null ? null : CiAnnotations.EscapeAzureLogCommands(issue.ExpressionLine)
+    };
+
+    private static void RenderCore(
         ValidateModelResult result,
         bool errorsOnly,
         bool noMultiline,

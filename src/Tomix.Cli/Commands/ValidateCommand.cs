@@ -103,7 +103,13 @@ internal sealed class ValidateCommand : ICommandModule
                 parseResult,
                 result,
                 format,
-                data => ValidateRenderer.Render(data, errorsOnly, parseResult.GetValue(noMultilineOption), includeBanner: !OutputFormats.IsCsv(format)));
+                data => ValidateRenderer.Render(
+                    data,
+                    errorsOnly,
+                    parseResult.GetValue(noMultilineOption),
+                    includeBanner: !OutputFormats.IsCsv(format),
+                    ciLog: CiAnnotations.IsCiLog(parseResult.GetValue(ciOption)),
+                    azureLog: CiAnnotations.IsAzurePipelinesLog(parseResult.GetValue(ciOption))));
         });
 
         return command;

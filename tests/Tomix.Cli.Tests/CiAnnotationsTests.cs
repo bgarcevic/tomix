@@ -25,6 +25,23 @@ public class CiAnnotationsTests
             output);
     }
 
+    [Theory]
+    [InlineData("Column [Group] cannot be found.", "Column [​Group] cannot be found.")]
+    [InlineData("'T'[endgroup] and [SECTION]", "'T'[​endgroup] and [​SECTION]")]
+    [InlineData("Column [Grouping] and [Amount]", "Column [Grouping] and [Amount]")]
+    public void Vsts_Escapes_Log_Formatting_Commands(string message, string expected)
+    {
+        var output = Emit("vsts", new CiAnnotation(IsError: false, message));
+
+        Assert.StartsWith("##vso[task.logissue type=warning;]" + expected + Environment.NewLine, output);
+    }
+
+    [Fact]
+    public void Github_Leaves_Log_Formatting_Words_Alone()
+        => Assert.Equal(
+            "::error::Column [Group] cannot be found." + Environment.NewLine,
+            Emit("github", new CiAnnotation(IsError: true, "Column [Group] cannot be found.")));
+
     [Fact]
     public void Vsts_Maps_Levels_And_Fails_Task_When_Any_Error()
     {

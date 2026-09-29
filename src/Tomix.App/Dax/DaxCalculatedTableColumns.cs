@@ -9,9 +9,9 @@ namespace Tomix.App.Dax;
 /// </summary>
 internal static class DaxCalculatedTableColumns
 {
-    private enum Kind { String, Word, Symbol }
+    internal enum Kind { String, Word, Symbol }
 
-    private readonly record struct Token(Kind Kind, string Text);
+    internal readonly record struct Token(Kind Kind, string Text);
 
     public static IReadOnlyList<string>? Infer(string? expression)
     {
@@ -85,7 +85,7 @@ internal static class DaxCalculatedTableColumns
     }
 
     /// <summary>Strings (unescaped), words, and single-character symbols; whitespace and comments dropped.</summary>
-    private static List<Token> Tokenize(string expression)
+    internal static List<Token> Tokenize(string expression)
     {
         var tokens = new List<Token>();
         var i = 0;

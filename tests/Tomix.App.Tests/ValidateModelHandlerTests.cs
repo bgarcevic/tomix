@@ -333,6 +333,35 @@ public sealed class ValidateModelHandlerTests
             Assert.Equal(expectedCode, Assert.Single(result.Data!.Errors).Code);
     }
 
+    [Theory]
+    [InlineData("COUNTROWS(FILTER(ADDCOLUMNS(Sales, \"@Required\", 1, \"@Passed\", 2), [@Required] > 0 && [@Required] = [@Passed]))", null)]
+    [InlineData("SUMX(GENERATESERIES(1, 12), [Value])", null)]
+    [InlineData("SUMX({ (1, 2) }, [Value1] + [Value2])", null)]
+    [InlineData("COUNTROWS(FILTER(ADDCOLUMNS(Sales, \"@Required\", 1), [@Requiredd] > 0))", "@Requiredd")]
+    [InlineData("SUMX(Sales, [Value])", "Value")]
+    // "@Required" in a comment defines nothing.
+    [InlineData("SUMX(Sales, [@Required]) // \"@Required\"", "@Required")]
+    [InlineData("SUMX(SELECTCOLUMNS(Sales, \"@A\", 1), [@A])", null)]
+    [InlineData("SUMX(SUMMARIZE(Sales, Sales[Amount], \"@Total\", 1), [@Total])", null)]
+    [InlineData("SUMX(SUMMARIZECOLUMNS(Sales[Amount], \"@Total\", 1), [@Total])", null)]
+    [InlineData("SUMX(ROW(\"@One\", 1), [@One])", null)]
+    // A string that is a value, not a column name, defines nothing.
+    [InlineData("IF([Status] = \"Status\", 1)", "Status")]
+    [InlineData("SUMX(ADDCOLUMNS(Sales, \"@Kind\", \"@Other\"), [@Other])", "@Other")]
+    // IN { ... } is a list and DATATABLE rows are literals, not a [Value] table.
+    [InlineData("IF(1 IN { 1, 2 }, [Value])", "Value")]
+    [InlineData("SUMX(DATATABLE(\"N\", INTEGER, {{1}}), [Value])", "Value")]
+    public async Task HandleAsync_AcceptsQueryScopedColumns(string expression, string? warnedName)
+    {
+        var result = await ValidateAsync(SalesSnapshot(Measure("Total", expression)));
+
+        Assert.Empty(result.Data!.Errors);
+        if (warnedName is null)
+            Assert.Empty(result.Data.Warnings);
+        else
+            Assert.Contains($"[{warnedName}]", Assert.Single(result.Data.Warnings).Message);
+    }
+
     [Fact]
     public async Task HandleAsync_ScansSecondaryMeasureExpressions()
     {

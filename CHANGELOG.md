@@ -16,6 +16,15 @@ and the API surface that major versions protect.
   (`DAX0002`) when its TMDL declares no columns because the table was never evaluated. Columns
   are inferred from `DATATABLE(...)` and `ROW(...)` expressions, so typos are still caught;
   references into calculated tables whose columns cannot be inferred offline are not judged (#320).
+- `tx validate` in CI logs: with `--ci` (or under Azure Pipelines), findings are no longer
+  hard-wrapped at 80 columns, so each one stays on its own line. In Azure Pipelines, a column
+  named like a log command (`[Group]`, `[Section]`, `[Error]`, ...) no longer turns its line
+  into a collapsible section header that drops the `##[error]` styling and leaves stray `8m`
+  fragments in the table.
+- `tx validate` no longer warns (`DAX0003`) about columns an expression defines for itself:
+  `[@Name]` when `"@Name"` is a new column's name in `ADDCOLUMNS`, `SELECTCOLUMNS`,
+  `SUMMARIZE`, `SUMMARIZECOLUMNS`, `GROUPBY`, `ROW`, or `DATATABLE`, and `[Value]` from
+  `GENERATESERIES` or a `{ ... }` table constructor (not an `IN { ... }` list).
 
 ## [0.5.0] - 2026-09-29
 

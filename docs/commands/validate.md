@@ -191,7 +191,7 @@ severity to its test outcome.
 
 | Option | Description |
 |--------|-------------|
-| `--ci <github\|vsts>` | Print CI log-group commands to stderr so findings annotate the PR. |
+| `--ci <github\|vsts>` | Print CI log-group commands to stderr so findings annotate the PR. The text table is then printed without wrapping (also under Azure Pipelines without `--ci`). |
 | `--trx <path>` | Write results to a `.trx` test-run file. |
 | `--errors-only` | Only show errors. |
 | `--no-warnings` | Leave out analyzer warnings. |

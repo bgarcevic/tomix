@@ -122,10 +122,12 @@ internal static class ModelValidation
                     break;
 
                 // A lone [X] that resolves nowhere may still be a query-scoped extension column
-                // (ADDCOLUMNS/SUMMARIZE), which the extractor cannot see — warn, don't fail.
+                // (ADDCOLUMNS/SUMMARIZE), which the extractor cannot see — warn, don't fail, and
+                // stay quiet when the expression itself names such a column.
                 case DaxReferenceShape.Unqualified:
                     if (!index.MeasureNames.Contains(reference.Object!)
-                        && !index.ColumnNames.Contains(reference.Object!))
+                        && !index.ColumnNames.Contains(reference.Object!)
+                        && !DaxQueryColumns.Defines(site.Expression, reference.Object!))
                         issues.Add(new ValidationIssue(
                             ValidationSeverity.Warning,
                             "DAX0003",
