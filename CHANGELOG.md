@@ -12,11 +12,19 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx bpa rules add`, `set`, `remove`, and `init` author custom BPA rules from the CLI. They edit
+  your config-dir `bpa-rules.json` (which `bpa run` loads) or the file `--rules-file` names, and
+  keep fields tx does not model. Scope and severity are validated (#232).
 - `tx bpa run --fix` now fixes `DAX_COLUMNS_FULLY_QUALIFIED` and `DAX_MEASURES_UNQUALIFIED`
   by rewriting the object's DAX, through two new fix expressions:
   `QualifyColumnReferences()` and `UnqualifyMeasureReferences()`. References that cannot be
   resolved for certain (a column name in several tables, a name that is also a string literal,
   a measure qualified with the wrong table) are reported as fix errors and left unchanged (#267).
+
+### Changed
+
+- `tx bpa rules list` shows each rule's scope, and lists the rules in your config-dir
+  `bpa-rules.json` (source `user`), matching what `bpa run` loads (#232).
 
 ## [0.6.0] - 2026-09-29
 

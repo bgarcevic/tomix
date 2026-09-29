@@ -46,15 +46,22 @@ public sealed class BpaRulesListHandler
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly BpaUserRuleState _userRules;
     private readonly HttpClient? _httpClient;
+    private readonly string? _configDirectory;
 
+    /// <param name="configDirectory">
+    /// Where the user's <c>bpa-rules.json</c> lives; its rules are listed with source <c>user</c>,
+    /// as <c>bpa run</c> loads them. Null leaves the user file out.
+    /// </param>
     public BpaRulesListHandler(
         IEnumerable<IModelProvider>? providers,
         BpaUserRuleState userRules,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        string? configDirectory = null)
     {
         _providers = providers?.ToList() ?? [];
         _userRules = userRules;
         _httpClient = httpClient;
+        _configDirectory = configDirectory;
     }
 
     public async Task<TomixResult<BpaRulesListResult>> HandleAsync(
@@ -64,7 +71,7 @@ public sealed class BpaRulesListHandler
         IReadOnlyList<LoadedRule> rules;
         try
         {
-            rules = await LoadRulesAsync(request, _httpClient, cancellationToken).ConfigureAwait(false);
+            rules = await LoadRulesAsync(request, _httpClient, _configDirectory, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
         {
@@ -188,6 +195,7 @@ public sealed class BpaRulesListHandler
     private static async Task<IReadOnlyList<LoadedRule>> LoadRulesAsync(
         BpaRulesListRequest request,
         HttpClient? httpClient,
+        string? configDirectory,
         CancellationToken cancellationToken)
     {
         var rules = new List<LoadedRule>();
@@ -209,6 +217,17 @@ public sealed class BpaRulesListHandler
                     .LoadFromSourceAsync(request.RulesFile, httpClient, cancellationToken)
                     .ConfigureAwait(false))
                 .Select(rule => new LoadedRule("custom", rule)));
+        }
+
+        // The user file is listed unless --rules-file already selected it.
+        if (!string.IsNullOrWhiteSpace(configDirectory))
+        {
+            var userFile = Path.GetFullPath(Path.Combine(configDirectory, BpaRulesFile.UserFileName));
+            var selected = request.RulesFile is { Length: > 0 } file && !file.Contains("://", StringComparison.Ordinal)
+                ? Path.GetFullPath(file)
+                : null;
+            if (File.Exists(userFile) && !string.Equals(userFile, selected, StringComparison.OrdinalIgnoreCase))
+                rules.AddRange(BpaRuleLoader.LoadFromFile(userFile).Select(rule => new LoadedRule("user", rule)));
         }
 
         return rules;

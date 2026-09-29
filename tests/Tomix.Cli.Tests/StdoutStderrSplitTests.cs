@@ -22,7 +22,7 @@ public sealed partial class StdoutStderrSplitTests
         { "bpa", "BPA analysis · basic-tmdl", "1 warning in 1 of 1 rule" },
         { "bpa", "tx bpa run --details", "R1 · Category" },
         { "refresh", "Refreshed Prod on", "Sales" },
-        { "bpa rules list", "tx bpa rules show R1", "R1 · warning · fixable" },
+        { "bpa rules list", "tx bpa rules show R1", "R1 · warning · Column · fixable" },
     };
 
     [Fact]

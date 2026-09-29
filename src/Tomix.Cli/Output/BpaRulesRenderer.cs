@@ -7,7 +7,7 @@ namespace Tomix.Cli.Output;
 
 /// <summary>
 /// Spectre rendering and JSON projections for the <c>bpa rules</c> subcommands
-/// (list, show, disable/enable, ignore/unignore).
+/// (list, show, disable/enable, ignore/unignore, add/set/remove/init).
 /// </summary>
 internal static class BpaRulesRenderer
 {
@@ -15,7 +15,7 @@ internal static class BpaRulesRenderer
 
     /// <summary>
     /// <c>bpa rules list</c>: one section per category, each rule as a severity dot and its name
-    /// over a muted metadata line (ID · severity · source · status · fixable) that never splits
+    /// over a muted metadata line (ID · severity · scope · source · status · fixable) that never splits
     /// the ID. Source is shown only when the listing mixes sources.
     /// </summary>
     public static void RenderList(BpaRulesListResult result) => RenderList(result, null);
@@ -166,6 +166,7 @@ internal static class BpaRulesRenderer
         var fixable = string.IsNullOrWhiteSpace(rule.FixExpression) ? "" : "fixable";
         var segments = new List<string> { rule.Id };
         segments.Add(BpaRunView.SeverityWord(rule.Severity).ToLowerInvariant());
+        segments.Add(rule.Scope);
         if (showSource) segments.Add(rule.Source);
         segments.Add(status);
         segments.Add(fixable);
@@ -278,6 +279,38 @@ internal static class BpaRulesRenderer
         AnsiConsole.MarkupLine($"  {Styling.KeyValue("Disabled rules:", result.DisabledRuleIds.Count.ToString())}");
     }
 
+    /// <summary><c>bpa rules add/set/remove/init</c>: what changed, and in which file.</summary>
+    public static void RenderFile(BpaRulesFileResult result)
+    {
+        var id = Styling.Value(result.RuleId ?? "");
+        var path = Styling.Path(result.Path);
+        switch (result.Action)
+        {
+            case "init":
+                AnsiConsole.MarkupLine($"Created empty rules file {path}.");
+                BpaRunRenderer.HintConsole().MarkupLine(Styling.Guidance("Add a rule:") + "  "
+                    + Styling.Option("tx bpa rules add --id MY_RULE --name \"...\" --scope Measure --expression \"...\""));
+                return;
+            case "remove":
+                AnsiConsole.MarkupLine($"Removed rule {id} from {path}.");
+                break;
+            case "set" when !result.Changed:
+                AnsiConsole.MarkupLine(Styling.Muted($"Rule '{result.RuleId}' already has those values — no change."));
+                return;
+            case "set":
+                AnsiConsole.MarkupLine($"Updated rule {id} in {path}.");
+                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Changed:", string.Join(", ", result.ChangedFields ?? []))}");
+                break;
+            default:
+                AnsiConsole.MarkupLine($"Added rule {id} to {path}.");
+                break;
+        }
+
+        if (result.Rule is { } rule)
+            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Applies to:", rule.Scope)}");
+        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules in file:", result.RuleCount.ToString())}");
+    }
+
     public static void RenderIgnore(BpaRulesIgnoreResult result)
     {
         var verb = result.Ignored ? "ignored" : "no longer ignored";
@@ -328,6 +361,30 @@ internal static class BpaRulesRenderer
             changed = result.Changed,
             disabledRuleIds = result.DisabledRuleIds
         };
+
+    /// <summary>
+    /// JSON projection for <c>bpa rules add/set/remove/init</c>. <c>rule</c> uses the
+    /// <c>bpa rules list</c> rule shape; <c>changedFields</c> appears only for <c>set</c>.
+    /// </summary>
+    internal static object ToFileJson(BpaRulesFileResult result)
+    {
+        var json = new Dictionary<string, object?>
+        {
+            ["action"] = result.Action,
+            ["path"] = result.Path,
+            ["changed"] = result.Changed,
+            ["ruleCount"] = result.RuleCount
+        };
+
+        if (result.RuleId is not null)
+            json["ruleId"] = result.RuleId;
+        if (result.ChangedFields is not null)
+            json["changedFields"] = result.ChangedFields;
+        if (result.Rule is not null)
+            json["rule"] = ProjectRuleInfo(result.Rule);
+
+        return json;
+    }
 
     internal static object ToIgnoreJson(BpaRulesIgnoreResult result)
         => new

@@ -40,6 +40,8 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     /// </summary>
     internal static readonly Dictionary<string, string> CommandNotes = new(StringComparer.Ordinal)
     {
+        ["bpa rules add"] = "Edits your config-dir bpa-rules.json, which bpa run loads, unless --rules-file names another file.",
+        ["bpa rules init"] = "Creates your config-dir bpa-rules.json, or the file --rules-file names.",
         ["connect"] = "With no arguments, shows the active connection. --recent reconnects to a recently used model.",
         ["diff"] = "Exit codes: 0 = identical, 1 = differences found, 2 = error.",
         ["format"] = "Formats an inline expression (--expression), one object (--path), or every expression in the model.",
@@ -159,6 +161,21 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx bpa run --errors",
             "tx bpa run --output-format json",
             "tx bpa run --fix",
+        ],
+        ["bpa rules add"] = [
+            "tx bpa rules add --id HIDE_KEYS --name Keys --scope Column --expression IsKey",
+            "tx bpa rules add --id NO_KPIS --name \"No KPIs\" --scope KPI --expression true",
+        ],
+        ["bpa rules set"] = [
+            "tx bpa rules set NO_DOUBLE --severity error",
+            "tx bpa rules --rules-file team.json set NO_DOUBLE --category Performance",
+        ],
+        ["bpa rules remove"] = [
+            "tx bpa rules remove NO_DOUBLE",
+        ],
+        ["bpa rules init"] = [
+            "tx bpa rules init",
+            "tx bpa rules --rules-file team.json init",
         ],
         ["bpa run"] = [
             "tx bpa run",

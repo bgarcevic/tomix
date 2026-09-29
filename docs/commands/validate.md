@@ -134,10 +134,14 @@ the prompt in scripts.
 
 | Subcommand | Description |
 |------------|-------------|
-| `bpa rules list` | List rules from every source, grouped by category, with each rule's severity, status, and whether it is `fixable`. With a model, also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. A rule on the model's ignore list shows as `ignored`; one turned off with `bpa rules disable` shows as `disabled`. |
+| `bpa rules list` | List rules from every source, grouped by category, with each rule's severity, scope, status, and whether it is `fixable`. Includes the rules in your config-dir `bpa-rules.json` (source `user`). With a model, also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. A rule on the model's ignore list shows as `ignored`; one turned off with `bpa rules disable` shows as `disabled`. |
 | `bpa rules show <rule-id> [model]` | Show one rule in full: description, reference link, source, scope, expression, and fix expression. Accepts `--ruleset` and `--no-defaults` like `list`. An unknown ID fails with `TOMIX_BPA_RULE_NOT_FOUND` and suggests IDs that contain what you typed. |
 | `bpa rules enable` / `bpa rules disable` | Turn a built-in rule back on, or off, for this user. |
 | `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
+| `bpa rules add --id <id> ...` | Add a custom rule to your rules file. Needs `--name`, `--scope`, and `--expression`; see [Authoring rules](#authoring-rules). |
+| `bpa rules set <rule-id> ...` | Change fields of a rule in your rules file. |
+| `bpa rules remove <rule-id>` | Delete a rule from your rules file. |
+| `bpa rules init` | Create an empty rules file. |
 
 `disable` and `ignore` check the rule ID first, so a typo can't silently turn off
 nothing. The ID must belong to the bundled catalog (every ruleset), your config-dir
@@ -162,6 +166,37 @@ file. `bpa rules list` narrows what is listed:
 tx bpa rules list
 tx bpa rules list model.bim --all
 tx bpa rules show HIDE_FOREIGN_KEYS
+```
+
+### Authoring rules
+
+`bpa rules add`, `set`, `remove`, and `init` edit a rules JSON file: your config-dir
+`bpa-rules.json` (`~/.tomix`, or `$TOMIX_CONFIG_DIR`), which `bpa run` loads on every
+run, or the file named by `bpa rules --rules-file <file>`. Remote rule files can't be
+edited (`TOMIX_BPA_RULES_FILE_REMOTE`). Fields tx does not know about are kept as they are.
+
+| Option | Description |
+|--------|-------------|
+| `--id <id>` | Rule ID (`add` only; `set` and `remove` take it as an argument). An ID the file already has fails with `TOMIX_BPA_RULE_EXISTS`. |
+| `--name <text>` | Rule name shown in results. Required for `add`. |
+| `--scope <types>` | Object types the rule checks, comma-separated, for example `"Measure, CalculatedColumn"`. Required for `add`. Unknown types fail with `TOMIX_BPA_RULE_INVALID_SCOPE`, which lists the valid ones. |
+| `--expression <expr>` | Rule expression; an object that matches it is a violation. Required for `add`. |
+| `--severity <level>` | `error`, `warning`, or `info` (or `3`, `2`, `1`). Defaults to `warning`. |
+| `--category <name>` | Category the rule is grouped under. Defaults to `Custom`. |
+| `--description <text>` | Guidance shown with violations. |
+| `--fix-expression <expr>` | Fix that `bpa run --fix` applies. |
+
+With `set`, pass only the fields to change; an empty value (`--description ""`)
+removes an optional field. `add` creates the file when it doesn't exist; `set` and
+`remove` fail with `TOMIX_BPA_RULES_FILE_NOT_FOUND`. `init` won't replace an
+existing file unless you pass `--force`. Built-in rules can't be edited or removed.
+Turn one off with `bpa rules disable`, or override it by adding a rule with the same ID.
+
+```sh
+tx bpa rules add --id MEASURE_DESCRIPTIONS --name "Measures need a description" --scope Measure --expression "string.IsNullOrWhitespace(Description)"
+tx bpa rules set MEASURE_DESCRIPTIONS --severity error
+tx bpa rules remove MEASURE_DESCRIPTIONS
+tx bpa rules --rules-file team-rules.json init
 ```
 
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,

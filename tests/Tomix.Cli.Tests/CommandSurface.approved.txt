@@ -78,6 +78,17 @@ Run best-practice rules and manage rule collections
 Manage BPA rule collections
   opt --rules-file <file>  Path to a BPA rules JSON file
 
+# tx bpa rules add
+Add a custom rule to a rules file
+  opt --id <id>  Rule ID
+  opt --name <name>  Rule name shown in results
+  opt --category <name>  Rule category (add default: Custom)
+  opt --severity <level>  error, warning, or info (add default: warning)
+  opt --scope <types>  Object types the rule checks, comma-separated (for example "Measure, CalculatedColumn")
+  opt --expression <expr>  Rule expression; an object that matches it is a violation
+  opt --description <text>  Guidance shown with violations ("" removes it)
+  opt --fix-expression <expr>  Fix applied by 'bpa run --fix' ("" removes it)
+
 # tx bpa rules disable
 Turn off a built-in rule for this user
   arg <rule-id>  Rule ID
@@ -101,6 +112,10 @@ Put a rule on the model's ignore list
   opt --force, -f  Save despite newly introduced validation errors
   opt --allow-unknown  Accept a rule ID that no loaded rule has (for example, one from a remote rule file)
 
+# tx bpa rules init
+Create an empty rules file
+  opt --force  Replace an existing rules file with an empty one
+
 # tx bpa rules list
 List rules from every source, with each rule's status
   arg [model]  Path to model
@@ -109,6 +124,21 @@ List rules from every source, with each rule's status
   opt --ignored  List only rules on the model's ignore list
   opt --disabled  List only rules disabled for this user
   opt --all  Include disabled and ignored rules in the listing
+
+# tx bpa rules remove
+Delete a custom rule from a rules file
+  arg <rule-id>  Rule ID
+
+# tx bpa rules set
+Change a custom rule in a rules file
+  arg <rule-id>  Rule ID
+  opt --name <name>  Rule name shown in results
+  opt --category <name>  Rule category (add default: Custom)
+  opt --severity <level>  error, warning, or info (add default: warning)
+  opt --scope <types>  Object types the rule checks, comma-separated (for example "Measure, CalculatedColumn")
+  opt --expression <expr>  Rule expression; an object that matches it is a violation
+  opt --description <text>  Guidance shown with violations ("" removes it)
+  opt --fix-expression <expr>  Fix applied by 'bpa run --fix' ("" removes it)
 
 # tx bpa rules show
 Show a rule's description, scope, expression, and fix
