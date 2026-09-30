@@ -73,6 +73,12 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- `tx format` and `tx add` no longer wait on stdin when it is redirected but nothing is piped,
+  as in a CI step, an ssh session, or a script whose parent holds stdin open. `format` reads a
+  piped expression only when no model, `--path`, `--save`, `--save-to`, `--stage`, or
+  `--revert` is given, so `tx format ./model --save` no longer blocks or formats stray stdin
+  instead of the model. `add` reads stdin only for `-e -`, as documented; a bare pipe into
+  `add` is no longer read. `tx query` still reads a piped query when none is given.
 - `tx deploy` without `-d` now previews the database it would actually write (named after the
   model) instead of skipping the diff and showing the model path as the target. A model with no
   name of its own, such as a bare TMDL folder, fails with `TOMIX_DEPLOY_NO_TARGET` asking for

@@ -274,7 +274,10 @@ internal sealed class QueryCommand : ICommandModule
                 DiagnosticSeverity.Error,
                 $"Query file not found: {file}"));
 
-        return (file == "-" ? InputValueResolver.Resolve("-") : InputValueResolver.Resolve(query ?? positional, file), null);
+        // With no query given, stdin is the only possible source, so a pipe is read.
+        return (file == "-"
+            ? InputValueResolver.Resolve("-")
+            : InputValueResolver.Resolve(query ?? positional, file, readPipedInput: true), null);
     }
 
     /// <summary>

@@ -101,11 +101,20 @@ internal sealed class FormatCommand : ICommandModule
                 type = parsed;
             }
 
-            var expression = InputValueResolver.Resolve(parseResult.GetValue(expressionOption));
+            var modelValue = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
+            var expression = InputValueResolver.Resolve(
+                parseResult.GetValue(expressionOption),
+                readPipedInput: ReadsPipedExpression(
+                    modelValue,
+                    parseResult.GetValue(pathOption),
+                    writes: parseResult.GetValue(saveOption)
+                            || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption))
+                            || parseResult.GetValue(stageOption)
+                            || parseResult.GetValue(revertOption)));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             if (!RecentConnections.TryResolveModel(
                     parseResult,
-                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                    modelValue,
                     _state,
                     out var model,
                     out var recentExit))
@@ -149,6 +158,15 @@ internal sealed class FormatCommand : ICommandModule
 
         return command;
     }
+
+    /// <summary>
+    /// Whether piped stdin can be the expression to format: only when nothing names a model to
+    /// format instead. A model, <c>--path</c>, or a write option (<c>--save</c>, <c>--save-to</c>,
+    /// <c>--stage</c>, <c>--revert</c>) means the model, so stdin is left alone; <c>-e -</c> still
+    /// reads it.
+    /// </summary>
+    internal static bool ReadsPipedExpression(string? model, string? path, bool writes)
+        => string.IsNullOrWhiteSpace(model) && string.IsNullOrWhiteSpace(path) && !writes;
 
     // The user typed this source, so show where it breaks. Only the first error: the parser stops there.
     private static void WriteInlineCaret(string expression, IReadOnlyList<TomixDiagnostic> diagnostics)

@@ -463,7 +463,7 @@ copy back into a model.
 
 | Option | Description |
 |--------|-------------|
-| `-e, --expression <expr>` | Format an inline expression (no model needed). |
+| `-e, --expression <expr>` | Format an inline expression (no model needed). `-` reads it from stdin. |
 | `--path <path>` | Format the expression on one object. |
 | `--lang <dax\|m>` | Expression language. |
 | `--long` | Prefer long lines when formatting M (120 columns instead of 40). |
@@ -472,7 +472,12 @@ copy back into a model.
 tx format -e "CALCULATE(sum(sales[amt]))"
 tx format --path "Sales/Total Sales" --save
 tx format --save                     # whole model
+cat measure.dax | tx format          # piped expression
 ```
+
+A piped expression is read only when nothing else names what to format: with a
+model, `--path`, `--save`, `--save-to`, `--stage`, or `--revert`, `format` leaves
+stdin alone and formats the model. Pass `-e -` to read stdin anyway.
 
 ## Refresh policies
 
