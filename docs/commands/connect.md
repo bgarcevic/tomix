@@ -10,10 +10,12 @@ model itself — sessions, profiles, workspace mode — is explained in
 tx connect [server] [database] [options]
 ```
 
-No arguments shows the current connection. For a Power BI Desktop session it
-shows the report name, and flags the session as `(not running)` — with the
-last-known report — once that Desktop window has been closed. The first
-argument can be a workspace name, an endpoint, or a local model path.
+No arguments shows the current connection and the
+[session](../guides/connections.md#sessions) that holds it. For a Power BI
+Desktop session it shows the report name, and flags the session as
+`(not running)` — with the last-known report — once that Desktop window has
+been closed. The first argument can be a workspace name, an endpoint, or a
+local model path.
 
 | Option | Description |
 |--------|-------------|
@@ -21,7 +23,7 @@ argument can be a workspace name, an endpoint, or a local model path.
 | `--list` | List without connecting or changing the active connection. With a server (`tx connect <workspace> --list`): the semantic models on that workspace or endpoint, with compatibility level and last update. With `--local`: running Desktop instances (report name, endpoint, database). Works without a TTY; use `--output-format json` for scripts and agents. |
 | `--remote` | Pick a workspace and model interactively from your tenant (requires a TTY; sign in first with `tx auth login`). |
 | `-p, --profile <name>` | Connect through a saved profile. |
-| `--clear` | Forget the active connection. |
+| `--clear` | Forget the active connection. Add `--all` to forget it in every session (every repository, worktree, and `TOMIX_SESSION`); that asks for confirmation, so pass `--yes` in scripts. |
 | `-w, --workspace [target]` | Enable workspace mode: mirror saves between the primary source and a secondary target. No value = pick interactively. |
 | `--workspace-format <fmt>` | How a local workspace is stored on disk (`tmdl` or `bim`); detected from the path when omitted. |
 | `--workspace-auth <auth>` | How to authenticate the remote side of workspace mode. |
@@ -37,6 +39,7 @@ tx connect MyWorkspace --list       # models on a workspace, no connect
 tx connect --local --list           # running Desktop instances, no connect
 tx connect localhost:56164          # a specific Desktop instance from the list
 tx connect ./model.tmdl -w MyWorkspace Sales
+tx connect --clear --all             # forget the connection everywhere
 ```
 
 A workspace that hosts more than one model cannot be opened without naming one:
@@ -276,40 +279,4 @@ tx auth login -u $APP_ID -t $TENANT --password-file ./secret.txt
 
 tx auth status
 tx auth logout
-```
-
-## `session` — active-connection session state
-
-```
-tx session [show|clear|list|prune]
-```
-
-| Subcommand | Description |
-|------------|-------------|
-| `session show` | Print this session's details (ID, kind, scope directory, file path, active state). Sessions are scoped to the git repository or worktree root, else the current folder; `TOMIX_SESSION` names one explicitly. |
-| `session clear` | Clear this session's active marker. |
-| `session list` | List saved session files. |
-| `session prune` | Remove session files whose shell has exited. |
-
-`session prune` options:
-
-| Option | Description |
-|--------|-------------|
-| `--all` | Also remove named and live process sessions. The current session is kept. |
-| `--dry-run` | Preview what prune would remove. |
-
-`session clear` and `session prune` ask for confirmation (`--dry-run` never
-does); pass `--yes` in scripts.
-
-Without `--all`, pruning removes only well-formed `pid-<number>` sessions whose
-process is no longer running. It preserves the current session, named sessions,
-malformed PID names, and live PID sessions. `--all` removes every non-current
-session. `--dry-run` runs the same candidate selection without deleting files,
-so its count exactly matches a subsequent prune against unchanged state.
-
-```sh
-tx session            # current session details
-tx session clear      # clear active state for this session
-tx session prune      # delete session files for dead shells
-tx session prune --all --dry-run
 ```

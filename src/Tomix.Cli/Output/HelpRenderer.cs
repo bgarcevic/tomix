@@ -29,7 +29,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     [
         ("Discover", ["summary", "ls", "get", "find", "deps", "query"]),
         ("Modify", ["add", "set", "mv", "rm", "replace", "format"]),
-        ("Connect", ["connect", "deploy", "refresh", "save", "auth", "session"]),
+        ("Connect", ["connect", "deploy", "refresh", "save", "auth"]),
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
     ];
@@ -43,7 +43,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["bpa rules add"] = "Edits your config-dir bpa-rules.json, which bpa run loads, unless --rules-file names another file.",
         ["bpa rules init"] = "Creates your config-dir bpa-rules.json, or the file --rules-file names.",
         ["deps"] = "A shortcut for tx get --deps (or --unused); both run the same read pipeline.",
-        ["connect"] = "With no arguments, shows the active connection. --recent reconnects to a recently used model.",
+        ["connect"] = "With no arguments, shows the active connection. --recent reconnects to a recently used model. --clear --all forgets the connection in every session.",
         ["diff"] = "Exit codes: 0 = identical, 1 = differences found, 2 = error.",
         ["get"] = "One object shows its properties; a wildcard or container path lists every match. --ls, --where, --deps and --unused select and analyze. get returns objects; tx find searches property text and returns match sites (name filtering deliberately overlaps).",
         ["format"] = "Formats an inline expression (--expression), one object (--path), or every expression in the model.",
@@ -132,6 +132,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx connect ./model.tmdl -w",
             "tx connect --local",
             "tx connect ./model.tmdl -w MyWorkspace Sales",
+            "tx connect --clear --all",
         ],
         ["deploy"] = [
             "tx deploy ./model.tmdl",
@@ -155,11 +156,6 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx auth login --auth spn --client-id $SPN_ID",
             "tx auth status",
             "tx auth logout",
-        ],
-        ["session"] = [
-            "tx session",
-            "tx session list",
-            "tx session clear",
         ],
         ["bpa"] = [
             "tx bpa run",

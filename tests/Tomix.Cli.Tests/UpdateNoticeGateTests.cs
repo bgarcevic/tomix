@@ -78,7 +78,7 @@ public sealed class UpdateNoticeGateTests
     [InlineData("doctor")]
     public void SelfReportingInvocation_IsDetected(params string[] args)
     {
-        var root = TestRoot.With(UpdateWithCheck(), new Command("doctor"), new Command("session"));
+        var root = TestRoot.With(UpdateWithCheck(), new Command("doctor"), new Command("connect"));
 
         Assert.True(UpdateNotice.ReportsUpdateStatus(root.Parse(args)));
     }
@@ -86,9 +86,9 @@ public sealed class UpdateNoticeGateTests
     [Fact]
     public void OtherInvocation_IsNotDetected()
     {
-        var root = TestRoot.With(UpdateWithCheck(), new Command("doctor"), new Command("session"));
+        var root = TestRoot.With(UpdateWithCheck(), new Command("doctor"), new Command("connect"));
 
-        Assert.False(UpdateNotice.ReportsUpdateStatus(root.Parse(["session"])));
+        Assert.False(UpdateNotice.ReportsUpdateStatus(root.Parse(["connect"])));
         Assert.False(UpdateNotice.ReportsUpdateStatus(root.Parse([])));
     }
 

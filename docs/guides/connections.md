@@ -91,16 +91,20 @@ output), so you always see what you are operating on:
 Connected to: Sales Overview  (localhost:50987)
 ```
 
+`tx connect` with no arguments shows the connection and, on its last line, the
+session it belongs to (the repository or folder, or the `TOMIX_SESSION` name).
+With `--output-format json` the same details are under `session`: `id`,
+`kind`, `scope`, and the session file's `path`.
+
 ```sh
-tx session          # show session ID, kind, scope directory, file path, active state
-tx session clear    # clear active state for this session
-tx session prune    # delete session files for dead shells
+tx connect                # show the connection and its session
+tx connect --clear        # forget the connection in this session
+tx connect --clear --all  # forget it in every session
 ```
 
-The default prune is conservative: only dead, well-formed `pid-<number>`
-sessions are removed. Directory, named, malformed-PID, live-PID, and current
-sessions are kept. Use `--all` to remove every non-current session; add
-`--dry-run` to inspect the exact candidate count without deleting anything.
+Session files clean up after themselves: each `tx connect <target>` removes
+the files of sessions whose folder no longer exists (a deleted worktree or
+clone). `tx doctor` reports any that are left.
 
 ## Authentication
 

@@ -436,8 +436,8 @@ Fabric workspace`). Add `--show-details` to include them, for your own
 troubleshooting.
 
 `doctor` is strictly local and deterministic: it checks config-directory
-read/write access, configuration validity, profiles, sessions (and suggests
-`tx session prune` for sessions of shells that have exited), the current
+read/write access, configuration validity, profiles, sessions (and reports
+stale ones, which the next `tx connect <target>` removes), the current
 session's connection, cached sign-in metadata (and, on Windows, that the
 matching token cache file exists), and the cached update record. It never
 opens the OS keystore, refreshes credentials, or contacts a model/release

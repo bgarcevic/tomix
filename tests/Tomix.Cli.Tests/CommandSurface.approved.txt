@@ -252,6 +252,7 @@ Set or show the active connection
   opt --force  Allow workspace mode to initialize over a folder that already has content
   opt --workspace-format <format>  How a local workspace is stored on disk (tmdl or bim); detected from the path when omitted
   opt --workspace-auth <method>  How to authenticate the remote side of workspace mode (default: --auth when set, otherwise auto)
+  opt --all  With --clear: forget the connection in every session (every repository, worktree, and TOMIX_SESSION), not just this one
 
 # tx deploy
 Deploy a semantic model to a workspace
@@ -468,23 +469,6 @@ Write a model to disk in a chosen format
   opt --bpa-rules <file>  Additional BPA rule files to enforce for this save, alongside the built-in ruleset
   opt --supporting-files  Write a {modelName}.SemanticModel/ folder (with .platform and definition.pbism) around the output. Only applies to tmdl/bim written to a bare target.
   opt --no-sync  Skip workspace sync when workspace mode is active
-
-# tx session
-Inspect this terminal's CLI session
-
-# tx session clear
-Clear this session's active marker
-
-# tx session list
-List saved session files
-
-# tx session prune
-Remove session files whose shell has exited
-  opt --all  Also remove named and live process sessions. The current session is kept.
-  opt --dry-run  Preview what prune would remove
-
-# tx session show
-Print this session's details (ID, file path, active state)
 
 # tx set
 Change a property on a model object

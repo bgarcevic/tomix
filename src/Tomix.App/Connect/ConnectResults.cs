@@ -26,8 +26,21 @@ public sealed record ConnectShowResult(
 {
     [JsonPropertyName("connection")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CliConnectionState? PublicConnection => Connection?.WithoutReportCache();
+    public CliConnectionState? PublicConnection => Connection?.ToPublic();
+
+    /// <summary>The session file that holds (or would hold) the active connection.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ConnectSessionInfo? Session { get; init; }
 }
+
+/// <param name="Kind"><c>directory</c>, <c>named</c> (<c>TOMIX_SESSION</c>), or legacy <c>pid</c>.</param>
+/// <param name="Scope">The repository, worktree, or folder a directory session is bound to.</param>
+public sealed record ConnectSessionInfo(
+    string Id,
+    string Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Scope,
+    string Path);
 
 public sealed record ConnectSetResult(
     bool Active,
@@ -35,9 +48,13 @@ public sealed record ConnectSetResult(
     CliConnectionState Connection)
 {
     [JsonPropertyName("connection")]
-    public CliConnectionState PublicConnection => Connection.WithoutReportCache();
+    public CliConnectionState PublicConnection => Connection.ToPublic();
 }
 
-public sealed record ConnectClearResult(bool Cleared);
+/// <param name="Removed">With <c>--clear --all</c>, how many session files were deleted.</param>
+public sealed record ConnectClearResult(
+    bool Cleared,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? Removed = null);
 
 public sealed record ConnectRecentListResult(IReadOnlyList<RecentConnection> Connections);

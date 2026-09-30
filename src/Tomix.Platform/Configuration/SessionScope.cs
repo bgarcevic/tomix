@@ -38,7 +38,7 @@ public static class SessionScope
 
     /// <summary>
     /// A stable, filename-safe session id for <paramref name="scopeDirectory"/>:
-    /// <c>dir-&lt;leaf&gt;-&lt;hash&gt;</c>. The leaf keeps <c>tx session list</c> readable; the hash
+    /// <c>dir-&lt;leaf&gt;-&lt;hash&gt;</c>. The leaf keeps the sessions folder readable; the hash
     /// of the full path keeps two same-named folders apart.
     /// </summary>
     public static string SessionIdFor(string scopeDirectory)

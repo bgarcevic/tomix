@@ -156,7 +156,7 @@ public sealed class DoctorHandlerTests : IDisposable
         var check = Check(CreateHandler().Handle("1.0.0", Terminal).Data!, "sessions");
 
         Assert.Equal(DoctorCheckStatus.Info, check.Status);
-        Assert.Equal("valid (2 session(s), 1 from exited shells; run 'tx session prune')", check.Message);
+        Assert.Equal("valid (2 session(s), 1 stale; the next 'tx connect <target>' removes them)", check.Message);
     }
 
     [Fact]

@@ -143,7 +143,7 @@ public sealed class CliStateStore
         // Recents are reconnection targets, not display state: Desktop picks a new port on every
         // start, so a cached report name is worthless here and its port-file path would leak into
         // `connect --recent --output-format json`.
-        entries.Insert(0, new RecentConnection(state.WithoutReportCache(), DateTimeOffset.UtcNow));
+        entries.Insert(0, new RecentConnection(state.ToPublic(), DateTimeOffset.UtcNow));
         if (entries.Count > MaxRecentConnections)
             entries.RemoveRange(MaxRecentConnections, entries.Count - MaxRecentConnections);
 
@@ -183,6 +183,7 @@ public sealed class CliStateStore
     public void SaveCurrentSession(CliConnectionState state)
     {
         Directory.CreateDirectory(SessionsDirectory);
+        state = state with { Scope = CurrentSessionScope };
         AtomicFile.WriteAllText(CurrentSessionFile, JsonSerializer.Serialize(state, AppJsonContext.Default.CliConnectionState));
     }
 
@@ -206,21 +207,68 @@ public sealed class CliStateStore
             .ToList();
     }
 
-    public int PruneSessions(bool all)
-        => PruneSessions(SelectPruneCandidates(all));
+    /// <summary>
+    /// Session files that provably belong to nothing any more: a directory session whose folder
+    /// is gone (a deleted worktree or clone), or a legacy <c>pid-&lt;n&gt;</c> session whose
+    /// process has exited. The current session is never stale. A directory session written
+    /// before the scope was recorded cannot be judged, so it is kept.
+    /// </summary>
+    public IReadOnlyList<SessionFileInfo> SelectStaleSessions()
+        => ListSessions()
+            .Where(session => !session.Current && (IsDeadPidSession(session.SessionId) || IsOrphanedDirectorySession(session.Path)))
+            .ToList();
 
-    public static int PruneSessions(IReadOnlyList<SessionFileInfo> candidates)
+    /// <summary>
+    /// Deletes <see cref="SelectStaleSessions"/>. Best-effort housekeeping: a file that cannot be
+    /// deleted (locked, already gone) is skipped rather than failing the caller.
+    /// </summary>
+    public int PruneStaleSessions()
     {
-        foreach (var candidate in candidates)
-            File.Delete(candidate.Path);
-
-        return candidates.Count;
+        try
+        {
+            return DeleteSessionFiles(SelectStaleSessions());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
     }
 
-    public IReadOnlyList<SessionFileInfo> SelectPruneCandidates(bool all)
-        => ListSessions()
-            .Where(session => !session.Current && (all || IsDeadPidSession(session.SessionId)))
-            .ToList();
+    /// <summary>Deletes every session file, the current one included. Returns how many were removed.</summary>
+    public int ClearAllSessions()
+        => DeleteSessionFiles(ListSessions());
+
+    private static int DeleteSessionFiles(IReadOnlyList<SessionFileInfo> sessions)
+    {
+        var removed = 0;
+        foreach (var session in sessions)
+        {
+            try
+            {
+                File.Delete(session.Path);
+                removed++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return removed;
+    }
+
+    private static bool IsOrphanedDirectorySession(string path)
+    {
+        try
+        {
+            var state = JsonSerializer.Deserialize(File.ReadAllText(path), AppJsonContext.Default.CliConnectionState);
+            return !string.IsNullOrWhiteSpace(state?.Scope) && !Directory.Exists(state.Scope);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            // Unreadable is not the same as orphaned; doctor reports corrupt files instead.
+            return false;
+        }
+    }
 
     private static bool IsDeadPidSession(string sessionId)
     {

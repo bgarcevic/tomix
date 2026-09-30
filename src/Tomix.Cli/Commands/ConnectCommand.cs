@@ -87,6 +87,10 @@ internal sealed class ConnectCommand : ICommandModule
         {
             Description = "How to authenticate the remote side of workspace mode (default: --auth when set, otherwise auto)"
         };
+        var clearAllOption = new Option<bool>("--all")
+        {
+            Description = "With --clear: forget the connection in every session (every repository, worktree, and TOMIX_SESSION), not just this one"
+        };
 
         var command = new Command("connect", "Set or show the active connection")
         {
@@ -100,7 +104,8 @@ internal sealed class ConnectCommand : ICommandModule
             clearOption,
             forceOption,
             workspaceFormatOption,
-            workspaceAuthOption
+            workspaceAuthOption,
+            clearAllOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -110,6 +115,10 @@ internal sealed class ConnectCommand : ICommandModule
                 return 2;
 
             var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
+
+            var clearAll = parseResult.GetValue(clearAllOption);
+            if (clearAll && !parseResult.GetValue(clearOption))
+                return RenderWorkspaceOptionError(parseResult, "--all requires --clear (e.g. 'tx connect --clear --all').");
 
             var handler = new ConnectHandler(_state);
             if (GlobalOptions.RecentSpecified(parseResult))
@@ -160,13 +169,20 @@ internal sealed class ConnectCommand : ICommandModule
             }
 
             if (parseResult.GetValue(clearOption))
+            {
+                if (clearAll && !ConfirmationHelper.ConfirmOrAbort(
+                    "Clear", "the active connection in every session", parseResult, format))
+                    return 1;
+
                 return CommandOutput.Render(
                     parseResult,
-                    handler.Clear(),
+                    handler.Clear(clearAll),
                     format,
-                    result => AnsiConsole.MarkupLine(result.Cleared
-                        ? Styling.Success("Cleared active connection.")
+                    result => AnsiConsole.MarkupLine(
+                        result.Removed is { } removed ? Styling.Success($"Cleared {removed} session(s).")
+                        : result.Cleared ? Styling.Success("Cleared active connection.")
                         : Styling.Muted("No active connection.")));
+            }
 
             // ArgumentArity.ZeroOrOne surfaces both "absent" and "bare -w" as null from GetValue;
             // gate on GetResult so a valueless -w (present, no value) is distinguishable from absent.

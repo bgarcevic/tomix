@@ -58,7 +58,7 @@ public sealed class DoctorAndConfigRecoveryTests : IDisposable
     [Fact]
     public void OtherCommands_KeepStructuredConfigCorruptFailure()
     {
-        var invocation = Invoke("session", "--error-format", "json");
+        var invocation = Invoke("connect", "--error-format", "json");
 
         Assert.Equal(2, invocation.ExitCode);
         Assert.Contains("\"code\": \"TOMIX_CONFIG_CORRUPT\"", invocation.Stderr);

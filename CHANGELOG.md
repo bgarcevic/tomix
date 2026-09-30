@@ -22,6 +22,12 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- **Breaking:** `tx session` is removed; `tx connect` covers it. `tx connect` now names the
+  session holding the connection (JSON: a `session` object with `id`, `kind`, `scope`, `path`),
+  `tx connect --clear` replaces `session clear`, and `tx connect --clear --all` forgets the
+  connection in every session. `session prune` and `session list` have no replacement: each
+  `tx connect <target>` now removes session files whose folder no longer exists (and legacy
+  `pid-*` sessions of exited shells), and `tx doctor` reports any stale ones left.
 - `tx get Measures` and other bare container paths now list the container instead of failing
   with `TOMIX_OBJECT_NOT_FOUND`, and `tx get ./model` lists the model's tables. `--query` or
   `--deps` on a path that selects a set fails with `TOMIX_SINGLE_OBJECT_REQUIRED` (#335).

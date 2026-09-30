@@ -118,6 +118,7 @@ internal static class ConnectRenderer
         if (!result.Active || result.Connection is null)
         {
             AnsiConsole.MarkupLine(Styling.Warning("No active connection."));
+            RenderSession(result.Session);
             return;
         }
 
@@ -165,6 +166,26 @@ internal static class ConnectRenderer
                     ? $"{connection.Workspace} / {mirrorDatabase}"
                     : connection.Workspace));
         }
+
+        RenderSession(result.Session);
+    }
+
+    /// <summary>
+    /// Names the session file holding the connection, so it is clear why a different repository
+    /// or worktree shows a different connection.
+    /// </summary>
+    private static void RenderSession(ConnectSessionInfo? session)
+    {
+        if (session is null)
+            return;
+
+        var label = session.Kind switch
+        {
+            "directory" when session.Scope is not null => session.Scope,
+            "named" => $"{session.Id} (TOMIX_SESSION)",
+            _ => session.Id,
+        };
+        AnsiConsole.MarkupLine(Styling.Muted($"Session: {label}"));
     }
 
     public static void RenderConnection(CliConnectionState connection)

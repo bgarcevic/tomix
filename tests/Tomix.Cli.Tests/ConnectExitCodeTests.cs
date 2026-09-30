@@ -23,12 +23,26 @@ public sealed class ConnectExitCodeTests
     [InlineData("connect", "SomeWorkspace", "SomeModel", "--list")]
     [InlineData("connect", "SomeWorkspace", "--list", "--remote")]
     [InlineData("connect", "SomeWorkspace", "--list", "-w", "folder")]
+    [InlineData("connect", "--all")]
     public void UsageErrors_ExitTwo(params string[] args)
     {
         var (exitCode, stderr) = Invoke(NoProviders, args);
 
         Assert.Equal(2, exitCode);
         Assert.NotEmpty(stderr);
+    }
+
+    [Fact]
+    public void Show_NamesTheSession_WithoutAnActiveConnection()
+    {
+        var services = TestServices.Create();
+        var root = TestRoot.With(new ConnectCommand(NoProviders, FakeWorkspaceCatalog.Empty, () => null, services.State).Build());
+
+        var captured = ConsoleCapture.Invoke(root.Parse(["connect", "--output-format", "json"]));
+
+        Assert.Equal(0, captured.ExitCode);
+        Assert.Contains("\"session\"", captured.Stdout);
+        Assert.Contains(services.State.CurrentSessionId, captured.Stdout);
     }
 
     [Fact]

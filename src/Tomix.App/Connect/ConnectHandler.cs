@@ -69,14 +69,27 @@ public sealed class ConnectHandler
             state = state.WithoutReportCache();
 
         return TomixResult<ConnectShowResult>.Ok(
-            new ConnectShowResult(state is not null, state, reachable, lastReportName));
+            new ConnectShowResult(state is not null, state, reachable, lastReportName)
+            {
+                Session = new ConnectSessionInfo(
+                    _store.CurrentSessionId, _store.CurrentSessionKind, _store.CurrentSessionScope, _store.CurrentSessionFile)
+            });
     }
 
-    public TomixResult<ConnectClearResult> Clear()
+    /// <summary>
+    /// Forgets the active connection. With <paramref name="all"/>, deletes every session file —
+    /// the connection in every other repository, worktree, and named session too.
+    /// </summary>
+    public TomixResult<ConnectClearResult> Clear(bool all = false)
     {
         var existed = _store.LoadCurrentSession() is not null;
-        _store.ClearCurrentSession();
-        return TomixResult<ConnectClearResult>.Ok(new ConnectClearResult(existed));
+        if (!all)
+        {
+            _store.ClearCurrentSession();
+            return TomixResult<ConnectClearResult>.Ok(new ConnectClearResult(existed));
+        }
+
+        return TomixResult<ConnectClearResult>.Ok(new ConnectClearResult(existed, _store.ClearAllSessions()));
     }
 
     public TomixResult<ConnectSetResult> Set(ConnectSetRequest request)
@@ -130,6 +143,10 @@ public sealed class ConnectHandler
 
         _store.SaveCurrentSession(state);
         _store.AddRecentConnection(state);
+
+        // Connecting is when session files accumulate, so it is also where the provably dead ones
+        // (deleted worktrees, exited legacy pid sessions) are swept.
+        _store.PruneStaleSessions();
         return TomixResult<ConnectSetResult>.Ok(new ConnectSetResult(Active: true, state));
     }
 

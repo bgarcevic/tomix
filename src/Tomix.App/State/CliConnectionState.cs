@@ -34,15 +34,28 @@ public sealed record CliConnectionState(
     /// proves the cached name still belongs to the instance now on that port.
     /// </summary>
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? ReportPortFile = null)
+    string? ReportPortFile = null,
+    /// <summary>
+    /// The directory a directory-scoped session file belongs to, stamped by
+    /// <see cref="CliStateStore.SaveCurrentSession"/>. The file name holds only a hash of the
+    /// path, so this is what lets a session whose folder was deleted be recognized as stale.
+    /// </summary>
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Scope = null)
 {
     /// <summary>
-    /// The same connection without the report-label cache. Those two fields are an internal
-    /// display optimization, not part of the connection contract — and <see cref="ReportPortFile"/>
-    /// is an absolute path inside the user's profile, which must not leak into command output or
-    /// the recents file. Use this anywhere the state is serialized for someone other than the
-    /// session file.
+    /// The same connection without the session-file bookkeeping: the report-label cache and the
+    /// session scope. Those fields are internal, not part of the connection contract — and
+    /// <see cref="ReportPortFile"/> is an absolute path inside the user's profile, which must not
+    /// leak into command output or the recents file. Use this anywhere the state is serialized
+    /// for someone other than the session file.
     /// </summary>
+    public CliConnectionState ToPublic()
+        => ReportName is null && ReportPortFile is null && Scope is null
+            ? this
+            : this with { ReportName = null, ReportPortFile = null, Scope = null };
+
+    /// <summary>The connection without the Desktop report-label cache, keeping everything else.</summary>
     public CliConnectionState WithoutReportCache()
         => ReportName is null && ReportPortFile is null
             ? this

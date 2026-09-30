@@ -217,15 +217,13 @@ public sealed class DoctorHandler
                 return;
             }
 
-            // Only sessions of exited shells are known to be stale: a directory session's file
-            // name holds a hash of its directory, not the path, so a deleted folder is undetectable.
-            var stale = _state.SelectPruneCandidates(all: false).Count;
+            var stale = _state.SelectStaleSessions().Count;
             checks.Add(stale == 0
                 ? new DoctorCheck("sessions", DoctorCheckStatus.Pass, $"valid ({sessions.Count} session(s))")
                 : new DoctorCheck(
                     "sessions",
                     DoctorCheckStatus.Info,
-                    $"valid ({sessions.Count} session(s), {stale} from exited shells; run 'tx session prune')"));
+                    $"valid ({sessions.Count} session(s), {stale} stale; the next 'tx connect <target>' removes them)"));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
