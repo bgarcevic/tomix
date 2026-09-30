@@ -101,6 +101,9 @@ Per project:
   factories. Imported as a static using, so call them unqualified.
 - `Tomix.Provider.Vpax.Tests/TestDaxModelBuilder` — DAX model fixtures.
 
+Use these hand-written stubs rather than a mocking library (no Moq, NSubstitute, or FluentAssertions);
+extend a stub when a test needs new behavior.
+
 If you need the same fixture or stub twice, extract it rather than copying — duplicated fixtures
 drift apart silently. Anything that creates files must clean up after itself.
 
