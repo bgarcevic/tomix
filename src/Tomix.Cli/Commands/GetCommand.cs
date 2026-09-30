@@ -32,9 +32,8 @@ internal sealed class GetCommand : ICommandModule
         var pathArgument = new Argument<string?>("path")
         {
             Description =
-                "What to read. One object shows its properties: 'Sales', 'Sales/Amount', or DAX form " +
-                "\"'Sales'[Amount]\"; '.' is the model root. A wildcard ('Sa*', '*/Amount') or container " +
-                "('Tables', 'Sales/Measures') lists every match; omitted lists the tables.",
+                "One object shows its properties ('Sales/Amount'); a wildcard ('Sa*') or container " +
+                "('Sales/Measures') lists every match (default: the tables)",
             Arity = ArgumentArity.ZeroOrOne
         };
 
@@ -56,8 +55,8 @@ internal sealed class GetCommand : ICommandModule
 
         var typeOption = new Option<string?>("--type")
         {
-            Description = "Object type: picks one when a path matches several objects, or filters a list. " +
-                          $"Values: {ModelObjectTypeCatalog.DiscoveryListText}."
+            Description = "Object kind: picks one when a path matches several objects, or filters a list; " +
+                          TypeValidation.KindsHint
         };
         typeOption.Aliases.Add("-t");
 
@@ -68,9 +67,8 @@ internal sealed class GetCommand : ICommandModule
 
         var whereOption = new Option<string[]>("--where")
         {
-            Description = "Keep objects whose property matches Prop=Value, case-insensitively. '*' is the " +
-                          "only wildcard (Name=*margin*, Name=margin*); no '*' means the whole value. " +
-                          "Repeat to AND filters. The path is the scope (omitted: the tables).",
+            Description = "Keep objects whose property matches Prop=Value, ignoring case; '*' is a wildcard. " +
+                          "Repeat to combine filters.",
             AllowMultipleArgumentsPerToken = false
         };
 

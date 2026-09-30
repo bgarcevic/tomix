@@ -42,7 +42,7 @@ internal sealed class StageCommand : ICommandModule
     {
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Commit despite source drift and newly introduced validation errors"
+            Description = "Commit even if the source changed since staging or the changes add validation errors"
         };
         var command = new Command("commit", "Commit staged mutations to the source and workspace mirror")
         {

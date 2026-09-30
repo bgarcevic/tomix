@@ -53,7 +53,7 @@ public sealed class DiffModelHandler
 
     /// <summary>
     /// Compares two already-loaded snapshots. Exposed so callers that produce their own snapshots
-    /// — notably the deploy dry run, which diffs the target against the model the deploy would
+    /// — notably the deploy preview, which diffs the target against the model the deploy would
     /// leave behind — share one definition of "what changed" with <c>tx diff</c>.
     /// </summary>
     public static DiffModelResult Diff(

@@ -21,5 +21,4 @@ public sealed record BpaRunRequest(
     bool Stage = false,
     bool Revert = false,
     bool NoSync = false,
-    bool Overwrite = false,
-    bool DryRun = false);
+    bool Overwrite = false);

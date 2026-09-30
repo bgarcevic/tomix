@@ -107,9 +107,9 @@ public sealed class BpaRunHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_FixDryRun_ListsPendingFixesAndLeavesTheModelByteIdentical()
+    public async Task HandleAsync_FixWithoutSave_PreviewsPendingFixesAndLeavesTheModelByteIdentical()
     {
-        // #268: --dry-run previews --fix; --save is suppressed and nothing reaches disk.
+        // #268: without --save/--stage, --fix is a preview and nothing reaches disk.
         using var config = new TempConfigDir();
         using var root = new TempDir();
         var model = SampleModel.CopyTo(root, "model");
@@ -121,16 +121,14 @@ public sealed class BpaRunHandlerTests
             RulesFiles = [rulesPath],
             NoDefaults = true,
             Fix = true,
-            Save = true,
-            DryRun = true,
             FailOn = "warning"
         });
 
         Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
         var data = result.Data!;
-        Assert.True(data.DryRun);
+        Assert.True(data.Preview);
         Assert.Equal(0, data.FixesApplied);
-        Assert.Equal(MutationStatus.DryRun, data.FixOutcome.Status);
+        Assert.Equal(MutationStatus.Preview, data.FixOutcome.Status);
         Assert.False(data.FixOutcome.Saved);
         Assert.NotEmpty(data.FixChanges);
         Assert.All(data.FixChanges, c =>
@@ -146,22 +144,6 @@ public sealed class BpaRunHandlerTests
         // Nothing changed, so --fail-on judges the model as it is.
         Assert.Equal(1, result.ExitCode);
         Assert.Equal(before, HashFiles(model));
-    }
-
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    public async Task HandleAsync_DryRunWithoutFixOrWithRevert_FailsWithUsageError(bool fix, bool revert)
-    {
-        using var config = new TempConfigDir();
-        using var root = new TempDir();
-        var model = SampleModel.CopyTo(root, "model");
-
-        var result = await RunAsync(config, model, r => r with { NoDefaults = true, Fix = fix, Revert = revert, DryRun = true });
-
-        Assert.False(result.Success);
-        Assert.Equal("TOMIX_BPA_DRY_RUN_REQUIRES_FIX", result.Diagnostics[0].Code);
-        Assert.Equal(2, result.ExitCode);
     }
 
     private static Dictionary<string, string> HashFiles(string folder)

@@ -60,7 +60,7 @@ public static class TomModelRefresher
 
     /// <summary>
     /// Builds a TMSL <c>{"refresh":{...}}</c> command without executing it.
-    /// Used by <c>--dry-run</c>. The database is implicit in the connection's <c>Initial Catalog</c>.
+    /// Used by the refresh preview. The database is implicit in the connection's <c>Initial Catalog</c>.
     /// </summary>
     public static string GenerateRefreshScript(TabularDatabase database, ModelRefreshRequest request)
     {

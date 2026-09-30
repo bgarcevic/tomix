@@ -23,7 +23,7 @@ public sealed class DeployModelHandlerTests
         var handler = new DeployModelHandler([provider], config.State);
 
         var result = await handler.HandleAsync(
-            DryRunRequest() with { Profile = "sandbox" }, CancellationToken.None);
+            PreviewRequest() with { Profile = "sandbox" }, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal(1, result.ExitCode);
@@ -49,7 +49,7 @@ public sealed class DeployModelHandlerTests
         var handler = new DeployModelHandler([provider], config.State);
 
         var result = await handler.HandleAsync(
-            DryRunRequest() with { Server = null, Database = null, Profile = "local" },
+            PreviewRequest() with { Server = null, Database = null, Profile = "local" },
             CancellationToken.None);
 
         Assert.False(result.Success);
@@ -73,7 +73,7 @@ public sealed class DeployModelHandlerTests
         var handler = new DeployModelHandler([new StubDeployProvider()], config.State);
 
         var result = await handler.HandleAsync(
-            DryRunRequest() with { Server = null, Database = null, Profile = "PROD" },
+            PreviewRequest() with { Server = null, Database = null, Profile = "PROD" },
             CancellationToken.None);
 
         Assert.True(result.Success);
@@ -92,7 +92,7 @@ public sealed class DeployModelHandlerTests
         var handler = new DeployModelHandler([new StubDeployProvider()], config.State);
 
         var result = await handler.HandleAsync(
-            DryRunRequest() with { Profile = "prod" }, CancellationToken.None);
+            PreviewRequest() with { Profile = "prod" }, CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal("my-workspace", result.Data!.Server);
@@ -108,7 +108,7 @@ public sealed class DeployModelHandlerTests
         var handler = new DeployModelHandler([new StubDeployProvider()], config.State);
 
         var result = await handler.HandleAsync(
-            DryRunRequest() with { Server = null, Database = null }, CancellationToken.None);
+            PreviewRequest() with { Server = null, Database = null }, CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Equal("active-workspace", result.Data!.Server);
@@ -130,7 +130,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -168,7 +167,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -192,7 +190,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null,
                 DeployOptions: new ModelDeployOptions(DeployRoleMembers: true)),
             CancellationToken.None);
@@ -217,7 +214,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null,
                 DeployOptions: new ModelDeployOptions(DeployPolicyPartitions: true)),
             CancellationToken.None);
@@ -242,7 +238,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null,
                 DeployOptions: ModelDeployOptions.Full),
             CancellationToken.None);
@@ -251,12 +246,12 @@ public sealed class DeployModelHandlerTests
     }
 
     /// <summary>
-    /// The dry-run diff answers "what will this deploy change on the target": an object that
+    /// The preview diff answers "what will this deploy change on the target": an object that
     /// exists in the source but not on the target must read as "added" (it will be added to
     /// the target), not "removed".
     /// </summary>
     [Fact]
-    public async Task HandleAsync_DryRun_DiffsInDeployDirection()
+    public async Task HandleAsync_Preview_DiffsInDeployDirection()
     {
         var planned = SnapshotWithMeasure(includeMeasure: true);
         var target = SnapshotWithMeasure(includeMeasure: false);
@@ -265,7 +260,7 @@ public sealed class DeployModelHandlerTests
             () => new ModelDeployPlan(TargetExists: true, target, planned));
 
         var handler = new DeployModelHandler([provider], TestState);
-        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+        var result = await handler.HandleAsync(PreviewRequest(), CancellationToken.None);
 
         Assert.True(result.Success);
         var change = Assert.Single(result.Data!.Diff!.Changes);
@@ -274,13 +269,13 @@ public sealed class DeployModelHandlerTests
     }
 
     /// <summary>
-    /// The proof of the #128 fix at the handler level: the dry run diffs the deploy plan, not
+    /// The proof of the #128 fix at the handler level: the preview diffs the deploy plan, not
     /// the raw source. Here the source carries a measure the deploy will not send (the plan
     /// preserves the target's state), so the honest answer is "no changes" — diffing the raw
     /// source would report an addition the deploy never makes.
     /// </summary>
     [Fact]
-    public async Task HandleAsync_DryRun_DiffsThePlan_NotTheRawSource()
+    public async Task HandleAsync_Preview_DiffsThePlan_NotTheRawSource()
     {
         var rawSource = SnapshotWithMeasure(includeMeasure: true);
         var target = SnapshotWithMeasure(includeMeasure: false);
@@ -289,7 +284,7 @@ public sealed class DeployModelHandlerTests
             () => new ModelDeployPlan(TargetExists: true, target, Planned: target));
 
         var handler = new DeployModelHandler([provider], TestState);
-        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+        var result = await handler.HandleAsync(PreviewRequest(), CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.False(result.Data!.Diff!.HasChanges);
@@ -297,7 +292,7 @@ public sealed class DeployModelHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DryRun_IgnoresCalculatedTableColumnDataTypeFromProcessedTarget()
+    public async Task HandleAsync_Preview_IgnoresCalculatedTableColumnDataTypeFromProcessedTarget()
     {
         var target = SnapshotWithCalculatedTableColumn("double");
         var planned = SnapshotWithCalculatedTableColumn("string");
@@ -306,7 +301,7 @@ public sealed class DeployModelHandlerTests
             () => new ModelDeployPlan(TargetExists: true, target, planned));
 
         var handler = new DeployModelHandler([provider], TestState);
-        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+        var result = await handler.HandleAsync(PreviewRequest(), CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.False(result.Data!.Diff!.HasChanges);
@@ -316,11 +311,11 @@ public sealed class DeployModelHandlerTests
 
     /// <summary>
     /// A target database that does not exist yet has nothing to diff against: the deploy creates
-    /// it with the full source model, and the dry run must say so rather than report every object
+    /// it with the full source model, and the preview must say so rather than report every object
     /// in the model as an addition or fail as "target unreachable".
     /// </summary>
     [Fact]
-    public async Task HandleAsync_DryRun_TargetMissing_ReportsCreatesDatabase()
+    public async Task HandleAsync_Preview_TargetMissing_ReportsCreatesDatabase()
     {
         var source = SnapshotWithMeasure(includeMeasure: true);
         var provider = new DirectionalDeployProvider(
@@ -328,7 +323,7 @@ public sealed class DeployModelHandlerTests
             () => new ModelDeployPlan(TargetExists: false, Target: null, Planned: source));
 
         var handler = new DeployModelHandler([provider], TestState);
-        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+        var result = await handler.HandleAsync(PreviewRequest(), CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.True(result.Data!.CreatesDatabase);
@@ -337,11 +332,33 @@ public sealed class DeployModelHandlerTests
     }
 
     /// <summary>
-    /// An unreadable target degrades the preview instead of failing the command: the dry run
+    /// Without -d the deploy writes a database named after the source model. The preview must
+    /// diff that database and name it, not skip the diff and show the model path as the target.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_Preview_WithoutDatabase_DiffsTheDatabaseTheDeployWouldWrite()
+    {
+        var source = SnapshotWithMeasure(includeMeasure: true);
+        var provider = new DirectionalDeployProvider(
+            _ => source,
+            () => new ModelDeployPlan(TargetExists: true, Target: SnapshotWithMeasure(includeMeasure: false), Planned: source,
+                TargetName: "Sales Model"));
+
+        var handler = new DeployModelHandler([provider], TestState);
+        var result = await handler.HandleAsync(PreviewRequest() with { Database = null }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("Sales Model", result.Data!.Database);
+        Assert.NotNull(result.Data.Diff);
+        Assert.True(result.Data.Diff!.HasChanges);
+    }
+
+    /// <summary>
+    /// An unreadable target degrades the preview instead of failing the command: it
     /// still succeeds, reporting why the diff is missing.
     /// </summary>
     [Fact]
-    public async Task HandleAsync_DryRun_PlanFailure_SetsDiffError_AndStillSucceeds()
+    public async Task HandleAsync_Preview_PlanFailure_SetsDiffError_AndStillSucceeds()
     {
         var source = SnapshotWithMeasure(includeMeasure: true);
         var provider = new DirectionalDeployProvider(
@@ -349,15 +366,15 @@ public sealed class DeployModelHandlerTests
             () => throw new InvalidOperationException("workspace is unreachable"));
 
         var handler = new DeployModelHandler([provider], TestState);
-        var result = await handler.HandleAsync(DryRunRequest(), CancellationToken.None);
+        var result = await handler.HandleAsync(PreviewRequest(), CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal("dry-run", result.Data!.Status);
+        Assert.Equal("preview", result.Data!.Status);
         Assert.Null(result.Data.Diff);
         Assert.Contains("workspace is unreachable", result.Data.DiffError);
     }
 
-    private static DeployModelRequest DryRunRequest()
+    private static DeployModelRequest PreviewRequest()
         => new(
             new ModelReference("local-model"),
             Server: "my-workspace",
@@ -368,9 +385,8 @@ public sealed class DeployModelHandlerTests
             FixBpa: false,
             BpaRules: null,
             XmlaOutput: null,
-            Force: false,
             Ci: null,
-            DryRun: true);
+            Preview: true);
 
     private static ModelSnapshot SnapshotWithMeasure(bool includeMeasure)
     {
@@ -423,7 +439,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -446,7 +461,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -469,7 +483,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: "-",
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -497,7 +510,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: scriptPath,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -527,7 +539,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: true,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -556,7 +567,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None);
 
@@ -566,6 +576,37 @@ public sealed class DeployModelHandlerTests
         Assert.Equal("TOMIX_BPA_VERTIPAQ_STATS_MISSING", warning.Code);
         Assert.Contains("FIX_REFERENTIAL_INTEGRITY_VIOLATIONS", warning.Message);
         Assert.Contains("tx vertipaq --annotate --save", warning.Hint);
+    }
+
+    [Fact]
+    public async Task Operation_PreviewThenApply_OpensOnceAndReportsGateWarningsOnce()
+    {
+        // The CLI previews, confirms, then deploys: one open and one BPA gate, and the gate's
+        // warning rides on the preview only, so it is not printed twice.
+        var provider = new DirectionalDeployProvider(_ => new ModelSnapshot("m", 1601, []));
+        var handler = new DeployModelHandler([provider], TestState);
+
+        await using var operation = await handler.OpenAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: false,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Ci: null),
+            CancellationToken.None);
+        var preview = await operation.PreviewAsync(CancellationToken.None);
+        var deployed = await operation.ApplyAsync(CancellationToken.None);
+
+        Assert.Equal("preview", preview.Data!.Status);
+        Assert.Equal("TOMIX_BPA_VERTIPAQ_STATS_MISSING", Assert.Single(preview.Diagnostics).Code);
+        Assert.Equal("created", deployed.Data!.Status);
+        Assert.Empty(deployed.Diagnostics);
+        Assert.Equal(1, provider.OpenCount);
     }
 
     [Theory]
@@ -589,7 +630,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null,
                 BpaFailOn: failOn),
             CancellationToken.None);
@@ -723,7 +763,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: [rulesPath],
                 XmlaOutput: null,
-                Force: false,
                 Ci: null,
                 BpaFailOn: bpaFailOn),
             CancellationToken.None);
@@ -762,7 +801,6 @@ public sealed class DeployModelHandlerTests
                 FixBpa: false,
                 BpaRules: null,
                 XmlaOutput: null,
-                Force: false,
                 Ci: null),
             CancellationToken.None));
     }
@@ -803,7 +841,7 @@ public sealed class DeployModelHandlerTests
 
     /// <summary>
     /// Serves a different snapshot per reference — the raw source for the local model, the live
-    /// model for the remote target — plus the deploy plan the dry run is supposed to diff. The
+    /// model for the remote target — plus the deploy plan the preview is supposed to diff. The
     /// two are configured independently so a handler that went back to diffing the raw source
     /// instead of the plan produces a visibly different answer.
     /// </summary>
@@ -811,10 +849,15 @@ public sealed class DeployModelHandlerTests
         Func<ModelReference, ModelSnapshot> snapshots,
         Func<ModelDeployPlan>? plan = null) : IModelProvider
     {
+        public int OpenCount { get; private set; }
+
         public bool CanOpen(ModelReference _) => true;
 
         public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new DirectionalDeploySession(snapshots(reference), plan));
+        {
+            OpenCount++;
+            return Task.FromResult<IModelSession>(new DirectionalDeploySession(snapshots(reference), plan));
+        }
     }
 
     private sealed class DirectionalDeploySession(ModelSnapshot snapshot, Func<ModelDeployPlan>? plan)

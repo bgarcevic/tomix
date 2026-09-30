@@ -49,7 +49,7 @@ public sealed class ConnectWorkspaceHandler
 
     /// <summary>
     /// Scaffolds a local mirror workspace by exporting the primary model to disk. Applies only
-    /// when the target is absent (or <c>Force</c> is set, which deletes an existing dir/file
+    /// when the target is absent (or <c>Overwrite</c> is set, which deletes an existing dir/file
     /// first). Silently reports <c>Initialized=false</c> when no provider can open the primary
     /// or its session cannot export.
     /// </summary>
@@ -57,7 +57,7 @@ public sealed class ConnectWorkspaceHandler
         ConnectWorkspaceInitRequest request,
         CancellationToken cancellationToken)
     {
-        if (!request.Force && (Directory.Exists(request.Workspace) || File.Exists(request.Workspace)))
+        if (!request.Overwrite && (Directory.Exists(request.Workspace) || File.Exists(request.Workspace)))
             return new ConnectWorkspaceInitResult(Initialized: false, null, null);
 
         var serialization = string.IsNullOrWhiteSpace(request.WorkspaceFormat) ? "tmdl" : request.WorkspaceFormat.Trim();
@@ -73,7 +73,7 @@ public sealed class ConnectWorkspaceHandler
         if (session is not IModelExportSession exporter)
             return new ConnectWorkspaceInitResult(Initialized: false, null, null);
 
-        if (request.Force && (Directory.Exists(request.Workspace) || File.Exists(request.Workspace)))
+        if (request.Overwrite && (Directory.Exists(request.Workspace) || File.Exists(request.Workspace)))
         {
             if (Directory.Exists(request.Workspace))
                 Directory.Delete(request.Workspace, true);
@@ -112,7 +112,7 @@ public sealed record ConnectWorkspaceProbeResult(
 public sealed record ConnectWorkspaceInitRequest(
     string Workspace,
     string? WorkspaceFormat,
-    bool Force,
+    bool Overwrite,
     ModelReference Primary);
 
 public sealed record ConnectWorkspaceInitResult(

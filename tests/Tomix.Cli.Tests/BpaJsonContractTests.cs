@@ -88,14 +88,14 @@ public sealed class BpaJsonContractTests
     }
 
     [Fact]
-    public void RunJson_DryRun_ReportsPendingFixesWithoutApplyingThem()
+    public void RunJson_Preview_ReportsPendingFixesWithoutApplyingThem()
     {
         // #268: a preview lists the fixes and what they would leave; fixesApplied stays 0.
         var result = SampleRunResult() with
         {
             FixesApplied = 0,
-            DryRun = true,
-            FixOutcome = MutationOutcome.DryRun,
+            Preview = true,
+            FixOutcome = MutationOutcome.Preview,
             ProjectedViolations = [],
             FixChanges =
             [
@@ -105,8 +105,8 @@ public sealed class BpaJsonContractTests
         };
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(result))).RootElement;
 
-        Assert.True(root.GetProperty("dryRun").GetBoolean());
-        Assert.Equal("dryRun", root.GetProperty("status").GetString());
+        Assert.True(root.GetProperty("preview").GetBoolean());
+        Assert.Equal("preview", root.GetProperty("status").GetString());
         Assert.False(root.GetProperty("saved").GetBoolean());
         Assert.Equal(0, root.GetProperty("fixesApplied").GetInt32());
         Assert.Equal(2, root.GetProperty("fixesPending").GetInt32());
@@ -126,11 +126,11 @@ public sealed class BpaJsonContractTests
     }
 
     [Fact]
-    public void RunJson_WithoutDryRun_OmitsWouldRemain()
+    public void RunJson_WithoutPreview_OmitsWouldRemain()
     {
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;
 
-        Assert.False(root.GetProperty("dryRun").GetBoolean());
+        Assert.False(root.GetProperty("preview").GetBoolean());
         Assert.Equal(0, root.GetProperty("fixesPending").GetInt32());
         Assert.True(!root.TryGetProperty("wouldRemain", out var wouldRemain) || wouldRemain.ValueKind == JsonValueKind.Null);
         Assert.Equal(0, root.GetProperty("fixes").GetArrayLength());

@@ -37,9 +37,9 @@ internal sealed class InitCommand : ICommandModule
         };
         serializationOption.AcceptAmongIgnoreCase("tmdl", "bim", "pbip");
 
-        var forceOption = new Option<bool>("--force")
+        var overwriteOption = new Option<bool>("--overwrite")
         {
-            Description = "Clear anything already at the target path"
+            Description = "Overwrite anything already at the target path"
         };
 
         var command = new Command("init", "Start a new empty semantic model")
@@ -49,7 +49,7 @@ internal sealed class InitCommand : ICommandModule
             compatibilityModeOption,
             nameOption,
             serializationOption,
-            forceOption
+            overwriteOption
         };
 
         command.SetAction(parseResult =>
@@ -68,7 +68,7 @@ internal sealed class InitCommand : ICommandModule
                 parseResult.GetValue(serializationOption) ?? "",
                 parseResult.GetValue(compatibilityModeOption) ?? "",
                 parseResult.GetValue(compatibilityLevelOption),
-                parseResult.GetValue(forceOption)));
+                parseResult.GetValue(overwriteOption)));
 
             return CommandOutput.Render(parseResult, result, formatValue, Render);
         });

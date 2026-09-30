@@ -32,7 +32,24 @@ public sealed class DeployModelHandler
         _bpaRules = bpaRules;
     }
 
+    /// <summary>Previews (<see cref="DeployModelRequest.Preview"/>) or runs one deploy.</summary>
     public async Task<TomixResult<DeployModelResult>> HandleAsync(
+        DeployModelRequest request,
+        CancellationToken cancellationToken)
+    {
+        await using var operation = await OpenAsync(request, cancellationToken);
+        return request.Preview
+            ? await operation.PreviewAsync(cancellationToken)
+            : await operation.ApplyAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Validates the request, opens the source model, and runs the BPA gate once. The returned
+    /// operation previews and applies against that same session, so a preview-then-confirm flow
+    /// opens the model and evaluates the gate only once. A failure here is carried by the
+    /// operation and returned by whichever of its methods is called.
+    /// </summary>
+    public async Task<DeployOperation> OpenAsync(
         DeployModelRequest request,
         CancellationToken cancellationToken)
     {
@@ -43,8 +60,8 @@ public sealed class DeployModelHandler
             if (!resolved.Success)
             {
                 var diagnostic = resolved.Diagnostics[0];
-                return TomixResult<DeployModelResult>.Fail(
-                    diagnostic.Code, diagnostic.Message, resolved.ExitCode, diagnostic.Hint);
+                return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
+                    diagnostic.Code, diagnostic.Message, resolved.ExitCode, diagnostic.Hint));
             }
 
             profile = resolved.Data!;
@@ -52,182 +69,93 @@ public sealed class DeployModelHandler
 
         var deployOptions = request.DeployOptions ?? ModelDeployOptions.Preserve;
         if (deployOptions.DeployRoleMembers && !deployOptions.DeployRoles)
-            return TomixResult<DeployModelResult>.Fail(
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
                 "TOMIX_DEPLOY_INVALID_FLAGS",
                 "--deploy-role-members requires --deploy-roles: members cannot be overwritten while the target's role definitions are preserved.",
-                exitCode: 2);
+                exitCode: 2));
 
         if (deployOptions.DeployPolicyPartitions && !deployOptions.DeployPartitions)
-            return TomixResult<DeployModelResult>.Fail(
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
                 "TOMIX_DEPLOY_INVALID_FLAGS",
                 "--deploy-policy-partitions requires --deploy-partitions.",
-                exitCode: 2);
+                exitCode: 2));
 
         // Validated even when --skip-bpa makes the threshold unused, so a typo fails as a usage
         // error instead of being silently ignored.
         if (!BpaFailOn.TryParse(request.BpaFailOn, "--bpa-fail-on", out var bpaFailOn, out var bpaFailOnError))
-            return TomixResult<DeployModelResult>.Fail(
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
                 "TOMIX_BPA_INVALID_FAIL_ON",
                 bpaFailOnError!,
-                exitCode: 2);
+                exitCode: 2));
 
         if (request.Model.Value.Length == 0)
-            return TomixResult<DeployModelResult>.Fail(
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_MODEL",
                 "No model specified. Use --model <path>, --server <url> --database <name>, or set an active connection with 'tx connect'.",
                 exitCode: 2,
-                hint: "Specify a model path or use --recent.");
+                hint: "Specify a model path or use --recent."));
 
         var provider = _providers.ResolveSingleProvider(request.Model);
         if (provider is null)
-            return TomixResult<DeployModelResult>.Fail(
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",
                 $"No provider can open model: {request.Model.Value}",
                 exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
+                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database."));
 
-        await using var session = await provider.OpenAsync(request.Model, cancellationToken);
-
-        // Non-fatal gate findings (rules the gate could not check) ride along on every
-        // successful outcome, so a deploy never looks fully gated when it was not.
-        IReadOnlyList<TomixDiagnostic> warnings = [];
-        if (!request.SkipBpa)
-        {
-            var (bpaResult, notChecked) = await RunBpaGate(session, request, bpaFailOn, cancellationToken);
-            if (bpaResult is not null)
-                return bpaResult;
-            warnings = MissingVertipaqStatsWarning(notChecked);
-        }
-
-        TomixResult<DeployModelResult> Ok(DeployModelResult data)
-            => TomixResult<DeployModelResult>.Ok(data, diagnostics: warnings);
-
-        if (session is not IModelDeploySession deployer)
-            return TomixResult<DeployModelResult>.Fail(
-                "TOMIX_DEPLOY_UNSUPPORTED",
-                $"Provider cannot deploy model: {request.Model.Value}",
-                exitCode: 1);
-
-        var (server, database) = ResolveTarget(request, profile, _resolveSession);
-
-        if (string.IsNullOrWhiteSpace(server))
-            return TomixResult<DeployModelResult>.Fail(
-                "TOMIX_DEPLOY_NO_TARGET",
-                "No target workspace specified. Use -s/--server or set an active connection with 'tx connect'.",
-                exitCode: 2,
-                hint: "Specify --workspace or --server and --database.");
-
-        var deployRequest = new ModelDeployRequest(
-            server,
-            database,
-            request.CreateOnly,
-            request.Force,
-            deployOptions);
-
-        if (request.DryRun)
-        {
-            DiffModelResult? diff = null;
-            string? diffError = null;
-            bool? createsDatabase = null;
-
-            if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(database))
-            {
-                try
-                {
-                    // The plan reads the target once and returns both the target's current model
-                    // and the model this deploy would leave behind under the same options a real
-                    // deploy uses, so preserved objects never surface as changes.
-                    var plan = await deployer.GeneratePlanAsync(deployRequest, cancellationToken);
-
-                    if (!plan.TargetExists)
-                        // Nothing to compare against: the deploy creates the database and ships
-                        // the full source model.
-                        createsDatabase = true;
-                    else
-                        // Target first: the dry run answers "what will this deploy change on the
-                        // target", so added/removed/old→new read in the deploy's direction. The
-                        // target is a processed database, so engine-computed state is ignored.
-                        diff = DiffModelHandler.Diff(
-                            plan.Target!, plan.Planned, ignoreEngineComputedState: true);
-                }
-                // Keep the reason: "not authenticated" and "target unreachable" are different
-                // situations and the dry-run output should not conflate them.
-                catch (AuthenticationRequiredException ex)
-                {
-                    diffError = ex.Message;
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException and not ModelLoadException)
-                {
-                    diffError = $"Cannot read target '{server}': {ex.InnerException?.Message ?? ex.Message}";
-                }
-            }
-
-            return Ok(new DeployModelResult(
-                server, database ?? request.Model.Value, "dry-run", null, null, null, diff, diffError,
-                createsDatabase));
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.XmlaOutput))
-        {
-            string script;
-            try
-            {
-                // Preservation options require reading the target so the script matches what a
-                // real deploy would execute; a full deploy is scripted offline.
-                script = await deployer.GenerateScriptAsync(deployRequest, cancellationToken);
-            }
-            catch (AuthenticationRequiredException ex)
-            {
-                return TomixResult<DeployModelResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
-                    hint: "Run 'tx auth login' to authenticate, or use --deploy-full to script without reading the target.");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException and not ModelLoadException)
-            {
-                return TomixResult<DeployModelResult>.Fail(
-                    "TOMIX_DEPLOY_FAILED",
-                    $"Cannot read target '{server}' to build the script: {ex.InnerException?.Message ?? ex.Message}",
-                    exitCode: 1,
-                    hint: "The script must reflect preserved target objects. Use --deploy-full to script without reading the target.");
-            }
-
-            var scriptPath = request.XmlaOutput;
-
-            if (scriptPath == "-")
-                return Ok(new DeployModelResult(
-                    server, database ?? request.Model.Value, "script", null, "-", script));
-
-            var fullPath = Path.GetFullPath(scriptPath);
-            var dir = Path.GetDirectoryName(fullPath);
-            if (!string.IsNullOrEmpty(dir))
-                Directory.CreateDirectory(dir);
-
-            await File.WriteAllTextAsync(fullPath, script, cancellationToken).ConfigureAwait(false);
-            return Ok(new DeployModelResult(
-                server, database ?? request.Model.Value, "script", null, fullPath, null));
-        }
-
+        var session = await provider.OpenAsync(request.Model, cancellationToken);
         try
         {
-            var result = await deployer.DeployAsync(deployRequest, cancellationToken);
-            return Ok(new DeployModelResult(
-                result.Server, result.Database, result.Status, result.DurationMs, null, null));
+
+            // Non-fatal gate findings (rules the gate could not check) ride along on every
+            // successful outcome, so a deploy never looks fully gated when it was not.
+            IReadOnlyList<TomixDiagnostic> warnings = [];
+            if (!request.SkipBpa)
+            {
+                var (bpaResult, notChecked) = await RunBpaGate(session, request, bpaFailOn, cancellationToken);
+                if (bpaResult is not null)
+                {
+                    await session.DisposeAsync();
+                    return DeployOperation.Failed(bpaResult);
+                }
+                warnings = MissingVertipaqStatsWarning(notChecked);
+            }
+
+            if (session is not IModelDeploySession deployer)
+            {
+                await session.DisposeAsync();
+                return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
+                    "TOMIX_DEPLOY_UNSUPPORTED",
+                    $"Provider cannot deploy model: {request.Model.Value}",
+                    exitCode: 1));
+            }
+
+            var (server, database) = ResolveTarget(request, profile, _resolveSession);
+
+            if (string.IsNullOrWhiteSpace(server))
+            {
+                await session.DisposeAsync();
+                return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
+                    "TOMIX_DEPLOY_NO_TARGET",
+                    "No target workspace specified. Use -s/--server or set an active connection with 'tx connect'.",
+                    exitCode: 2,
+                    hint: "Specify --workspace or --server and --database."));
+            }
+
+            var deployRequest = new ModelDeployRequest(
+                server,
+                database,
+                request.CreateOnly,
+                Force: false,
+                deployOptions);
+
+            return new DeployOperation(session, deployer, deployRequest, request, server, database, warnings);
         }
-        catch (AuthenticationRequiredException ex)
+        catch
         {
-            return TomixResult<DeployModelResult>.Fail("TOMIX_AUTH_REQUIRED", ex.Message, exitCode: 1,
-                hint: "Run 'tx auth login' to authenticate, or use --auth spn for service principal.");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return TomixResult<DeployModelResult>.Fail("TOMIX_DEPLOY_FAILED", ex.Message, exitCode: 1,
-                hint: "Check that the target workspace exists and you have deploy permissions.");
-        }
-        // ModelLoadException stays unhandled: the source model being unloadable is not a deploy
-        // failure — the CLI's top-level handler reports it as TOMIX_MODEL_LOAD_FAILED (exit 2).
-        catch (Exception ex) when (ex is not OperationCanceledException and not ModelLoadException)
-        {
-            return TomixResult<DeployModelResult>.Fail("TOMIX_DEPLOY_FAILED", $"Deploy to '{server}' failed: {ex.InnerException?.Message ?? ex.Message}", exitCode: 1,
-                hint: "Check that the target workspace exists and you have deploy permissions.");
+            // The operation owns the session only once it is returned.
+            await session.DisposeAsync();
+            throw;
         }
     }
 
@@ -244,9 +172,12 @@ public sealed class DeployModelHandler
                 new TomixDiagnostic(
                     "TOMIX_BPA_VERTIPAQ_STATS_MISSING",
                     DiagnosticSeverity.Warning,
-                    $"BPA gate did not check {notChecked.Count} rule(s) that need VertiPaq statistics, which this model does not have: "
+                    $"BPA gate skipped {notChecked.Count} rule(s) that need VertiPaq statistics: "
                         + string.Join(", ", notChecked.Select(r => r.RuleId)) + ".",
-                    Hint: $"Statistics come from a deployed model: run '{BpaEngine.VertipaqAnnotateCommand}' against it, or for a model file, {BpaEngine.VertipaqFileModelGuidance}.")
+                    // A plain model file cannot collect statistics itself; it reads them from a
+                    // deployed copy through workspace mode.
+                    Hint: $"Run '{BpaEngine.VertipaqAnnotateCommand}' on a deployed model. For a model file, "
+                        + $"connect it to a deployed copy in workspace mode first ({BpaEngine.VertipaqWorkspaceConnectCommand}).")
             ];
 
     private async Task<(TomixResult<DeployModelResult>? Failure, IReadOnlyList<BpaResult> NotChecked)> RunBpaGate(

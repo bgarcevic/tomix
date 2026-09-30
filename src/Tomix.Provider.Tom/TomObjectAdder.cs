@@ -61,7 +61,8 @@ internal sealed class TomObjectAdder
             "" => throw new ArgumentException(
                 $"No object type given for '{request.Path}'. Pass -t <type> or use a path keyword "
                 + "(e.g. 'tables/<Table>', 'tables/<Table>/measures/<Name>')."),
-            _ => throw new NotSupportedException($"Adding object type '{request.Type}' is not supported yet.")
+            _ => throw new NotSupportedException(
+                $"Unknown object type '{request.Type}'. Supported: {ModelObjectTypeCatalog.CreationListText}.")
         };
     }
 

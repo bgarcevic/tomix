@@ -176,14 +176,14 @@ public sealed class BpaRulesAuthoringTests
     }
 
     [Fact]
-    public void Init_ExistingFile_FailsUnlessForce()
+    public void Init_ExistingFile_FailsUnlessOverwrite()
     {
         using var dir = new TempDir();
         new BpaRulesAddHandler(dir.Path).Handle(new BpaRulesAddRequest("MY_RULE", NewRule));
         var handler = new BpaRulesInitHandler(dir.Path);
 
         Assert.Equal("TOMIX_BPA_RULES_FILE_EXISTS", handler.Handle(new BpaRulesInitRequest()).Diagnostics[0].Code);
-        Assert.True(handler.Handle(new BpaRulesInitRequest(Force: true)).Success);
+        Assert.True(handler.Handle(new BpaRulesInitRequest(Overwrite: true)).Success);
         Assert.Empty(BpaRuleLoader.LoadFromFile(Path.Combine(dir.Path, "bpa-rules.json")));
     }
 

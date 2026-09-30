@@ -8,9 +8,9 @@ using Tomix.Provider.Tmdl;
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// Pins the CLI-to-request wiring of format's lifecycle flags. Regression: <c>--dry-run</c> was
-/// inserted positionally into the request construction and bound to <see cref="FormatModelRequest"/>'s
-/// <c>Stage</c> slot, so a dry-run staged the mutation and <c>--stage</c> reverted it — none of the
+/// Pins the CLI-to-request wiring of format's lifecycle flags. Regression: a (since removed)
+/// <c>--dry-run</c> flag was inserted positionally into the request construction and bound to
+/// <see cref="FormatModelRequest"/>'s <c>Stage</c> slot, so a preview staged the mutation and <c>--stage</c> reverted it — none of the
 /// parse-level or handler-level tests could see it, because the misalignment lived in the command's
 /// argument construction. These tests invoke the real command against the sample model and assert
 /// the rendered outcome matches the flags that were passed.
@@ -29,16 +29,16 @@ public sealed partial class FormatFlagBindingTests
     }
 
     [Fact]
-    public void DryRun_RendersPreview_DoesNotStage()
+    public void Default_RendersPreview_DoesNotStage()
     {
         var captured = ConsoleCapture.Invoke(
-            BuildRoot().Parse(["format", "-m", SampleTmdl, "--dry-run"]),
+            BuildRoot().Parse(["format", "-m", SampleTmdl]),
             captureAnsiConsole: true);
 
         Assert.Equal(0, captured.ExitCode);
         var output = StripAnsi(captured.Stdout);
         Assert.Contains("Formatted: 4", output);
-        Assert.Contains("Dry run: nothing was saved.", StripAnsi(captured.Stderr));
+        Assert.Contains("Not saved", output);
         Assert.DoesNotContain("Mutation staged.", output);
     }
 
@@ -60,7 +60,7 @@ public sealed partial class FormatFlagBindingTests
         // Issue #200: a uniform sweep failure printed only "Failed: 4" and hid the formatter's
         // HTTP error; the detail now goes to stderr, deduplicated with the affected-object count.
         var captured = ConsoleCapture.Invoke(
-            BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--dry-run"]),
+            BuildFailingRoot().Parse(["format", "-m", SampleTmdl]),
             captureAnsiConsole: true);
 
         Assert.Equal(1, captured.ExitCode);
@@ -76,7 +76,7 @@ public sealed partial class FormatFlagBindingTests
     public void SweepFailure_JsonOutput_CarriesErrorPerFailedResult()
     {
         var captured = ConsoleCapture.Invoke(
-            BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--dry-run", "--output-format", "json"]),
+            BuildFailingRoot().Parse(["format", "-m", SampleTmdl, "--output-format", "json"]),
             captureAnsiConsole: true);
 
         Assert.Equal(1, captured.ExitCode);

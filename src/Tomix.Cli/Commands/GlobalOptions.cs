@@ -66,7 +66,7 @@ internal static class GlobalOptions
 
     public static readonly Option<bool> Yes = new("--yes")
     {
-        Description = "Skip confirmation prompts for destructive operations",
+        Description = "Skip confirmation prompts; deploy and risky refreshes apply instead of previewing",
         Recursive = true
     };
 

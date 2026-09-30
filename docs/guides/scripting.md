@@ -110,5 +110,5 @@ Ready-made workflow examples live in the
 
 The expression evaluator does not execute `Model.Tables["Sales"].ApplyRefreshPolicy()`.
 Use `tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel` to apply a saved
-policy without loading data. Preview with `--dry-run`; use `--yes` for noninteractive
+policy without loading data. It previews and asks first; use `--yes` for noninteractive
 execution. A subsequent `tx refresh --table Sales -s MyWorkspace -d MyModel` loads data.

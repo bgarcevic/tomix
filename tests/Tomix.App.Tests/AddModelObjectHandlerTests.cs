@@ -102,7 +102,7 @@ public sealed class AddModelObjectHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DryRun_ReturnsAddedPath()
+    public async Task HandleAsync_Preview_ReturnsWouldAddPath()
     {
         var session = new StubMutationSession();
         var handler = new AddModelObjectHandler([new StubProvider(session)], TestStores);

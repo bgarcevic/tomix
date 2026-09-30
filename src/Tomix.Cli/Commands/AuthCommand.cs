@@ -37,14 +37,14 @@ internal sealed class AuthCommand : ICommandModule
     {
         var usernameOption = new Option<string?>("--username") { Description = "Service-principal application (client) id" };
         usernameOption.Aliases.Add("-u");
-        var passwordOption = new Option<string?>("--password") { Description = "Service-principal client secret source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --password-file." };
+        var passwordOption = new Option<string?>("--password") { Description = "Pass '-' to read the service-principal client secret from stdin (or use --password-file). The secret itself is never accepted on the command line." };
         AddStdinSentinelValidator(passwordOption, "--password", "--password-file");
         var passwordFileOption = new Option<string?>("--password-file") { Description = "Path to a file containing the service-principal client secret (trailing newline ignored)" };
         var tenantOption = new Option<string?>("--tenant") { Description = "Tenant id or domain (required for service principal)" };
         var identityOption = new Option<bool>("--identity") { Description = "Sign in with a managed identity (Azure-hosted; use --username for user-assigned)" };
         identityOption.Aliases.Add("-I");
         var certificateOption = new Option<string?>("--certificate") { Description = "Certificate file (PEM or PKCS12) for signing in as a service principal" };
-        var certificatePasswordOption = new Option<string?>("--certificate-password") { Description = "Certificate password source: pass '-' to read one line from stdin. Secret values on the command line are rejected; see --certificate-password-file." };
+        var certificatePasswordOption = new Option<string?>("--certificate-password") { Description = "Pass '-' to read the certificate password from stdin (or use --certificate-password-file). The password itself is never accepted on the command line." };
         AddStdinSentinelValidator(certificatePasswordOption, "--certificate-password", "--certificate-password-file");
         var certificatePasswordFileOption = new Option<string?>("--certificate-password-file") { Description = "Path to a file containing the certificate password (trailing newline ignored)" };
         var deviceCodeOption = new Option<bool>("--device-code") { Description = "Use the device-code flow instead of a local browser" };

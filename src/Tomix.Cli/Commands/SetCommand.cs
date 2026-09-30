@@ -48,7 +48,6 @@ internal sealed class SetCommand : ICommandModule
         });
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
-        var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Type to pick when the path matches several objects (e.g. a measure and a partition sharing a name)"
@@ -76,7 +75,6 @@ internal sealed class SetCommand : ICommandModule
             setOption,
             forceOption,
             overwriteOption,
-            dryRunOption,
             typeOption,
             saveOption,
             saveToOption,
@@ -137,7 +135,6 @@ internal sealed class SetCommand : ICommandModule
                         parseResult.GetValue(strictRefsOption),
                         FixRefs: !parseResult.GetValue(noFixRefsOption),
                         Overwrite: parseResult.GetValue(overwriteOption),
-                        DryRun: parseResult.GetValue(dryRunOption),
                         Force: parseResult.GetValue(forceOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));

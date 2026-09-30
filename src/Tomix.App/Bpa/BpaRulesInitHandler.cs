@@ -4,11 +4,11 @@ namespace Tomix.App.Bpa;
 
 public sealed record BpaRulesInitRequest(
     string? RulesFile = null,
-    bool Force = false);
+    bool Overwrite = false);
 
 /// <summary>
 /// Scaffolds an empty rules file (<c>bpa rules init</c>) at the selected <c>--rules-file</c> or the
-/// user's config-dir <c>bpa-rules.json</c>. An existing file is kept unless <c>--force</c>.
+/// user's config-dir <c>bpa-rules.json</c>. An existing file is kept unless <c>--overwrite</c>.
 /// </summary>
 public sealed class BpaRulesInitHandler
 {
@@ -21,12 +21,12 @@ public sealed class BpaRulesInitHandler
         if (BpaRulesFile.TryResolvePath(_configDirectory, request.RulesFile, out var path) is { } remote)
             return remote;
 
-        if (File.Exists(path) && !request.Force)
+        if (File.Exists(path) && !request.Overwrite)
             return TomixResult<BpaRulesFileResult>.Fail(
                 "TOMIX_BPA_RULES_FILE_EXISTS",
                 $"BPA rules file already exists: {path}",
                 exitCode: 2,
-                hint: "Pass --force to replace it with an empty file.");
+                hint: "Pass --overwrite to replace it with an empty file.");
 
         var file = BpaRulesFile.Empty(path);
         file.Save();

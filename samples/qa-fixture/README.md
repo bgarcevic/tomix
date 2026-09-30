@@ -65,8 +65,8 @@ snapshots are run artifacts (they encode server values), not repo content.
 ## Deploying
 
 ```sh
-tx deploy samples/qa-fixture -s <qa-workspace> -d TomixQa_<run-id> --dry-run
-tx deploy samples/qa-fixture -s <qa-workspace> -d TomixQa_<run-id>
+tx deploy samples/qa-fixture -s <qa-workspace> -d TomixQa_<run-id>        # preview, then confirm
+tx deploy samples/qa-fixture -s <qa-workspace> -d TomixQa_<run-id> --yes
 ```
 
 Do not point mutations at shared or production resources; the live checklist

@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Tomix.App.Get;
 using Tomix.App.State;
+using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Commands;
@@ -22,10 +23,8 @@ internal sealed class LsCommand : ICommandModule
         var pathArgument = new Argument<string?>("path-filter")
         {
             Description =
-                "Object-path filter. Bare names match literally ('Sales', 'Sales/Measures'); container " +
-                "keywords pivot ('Tables', 'Measures', 'Sales/Partitions'); '*' is a wildcard " +
-                "('Sa*', '*/Amount'); quote names with spaces (\"'Net Sales'/'Sales Amount'\"); " +
-                "inside quotes, '' is a literal apostrophe.",
+                "Which objects to list: a name ('Sales'), a container ('Sales/Measures'), or a wildcard " +
+                "('Sa*'); quote names with spaces (\"'Net Sales'\")",
             Arity = ArgumentArity.ZeroOrOne
         };
 
@@ -37,7 +36,7 @@ internal sealed class LsCommand : ICommandModule
 
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Filter by type: {ModelObjectTypeCatalog.DiscoveryListText}"
+            Description = $"Only list objects of this kind, {TypeValidation.KindsHint}"
         };
         typeOption.Aliases.Add("-t");
 

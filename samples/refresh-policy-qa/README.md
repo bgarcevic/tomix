@@ -21,6 +21,7 @@ in that copy to `QA_<run-id>_Events`. Keep the effective date fixed throughout Q
 4. Backfill the existing partition ranges with `--refresh-type full --skip-refresh-policy`.
    All eight partitions become ready; `COUNTROWS` = **2**, `SUM(EventCount)` = **13**.
 
-Pass `-s <workspace> -d <model>` for every remote command. Preview refreshes with
-`--dry-run`; pass `--yes --non-interactive` when executing partition-risky operations.
+Pass `-s <workspace> -d <model>` for every remote command. Partition-risky refreshes preview and ask
+first (with `--non-interactive` they stop after the preview); pass `--yes --non-interactive`
+to execute.
 Initial local parameters cover 2021 through September 2024.

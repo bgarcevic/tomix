@@ -130,14 +130,14 @@ public sealed class InitModelHandlerTests : IDisposable
     }
 
     [Fact]
-    public void Handle_TmdlExistingDirectoryWithForce_ClearsPreviousContents()
+    public void Handle_TmdlExistingDirectoryWithOverwrite_ClearsPreviousContents()
     {
         var outputPath = OutputPath("reused");
         Directory.CreateDirectory(Path.Combine(outputPath, "old-sub"));
         File.WriteAllText(Path.Combine(outputPath, "stale.txt"), "old");
         File.WriteAllText(Path.Combine(outputPath, "old-sub", "leftover.tmdl"), "junk");
 
-        var result = new InitModelHandler().Handle(NewRequest(outputPath, force: true));
+        var result = new InitModelHandler().Handle(NewRequest(outputPath, overwrite: true));
 
         Assert.True(result.Success);
         Assert.False(File.Exists(Path.Combine(outputPath, "stale.txt")));
@@ -182,7 +182,7 @@ public sealed class InitModelHandlerTests : IDisposable
     }
 
     [Fact]
-    public void Handle_BimTargetExistsWithoutForce_FailsWithOutputExists()
+    public void Handle_BimTargetExistsWithoutOverwrite_FailsWithOutputExists()
     {
         var bimPath = OutputPath("taken.bim");
         Directory.CreateDirectory(_root);
@@ -199,14 +199,14 @@ public sealed class InitModelHandlerTests : IDisposable
     }
 
     [Fact]
-    public void Handle_BimTargetExistsWithForce_Overwrites()
+    public void Handle_BimTargetExistsWithOverwrite_Overwrites()
     {
         var bimPath = OutputPath("overwrite.bim");
         Directory.CreateDirectory(_root);
         File.WriteAllText(bimPath, "{}");
 
         var result = new InitModelHandler().Handle(
-            NewRequest(bimPath, serialization: "bim", force: true));
+            NewRequest(bimPath, serialization: "bim", overwrite: true));
 
         Assert.True(result.Success);
         Assert.Contains("compatibilityLevel", File.ReadAllText(bimPath));
@@ -266,8 +266,8 @@ public sealed class InitModelHandlerTests : IDisposable
         string serialization = "",
         string compatibilityMode = "",
         int? compatibilityLevel = null,
-        bool force = false)
-        => new(outputPath, name, serialization, compatibilityMode, compatibilityLevel, force);
+        bool overwrite = false)
+        => new(outputPath, name, serialization, compatibilityMode, compatibilityLevel, overwrite);
 
     private static async Task<ModelSummary> OpenAndSummarizeAsync(IModelProvider provider, string path)
     {

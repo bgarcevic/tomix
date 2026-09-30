@@ -23,7 +23,7 @@ internal static class BpaRunRenderer
         var visible = groups
             .Where(g => BpaRunView.MatchesFilter(g.Severity, view.Errors, view.Warnings, view.Info))
             .ToList();
-        var fixRan = result.DryRun || result.FixesApplied > 0 || result.FixesSkipped > 0
+        var fixRan = result.Preview || result.FixesApplied > 0 || result.FixesSkipped > 0
             || result.DestructiveFixesSkipped > 0 || result.FixErrors is { Count: > 0 };
 
         AnsiConsole.WriteLine();
@@ -44,8 +44,8 @@ internal static class BpaRunRenderer
         RenderSummary(result, groups.Count, view);
         RenderDiagnostics(result, view);
 
-        if (result.DryRun)
-            RenderDryRun(result, view);
+        if (result.Preview)
+            RenderPreview(result, view);
         else if (fixRan)
             RenderFixOutcome(result, view);
 
@@ -148,8 +148,8 @@ internal static class BpaRunRenderer
     }
 
     /// <summary>
-    /// One block for what <c>--fix</c> did: how many findings were fixed and remain, anything
-    /// held back, and where the result went (saved, staged, or only in memory).
+    /// One block for what <c>--fix --save</c>/<c>--stage</c> did: how many findings were fixed and
+    /// remain, anything held back, and where the result went (saved or staged).
     /// </summary>
     private static void RenderFixOutcome(BpaRunResult result, BpaRunView.RunOptions view)
     {
@@ -189,23 +189,16 @@ internal static class BpaRunRenderer
             case MutationStatus.Staged:
                 AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
                 break;
-            default:
-                // Without --save/--stage the fixes only touched the in-memory copy.
-                HintConsole().MarkupLine("  " + Styling.Warning("Not saved.") + " "
-                    + Styling.Guidance("Persist with:") + " "
-                    + Styling.Option(BpaRunView.HintCommand(view.CommandTokens, "--fix", "--save"))
-                    + Styling.Guidance("  (or --stage)"));
-                break;
         }
 
         MutationOutput.RenderSync(result.FixOutcome, "  ");
     }
 
     /// <summary>
-    /// The <c>--fix --dry-run</c> preview: each pending fix as a "Would fix:" line with its
+    /// The <c>--fix</c> preview (no <c>--save</c>/<c>--stage</c>): each pending fix as a "Would fix:" line with its
     /// before/after values, what the fixes would leave, and how to apply them. Nothing ran.
     /// </summary>
-    private static void RenderDryRun(BpaRunResult result, BpaRunView.RunOptions view)
+    private static void RenderPreview(BpaRunResult result, BpaRunView.RunOptions view)
     {
         AnsiConsole.WriteLine();
 
@@ -243,7 +236,7 @@ internal static class BpaRunRenderer
         }
 
         var hint = HintConsole();
-        hint.MarkupLine("  " + Styling.Muted("Dry run: nothing was applied, saved, or staged."));
+        hint.MarkupLine("  " + Styling.Muted("Preview: nothing was saved or staged."));
         if (result.FixChanges.Count > 0)
             hint.MarkupLine("  " + Styling.Guidance("Apply with:") + " "
                 + Styling.Option(BpaRunView.HintCommand(view.CommandTokens,
@@ -403,11 +396,11 @@ internal static class BpaRunRenderer
             fixesSkipped = result.FixesSkipped,
             destructiveFixesSkipped = result.DestructiveFixesSkipped,
             fixErrors = result.FixErrors ?? Array.Empty<string>(),
-            // --fix --dry-run: fixesApplied stays 0; the pending fixes are counted and listed
-            // under fixes, and wouldRemain is what they would leave (null outside a dry run).
-            dryRun = result.DryRun,
-            fixesPending = result.DryRun ? result.FixChanges.Count : 0,
-            wouldRemain = result.DryRun ? result.ProjectedViolations?.Count ?? result.Violations.Count : (int?)null,
+            // --fix preview: fixesApplied stays 0; the pending fixes are counted and listed
+            // under fixes, and wouldRemain is what they would leave (null outside a preview).
+            preview = result.Preview,
+            fixesPending = result.Preview ? result.FixChanges.Count : 0,
+            wouldRemain = result.Preview ? result.ProjectedViolations?.Count ?? result.Violations.Count : (int?)null,
             ruleLoadDiagnostics = result.RuleLoadDiagnostics ?? Array.Empty<string>(),
             status = result.FixOutcome.Status,
             saved = result.FixOutcome.Saved,

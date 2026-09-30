@@ -5,7 +5,7 @@ namespace Tomix.App.Set;
 
 /// <summary>
 /// <paramref name="ObjectPath"/> serializes as <c>set</c> once the edit was saved or staged and as
-/// <c>wouldSet</c> for a preview or dry run; an unchanged or reverted result reports it as <c>path</c>.
+/// <c>wouldSet</c> for a preview; an unchanged or reverted result reports it as <c>path</c>.
 /// </summary>
 public sealed record SetModelPropertyResult(
     [property: JsonIgnore]

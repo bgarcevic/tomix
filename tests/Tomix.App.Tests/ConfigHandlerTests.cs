@@ -38,7 +38,7 @@ public sealed class ConfigHandlerTests
         var handler = NewHandler(out var path);
         try
         {
-            var result = handler.Init(force: false);
+            var result = handler.Init(overwrite: false);
 
             Assert.True(result.Success);
             Assert.True(result.Data!.Created);
@@ -53,14 +53,14 @@ public sealed class ConfigHandlerTests
     }
 
     [Fact]
-    public void Init_ExistingFileWithoutForce_LeavesValuesIntact()
+    public void Init_ExistingFileWithoutOverwrite_LeavesValuesIntact()
     {
         var handler = NewHandler(out var path);
         try
         {
             handler.Set(ConfigKeys.NoColor, "true");
 
-            var result = handler.Init(force: false);
+            var result = handler.Init(overwrite: false);
 
             Assert.True(result.Success);
             Assert.False(result.Data!.Created);
@@ -73,14 +73,14 @@ public sealed class ConfigHandlerTests
     }
 
     [Fact]
-    public void Init_ExistingFileWithForce_ResetsToEmptyConfig()
+    public void Init_ExistingFileWithOverwrite_ResetsToEmptyConfig()
     {
         var handler = NewHandler(out var path);
         try
         {
             handler.Set(ConfigKeys.NoColor, "true");
 
-            var result = handler.Init(force: true);
+            var result = handler.Init(overwrite: true);
 
             Assert.True(result.Success);
             Assert.True(result.Data!.Created);

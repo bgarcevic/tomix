@@ -22,7 +22,7 @@ internal static class LifecycleOptions
     {
         var option = new Option<bool>("--force")
         {
-            Description = description ?? "Save despite newly introduced validation errors"
+            Description = description ?? "Save even if the change adds validation errors"
         };
         option.Aliases.Add("-f");
         return option.In(HelpGroups.Save);
@@ -35,18 +35,16 @@ internal static class LifecycleOptions
     }.In(HelpGroups.Save);
 
     /// <summary>
-    /// The uniform mutation preview: the change is applied to the in-memory model and its result
-    /// is rendered, but nothing is written — no save, no stage, no workspace sync.
+    /// True when the mutation will be written (--save, --save-to, or --stage). Without any of them
+    /// a mutation is a preview, so it never needs a confirmation prompt.
     /// </summary>
-    public static Option<bool> DryRun() => new Option<bool>("--dry-run")
-    {
-        Description = "Preview: show the change without saving, staging, or syncing"
-    }.In(HelpGroups.Save);
+    public static bool Persists(bool save, string? saveTo, bool stage)
+        => save || stage || !string.IsNullOrWhiteSpace(saveTo);
 
     public static Option<bool> Save(string? description = null) => new Option<bool>("--save")
     {
         Description = description ??
-            "Write this command's change back to the model's source. Cannot be combined with --revert or --stage."
+            "Write the change to the model's source (default: preview only, nothing is written)"
     }.In(HelpGroups.Save);
 
     public static Option<string?> SaveTo(string? description = null) => new Option<string?>("--save-to")
@@ -66,12 +64,12 @@ internal static class LifecycleOptions
 
     public static Option<bool> Stage() => new Option<bool>("--stage")
     {
-        Description = "Stage this command's mutation instead of saving it (commit with 'tx stage commit')"
+        Description = "Stage the change instead of saving it (commit with 'tx stage commit')"
     }.In(HelpGroups.Save);
 
     public static Option<bool> Revert() => new Option<bool>("--revert")
     {
-        Description = "Revert a staged mutation"
+        Description = "Discard this model's staged changes"
     }.In(HelpGroups.Save);
 
     public static Option<bool> NoSync() => new Option<bool>("--no-sync")

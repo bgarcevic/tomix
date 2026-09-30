@@ -75,9 +75,9 @@ internal sealed class ConnectCommand : ICommandModule
         {
             Description = "Forget the active connection"
         };
-        var forceOption = new Option<bool>("--force")
+        var overwriteOption = new Option<bool>("--overwrite")
         {
-            Description = "Allow workspace mode to initialize over a folder that already has content"
+            Description = "Replace the workspace folder's contents and overwrite an existing workspace database without asking"
         };
         var workspaceFormatOption = new Option<string?>("--workspace-format")
         {
@@ -102,7 +102,7 @@ internal sealed class ConnectCommand : ICommandModule
             listOption,
             profileOption,
             clearOption,
-            forceOption,
+            overwriteOption,
             workspaceFormatOption,
             workspaceAuthOption,
             clearAllOption
@@ -374,7 +374,7 @@ internal sealed class ConnectCommand : ICommandModule
             var remoteServer = target.RemoteServer;
             var database = target.Database;
             var workspace = target.Workspace;
-            var force = parseResult.GetValue(forceOption);
+            var overwrite = parseResult.GetValue(overwriteOption);
 
             if (target.Validation is { } validation)
             {
@@ -406,7 +406,7 @@ internal sealed class ConnectCommand : ICommandModule
                     {
                         database = probe.ResolvedDatabase;
 
-                        if (!force && !ConfirmationHelper.ConfirmOrAbort(
+                        if (!overwrite && !ConfirmationHelper.ConfirmOrAbort(
                             "Overwrite workspace target", $"'{database}' on {workspace}",
                             parseResult, format))
                         {
@@ -415,7 +415,7 @@ internal sealed class ConnectCommand : ICommandModule
                             // followed by a sentence -- not parseable as either.
                             if (GlobalOptions.ErrorFormatValue(parseResult, format) is not OutputFormats.Json)
                                 ErrConsole().MarkupLine(Styling.Guidance(
-                                    "Aborted; connection unchanged. Re-run without -w to connect without the workspace, or pass --force to overwrite it."));
+                                    "Aborted; connection unchanged. Re-run without -w to connect without the workspace, or pass --overwrite to overwrite it."));
                             return 1;
                         }
                     }
@@ -444,7 +444,7 @@ internal sealed class ConnectCommand : ICommandModule
                 if (target.InitializeWorkspace)
                 {
                     var init = await new ConnectWorkspaceHandler(_providers).InitializeAsync(
-                        new ConnectWorkspaceInitRequest(workspace!, target.WorkspaceFormat, force, validation),
+                        new ConnectWorkspaceInitRequest(workspace!, target.WorkspaceFormat, overwrite, validation),
                         cancellationToken);
 
                     if (init.Initialized && format == OutputFormats.Text)

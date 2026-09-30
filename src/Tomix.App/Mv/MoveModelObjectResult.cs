@@ -5,7 +5,7 @@ namespace Tomix.App.Mv;
 
 /// <summary>
 /// <paramref name="Source"/> serializes as <c>moved</c> once the edit was saved or staged and as
-/// <c>wouldMove</c> for a preview or dry run.
+/// <c>wouldMove</c> for a preview.
 /// </summary>
 public sealed record MoveModelObjectResult(
     [property: JsonIgnore]

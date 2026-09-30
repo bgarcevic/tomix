@@ -14,7 +14,7 @@ namespace Tomix.Provider.Tom;
 internal static class TmslDeployScriptBuilder
 {
     /// <summary>
-    /// Deploy scripts and the dry-run plans derived from them must be byte-stable across OSes,
+    /// Deploy scripts and the preview plans derived from them must be byte-stable across OSes,
     /// so indent with LF newlines instead of the default <see cref="Environment.NewLine"/>.
     /// </summary>
     private static readonly JsonSerializerOptions IndentedLfJsonOptions = new()
@@ -59,7 +59,7 @@ internal static class TmslDeployScriptBuilder
     /// <summary>
     /// Builds the merged <c>database</c> node — the exact model a deploy would leave on the
     /// target — without the <c>createOrReplace</c> envelope. <see cref="Build"/> wraps it for
-    /// execution; the dry-run plan deserializes it to snapshot what the deploy will produce, so
+    /// execution; the deploy preview deserializes it to snapshot what the deploy will produce, so
     /// both paths are guaranteed to describe the same model.
     /// </summary>
     internal static JsonObject BuildDatabaseNode(
@@ -223,7 +223,7 @@ internal static class TmslDeployScriptBuilder
     /// one. Injects a placeholder import partition built from the policy's source expression —
     /// the service replaces it with policy-generated partitions on the next refresh.
     /// The name is deterministic rather than a fresh GUID so scripts are reproducible and the
-    /// dry-run plan does not report a spurious change on every run; it is only ever injected
+    /// deploy preview does not report a spurious change on every run; it is only ever injected
     /// into a table that has no partitions at all, so it cannot collide.
     /// </summary>
     internal static void AddPlaceholderPartitionsToPolicyTables(JsonObject model)

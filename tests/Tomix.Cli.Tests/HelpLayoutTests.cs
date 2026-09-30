@@ -47,11 +47,11 @@ public sealed partial class HelpLayoutTests
     [Fact]
     public void WrappedDescription_ContinuesUnderItsColumn()
     {
-        var help = Render(Command("ls"), 80);
+        var help = Render(Command("get"), 80);
 
         var lines = help.Split('\n');
         var start = Array.FindIndex(lines, l => l.Contains("-t, --type <type>", StringComparison.Ordinal));
-        var column = lines[start].IndexOf("Filter by type", StringComparison.Ordinal);
+        var column = lines[start].IndexOf("Object kind", StringComparison.Ordinal);
 
         Assert.True(column > 0);
         Assert.Equal(new string(' ', column), lines[start + 1][..column]);
@@ -61,10 +61,10 @@ public sealed partial class HelpLayoutTests
     [Fact]
     public void RedirectedHelp_IsNotWrapped()
     {
-        var help = Render(Command("ls"), int.MaxValue);
+        var help = Render(Command("get"), int.MaxValue);
 
         Assert.Contains(
-            "Filter by type: table, measure, column, calculatedcolumn, hierarchy, level, partition,",
+            "Object kind: picks one when a path matches several objects, or filters a list; for example table,",
             help);
     }
 

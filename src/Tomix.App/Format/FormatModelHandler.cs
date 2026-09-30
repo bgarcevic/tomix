@@ -31,7 +31,7 @@ public sealed class FormatModelHandler
 
         var options = new MutationOptions(
             request.Save, request.SaveTo, request.Stage, request.Revert,
-            request.Serialization, request.Force, request.Overwrite, request.NoSync, DryRun: request.DryRun);
+            request.Serialization, request.Force, request.Overwrite, request.NoSync);
 
         if (!string.IsNullOrWhiteSpace(request.Path))
         {

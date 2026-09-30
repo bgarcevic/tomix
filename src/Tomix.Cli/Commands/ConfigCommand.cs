@@ -32,11 +32,11 @@ internal sealed class ConfigCommand : ICommandModule
 
     private Command BuildInit()
     {
-        var forceOption = new Option<bool>("--force") { Description = "Replace an existing config file" };
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Overwrite an existing config file" };
 
         var command = new Command("init", "Write a default config.json")
         {
-            forceOption
+            overwriteOption
         };
 
         command.SetAction(parseResult =>
@@ -46,7 +46,7 @@ internal sealed class ConfigCommand : ICommandModule
             if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "config init", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new ConfigHandler(_configStore).Init(parseResult.GetValue(forceOption));
+            var result = new ConfigHandler(_configStore).Init(parseResult.GetValue(overwriteOption));
             return CommandOutput.Render(parseResult, result, formatValue, RenderInit);
         });
 

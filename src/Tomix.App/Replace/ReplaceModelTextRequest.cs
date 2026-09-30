@@ -9,7 +9,6 @@ public sealed record ReplaceModelTextRequest(
     string Scope,
     bool Regex,
     bool CaseSensitive,
-    bool DryRun,
     bool Save,
     string? SaveTo,
     string Serialization,

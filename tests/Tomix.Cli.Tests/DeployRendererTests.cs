@@ -7,7 +7,7 @@ using Tomix.Cli.Output;
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// The dry-run branch of the deploy renderer — the user-facing half of the #128 behavior
+/// The preview branch of the deploy renderer — the user-facing half of the #128 behavior
 /// ("preview what the deploy would change"). Each of its four outcomes (first deploy,
 /// identical plan, change list, failed diff) prints a different message, so every branch is
 /// pinned. Asserted on captured plain text; styling is not under test here.
@@ -20,7 +20,7 @@ public sealed class DeployRendererTests
     [Fact]
     public void MissingTarget_SaysTheDeployCreatesIt()
     {
-        var output = Render(DryRun(createsDatabase: true));
+        var output = Render(Preview(createsDatabase: true));
 
         Assert.Contains("Target database does not exist", output);
         Assert.Contains("creates it with the full source model", output);
@@ -29,7 +29,7 @@ public sealed class DeployRendererTests
     [Fact]
     public void IdenticalPlan_SaysNoChanges()
     {
-        var output = Render(DryRun(diff: NoChanges()));
+        var output = Render(Preview(diff: NoChanges()));
 
         Assert.Contains("No changes — local and remote are identical.", output);
     }
@@ -37,7 +37,7 @@ public sealed class DeployRendererTests
     [Fact]
     public void ChangedPlan_ShowsSummaryAndChangeLines()
     {
-        var output = Render(DryRun(diff: new DiffModelResult(
+        var output = Render(Preview(diff: new DiffModelResult(
             HasChanges: true,
             Summary: new DiffSummary(Added: 1, Removed: 1, Modified: 1),
             Changes:
@@ -58,19 +58,19 @@ public sealed class DeployRendererTests
     [Fact]
     public void DiffFailure_SaysDiffUnavailableButPlanShown()
     {
-        var output = Render(DryRun(diffError: "not authenticated"), stderr: true);
+        var output = Render(Preview(diffError: "not authenticated"), stderr: true);
 
-        Assert.Contains("Diff unavailable: not authenticated", output);
-        Assert.Contains("Showing deploy plan only.", output);
+        Assert.Contains("Cannot preview changes: not authenticated", output);
+        Assert.DoesNotContain("deploy plan", output);
     }
 
     // -- Helpers ---------------------------------------------------------------------------------
 
-    private static DeployModelResult DryRun(
+    private static DeployModelResult Preview(
         DiffModelResult? diff = null,
         string? diffError = null,
         bool? createsDatabase = null)
-        => new(Server, "Prod", Status: "dry-run", DurationMs: 0, ScriptPath: null, Script: null)
+        => new(Server, "Prod", Status: "preview", DurationMs: 0, ScriptPath: null, Script: null)
         {
             Diff = diff,
             DiffError = diffError,

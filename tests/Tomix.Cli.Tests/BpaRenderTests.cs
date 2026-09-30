@@ -164,7 +164,7 @@ public class BpaRenderTests
         "tx bpa run m.bim --details")]
     [InlineData(new[] { "bpa", "run", "m.bim", "--save-to=old.bim", "--trx=old.trx", "--fix=true" },
         "tx bpa run m.bim --details")]
-    [InlineData(new[] { "bpa", "run", "m.bim", "--fix", "--dry-run", "--allow-delete" },
+    [InlineData(new[] { "bpa", "run", "m.bim", "--fix", "--stage", "--allow-delete" },
         "tx bpa run m.bim --details")]
     [InlineData(new[] { "bpa", "run", "Sales$(whoami).bim" },
         "tx bpa run 'Sales$(whoami).bim' --details")]

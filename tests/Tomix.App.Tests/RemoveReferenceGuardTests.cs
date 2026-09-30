@@ -1,3 +1,4 @@
+using Tomix.App.Mutations;
 using Tomix.App.Rm;
 using Tomix.Core.Models;
 
@@ -120,15 +121,15 @@ public sealed class RemoveReferenceGuardTests
     }
 
     [Fact]
-    public async Task RemoveReferencedMeasure_DryRun_PreviewsBlockedRemoval_WithoutMutating()
+    public async Task RemoveReferencedMeasure_Preview_ReportsBlockedRemoval_WithoutMutating()
     {
         var session = NewSession();
-        var result = await Handle(session, "Sales/Base", force: false, dryRun: true);
+        var result = await Handle(session, "Sales/Base", force: false, save: false);
 
-        // A dry run exists precisely to discover that --force is needed, so the guard reports
+        // A preview (no --save/--stage) is where --force turns out to be needed, so the guard reports
         // instead of failing and the mutator is never invoked.
         Assert.True(result.Success);
-        Assert.True(result.Data!.DryRun);
+        Assert.Equal(MutationStatus.Preview, result.Data!.Status);
         Assert.Equal("Sales/Base", result.Data.WouldRemove);
         Assert.Equal("would_block", result.Data.Reason);
         Assert.Equal(["Sales/Derived"], result.Data.BrokenReferences);
@@ -136,26 +137,26 @@ public sealed class RemoveReferenceGuardTests
     }
 
     [Fact]
-    public async Task RemoveReferencedMeasure_DryRunWithForce_MutatesAndReportsBrokenReferences()
+    public async Task RemoveReferencedMeasure_PreviewWithForce_MutatesAndReportsBrokenReferences()
     {
         var session = NewSession();
-        var result = await Handle(session, "Sales/Base", force: true, dryRun: true);
+        var result = await Handle(session, "Sales/Base", force: true, save: false);
 
         Assert.True(result.Success);
-        Assert.True(result.Data!.DryRun);
+        Assert.Equal(MutationStatus.Preview, result.Data!.Status);
         Assert.Null(result.Data.Reason);
         Assert.True(session.RemoveCalled);
         Assert.Equal(["Sales/Derived"], result.Data.BrokenReferences);
     }
 
     [Fact]
-    public async Task RemoveUnreferencedMeasure_DryRun_PreviewsRemoval()
+    public async Task RemoveUnreferencedMeasure_Preview_PreviewsRemoval()
     {
         var session = NewSession();
-        var result = await Handle(session, "Sales/Lonely", force: false, dryRun: true);
+        var result = await Handle(session, "Sales/Lonely", force: false, save: false);
 
         Assert.True(result.Success);
-        Assert.True(result.Data!.DryRun);
+        Assert.Equal(MutationStatus.Preview, result.Data!.Status);
         Assert.Equal("Sales/Lonely", result.Data.WouldRemove);
         Assert.Null(result.Data.Reason);
         Assert.Null(result.Data.BrokenReferences);
@@ -191,13 +192,13 @@ public sealed class RemoveReferenceGuardTests
             Detail: null, Expression: expression, Description: null, Hidden: false, SourceColumn: null, Children: []);
 
     private static Task<Core.Results.TomixResult<RemoveModelObjectResult>> Handle(
-        StubSnapshotSession session, string path, bool force, bool dryRun = false)
+        StubSnapshotSession session, string path, bool force, bool save = true)
         => new RemoveModelObjectHandler([new StubProvider(session)], TestStores).HandleAsync(
             new RemoveModelObjectRequest(
                 new ModelReference("model.bim"),
                 path, Type: null,
-                IfExists: false, DryRun: dryRun,
-                Save: false, SaveTo: null, Serialization: "", Force: force),
+                IfExists: false,
+                Save: save, SaveTo: null, Serialization: "", Force: force),
             CancellationToken.None);
 
     /// <summary>

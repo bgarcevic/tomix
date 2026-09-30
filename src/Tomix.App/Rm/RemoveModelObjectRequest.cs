@@ -7,7 +7,6 @@ public sealed record RemoveModelObjectRequest(
     string Path,
     ModelObjectKind? Type,
     bool IfExists,
-    bool DryRun,
     bool Save,
     string? SaveTo,
     string Serialization,

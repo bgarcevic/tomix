@@ -49,18 +49,18 @@ public sealed class ModelBannerNameTests
     }
 
     [Fact]
-    public void DeployBanner_DryRun_UsesResolvedDisplayName()
+    public void DeployBanner_Preview_UsesResolvedDisplayName()
     {
         var source = Path.Combine(Path.GetTempPath(), Named);
         var result = new DeployModelResult(
-            Server: "powerbi://ws", Database: "db", Status: "dry-run", DurationMs: 5,
+            Server: "powerbi://ws", Database: "db", Status: "preview", DurationMs: 5,
             ScriptPath: null, Script: null);
 
         var captured = ConsoleCapture.Run(
             () => DeployRenderer.Render(result, source),
             captureAnsiConsole: true);
 
-        Assert.Contains($"Dry run: {Named} to", captured.Stdout);
+        Assert.Contains($"Preview: {Named} to", captured.Stdout);
         Assert.DoesNotContain("(unnamed)", captured.Stdout);
     }
 

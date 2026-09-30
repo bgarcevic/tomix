@@ -41,6 +41,7 @@ Fields:
 | 0    | Success. |
 | 1    | General failure (most errors). |
 | 2    | Usage/argument error, IO failure, or pre-condition violation. |
+| 3    | Preview only: `deploy` or a partition-risky `refresh` ran without `--yes` where it could not prompt, so it showed the preview and applied nothing. Pass `--yes` to apply. |
 
 Handlers override the default via `TomixResult.Fail(..., exitCode: 2)`. If no exit code
 is specified, the default is `1`. Command-line parse errors (unknown option, missing
@@ -82,7 +83,6 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_BPA_DRY_RUN_REQUIRES_FIX` | 2 | `bpa run --dry-run` was passed without `--fix`, or together with `--revert`. `--dry-run` previews fixes, so it needs `--fix`. |
 | `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` or `--bpa-fail-on` value (expected: error, warning). |
 | `TOMIX_BPA_RULE_EXISTS` | 2 | `bpa rules add` was given an ID the rules file (or the model's `BestPracticeAnalyzer` annotation) already has. Change it with `bpa rules set`, or remove it first. |
 | `TOMIX_BPA_RULE_FIELD_REQUIRED` | 2 | `bpa rules add` is missing `--name`, `--scope`, or `--expression` (the message names which); `bpa rules set` was given no field to change; or a name or expression was set to an empty value. |
@@ -90,7 +90,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | `TOMIX_BPA_RULE_INVALID_SCOPE` | 2 | `bpa rules add/set --scope` named an unknown object type or no type at all. The hint lists the valid scopes. |
 | `TOMIX_BPA_RULE_INVALID_SEVERITY` | 2 | `bpa rules add/set --severity` was not `error`, `warning`, `info`, `3`, `2`, or `1`. |
 | `TOMIX_BPA_RULE_NOT_FOUND` | 2 | `bpa rules show`, `disable`, or `ignore` was given an ID that no loaded rule has. The hint names up to three IDs that contain the input; `disable` and `ignore` accept `--allow-unknown` to use the ID anyway. `bpa rules set` and `remove` fail with it when the edited rules file or model annotation has no rule with that ID; for a built-in rule, the hint points to `bpa rules disable`. |
-| `TOMIX_BPA_RULES_FILE_EXISTS` | 2 | `bpa rules init` found an existing rules file. Pass `--force` to replace it with an empty one. |
+| `TOMIX_BPA_RULES_FILE_EXISTS` | 2 | `bpa rules init` found an existing rules file. Pass `--overwrite` to replace it with an empty one. |
 | `TOMIX_BPA_RULES_FILE_NOT_FOUND` | 2 | `bpa rules set` or `remove` found no rules file. Create one with `bpa rules init` or `bpa rules add`. |
 | `TOMIX_BPA_RULES_FILE_REMOTE` | 2 | `bpa rules add/set/remove/init` was pointed at a remote `--rules-file` URL, which can't be edited. Download it and pass the local path. |
 | `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog, or a rules file or model `BestPracticeAnalyzer` annotation being edited is not a JSON array of rules. |
@@ -128,7 +128,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_DEPLOY_NO_TARGET` | 2 | `deploy` called without a target server/database. |
+| `TOMIX_DEPLOY_NO_TARGET` | 2 | `deploy` called without a target server, or without `-d/--database` for a model that has no name of its own (such as a bare TMDL folder). |
 | `TOMIX_DEPLOY_PROFILE_NO_SERVER` | 2 | `deploy --profile` selected an existing profile without a server; deploy requires a remote profile. |
 | `TOMIX_DEPLOY_UNSUPPORTED` | 2 | The source model cannot be deployed (wrong provider/type). |
 | `TOMIX_DEPLOY_FIX_UNSUPPORTED` | 2 | `deploy --fix-bpa` was requested but the provider session does not implement `IModelMutationSession`. |
@@ -318,7 +318,7 @@ come from structural integrity checks.
 | `TOMIX_WORKSPACE_PRIMARY_REQUIRED` | 2 | `connect -w` was given without enough of a primary connection to mirror from (needs `<server> <database>`, or a local path). A missing value, not a conflict — see `TOMIX_OPTION_CONFLICT` for that. |
 | `TOMIX_WORKSPACE_UNREACHABLE` | 1 | `connect -w` reached the primary model but could not reach the workspace mirror's server. The connection is left unchanged. |
 | `TOMIX_OUTPUT_FORMAT_UNSUPPORTED` | 2 | The command cannot render the requested `--output-format`; the message lists the formats it supports. |
-| `TOMIX_CONFIG_CORRUPT` | 2 | `~/.tomix/config.json` exists but does not parse. Repair it manually or reset it with `tx config init --force`; help, version, doctor, and config recovery paths remain available. |
+| `TOMIX_CONFIG_CORRUPT` | 2 | `~/.tomix/config.json` exists but does not parse. Repair it manually or reset it with `tx config init --overwrite`; help, version, doctor, and config recovery paths remain available. |
 | `TOMIX_UNEXPECTED` | 1 | An unexpected exception reached the top-level handler. The stack trace is only printed under `--debug`; with `--error-format json` it is embedded as a `detail` field in the envelope so stderr stays valid JSON. |
 
 ## Update Codes (`TOMIX_UPDATE_*`)

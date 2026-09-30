@@ -13,9 +13,9 @@ public sealed class ConfigHandler
 
     public ConfigHandler(TomixConfigStore store) => _store = store;
 
-    public TomixResult<ConfigInitResult> Init(bool force)
+    public TomixResult<ConfigInitResult> Init(bool overwrite)
     {
-        var created = force || !File.Exists(_store.FilePath);
+        var created = overwrite || !File.Exists(_store.FilePath);
 
         if (created)
             _store.Save(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));

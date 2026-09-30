@@ -41,15 +41,6 @@ public sealed class BpaRunHandler
                 failOnError!,
                 exitCode: 2);
 
-        if (request.DryRun && (!request.Fix || request.Revert))
-            return TomixResult<BpaRunResult>.Fail(
-                "TOMIX_BPA_DRY_RUN_REQUIRES_FIX",
-                request.Revert
-                    ? "--dry-run cannot be combined with --revert."
-                    : "--dry-run previews fixes, so it needs --fix.",
-                exitCode: 2,
-                hint: "Preview fixes with: tx bpa run --fix --dry-run");
-
         var options = new MutationOptions(
             request.Save && request.Fix,
             request.SaveTo,
@@ -58,8 +49,7 @@ public sealed class BpaRunHandler
             request.Serialization,
             request.Force,
             request.Overwrite,
-            request.NoSync,
-            DryRun: request.DryRun);
+            request.NoSync);
         var stagingStore = _stores.Staging;
         var connection = _stores.ResolveSession();
 
@@ -139,16 +129,17 @@ public sealed class BpaRunHandler
                         $"Provider cannot mutate model: {context.EffectiveModel.Value}");
 
                 var fixer = new BpaFixer();
-                // --dry-run applies the fixes to the in-memory model too, so the preview shows
-                // the values the provider would really write and what would remain; the
-                // lifecycle then discards them instead of saving or staging.
+                // Without --save/--stage the run is a preview: the fixes are applied to the
+                // in-memory model too, so it shows the values the provider would really write and
+                // what would remain, and the lifecycle then discards them.
+                var preview = context.Mode is not (MutationMode.Save or MutationMode.Stage);
                 var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules, request.AllowDelete, snapshot);
 
                 runResult = runResult with
                 {
-                    FixesApplied = request.DryRun ? 0 : fixResult.FixesApplied,
+                    FixesApplied = preview ? 0 : fixResult.FixesApplied,
                     FixChanges = BpaFixer.WithBefore(fixResult.Changes, snapshot),
-                    DryRun = request.DryRun,
+                    Preview = preview,
                     FixesSkipped = fixResult.FixesSkipped,
                     DestructiveFixesSkipped = fixResult.DestructiveFixesSkipped,
                     FixErrors = fixResult.Errors.Count > 0
@@ -167,13 +158,13 @@ public sealed class BpaRunHandler
                         request.PathFilter,
                         request.RuleIds,
                         userDisabled));
-                    runResult = request.DryRun
+                    runResult = preview
                         ? runResult with { ProjectedViolations = postFix.Violations }
                         : runResult with { RemainingViolations = postFix.Violations };
                 }
 
-                if (request.DryRun)
-                    runResult = runResult with { FixOutcome = MutationOutcome.DryRun };
+                if (preview)
+                    runResult = runResult with { FixOutcome = MutationOutcome.Preview };
 
                 if (fixResult.FixesApplied > 0 && context.Mode is MutationMode.Save or MutationMode.Stage)
                 {

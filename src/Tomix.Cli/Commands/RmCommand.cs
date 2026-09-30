@@ -35,11 +35,10 @@ internal sealed class RmCommand : ICommandModule
         };
         var forceOption = new Option<bool>("--force")
         {
-            Description = "Remove despite DAX dependents and save despite newly introduced validation errors"
+            Description = "Remove even if DAX still references the object, and save even if the change adds validation errors"
         };
         forceOption.Aliases.Add("-f");
         var overwriteOption = LifecycleOptions.Overwrite();
-        var dryRunOption = LifecycleOptions.DryRun();
         var ifExistsOption = new Option<bool>("--if-exists")
         {
             Description = "Exit 0 when the object is already gone"
@@ -62,7 +61,6 @@ internal sealed class RmCommand : ICommandModule
             modelArgument,
             forceOption,
             overwriteOption,
-            dryRunOption,
             ifExistsOption,
             saveToOption,
             serializationOption,
@@ -93,9 +91,11 @@ internal sealed class RmCommand : ICommandModule
             }
 
             var path = parseResult.GetValue(pathArgument) ?? "";
-            var dryRun = parseResult.GetValue(dryRunOption);
-
-            if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
+            // Without --save/--save-to/--stage the removal is only previewed, so it asks nothing.
+            var persists = parseResult.GetValue(revertOption)
+                || LifecycleOptions.Persists(
+                    parseResult.GetValue(saveOption), parseResult.GetValue(saveToOption), parseResult.GetValue(stageOption));
+            if (persists && !ConfirmationHelper.ConfirmOrAbort(
                 "Remove", path, parseResult, formatValue))
                 return 1;
 
@@ -120,7 +120,6 @@ internal sealed class RmCommand : ICommandModule
                         path,
                         type,
                         parseResult.GetValue(ifExistsOption),
-                        dryRun,
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         parseResult.GetValue(serializationOption) ?? "",
@@ -132,13 +131,14 @@ internal sealed class RmCommand : ICommandModule
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
-            return CommandOutput.Render(parseResult, result, formatValue, Render);
+            var tokens = parseResult.Tokens.Select(t => t.Value).ToList();
+            return CommandOutput.Render(parseResult, result, formatValue, data => Render(data, tokens));
         });
 
         return command;
     }
 
-    private static void Render(RemoveModelObjectResult result)
+    private static void Render(RemoveModelObjectResult result, IReadOnlyList<string> tokens)
     {
         if (result.Status == MutationStatus.Reverted)
         {
@@ -160,7 +160,7 @@ internal sealed class RmCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning(
                 $"Policy-generated partitions remain on the table: {string.Join(", ", remaining)}."));
 
-        if (result.DryRun)
+        if (result.Status == MutationStatus.Preview)
         {
             AnsiConsole.MarkupLine(Styling.Warning(
                 $"Would remove: {Styling.MarkupEscape(result.ObjectPath ?? "")}"));
@@ -173,11 +173,14 @@ internal sealed class RmCommand : ICommandModule
                 AnsiConsole.MarkupLine(Styling.Warning(
                     $"Would break {wouldBreak.Count} DAX reference(s) in: "
                     + $"{string.Join(", ", wouldBreak.Select(Styling.MarkupEscape))}."));
-                if (result.Reason == "would_block")
-                    StdErr.MarkupLine(Styling.Guidance("Re-run with --force to remove anyway."));
             }
 
-            StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
+            // Blocked: --force alone still only previews and --save alone fails the guard, so
+            // give the one command that removes it instead of two half-steps.
+            if (result.Reason == "would_block")
+                StdErr.MarkupLine(Styling.Guidance("To remove anyway: ") + Styling.Option(ForceSaveHint(tokens)));
+            else
+                MutationOutput.RenderPersistence(result.Outcome);
             return;
         }
 
@@ -193,4 +196,12 @@ internal sealed class RmCommand : ICommandModule
 
         MutationOutput.RenderPersistence(result.Outcome);
     }
+
+    /// <summary>The user's own command line plus <c>--force --save</c>, quoted for the host shell.</summary>
+    internal static string ForceSaveHint(IReadOnlyList<string> tokens)
+        => "tx " + string.Join(" ", tokens
+            .Where(t => t is not ("--force" or "-f"))
+            .Append("--force")
+            .Append("--save")
+            .Select(BpaRunView.QuoteToken));
 }

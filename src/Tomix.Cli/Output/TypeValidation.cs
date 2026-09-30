@@ -9,6 +9,12 @@ internal static class TypeValidation
     private static readonly string ValidTypes = ModelObjectTypeCatalog.DiscoveryListText;
 
     /// <summary>
+    /// The tail of every <c>--type</c> description. Help names a few kinds instead of all twenty:
+    /// an invalid value prints the full list (<see cref="WriteInvalidTypeError"/>).
+    /// </summary>
+    public const string KindsHint = "for example table, measure, or column; an invalid value lists them all";
+
+    /// <summary>
     /// Reports an unrecognized <c>--type</c> value and returns exit code 2. Routed through
     /// <see cref="ErrorOutput"/> rather than writing markup straight to stderr so the failure
     /// carries a documented code and honors <c>--error-format json</c> like every other

@@ -6,4 +6,4 @@ public sealed record InitModelRequest(
     string Serialization,
     string CompatibilityMode,
     int? CompatibilityLevel,
-    bool Force);
+    bool Overwrite);

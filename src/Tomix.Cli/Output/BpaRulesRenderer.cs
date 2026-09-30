@@ -439,7 +439,6 @@ internal static class BpaRulesRenderer
             json["rule"] = ProjectRuleInfo(result.Rule);
 
         json["status"] = result.Status;
-        json["dryRun"] = result.DryRun;
         json["saved"] = result.Saved;
         json["savedTo"] = result.SavedTo;
         json["persistence"] = result.Persistence;

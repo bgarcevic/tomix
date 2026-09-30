@@ -79,8 +79,9 @@ tx deploy --server MyWorkspace --database basic-tmdl
 tx refresh --refresh-type full
 ```
 
-Deploys run the BPA gate first (`--skip-bpa` to bypass), and `--dry-run`
-previews what would change on the remote target.
+Deploys run the BPA gate first (`--skip-bpa` to bypass), then preview what
+would change on the remote target and ask before deploying (`--yes` skips the
+preview, for CI).
 
 ## Where next
 

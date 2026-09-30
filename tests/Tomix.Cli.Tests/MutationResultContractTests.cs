@@ -14,11 +14,11 @@ namespace Tomix.Cli.Tests;
 
 /// <summary>
 /// JSON contract tests for mutation command results (issue #161). Every mutation result carries
-/// the same persistence fields from <see cref="MutationResult"/>: <c>status</c>, <c>dryRun</c>
-/// (always a bool), <c>saved</c> (always a bool), <c>savedTo</c>, <c>persistence</c>,
+/// the same persistence fields from <see cref="MutationResult"/>: <c>status</c>,
+/// <c>saved</c> (always a bool), <c>savedTo</c>, <c>persistence</c>,
 /// <c>target</c>, <c>sync</c> ({status, target?, warning?}) and <c>newValidationErrors</c>. The
 /// object path uses a past-tense key (<c>added</c>, <c>moved</c>, <c>removed</c>, <c>set</c>) only
-/// when the edit was saved or staged, and a <c>would*</c> key for previews and dry runs.
+/// when the edit was saved or staged, and a <c>would*</c> key for previews.
 /// <para>
 /// Serialization goes through <see cref="JsonOutput"/>, the same code path the commands use,
 /// so that omission driven by <c>[JsonIgnore(WhenWritingNull)]</c> is actually exercised. Do not
@@ -45,7 +45,6 @@ public sealed class MutationResultContractTests
     public static TheoryData<string, MutationOutcome> Modes => new()
     {
         { "preview", MutationOutcome.Preview },
-        { "dryRun", MutationOutcome.DryRun },
         { "unchanged", MutationOutcome.Unchanged },
         { "staged", MutationOutcome.Staged },
         { "saved", SavedToFile },
@@ -76,7 +75,7 @@ public sealed class MutationResultContractTests
 
             Assert.True(json.GetProperty("status").GetString() == status, $"{name}: status");
             Assert.True(json.GetProperty("saved").ValueKind is JsonValueKind.True or JsonValueKind.False, $"{name}: saved is bool");
-            Assert.True(json.GetProperty("dryRun").ValueKind is JsonValueKind.True or JsonValueKind.False, $"{name}: dryRun is bool");
+            Assert.False(json.TryGetProperty("dryRun", out _), $"{name}: legacy dryRun");
             Assert.Equal(JsonValueKind.Object, json.GetProperty("sync").ValueKind);
             Assert.False(json.TryGetProperty("synced", out _), $"{name}: legacy synced");
             Assert.False(json.TryGetProperty("staged", out _), $"{name}: legacy staged");
@@ -93,14 +92,12 @@ public sealed class MutationResultContractTests
         Assert.Equal(status == "saved", json.GetProperty("saved").GetBoolean());
         Assert.Equal(status == "saved", json.TryGetProperty("savedTo", out _));
         Assert.Equal(status == "saved", json.TryGetProperty("persistence", out _));
-        Assert.Equal(status == "dryRun", json.GetProperty("dryRun").GetBoolean());
     }
 
     [Theory]
     [InlineData("saved", "added", null)]
     [InlineData("staged", "added", null)]
     [InlineData("preview", null, "wouldAdd")]
-    [InlineData("dryRun", null, "wouldAdd")]
     [InlineData("unchanged", null, null)]
     [InlineData("reverted", null, null)]
     public void ObjectKey_IsPastTenseOnlyWhenApplied(string status, string? appliedKey, string? previewKey)
@@ -113,9 +110,9 @@ public sealed class MutationResultContractTests
     }
 
     [Fact]
-    public void DryRunKeys_NeverUsePastTense()
+    public void PreviewKeys_NeverUsePastTense()
     {
-        var keys = AllResults(MutationOutcome.DryRun)
+        var keys = AllResults(MutationOutcome.Preview)
             .SelectMany(r => Json<object>(r.Result).EnumerateObject().Select(p => p.Name))
             .ToHashSet();
 
@@ -170,28 +167,17 @@ public sealed class MutationResultContractTests
     }
 
     [Fact]
-    public void RemoveModelObjectResult_GuardedDryRun_SerializesWouldRemoveWithBlockers()
+    public void RemoveModelObjectResult_GuardedPreview_SerializesWouldRemoveWithBlockers()
     {
         var json = Json(new RemoveModelObjectResult(
             "Sales/Amount", Reason: "would_block", BrokenReferences: ["Sales/Total Sales"])
-        { Outcome = MutationOutcome.DryRun });
+        { Outcome = MutationOutcome.Preview });
 
-        Assert.True(json.GetProperty("dryRun").GetBoolean());
+        Assert.Equal("preview", json.GetProperty("status").GetString());
         Assert.Equal("Sales/Amount", json.GetProperty("wouldRemove").GetString());
         Assert.Equal("would_block", json.GetProperty("reason").GetString());
         Assert.Equal(1, json.GetProperty("brokenReferences").GetArrayLength());
         Assert.False(json.GetProperty("saved").GetBoolean());
-    }
-
-    [Fact]
-    public void RemoveModelObjectResult_UnchangedDryRun_KeepsDryRunTrue()
-    {
-        var outcome = MutationOutcome.Unchanged with { DryRunRequested = true };
-        var json = Json(new RemoveModelObjectResult("Sales/Nope", Reason: "not_found") { Outcome = outcome });
-
-        Assert.Equal("unchanged", json.GetProperty("status").GetString());
-        Assert.True(json.GetProperty("dryRun").GetBoolean());
-        Assert.Equal("Sales/Nope", json.GetProperty("path").GetString());
     }
 
     [Fact]
@@ -230,9 +216,9 @@ public sealed class MutationResultContractTests
     [Fact]
     public void ReplaceModelTextResult_Preview_ReportsPreviewsWithoutSaving()
     {
-        var json = Json(new ReplaceModelTextResult("foo", "bar", 3, []) { Outcome = MutationOutcome.DryRun });
+        var json = Json(new ReplaceModelTextResult("foo", "bar", 3, []) { Outcome = MutationOutcome.Preview });
 
-        Assert.True(json.GetProperty("dryRun").GetBoolean());
+        Assert.Equal("preview", json.GetProperty("status").GetString());
         Assert.False(json.GetProperty("saved").GetBoolean());
         Assert.Equal(JsonValueKind.Array, json.GetProperty("previews").ValueKind);
     }

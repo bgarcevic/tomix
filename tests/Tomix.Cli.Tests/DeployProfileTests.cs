@@ -75,7 +75,7 @@ public sealed class DeployProfileTests
         Assert.Equal(0, deployHelp.ExitCode);
         Assert.Contains("tx profile list", deployHelp.Stdout);
         Assert.Contains("tx profile set", deployHelp.Stdout);
-        Assert.Contains("tx deploy ./model.tmdl --profile prod --dry-run", deployHelp.Stdout);
+        Assert.Contains("tx deploy ./model.tmdl --profile prod", deployHelp.Stdout);
         Assert.Equal(0, setHelp.ExitCode);
         Assert.Contains("tx profile set dev -s MyWorkspace -d Sales", setHelp.Stdout);
         Assert.Contains("tx profile set dev --from-active", setHelp.Stdout);

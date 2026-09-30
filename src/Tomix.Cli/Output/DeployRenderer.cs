@@ -20,9 +20,9 @@ internal static class DeployRenderer
         // folder name), not as a raw path; the target database is already shown after the server.
         var modelName = ModelDisplayName.Resolve(tomName: null, sourcePath: source, fallback: result.Database);
 
-        if (result.Status == "dry-run")
+        if (result.Status == "preview")
         {
-            AnsiConsole.MarkupLine(Styling.Value($"Dry run: {modelName} to {result.Server} / {result.Database}"));
+            AnsiConsole.MarkupLine(Styling.Value($"Preview: {modelName} to {result.Server} / {result.Database}"));
 
             if (result.CreatesDatabase == true)
             {
@@ -47,15 +47,7 @@ internal static class DeployRenderer
             }
             else if (result.DiffError is not null)
             {
-                var err = StdErr.Console();
-                err.MarkupLine(Styling.Warning(
-                    $"Diff unavailable: {result.DiffError}"));
-                err.MarkupLine(Styling.Muted("Showing deploy plan only."));
-            }
-            else
-            {
-                StdErr.MarkupLine(Styling.Muted(
-                    "No remote target specified — showing deploy plan only."));
+                StdErr.MarkupLine(Styling.Warning($"Cannot preview changes: {result.DiffError}"));
             }
 
             return;

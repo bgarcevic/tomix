@@ -66,19 +66,11 @@ internal sealed class DeployCommand : ICommandModule
         }.In("BPA gate options");
         var bpaFailOnOption = new Option<string?>("--bpa-fail-on")
         {
-            Description = "Severity threshold for the BPA gate: error or warning (default: error). Applies before the deploy and again after --fix-bpa fixes. Rules that cannot be evaluated count as error-severity findings."
+            Description = "Severity that blocks the deploy: error or warning (default: error). Rules that cannot be evaluated count as errors."
         }.In("BPA gate options");
-        var forceOption = new Option<bool>("--force")
-        {
-            Description = "Force deployment, bypassing validation checks"
-        };
         var ciOption = new Option<string?>("--ci")
         {
             Description = "Print CI log-group commands to stderr for the given system: vsts or github"
-        };
-        var dryRunOption = new Option<bool>("--dry-run")
-        {
-            Description = "Preview what would change on the remote target without deploying"
         };
         var deployConnectionsOption = new Option<bool>("--deploy-connections")
         {
@@ -119,9 +111,7 @@ internal sealed class DeployCommand : ICommandModule
             fixBpaOption,
             bpaRulesOption,
             bpaFailOnOption,
-            forceOption,
             ciOption,
-            dryRunOption,
             deployConnectionsOption,
             deployPartitionsOption,
             deployPolicyPartitionsOption,
@@ -193,7 +183,6 @@ internal sealed class DeployCommand : ICommandModule
                 server = profile.Server;
                 database = profile.Database ?? database;
             }
-            var dryRun = parseResult.GetValue(dryRunOption);
 
             var deployFull = parseResult.GetValue(deployFullOption);
             var granularFlags = new Option<bool>[]
@@ -225,15 +214,16 @@ internal sealed class DeployCommand : ICommandModule
                     DeployRoleMembers: parseResult.GetValue(deployRoleMembersOption),
                     DeployPolicyPartitions: parseResult.GetValue(deployPolicyPartitionsOption));
 
-            if (!dryRun && !ConfirmationHelper.ConfirmOrAbort(
-                "Deploy", $"{database ?? reference.Value} to {server ?? "workspace"}",
-                parseResult, format))
-                return 1;
+            var xmla = parseResult.GetValue(xmlaOption);
+            var suppressSpinner = quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format);
+            // --xmla only writes a script, which is its own preview: nothing reaches the target.
+            var previewFirst = string.IsNullOrWhiteSpace(xmla) && PreviewGate.PreviewFirst(parseResult);
 
-            var spinnerLabel = dryRun ? "Previewing deployment..." : "Deploying model...";
-            var result = await CliSpinner.RunAsync(
-                spinnerLabel,
-                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient, bpaRules: _bpaRules).HandleAsync(
+            // One operation for the preview and the deploy: the source opens and the BPA gate runs
+            // once, and its warnings are reported with whichever result comes first.
+            await using var operation = await CliSpinner.RunAsync(
+                "Preparing deployment...",
+                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient, bpaRules: _bpaRules).OpenAsync(
                     new DeployModelRequest(
                         reference,
                         server,
@@ -243,14 +233,37 @@ internal sealed class DeployCommand : ICommandModule
                         parseResult.GetValue(skipBpaOption),
                         parseResult.GetValue(fixBpaOption),
                         parseResult.GetValue(bpaRulesOption),
-                        parseResult.GetValue(xmlaOption),
-                        parseResult.GetValue(forceOption),
+                        xmla,
                         parseResult.GetValue(ciOption),
-                        dryRun,
+                        Preview: previewFirst,
                         deployOptions,
                         parseResult.GetValue(bpaFailOnOption)),
                     cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
+                suppress: suppressSpinner);
+
+            // Preview first: show what the deploy would change on the target, then confirm.
+            if (previewFirst && operation.Failure is null)
+            {
+                var preview = await CliSpinner.RunAsync(
+                    "Previewing deployment...", () => operation.PreviewAsync(cancellationToken), suppress: suppressSpinner);
+                var previewExit = CommandOutput.Render(
+                    preview,
+                    format,
+                    errorFormat,
+                    data => DeployRenderer.Render(data, reference.Value));
+                if (!preview.Success || previewExit != 0)
+                    return previewExit;
+
+                var decision = PreviewGate.Decide(
+                    "Deploy", $"{database ?? reference.Value} to {server ?? "workspace"}", parseResult, format);
+                if (decision != PreviewDecision.Apply)
+                    return PreviewGate.ExitCode(decision);
+            }
+
+            var result = await CliSpinner.RunAsync(
+                string.IsNullOrWhiteSpace(xmla) ? "Deploying model..." : "Writing deployment script...",
+                () => operation.ApplyAsync(cancellationToken),
+                suppress: suppressSpinner);
 
             if (result.Data is not null && result.Data.ScriptPath == "-" && result.Data.Script is not null)
             {

@@ -20,7 +20,7 @@ you compare against. A check with no expected value recorded is not a check.
    refresh if needed and rerun a known-value query. A clean metadata diff alone
    does not prove that processed data survived the restore.
 3. Prefix every object created during the run with `QA_<run-id>_` so cleanup is
-   unambiguous. Run destructive commands in preview/dry-run first; persist only
+   unambiguous. Run destructive commands in preview first; persist only
    after reviewing the preview.
 4. Before every persisted mutation, record a probe proving current state; after
    it, reconnect and rerun the probe to prove persistence. Never retry a
@@ -74,7 +74,7 @@ you compare against. A check with no expected value recorded is not a check.
 
 ### Refresh and incremental refresh (real engine only)
 
-- [ ] `refresh --dry-run` script parses and validates independently; a bounded
+- [ ] The `refresh --refresh-type clearvalues` preview script parses and validates independently; a bounded
       full and table refresh completes and updates a timestamp probe.
 - [ ] `refresh --table <table> --policy-only` with a fixed `--effective-date`: generated partitions appear on a fresh connection with
       stable names; repeat apply is idempotent. Restore the fixture explicitly afterward;
@@ -84,7 +84,7 @@ you compare against. A check with no expected value recorded is not a check.
 
 ### Deploy
 
-- [ ] Dry-run of no-op and known-change deployments matches what a real deploy
+- [ ] The preview of no-op and known-change deployments matches what a real deploy
       executes; `--create-only` refuses on an existing target.
 - [ ] Deploy the fixture, verify object counts and baseline queries on the
       target, then record one failed-deploy recovery (missing permission or
@@ -123,7 +123,7 @@ evidence.
 
 Use a disposable deployed model with a saved policy and a working data source.
 
-- [ ] Capture baseline partitions and row counts; run policy-only with `--dry-run`
+- [ ] Capture baseline partitions and row counts; preview policy-only (`--non-interactive`, no `--yes`)
       and a fixed `--effective-date`; verify no partitions or data changed.
 - [ ] Execute `tx refresh --table Sales --policy-only --effective-date 2026-01-01
       -s <workspace> -d <test-model> --yes`; verify generated partitions exist

@@ -38,7 +38,7 @@ public sealed class SetModelPropertyHandler
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: request.Force, request.Overwrite, request.NoSync, DryRun: request.DryRun);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: request.Force, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "set", _stores,
@@ -72,7 +72,7 @@ public sealed class SetModelPropertyHandler
                     request.Type, request.Force));
 
                 // The in-memory model is already post-mutation in every lifecycle mode (save,
-                // stage, dry-run), so the shared offline analyzer measures what the save gate
+                // stage, preview), so the shared offline analyzer measures what the save gate
                 // will gate on. The result builder is synchronous, so the count rides into it
                 // through this closure.
                 var validationErrors = ModelValidation

@@ -93,7 +93,7 @@ public sealed class RefreshPolicyWorkflowTests
         Assert.True(read.Data.Object!.Properties.ContainsKey("issues"));
         Assert.True(read.Data.Object!.Properties.ContainsKey("policyPartitions"));
         var removed = await new RemoveModelObjectHandler(Providers, config.Stores).HandleAsync(
-            new RemoveModelObjectRequest(reference, "Sales/RefreshPolicy", null, false, false, true, null, "", false, NoSync: true),
+            new RemoveModelObjectRequest(reference, "Sales/RefreshPolicy", null, false, true, null, "", false, NoSync: true),
             CancellationToken.None);
         Assert.True(removed.Success);
         Assert.Equal("Sales/RefreshPolicy", removed.Data!.Removed);
@@ -126,7 +126,7 @@ public sealed class RefreshPolicyWorkflowTests
         using var model = SampleModel.CopyToTemp();
         using var config = new TempConfigDir();
         var result = await new RemoveModelObjectHandler(Providers, config.Stores).HandleAsync(
-            new RemoveModelObjectRequest(new(model.Path), "Sales/RefreshPolicy", null, ifExists, false, true, null, "", false), CancellationToken.None);
+            new RemoveModelObjectRequest(new(model.Path), "Sales/RefreshPolicy", null, ifExists, true, null, "", false), CancellationToken.None);
         Assert.Equal(ifExists, result.Success);
         if (ifExists)
             Assert.Equal(MutationStatus.Unchanged, result.Data!.Status);

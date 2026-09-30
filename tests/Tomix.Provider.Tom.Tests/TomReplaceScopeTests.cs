@@ -40,7 +40,7 @@ public sealed class TomReplaceScopeTests
     }
 
     [Fact]
-    public void AnnotationsScope_DryRun_LeavesValuesUntouched()
+    public void AnnotationsScope_Preview_LeavesValuesUntouched()
     {
         var db = WithSales();
         var sales = db.Model.Tables.Single(t => t.Name == "Sales");

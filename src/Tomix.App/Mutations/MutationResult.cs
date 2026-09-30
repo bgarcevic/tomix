@@ -9,8 +9,6 @@ public enum MutationStatus
 {
     /// <summary>Applied in memory only; nothing was written (no <c>--save</c>/<c>--stage</c>).</summary>
     [JsonStringEnumMemberName("preview")] Preview,
-    /// <summary><c>--dry-run</c>: the edit was evaluated and discarded.</summary>
-    [JsonStringEnumMemberName("dryRun")] DryRun,
     /// <summary>Nothing to change (e.g. <c>--if-not-exists</c> on an existing object).</summary>
     [JsonStringEnumMemberName("unchanged")] Unchanged,
     /// <summary>Recorded in the staged working copy (<c>--stage</c>).</summary>
@@ -101,14 +99,7 @@ public sealed record MutationOutcome(
     MutationTarget? Target = null,
     SaveValidationDelta? Validation = null)
 {
-    /// <summary>
-    /// True when <c>--dry-run</c> was passed, including when there was nothing to change
-    /// (status <c>unchanged</c>), so a caller never mistakes a dry run for a live run.
-    /// </summary>
-    public bool DryRunRequested { get; init; } = Status == MutationStatus.DryRun;
-
     public static readonly MutationOutcome Preview = new(MutationStatus.Preview);
-    public static readonly MutationOutcome DryRun = new(MutationStatus.DryRun);
     public static readonly MutationOutcome Unchanged = new(MutationStatus.Unchanged);
     public static readonly MutationOutcome Staged = new(MutationStatus.Staged);
     public static readonly MutationOutcome Reverted = new(MutationStatus.Reverted);
@@ -119,7 +110,7 @@ public sealed record MutationOutcome(
     public bool Applied => Status is MutationStatus.Saved or MutationStatus.Staged;
 
     /// <summary>True when the edit was evaluated but not kept; results use <c>would*</c> keys then.</summary>
-    public bool Previewed => Status is MutationStatus.Preview or MutationStatus.DryRun;
+    public bool Previewed => Status == MutationStatus.Preview;
 
     /// <summary>
     /// True when a workspace sync was attempted (or required) and did not happen. The command
@@ -130,7 +121,7 @@ public sealed record MutationOutcome(
 
 /// <summary>
 /// The persistence fields every mutation result carries, so the JSON contract cannot drift
-/// between commands: <c>status</c>, <c>dryRun</c>, <c>saved</c> (always a bool), <c>savedTo</c>,
+/// between commands: <c>status</c>, <c>saved</c> (always a bool), <c>savedTo</c>,
 /// <c>persistence</c>, <c>target</c>, <c>sync</c>, and <c>newValidationErrors</c>. Derived
 /// records set <see cref="Outcome"/> with an initializer.
 /// </summary>
@@ -141,9 +132,6 @@ public abstract record MutationResult
 
     [JsonPropertyOrder(100)]
     public MutationStatus Status => Outcome.Status;
-
-    [JsonPropertyOrder(101)]
-    public bool DryRun => Outcome.DryRunRequested;
 
     [JsonPropertyOrder(102)]
     public bool Saved => Outcome.Saved;
@@ -171,6 +159,6 @@ public abstract record MutationResult
     /// <summary>The object path under its past-tense key: set only when the edit was saved or staged.</summary>
     protected string? IfApplied(string? path) => Outcome.Applied ? path : null;
 
-    /// <summary>The object path under its <c>would*</c> key: set only for previews and dry runs.</summary>
+    /// <summary>The object path under its <c>would*</c> key: set only for previews.</summary>
     protected string? IfPreviewed(string? path) => Outcome.Previewed ? path : null;
 }

@@ -5,7 +5,7 @@ namespace Tomix.App.Add;
 
 /// <summary>
 /// <paramref name="Path"/> is the object the command addressed. It serializes as <c>added</c>
-/// once the edit was saved or staged and as <c>wouldAdd</c> for a preview or dry run;
+/// once the edit was saved or staged and as <c>wouldAdd</c> for a preview;
 /// <paramref name="ExistingPath"/> is set when <c>--if-not-exists</c> left the model unchanged.
 /// </summary>
 public sealed record AddModelObjectResult(

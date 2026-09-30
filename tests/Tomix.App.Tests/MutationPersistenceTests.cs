@@ -61,13 +61,10 @@ public sealed class MutationPersistenceTests
     }
 
     [Fact]
-    public void Unchanged_DryRun_StaysADryRun()
+    public void Preview_IsPreviewedButNotApplied()
     {
-        var outcome = MutationOutcome.Unchanged with { DryRunRequested = true };
-
-        Assert.Equal(MutationStatus.Unchanged, outcome.Status);
-        Assert.True(outcome.DryRunRequested);
-        Assert.True(MutationOutcome.DryRun.DryRunRequested);
-        Assert.False(MutationOutcome.Preview.DryRunRequested);
+        Assert.True(MutationOutcome.Preview.Previewed);
+        Assert.False(MutationOutcome.Preview.Applied);
+        Assert.False(MutationOutcome.Unchanged.Previewed);
     }
 }

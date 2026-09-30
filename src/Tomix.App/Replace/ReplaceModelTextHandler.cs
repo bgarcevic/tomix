@@ -26,15 +26,14 @@ public sealed class ReplaceModelTextHandler
                 exitCode: 2);
 
         var options = new MutationOptions(
-            request.Save && !request.DryRun,
-            request.DryRun ? null : request.SaveTo,
-            request.Stage && !request.DryRun,
+            request.Save,
+            request.SaveTo,
+            request.Stage,
             request.Revert,
             request.Serialization,
             request.Force,
             request.Overwrite,
-            request.NoSync,
-            DryRun: request.DryRun);
+            request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "replace", _stores,
@@ -52,7 +51,7 @@ public sealed class ReplaceModelTextHandler
                     Type: request.Type));
 
                 // Without --save/--stage nothing is applied, only previewed. Reporting it as a
-                // change lets the lifecycle label it a preview or dry run; that mode persists nothing.
+                // change lets the lifecycle label it a preview; that mode persists nothing.
                 if (!persist)
                 {
                     return (true, "",

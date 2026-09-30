@@ -110,7 +110,10 @@ the bottom for where each concern lives.
 - Prefer flags to positional arguments; flags self-document at the call site.
 - Every flag has a full-length name; one-letter aliases only for the most-used
   flags. Use standard names where they exist: `-q/--quiet`, `-f/--force`,
-  `-o/--output`, `--json`, `--no-color`, `--no-input`, `--version`, `--dry-run`.
+  `-o/--output`, `--json`, `--no-color`, `--no-input`, `--version`.
+- Preview by default. Model edits write only with `--save`/`--stage`; commands that act on a
+  remote state (`deploy`, partition-risky `refresh`) show their preview, then prompt,
+  and apply without it only with `--yes`. Do not add a `--dry-run` flag.
 - Two positional arguments meaning different things is a smell; more than two is
   a bug. (Multiple args of the *same* kind — file lists — are fine.)
 - Defaults should be correct for the majority; flags adjust, never enable basic
@@ -272,7 +275,7 @@ than a missing-key error. **Scripts wanting a command's own diagnostics must rea
 - [x] Grouped sections + Examples blocks in help
 - [x] Help wraps to the terminal, groups long option lists, and fits 80 columns; `tx help <command>`
 - [x] `NO_COLOR` / `TERM=dumb` handling verified or added
-- [x] Confirmations with `--yes` on `rm`, `replace`, `deploy`, `stage commit`, `mv --save`/`--revert`, `bpa run --fix --allow-delete`/`--revert`, and partition-risky `refresh`; `--dry-run` on `deploy`
+- [x] Confirmations with `--yes` on `stage commit` and the persisting forms of `rm`, `replace`, `mv`, and `bpa run --fix --allow-delete`; preview-first `deploy` and partition-risky `refresh` (exit 3 when they cannot prompt)
 - [x] `-q/--quiet` global flag (suppresses spinners, progress, non-essential output)
 - [x] Empty-state messages with next-step hints on `ls`/`find`
 - [x] "Did you mean?" suggestions for unknown subcommands

@@ -151,14 +151,14 @@ public sealed class RefreshModelHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DryRun_ReturnsScriptWithoutExecuting()
+    public async Task HandleAsync_Preview_ReturnsScriptWithoutExecuting()
     {
         var session = new StubRefreshSession();
         var handler = new RefreshModelHandler(
             [new StubRefreshProvider(session)],
             () => RemoteSession("powerbi://api.powerbi.com/v1.0/myorg/ws", "MyModel"));
         var result = await handler.HandleAsync(
-            Request(dryRun: true, database: "MyModel"),
+            Request(preview: true, database: "MyModel"),
             progress: null,
             traceWriter: null,
             CancellationToken.None);
@@ -168,6 +168,30 @@ public sealed class RefreshModelHandlerTests
         Assert.Contains("\"refresh\"", result.Data.Script);
         Assert.Contains("full", result.Data.Script);
         Assert.False(session.RefreshCalled);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Operation_PreviewThenApply_ConnectsOnce(bool policyOnly)
+    {
+        // The CLI previews a partition-risky refresh, confirms, then applies on the same session.
+        var session = new StubRefreshSession();
+        var provider = new StubRefreshProvider(session);
+        var request = Request(refreshType: policyOnly ? "automatic" : "clearvalues", tables: ["Sales"],
+            server: "powerbi://api.powerbi.com/v1.0/myorg/ws", database: "Model") with
+        { PolicyOnly = policyOnly };
+
+        await using var operation = await new RefreshModelHandler([provider], () => null)
+            .OpenAsync(request, CancellationToken.None);
+        var preview = await operation.PreviewAsync(CancellationToken.None);
+        var applied = await operation.ApplyAsync(null, null, CancellationToken.None);
+
+        Assert.True(preview.Success, string.Join("; ", preview.Diagnostics.Select(d => d.Message)));
+        Assert.True(applied.Success, string.Join("; ", applied.Diagnostics.Select(d => d.Message)));
+        Assert.Equal(policyOnly, session.Applied is not null);
+        Assert.Equal(!policyOnly, session.RefreshCalled);
+        Assert.Equal(1, provider.OpenCount);
     }
 
     [Theory]
@@ -192,10 +216,10 @@ public sealed class RefreshModelHandlerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PolicyOnly_UsesApplyWithoutLoading_AndDryRunNeverExecutes(bool dryRun)
+    public async Task PolicyOnly_UsesApplyWithoutLoading_AndPreviewNeverExecutes(bool preview)
     {
         var session = new StubRefreshSession();
-        var request = Request(refreshType: "automatic", tables: ["Sales"], dryRun: dryRun,
+        var request = Request(refreshType: "automatic", tables: ["Sales"], preview: preview,
             server: "powerbi://api.powerbi.com/v1.0/myorg/ws", database: "Model") with
         { PolicyOnly = true, EffectiveDate = new DateOnly(2024, 6, 1), MaxParallelism = 4 };
         var result = await new RefreshModelHandler([new StubRefreshProvider(session)], () => null)
@@ -203,7 +227,7 @@ public sealed class RefreshModelHandlerTests
         Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
         Assert.False(session.RefreshCalled);
         Assert.Null(result.Data!.Script);
-        if (dryRun)
+        if (preview)
         {
             Assert.Null(session.Applied);
             Assert.NotNull(result.Data.PolicyPreview);
@@ -260,12 +284,12 @@ public sealed class RefreshModelHandlerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PolicyOnly_MissingPolicyNeverApplies(bool dryRun)
+    public async Task PolicyOnly_MissingPolicyNeverApplies(bool preview)
     {
         var session = new StubRefreshSession { MissingPolicy = true };
         var result = await new RefreshModelHandler([new StubRefreshProvider(session)],
             () => RemoteSession("powerbi://api.powerbi.com/v1.0/myorg/ws", "Model"))
-            .HandleAsync(Request(refreshType: "automatic", tables: ["Sales"], dryRun: dryRun) with { PolicyOnly = true },
+            .HandleAsync(Request(refreshType: "automatic", tables: ["Sales"], preview: preview) with { PolicyOnly = true },
                 null, null, CancellationToken.None);
         Assert.False(result.Success);
         Assert.Equal("TOMIX_REFRESH_POLICY_NOT_FOUND", result.Diagnostics[0].Code);
@@ -289,7 +313,7 @@ public sealed class RefreshModelHandlerTests
         string refreshType = "full",
         string[]? tables = null,
         TablePartition[]? partitions = null,
-        bool dryRun = false,
+        bool preview = false,
         string? server = null,
         string? database = null,
         string? model = null) =>
@@ -303,7 +327,7 @@ public sealed class RefreshModelHandlerTests
             ApplyRefreshPolicy: true,
             EffectiveDate: null,
             MaxParallelism: null,
-            DryRun: dryRun,
+            Preview: preview,
             NoProgress: false,
             TracePath: null);
 
@@ -329,9 +353,13 @@ public sealed class RefreshModelHandlerTests
     {
         private readonly StubRefreshSession _session;
         public StubRefreshProvider(StubRefreshSession session) => _session = session;
+        public int OpenCount { get; private set; }
         public bool CanOpen(ModelReference reference) => reference.IsRemote;
         public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(_session);
+        {
+            OpenCount++;
+            return Task.FromResult<IModelSession>(_session);
+        }
     }
 
     private sealed class StubRefreshSession : IModelSession, IModelRefreshSession, IRefreshPolicyApplySession, IRefreshPolicyMutationSession

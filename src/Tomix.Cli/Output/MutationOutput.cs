@@ -16,7 +16,7 @@ internal static class MutationOutput
         "Saved to the running Power BI Desktop model. Save the report in Power BI Desktop to keep the change.";
 
     /// <summary>
-    /// Renders staged / dry-run / not-saved / saved, then the workspace sync line. Only the
+    /// Renders staged / not-saved (preview) / saved, then the workspace sync line. Only the
     /// "Saved:" and "Synced:" lines are results (stdout); the hints and warnings are stderr.
     /// </summary>
     public static void RenderPersistence(MutationOutcome outcome, string indent = "")
@@ -25,9 +25,6 @@ internal static class MutationOutput
         {
             case MutationStatus.Staged:
                 StdErr.MarkupLine(indent + Styling.Guidance("Staged. Run 'tx stage commit' to promote."));
-                break;
-            case MutationStatus.DryRun:
-                StdErr.MarkupLine(indent + Styling.Guidance("Dry run: nothing was saved."));
                 break;
             case MutationStatus.Preview:
                 StdErr.MarkupLine(indent + Styling.Warning(NotSavedHint));

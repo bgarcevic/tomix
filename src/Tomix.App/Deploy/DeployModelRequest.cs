@@ -12,8 +12,7 @@ public sealed record DeployModelRequest(
     bool FixBpa,
     string[]? BpaRules,
     string? XmlaOutput,
-    bool Force,
     string? Ci,
-    bool DryRun = false,
+    bool Preview = false,
     ModelDeployOptions? DeployOptions = null,
     string? BpaFailOn = null);

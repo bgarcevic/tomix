@@ -98,7 +98,7 @@ internal static class Program
                     "TOMIX_CONFIG_CORRUPT",
                     DiagnosticSeverity.Error,
                     configLoadError.Message,
-                    "Run 'tx config init --force' to reset the file, or repair it manually.")],
+                    "Run 'tx config init --overwrite' to reset the file, or repair it manually.")],
                 GlobalOptions.ErrorFormatValue(parseResult));
             return 2;
         }
@@ -255,7 +255,7 @@ internal static class Program
         var isConfig = args.Any(argument => argument.Equals("config", StringComparison.OrdinalIgnoreCase));
         return isConfig &&
                (leaf.Equals("paths", StringComparison.OrdinalIgnoreCase) ||
-                leaf.Equals("init", StringComparison.OrdinalIgnoreCase) && args.Contains("--force"));
+                leaf.Equals("init", StringComparison.OrdinalIgnoreCase) && args.Contains("--overwrite"));
     }
 
     /// <summary>

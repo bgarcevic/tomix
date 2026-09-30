@@ -49,9 +49,9 @@ public sealed class InitModelHandler
         {
             var created = format switch
             {
-                "tmdl" => CreateTmdl(outputPath, name, compatibilityMode, compatibilityLevel, request.Force),
-                "bim" => CreateBim(outputPath, name, compatibilityMode, compatibilityLevel, request.Force),
-                "pbip" => CreatePbip(outputPath, name, compatibilityMode, compatibilityLevel, request.Force),
+                "tmdl" => CreateTmdl(outputPath, name, compatibilityMode, compatibilityLevel, request.Overwrite),
+                "bim" => CreateBim(outputPath, name, compatibilityMode, compatibilityLevel, request.Overwrite),
+                "pbip" => CreatePbip(outputPath, name, compatibilityMode, compatibilityLevel, request.Overwrite),
                 _ => throw new InvalidOperationException()
             };
 
@@ -64,7 +64,10 @@ public sealed class InitModelHandler
         }
         catch (IOException ex)
         {
-            return TomixResult<InitModelResult>.Fail("TOMIX_INIT_OUTPUT_EXISTS", ex.Message, exitCode: 2);
+            return TomixResult<InitModelResult>.Fail("TOMIX_INIT_OUTPUT_EXISTS", ex.Message, exitCode: 2,
+                hint: ex.Message.StartsWith("Output file already exists", StringComparison.Ordinal)
+                    ? "Pass --overwrite to replace it."
+                    : null);
         }
     }
 
@@ -73,9 +76,9 @@ public sealed class InitModelHandler
         string name,
         string compatibilityMode,
         int compatibilityLevel,
-        bool force)
+        bool overwrite)
     {
-        PrepareDirectory(outputPath, force);
+        PrepareDirectory(outputPath, overwrite);
         WriteTmdlDefinition(outputPath, name, compatibilityMode, compatibilityLevel);
         return outputPath;
     }
@@ -85,16 +88,16 @@ public sealed class InitModelHandler
         string name,
         string compatibilityMode,
         int compatibilityLevel,
-        bool force)
+        bool overwrite)
     {
         var target = Path.HasExtension(outputPath)
             ? outputPath
             : Path.Combine(outputPath, "model.bim");
         var parent = Path.GetDirectoryName(target);
         if (!string.IsNullOrEmpty(parent))
-            PrepareDirectory(parent, force: false);
+            PrepareDirectory(parent, overwrite: false);
 
-        if (File.Exists(target) && !force)
+        if (File.Exists(target) && !overwrite)
             throw new IOException($"Output file already exists: {target}");
 
         File.WriteAllText(target, CreateBimJson(name, compatibilityMode, compatibilityLevel));
@@ -106,9 +109,9 @@ public sealed class InitModelHandler
         string name,
         string compatibilityMode,
         int compatibilityLevel,
-        bool force)
+        bool overwrite)
     {
-        PrepareDirectory(outputPath, force);
+        PrepareDirectory(outputPath, overwrite);
 
         var projectName = Path.GetFileName(outputPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         var semanticModelPath = Path.Combine(outputPath, $"{projectName}.SemanticModel");
@@ -237,11 +240,11 @@ public sealed class InitModelHandler
             }
             """;
 
-    private static void PrepareDirectory(string path, bool force)
+    private static void PrepareDirectory(string path, bool overwrite)
     {
         if (Directory.Exists(path))
         {
-            if (force)
+            if (overwrite)
             {
                 foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                     File.Delete(file);

@@ -12,7 +12,7 @@ namespace Tomix.App.Refresh;
 /// <param name="ApplyRefreshPolicy">--apply-refresh-policy (default true).</param>
 /// <param name="EffectiveDate">--effective-date (yyyy-MM-dd).</param>
 /// <param name="MaxParallelism">--max-parallelism.</param>
-/// <param name="DryRun">--dry-run: emit TMSL or a policy-only operation preview without executing.</param>
+/// <param name="Preview">Emit TMSL or a policy-only operation preview without executing (the default until --yes or a confirmed prompt).</param>
 /// <param name="NoProgress">--no-progress: suppress live progress reporting.</param>
 /// <param name="TracePath">--trace: null=off, "-"=stderr, path=write to file.</param>
 /// <param name="PolicyOnly">Apply the saved policy without loading data.</param>
@@ -28,7 +28,7 @@ public sealed record RefreshModelRequest(
     bool ApplyRefreshPolicy,
     DateOnly? EffectiveDate,
     int? MaxParallelism,
-    bool DryRun,
+    bool Preview,
     bool NoProgress,
     string? TracePath,
     bool PolicyOnly = false,

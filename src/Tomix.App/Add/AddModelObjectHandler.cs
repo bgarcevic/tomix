@@ -20,7 +20,7 @@ public sealed class AddModelObjectHandler
         CancellationToken cancellationToken)
     {
         var options = new MutationOptions(
-            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync, DryRun: request.DryRun);
+            request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, "add", _stores,

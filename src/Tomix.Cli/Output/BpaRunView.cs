@@ -158,7 +158,7 @@ internal static class BpaRunView
     private static readonly HashSet<string> HintDroppedFlags = new(StringComparer.OrdinalIgnoreCase)
     {
         "--details", "--full", "--no-multiline", "--errors", "--warnings", "--info",
-        "--fix", "--allow-delete", "--dry-run", "--save", "--stage", "--revert", "--quiet", "-q",
+        "--fix", "--allow-delete", "--save", "--stage", "--revert", "--quiet", "-q",
         "--yes", "-y", "--force", "-f", "--overwrite", "--no-sync",
     };
 
@@ -210,7 +210,7 @@ internal static class BpaRunView
     private const int FixValueWidth = 60;
 
     /// <summary>
-    /// One pending fix for the <c>--fix --dry-run</c> view: the headline
+    /// One pending fix for the <c>--fix</c> preview: the headline
     /// (<c>Would fix: Column 'Sales/Amount' — RULE_ID</c>, or <c>Would delete:</c>) and, for
     /// a property set, the change (<c>FormatString: "" → "#,##0"</c>). Values stay on one line
     /// and are cut at a fixed width, so a rewritten expression cannot flood the preview.

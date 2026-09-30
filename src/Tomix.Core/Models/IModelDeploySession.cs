@@ -30,11 +30,14 @@ public interface IModelDeploySession
 /// The two sides of a planned deploy, produced from a single read of the target.
 /// <paramref name="Target"/> is null exactly when <paramref name="TargetExists"/> is false — the
 /// deploy creates the database and ships the full source model, so there is nothing to diff.
+/// <paramref name="TargetName"/> is the database the deploy writes: the requested name, or the
+/// source model's own name when none was given.
 /// </summary>
 public sealed record ModelDeployPlan(
     bool TargetExists,
     ModelSnapshot? Target,
-    ModelSnapshot Planned);
+    ModelSnapshot Planned,
+    string? TargetName = null);
 
 /// <summary>
 /// Controls which aspects of an existing target database are overwritten by a deploy.

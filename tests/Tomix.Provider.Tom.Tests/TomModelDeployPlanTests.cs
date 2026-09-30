@@ -4,7 +4,7 @@ using Tomix.Core.Models;
 namespace Tomix.Provider.Tom.Tests;
 
 /// <summary>
-/// The plan is what <c>tx deploy --dry-run</c> diffs, so it must describe the model the deploy
+/// The plan is what the <c>tx deploy</c> preview diffs, so it must describe the model the deploy
 /// would actually leave on the target — merged exactly as <see cref="TmslDeployScriptBuilder"/>
 /// merges it. These tests run the pure <c>BuildPlan</c> against in-memory TOM databases: no
 /// server, no auth, and the same preservation matrix the script builder is held to.
@@ -30,7 +30,7 @@ public sealed class TomModelDeployPlanTests
     /// <summary>
     /// The provider-level proof of the #128 fix: with preserve-by-default options the deploy
     /// keeps the target's incremental-refresh partitions, so the plan must show them too — a
-    /// dry run built from the raw source would report them as removed.
+    /// preview built from the raw source would report them as removed.
     /// </summary>
     [Fact]
     public void BuildPlan_PreserveDefaults_PlannedKeepsTargetPolicyPartitions()
@@ -61,7 +61,7 @@ public sealed class TomModelDeployPlanTests
     /// <summary>
     /// A #128 nuance: preserving shared expressions and data sources still deploys entries that
     /// are new in the source. Dropping preserved kinds from the plan wholesale would hide real
-    /// additions, so the plan must carry them and the dry run must report them.
+    /// additions, so the plan must carry them and the preview must report them.
     /// </summary>
     [Fact]
     public void BuildPlan_PreserveDefaults_SourceOnlyExpressionsAndDataSources_RemainInPlan()
@@ -86,7 +86,7 @@ public sealed class TomModelDeployPlanTests
     /// A #128 nuance: <c>--deploy-partitions</c> without <c>--deploy-policy-partitions</c> is a
     /// mixed outcome, not a plain overwrite — tables whose target refresh policy carries a
     /// <c>sourceExpression</c> keep the target's partitions, while plain tables take the source's.
-    /// The dry run must show both halves.
+    /// The preview must show both halves.
     /// </summary>
     [Fact]
     public void BuildPlan_DeployPartitionsOnly_KeepsTargetPolicyTable_OverwritesPlainTable()
@@ -105,8 +105,8 @@ public sealed class TomModelDeployPlanTests
     /// <summary>
     /// A #128 nuance: preservation is keyed by name, so a renamed table does not match its old
     /// target self — the planned model carries the new name with the source's partitions, and
-    /// the old table is gone. A rename genuinely changes partitions on the target, and the dry
-    /// run must say so.
+    /// the old table is gone. A rename genuinely changes partitions on the target, and the preview
+    /// must say so.
     /// </summary>
     [Fact]
     public void BuildPlan_RenamedTable_PlannedWithSourcePartitions_TargetNameGone()
@@ -124,7 +124,7 @@ public sealed class TomModelDeployPlanTests
 
     /// <summary>
     /// Preserved data sources are copied from the target verbatim, so the planned model's data
-    /// sources must be indistinguishable from the target's — otherwise every dry run against a
+    /// sources must be indistinguishable from the target's — otherwise every preview against a
     /// credentialed target would report noise the deploy never causes. Compared as property bags
     /// because this project must not reference Tomix.App's diff.
     /// </summary>
@@ -161,6 +161,27 @@ public sealed class TomModelDeployPlanTests
     }
 
     // -- Helpers ---------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Prod", "Model", "Prod")]   // -d wins
+    [InlineData(null, "Model", "Model")]    // otherwise the model's own name
+    [InlineData(null, "", "id-1")]          // a blank name is no name: fall back to the ID
+    public void ResolveTargetName_PrefersRequestThenNameThenId(string? requested, string name, string expected)
+    {
+        var source = new Database { Name = name, ID = "id-1" };
+
+        Assert.Equal(expected, TomModelDeployer.ResolveTargetName(source, Request() with { Database = requested }));
+    }
+
+    [Fact]
+    public void ResolveTargetName_WithoutAnyName_AsksForDatabase()
+    {
+        // A bare TMDL folder: deploying it as "" used to fail deep in the serializer.
+        var source = new Database { Name = "", ID = "" };
+
+        Assert.Throws<DeployTargetNameRequiredException>(
+            () => TomModelDeployer.ResolveTargetName(source, Request() with { Database = null }));
+    }
 
     private static ModelDeployRequest Request(ModelDeployOptions? options = null)
         => new("localhost:59962", "Prod", CreateOnly: false, Force: false, options);

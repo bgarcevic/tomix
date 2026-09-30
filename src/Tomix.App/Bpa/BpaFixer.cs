@@ -331,7 +331,7 @@ public sealed record BpaFixResult(
 public enum BpaFixAction { Set, Delete }
 
 /// <summary>
-/// One fix the fixer applied (or, under <c>--dry-run</c>, would apply): a property set with its
+/// One fix the fixer applied (or, in a preview, would apply): a property set with its
 /// before/after values, or a <c>Delete()</c>.
 /// </summary>
 public sealed record BpaFixChange(

@@ -14,8 +14,7 @@ public sealed record MutationOptions(
     string Serialization,
     bool Force,
     bool Overwrite = false,
-    bool NoSync = false,
-    bool DryRun = false);
+    bool NoSync = false);
 
 /// <summary>Where a handler should open/mutate and how it should persist, resolved up front by <see cref="MutationLifecycle"/>.</summary>
 public sealed record MutationContext(
@@ -27,7 +26,6 @@ public sealed record MutationContext(
     StagingHandle? Staging,
     ModelReference? SyncTarget = null,
     bool Overwrite = false,
-    bool DryRun = false,
     bool SyncSuppressed = false);
 
 /// <summary>A failed pre-flight: the code/message/exit-code the handler should return verbatim.</summary>
@@ -56,8 +54,6 @@ public static class MutationLifecycle
 
         if (options.Revert)
             mode = MutationMode.Revert;
-        else if (options.DryRun)
-            mode = MutationMode.None; // --dry-run suppresses --save/--stage/--save-to
         else if (options.Stage)
             mode = MutationMode.Stage;
         else if (MutationSave.Requested(options.Save, options.SaveTo))
@@ -96,7 +92,7 @@ public static class MutationLifecycle
         if (mode is MutationMode.None or MutationMode.Save)
             return new MutationBegin(
                 new MutationContext(mode, source, options.SaveTo, options.Serialization, options.Force, null, syncTarget, options.Overwrite,
-                    options.DryRun, SyncSuppressed: syncSuppressed && configuredSync is not null),
+                    SyncSuppressed: syncSuppressed && configuredSync is not null),
                 null);
 
         if (mode == MutationMode.Revert)
@@ -175,7 +171,7 @@ public static class MutationLifecycle
                 return MutationOutcome.Staged;
 
             default:
-                return context.DryRun ? MutationOutcome.DryRun : MutationOutcome.Preview;
+                return MutationOutcome.Preview;
         }
     }
 

@@ -33,7 +33,7 @@ public sealed class TmslDeployScriptBuilderTests
     }
 
     /// <summary>
-    /// The script and the dry-run plan derived from it must be byte-stable across OSes:
+    /// The script and the preview plan derived from it must be byte-stable across OSes:
     /// LF newlines everywhere, never <see cref="Environment.NewLine"/> (#256).
     /// </summary>
     [Fact]
@@ -340,7 +340,7 @@ public sealed class TmslDeployScriptBuilderTests
 
     /// <summary>
     /// The placeholder name is derived from the table, not generated: a random name would make
-    /// every script byte-different and make the dry-run plan report a changed partition on every
+    /// every script byte-different and make the deploy preview report a changed partition on every
     /// run even when nothing changed.
     /// </summary>
     [Fact]

@@ -28,9 +28,48 @@ and the API surface that major versions protect.
   connection in every session. `session prune` and `session list` have no replacement: each
   `tx connect <target>` now removes session files whose folder no longer exists (and legacy
   `pid-*` sessions of exited shells), and `tx doctor` reports any stale ones left.
+- **Breaking:** `tx deploy` and the partition-risky `tx refresh` variants (`--refresh-type
+  clearvalues`, `--skip-refresh-policy`, `--effective-date`, `--policy-only`) preview by
+  default. Each shows its preview (the deploy diff, or the refresh TMSL or policy-only
+  summary), then asks before applying. The preview and the apply share one connection, so
+  the model opens and the deploy BPA gate runs once.
+  Where it cannot prompt (`--non-interactive`, `--quiet`, JSON or CSV output, redirected input)
+  it stops after the preview and exits with the new exit code `3`, instead of failing with
+  `TOMIX_CONFIRMATION_REQUIRED`. Pass `--yes` to apply without the preview. Routine refreshes
+  still run without asking. `deploy --xmla` only writes a script, so it no longer asks.
+- **Breaking:** `tx bpa run --fix` without `--save`, `--save-to`, or `--stage` is a preview: it
+  lists each pending fix with before and after values, reports `fixesApplied: 0`, and judges the
+  exit code on the model as it is.
+- `tx rm`, `tx replace`, and `tx bpa run --fix --allow-delete` ask for confirmation only when
+  they write (`--save`, `--save-to`, `--stage`, or `--revert`). A preview no longer asks. A
+  preview of `rm` on an object that DAX still references reports the dependents and hints
+  `--force` instead of failing.
+- **Breaking:** JSON output says `preview` where it said `dryRun`: mutation results drop the
+  `dryRun` field and the `dryRun` status (`status` is `preview`), `bpa run` reports `preview`
+  instead of `dryRun`, and `deploy` reports `status: "preview"` instead of `"dry-run"`. The `refresh --policy-only` preview's
+  CSV column `dry_run` is now `preview`.
 - `tx get Measures` and other bare container paths now list the container instead of failing
   with `TOMIX_OBJECT_NOT_FOUND`, and `tx get ./model` lists the model's tables. `--query` or
   `--deps` on a path that selects a set fails with `TOMIX_SINGLE_OBJECT_REQUIRED` (#335).
+
+### Fixed
+
+- `tx deploy` without `-d` now previews the database it would actually write (named after the
+  model) instead of skipping the diff and showing the model path as the target. A model with no
+  name of its own, such as a bare TMDL folder, fails with `TOMIX_DEPLOY_NO_TARGET` asking for
+  `-d` instead of a serializer error.
+
+### Removed
+
+- **Breaking:** `--dry-run` is removed from every command (`add`, `set`, `mv`, `rm`, `replace`,
+  `format`, `bpa run`, `deploy`, `refresh`, `session prune`). Model edits already preview unless
+  you pass `--save` or `--stage`, and the commands that change a target now preview by default.
+  The `TOMIX_BPA_DRY_RUN_REQUIRES_FIX` code is gone with it.
+- **Breaking:** `tx init`, `tx config init`, `tx bpa rules init`, and `tx connect -w` take
+  `--overwrite` instead of `--force` to replace an existing target, matching `--overwrite` on the
+  save commands. `--force` now only ever bypasses a check. Recover a corrupt config with `tx config init --overwrite`.
+- **Breaking:** `tx deploy --force` is removed. It never had an effect: no deploy check read it.
+  Use `--skip-bpa` to bypass the BPA gate.
 
 ## [0.7.0] - 2026-09-29
 

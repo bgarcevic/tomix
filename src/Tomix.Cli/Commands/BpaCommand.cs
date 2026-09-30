@@ -87,11 +87,6 @@ internal sealed class BpaCommand : ICommandModule
             Description = "With --fix: also apply destructive Delete() fixes that remove model objects"
         };
 
-        var dryRunOption = new Option<bool>("--dry-run")
-        {
-            Description = "With --fix: list each fix as \"Would fix:\" with before/after values, and apply, save, or stage nothing"
-        };
-
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
 
@@ -173,7 +168,6 @@ internal sealed class BpaCommand : ICommandModule
             failOnOption,
             fixOption,
             allowDeleteOption,
-            dryRunOption,
             forceOption,
             overwriteOption,
             saveOption,
@@ -214,17 +208,17 @@ internal sealed class BpaCommand : ICommandModule
                 return recentExit;
 
             // --allow-delete opts into Delete() fixes that remove model objects, and --revert
-            // drops staged work; both confirm before running. Plain --fix applies property
-            // fixes only and asks nothing unless it persists (--save/--stage paths gate there).
-            // --dry-run discards every fix, so a destructive preview needs no confirmation.
-            var dryRun = parseResult.GetValue(dryRunOption);
+            // drops staged work; both confirm before running. Without --save/--save-to/--stage
+            // --fix is a preview that discards every fix, so it needs no confirmation.
+            var persists = LifecycleOptions.Persists(
+                    parseResult.GetValue(saveOption), parseResult.GetValue(saveToOption), parseResult.GetValue(stageOption));
             if (parseResult.GetValue(revertOption))
             {
                 if (!ConfirmationHelper.ConfirmOrAbort(
                         "Revert staged changes", $"for {model.Value}", parseResult, format))
                     return 1;
             }
-            else if (parseResult.GetValue(fixOption) && parseResult.GetValue(allowDeleteOption) && !dryRun
+            else if (parseResult.GetValue(fixOption) && parseResult.GetValue(allowDeleteOption) && persists
                 && !ConfirmationHelper.ConfirmOrAbort(
                     "Apply destructive BPA fixes", $"on {model.Value}", parseResult, format))
                 return 1;
@@ -252,8 +246,7 @@ internal sealed class BpaCommand : ICommandModule
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         NoSync: parseResult.GetValue(noSyncOption),
-                        Overwrite: parseResult.GetValue(overwriteOption),
-                        DryRun: dryRun),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 
@@ -748,13 +741,13 @@ internal sealed class BpaCommand : ICommandModule
 
     private Command BuildRulesInitCommand(Option<string?> rulesFileOption)
     {
-        var forceOption = new Option<bool>("--force") { Description = "Replace an existing rules file with an empty one" };
-        var command = new Command("init", "Create an empty rules file") { forceOption };
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Overwrite an existing rules file with an empty one" };
+        var command = new Command("init", "Create an empty rules file") { overwriteOption };
 
         command.SetAction(parseResult => RenderRulesFile(parseResult, "bpa rules init", () =>
             new BpaRulesInitHandler(_configDirectory).Handle(new BpaRulesInitRequest(
                 parseResult.GetValue(rulesFileOption),
-                parseResult.GetValue(forceOption)))));
+                parseResult.GetValue(overwriteOption)))));
 
         return command;
     }

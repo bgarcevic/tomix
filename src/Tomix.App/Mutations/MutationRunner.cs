@@ -77,7 +77,7 @@ public static class MutationRunner
             var (changed, summary, buildResult) = await mutate(mutator, session, context);
 
             if (!changed)
-                return TomixResult<TResult>.Ok(buildResult(MutationOutcome.Unchanged with { Target = target, DryRunRequested = context.DryRun }));
+                return TomixResult<TResult>.Ok(buildResult(MutationOutcome.Unchanged with { Target = target }));
 
             var completed = await MutationLifecycle.CompleteAsync(
                 mutator, session, context, validationBaseline, command, summary, cancellationToken);

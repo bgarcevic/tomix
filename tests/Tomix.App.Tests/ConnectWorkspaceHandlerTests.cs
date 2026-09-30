@@ -70,7 +70,7 @@ public class ConnectWorkspaceHandlerTests
         var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(workspace, WorkspaceFormat: null, Force: false, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(workspace, WorkspaceFormat: null, Overwrite: false, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.True(init.Initialized);
@@ -90,7 +90,7 @@ public class ConnectWorkspaceHandlerTests
         var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(workspace, WorkspaceFormat: "bim", Force: false, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(workspace, WorkspaceFormat: "bim", Overwrite: false, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.True(init.Initialized);
@@ -99,14 +99,14 @@ public class ConnectWorkspaceHandlerTests
     }
 
     [Fact]
-    public async Task Initialize_ExistingTargetWithoutForce_Skips()
+    public async Task Initialize_ExistingTargetWithoutOverwrite_Skips()
     {
         using var workspace = new TempDir();
         var session = new RecordingExportSession();
         var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(workspace.Path, WorkspaceFormat: null, Force: false, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(workspace.Path, WorkspaceFormat: null, Overwrite: false, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.False(init.Initialized);
@@ -115,7 +115,7 @@ public class ConnectWorkspaceHandlerTests
     }
 
     [Fact]
-    public async Task Initialize_ExistingTargetWithForce_DeletesThenExports()
+    public async Task Initialize_ExistingTargetWithOverwrite_DeletesThenExports()
     {
         using var workspace = new TempDir();
         workspace.WriteFile("stale.txt", "old");
@@ -123,7 +123,7 @@ public class ConnectWorkspaceHandlerTests
         var handler = new ConnectWorkspaceHandler([new StubExportProvider("./model.bim", session)]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(workspace.Path, WorkspaceFormat: null, Force: true, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(workspace.Path, WorkspaceFormat: null, Overwrite: true, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.True(init.Initialized);
@@ -137,7 +137,7 @@ public class ConnectWorkspaceHandlerTests
         var handler = new ConnectWorkspaceHandler([]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(FreshPath(), WorkspaceFormat: null, Force: false, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(FreshPath(), WorkspaceFormat: null, Overwrite: false, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.False(init.Initialized);
@@ -149,7 +149,7 @@ public class ConnectWorkspaceHandlerTests
         var handler = new ConnectWorkspaceHandler([new StubRemoteProvider(summaryDatabaseName: null, expectedPath: "./model.bim")]);
 
         var init = await handler.InitializeAsync(
-            new ConnectWorkspaceInitRequest(FreshPath(), WorkspaceFormat: null, Force: false, Primary: new ModelReference("./model.bim")),
+            new ConnectWorkspaceInitRequest(FreshPath(), WorkspaceFormat: null, Overwrite: false, Primary: new ModelReference("./model.bim")),
             CancellationToken.None);
 
         Assert.False(init.Initialized);

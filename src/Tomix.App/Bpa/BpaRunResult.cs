@@ -39,20 +39,20 @@ public sealed record BpaRunResult(
     public IReadOnlyList<BpaViolation> BlockingCandidates => RemainingViolations ?? Violations;
 
     /// <summary>
-    /// Each fix <c>--fix</c> applied, or under <c>--dry-run</c> would apply, with before/after
+    /// Each fix <c>--fix</c> applied, or in a preview would apply, with before/after
     /// values for property sets. Empty when no fix ran.
     /// </summary>
     public IReadOnlyList<BpaFixChange> FixChanges { get; init; } = [];
 
     /// <summary>
-    /// <c>--fix --dry-run</c>: the fixes were evaluated on an in-memory copy and discarded.
+    /// <c>--fix</c> without <c>--save</c>/<c>--stage</c>: the fixes were evaluated on an in-memory copy and discarded.
     /// <see cref="FixChanges"/> lists them, <see cref="FixesApplied"/> stays 0, and
     /// <see cref="ProjectedViolations"/> holds what the fixes would leave. The exit code judges
     /// the model as it is, because nothing changed.
     /// </summary>
-    public bool DryRun { get; init; }
+    public bool Preview { get; init; }
 
-    /// <summary>Visible violations the pending fixes would leave; set only under <see cref="DryRun"/>.</summary>
+    /// <summary>Visible violations the pending fixes would leave; set only under <see cref="Preview"/>.</summary>
     public IReadOnlyList<BpaViolation>? ProjectedViolations { get; init; }
 
     /// <summary>

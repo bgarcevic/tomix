@@ -35,13 +35,13 @@ internal sealed class FindCommand : ICommandModule
         var inOption = new Option<string?>("--in")
         {
             Description = "Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all " +
-                          "(default: all; annotations are only searched when requested explicitly)"
+                          "(default: all, which skips annotations; name them explicitly to include them)"
         };
         inOption.AcceptAmongIgnoreCase(
             "all", "names", "expressions", "descriptions", "formatStrings", "displayFolders", "annotations");
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Only search objects of this kind: {ModelObjectTypeCatalog.DiscoveryListText}"
+            Description = $"Only search objects of this kind, {TypeValidation.KindsHint}"
         };
         typeOption.Aliases.Add("-t");
         var regexOption = new Option<bool>("--regex")

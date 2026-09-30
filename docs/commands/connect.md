@@ -27,7 +27,7 @@ local model path.
 | `-w, --workspace [target]` | Enable workspace mode: mirror saves between the primary source and a secondary target. No value = pick interactively. |
 | `--workspace-format <fmt>` | How a local workspace is stored on disk (`tmdl` or `bim`); detected from the path when omitted. |
 | `--workspace-auth <auth>` | How to authenticate the remote side of workspace mode. |
-| `--force` | Allow workspace mode to initialize over a folder that already has content. |
+| `--overwrite` | With `-w`, delete the workspace folder's contents before exporting the model into it, and overwrite an existing workspace database without asking. |
 
 ```sh
 tx connect                          # show current
@@ -78,9 +78,17 @@ Without `-s/--server`, the target comes from the active connection: a remote con
 deploys to itself, and a local connection with a workspace-mode mirror deploys to the
 mirror.
 
+`deploy` previews first. It shows what the deploy would change on the target (`+` = added
+to the target, `-` = removed from it), then asks before deploying. The preview compares the
+target against the exact model this deploy would leave behind, so anything
+[granular deployment](#granular-deployment) preserves is not reported as a change, and a
+target that does not exist yet is reported as "will be created". Where it cannot prompt
+(`--non-interactive`, `--quiet`, JSON output, or redirected input), it stops after the
+preview and exits `3`. Pass `--yes` to deploy without the preview. `--xmla` only writes a
+script, so it neither previews nor asks.
+
 | Option | Description |
 |--------|-------------|
-| `--dry-run` | Preview what the deploy would change on the target (`+` = added to the target, `-` = removed from it). Compares the target against the exact model this deploy would leave behind, so anything [granular deployment](#granular-deployment) preserves is not reported as a change. A target that does not exist yet is reported as "will be created". |
 | `--xmla <file>` | Write the deployment as a TMSL script to a file instead of deploying (`-` for stdout). |
 | `--create-only` | Create the target model only if it does not exist; fail when it does. |
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or apply rule fixes before deploying. |
@@ -88,15 +96,14 @@ mirror.
 | `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. Rules that cannot be evaluated count as error-severity findings. |
 | `-p, --profile <name>` | Use a saved remote profile for this deploy only. List profiles with `tx profile list`; create one with `tx profile set <name> -s <workspace> -d <database>`. |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
-| `--force` | Bypass validation checks. |
 
-The dry-run diff ignores engine-derived calculated-table column data types, including
+The preview diff ignores engine-derived calculated-table column data types, including
 type differences when a column exists on both the processed target and the planned
 model. Other column property changes remain visible.
 
 ```sh
-tx deploy ./model.tmdl --dry-run
-tx deploy ./model.tmdl --profile prod --dry-run
+tx deploy ./model.tmdl                          # preview, then confirm
+tx deploy ./model.tmdl --profile prod --yes     # deploy without the preview (CI)
 tx deploy --server MyWorkspace --database Sales
 tx deploy ./model.bim --xmla deploy.xmla
 tx deploy ./model.tmdl --bpa-fail-on warning
@@ -139,7 +146,7 @@ tx deploy ./model.tmdl --deploy-partitions               # push partitions, keep
 tx deploy ./model.tmdl --deploy-full                     # overwrite everything (first-deploy semantics)
 ```
 
-!!! note "`--dry-run` reflects preservation"
+!!! note "The preview reflects preservation"
 
     The preview reads the target once and compares it against the model this deploy would
     actually leave behind, merged with the same rules a real deploy uses. Aspects the flags
@@ -148,7 +155,7 @@ tx deploy ./model.tmdl --deploy-full                     # overwrite everything 
     what the preview reports.
 
     With default flags or `--deploy-roles` alone, a members-only source edit can show "No changes"
-    in `--dry-run` because an existing target's role members are preserved. A real deploy also
+    in the preview because an existing target's role members are preserved. A real deploy also
     leaves those members unchanged; use `--deploy-roles --deploy-role-members` (or `--deploy-full`)
     to preview and deploy member changes.
 
@@ -159,7 +166,7 @@ tx deploy ./model.tmdl --deploy-full                     # overwrite everything 
     the exact TMSL that would be sent:
 
     ```sh
-    tx deploy ./model.tmdl --xmla preview.xmla --yes
+    tx deploy ./model.tmdl --xmla preview.xmla
     ```
 
 ## `refresh` — trigger a data refresh
@@ -177,7 +184,6 @@ tx refresh [options]
 | `--policy-only` | Apply one table's deployed policy without loading data. Requires exactly one `--table`; may remove expired partitions. |
 | `--effective-date <yyyy-MM-dd>` | Evaluate refresh policies as if today were this date. |
 | `--max-parallelism <n>` | Maximum parallel refresh operations. |
-| `--dry-run` | Preview without execution: TMSL for normal refresh, a validated operation summary for `--policy-only`. |
 | `--no-progress` | Turn off live progress tracking (useful in CI and when piping). |
 | `--trace [path]` | Write raw XMLA trace events (stderr, or a log file). |
 
@@ -198,17 +204,20 @@ detail is in `tables[].processMs`, `tables[].partitions`, and `phases`; the CSV 
 unchanged. Power BI / Fabric delivers the trace a few seconds behind the refresh, so the summary
 can appear a little after the refresh itself finishes; the reported duration is the refresh's own.
 
-Routine refreshes run without prompting. The partition-risky variants —
+Routine refreshes run straight away. The partition-risky variants preview first:
 `--refresh-type clearvalues` (wipes partition data), `--skip-refresh-policy` /
 `--apply-refresh-policy false` (refreshes all historical partitions), `--policy-only`, and
-`--effective-date` (shifts policy window boundaries) — ask for confirmation
-first; `--dry-run` never does. Pass `--yes` to skip the prompt in scripts.
+`--effective-date` (shifts policy window boundaries). They print the TMSL the refresh would
+send (a validated operation summary for `--policy-only`), then ask before refreshing, on the
+same connection. Where they cannot prompt (`--non-interactive`, `--quiet`, JSON output, or
+redirected input), they stop after the preview and exit `3`. Pass `--yes` to run them
+without the preview.
 
 Apply a saved policy with data loading, or bootstrap empty partitions:
 
 ```sh
 tx refresh --table Sales --apply-refresh-policy true -s MyWorkspace -d MyModel
-tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel --dry-run
+tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel          # preview, then confirm
 tx refresh --table Sales --policy-only -s MyWorkspace -d MyModel --yes
 ```
 

@@ -6,8 +6,9 @@ with `--save`, batch with `--stage`, or write elsewhere with
 `--save-to <path>` (which implies `--save`). `--serialization tmdl|bim`
 controls the on-disk format, `--force` (alias `-f`) saves despite newly
 introduced validation errors, `--overwrite` lets `--save-to` replace an existing target, and
-`--no-sync` skips the workspace mirror. `--dry-run` previews: the change is
-applied to the in-memory model and rendered, but nothing is written.
+`--no-sync` skips the workspace mirror. Without `--save`, `--save-to`, or
+`--stage`, the change is applied to the in-memory model and rendered, but
+nothing is written.
 
 Before `--save` or `--save-to` writes anything, tx runs the same validation as
 `tx validate`. Only errors introduced by this command block the save; existing
@@ -16,7 +17,7 @@ errors and warnings do not. A blocked save exits 1 and lists the new errors.
 bypasses its dependent-reference guard. Set `validateOnSave` to `false` with
 `tx config set validateOnSave false` to disable this gate; it is on by default.
 Staged edits are checked when you run `tx stage commit`. The `--force` flags on
-`init`, `connect`, `deploy`, and `config init` retain their command-specific uses.
+`init`, `connect`, and `config init` retain their command-specific uses.
 
 A TMDL save rewrites only the files whose content changed, so a small edit gives
 a small git diff. Untouched files keep their bytes, line endings (CRLF checkouts
@@ -43,8 +44,7 @@ persistence fields under `data`:
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `status` | string | `saved`, `staged`, `preview` (applied in memory only), `dryRun`, `unchanged` (nothing to change), or `reverted` |
-| `dryRun` | bool | `--dry-run` was passed |
+| `status` | string | `saved`, `staged`, `preview` (applied in memory only), `unchanged` (nothing to change), or `reverted` |
 | `saved` | bool | The change was persisted. Always a bool |
 | `savedTo` | string | Where it was saved: a folder or file path, or `server / database`. Present only when saved |
 | `persistence` | string | `file`, `liveModel` (Power BI Desktop, in memory until the report is saved), or `service`. Present only when saved |
@@ -53,15 +53,14 @@ persistence fields under `data`:
 | `newValidationErrors` | int | Errors the change introduced, when the save gate measured them |
 
 The object path uses a past-tense key (`added`, `moved`, `removed`, `set`) only when the
-change was saved or staged. Previews and dry runs use `wouldAdd`, `wouldMove`,
+change was saved or staged. Previews use `wouldAdd`, `wouldMove`,
 `wouldRemove`, or `wouldSet`, so a script never reads a preview as done:
 
 ```json
 {
   "data": {
     "wouldRemove": "Sales/Total Sales",
-    "status": "dryRun",
-    "dryRun": true,
+    "status": "preview",
     "saved": false,
     "sync": { "status": "notAttempted" }
   },
@@ -76,7 +75,6 @@ A save to Power BI Desktop:
   "data": {
     "added": "Sales/Margin",
     "status": "saved",
-    "dryRun": false,
     "saved": true,
     "savedTo": "localhost:51234 / 0f1e2d3c-...",
     "persistence": "liveModel",
@@ -330,16 +328,18 @@ tx rm <path> [model] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--dry-run` | Preview: show the change without saving, staging, or syncing. |
 | `--force` | Remove even if the object has DAX dependents (reports the now-broken references). |
 | `--if-exists` | Exit 0 when the object is already gone. |
 | `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
 
-`--dry-run` previews instead of executing: it prints
+Without `--save` or `--stage`, `rm` previews: it prints
 `Would remove: <path>` and exits 0 without touching the model. When the
 guard would block the removal, the preview lists the dependents
-(`Would break N DAX reference(s) in: ...`) and hints `--force`, so a dry
-run is how you discover that `--force` is needed.
+(`Would break N DAX reference(s) in: ...`) and prints the command that removes
+it anyway (your command line plus `--force --save`), so the preview is how you
+discover that `--force` is needed. `rm --save`,
+`--save-to`, `--stage`, and `--revert` ask for confirmation; pass `--yes`
+to skip the prompt in scripts.
 
 Removal is blocked while DAX still references the object; structural
 references (relationships, sort-by, hierarchy levels, perspectives, role
@@ -355,7 +355,7 @@ address it explicitly: `tx rm "Sales/Total/KPI"` or
 takes its KPI with it).
 
 ```sh
-tx rm "Sales/Obsolete" --dry-run
+tx rm "Sales/Obsolete"            # preview
 tx rm tables/Staging --save
 tx rm "Sales[CustomerID] -> Customers[CustomerID]" --save
 ```
@@ -372,7 +372,11 @@ tx replace [pattern] [replacement] [model] [options]
 | `-t, --type <type>` | Only replace in objects of this kind (same vocabulary as `ls --type`). |
 | `--regex` | Treat the pattern as a regular expression. |
 | `--case-sensitive` | Case-sensitive matching. |
-| `--dry-run` | Preview changes without applying. |
+
+Without `--save` or `--stage`, `replace` previews each change as
+`<object>.<property>: <before> -> <after>` and writes nothing. The persisting
+forms (`--save`, `--save-to`, `--stage`, `--revert`) ask for confirmation;
+pass `--yes` to skip the prompt in scripts.
 
 `--in expressions` walks every expression-bearing property: measure DAX,
 detail-rows and format-string definitions, KPI target/status/trend, calculated
@@ -387,9 +391,9 @@ includes them in `all`). Whatever `tx find` reports for a scope, `tx replace`
 rewrites in that scope; a test enforces the pairing.
 
 ```sh
-tx replace "[OrderDate]" "[ShipDate]" --dry-run
+tx replace "[OrderDate]" "[ShipDate]"            # preview
 tx replace "old_name" "new_name" --in names --save
-tx replace "Sales" "Revenue" -t measure --dry-run
+tx replace "Sales" "Revenue" -t measure          # preview
 ```
 
 ## `format` — format DAX and M
@@ -506,7 +510,7 @@ cat source.m | tx set 'Sales/RefreshPolicy' --model ./model.tmdl \
 In PowerShell, use `Get-Content -Raw source.m` to feed the pipeline.
 Policy inspection includes validation findings and generated partition names.
 `--force` permits saving a policy with validation errors but cannot bypass TOM
-compatibility requirements. Save, save-to, stage, revert, dry-run, and no-sync
+compatibility requirements. Save, save-to, stage, revert, and no-sync
 follow the standard mutation lifecycle. Removing a policy leaves its generated
 partitions in place and reports them; `--if-exists` permits a missing policy.
 

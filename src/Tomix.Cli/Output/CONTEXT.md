@@ -41,7 +41,7 @@ Shared output wiring for all commands.
 - `ValidateRenderer` — CI annotation emission for `validate` (error-level only; issues carry no severity).
 - `BpaRulesRenderer` — Spectre rendering and JSON projections for the `bpa rules` subcommands.
 - `ConnectRenderer` — connected-model summary (text + JSON projection), show-current and raw-connection views for the `connect` command.
-- `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), `--dry-run` TMSL pretty-print, per-partition rows and the phase table, and the live `AnsiConsole.Live()` progress panel fed by XMLA trace events (trace thread updates state under a lock; a render loop on the Live context redraws it).
+- `RefreshRenderer` / `RefreshLiveDisplay` — `refresh` command rendering: per-table statistics (text + CSV), preview TMSL pretty-print, per-partition rows and the phase table, and the live `AnsiConsole.Live()` progress panel fed by XMLA trace events (trace thread updates state under a lock; a render loop on the Live context redraws it).
 - `UpdateRenderer` — `update` command rendering: `--check` release-notes preview with `[breaking]` badges, and the performed-update summary line.
 - `Styling` — color palette, markup helpers, and shared utilities. The single source of truth for all color/style decisions; `ExpressionMarkup`/`DaxMarkup`/`MMarkup` are the shared DAX and M highlighting path.
 

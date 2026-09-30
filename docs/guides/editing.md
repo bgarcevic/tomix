@@ -58,7 +58,7 @@ columns, hierarchy levels, perspective entries, role permissions — never
 block; they are cascade-removed with the object.
 
 ```sh
-tx rm "Sales/Amount" --dry-run     # see what would happen
+tx rm "Sales/Amount"               # preview: see what would happen
 tx rm "Sales/Amount" --force
 ```
 
@@ -71,10 +71,10 @@ for the whole lifecycle are listed in the
 
 ## Bulk edits
 
-`replace` applies a find-and-replace across the model (`--dry-run` to
-preview), and `format` reformats DAX and M expressions:
+`replace` applies a find-and-replace across the model (previewed until you
+pass `--save`), and `format` reformats DAX and M expressions:
 
 ```sh
-tx replace "[OrderDate]" "[ShipDate]" --dry-run
+tx replace "[OrderDate]" "[ShipDate]"     # preview
 tx format --save
 ```

@@ -26,6 +26,7 @@ public sealed class RefreshModelHandler
         _resolveSession = resolveSession;
     }
 
+    /// <summary>Previews (<see cref="RefreshModelRequest.Preview"/>) or runs one refresh.</summary>
     /// <param name="progress">Optional progress channel (CLI-owned; null when --no-progress or non-TTY).</param>
     /// <param name="traceWriter">Optional trace sink for --trace (null=off, stderr/file owned by the CLI).</param>
     public async Task<TomixResult<RefreshModelResult>> HandleAsync(
@@ -34,135 +35,123 @@ public sealed class RefreshModelHandler
         TextWriter? traceWriter,
         CancellationToken cancellationToken)
     {
+        await using var operation = await OpenAsync(request, cancellationToken).ConfigureAwait(false);
+        return request.Preview
+            ? await operation.PreviewAsync(cancellationToken).ConfigureAwait(false)
+            : await operation.ApplyAsync(progress, traceWriter, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Validates the request, resolves the remote target, and opens one session on it. The
+    /// returned operation previews and applies on that session, so a preview-then-confirm flow
+    /// connects once. A failure here is carried by the operation and returned by whichever of its
+    /// methods is called.
+    /// </summary>
+    public async Task<RefreshOperation> OpenAsync(RefreshModelRequest request, CancellationToken cancellationToken)
+    {
         if (ValidatePolicyOnly(request) is { } policyError)
-            return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_OPTIONS_CONFLICT", policyError, exitCode: 2);
+            return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_OPTIONS_CONFLICT", policyError, exitCode: 2));
 
         var typeValidation = ValidateRefreshType(request.RefreshType);
         if (typeValidation is not null)
-            return typeValidation;
+            return RefreshOperation.Failed(typeValidation);
 
         if (request.Partitions is { Count: > 0 } && request.Tables is { Count: > 0 })
-            return TomixResult<RefreshModelResult>.Fail(
+            return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_REFRESH_TABLE_PARTITION_CONFLICT",
                 "Pass either --table or --partition, not both. --partition implies its own table scope (Table.Partition).",
-                exitCode: 2);
+                exitCode: 2));
 
         if (request.Partitions is { Count: > 0 } && request.Partitions.Any(p => string.IsNullOrWhiteSpace(p.Partition) || string.IsNullOrWhiteSpace(p.Table)))
-            return TomixResult<RefreshModelResult>.Fail(
+            return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_REFRESH_BAD_PARTITION",
                 "--partition values must be formatted as TableName.PartitionName.",
                 exitCode: 2,
-                hint: "Example: --partition Sales.Internet");
+                hint: "Example: --partition Sales.Internet"));
 
         var target = ResolveTarget(request);
         if (target is null)
-            return TomixResult<RefreshModelResult>.Fail(
+            return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_REFRESH_NO_REMOTE_TARGET",
                 "No remote connection to refresh. The default connection is local and no remote workspace-mode secondary is set.",
                 exitCode: 2,
-                hint: "Use 'tx connect -s <workspace> -d <model>' or pass -s/-d explicitly, or set up workspace mode with 'tx connect --workspace <endpoint>'.");
+                hint: "Use 'tx connect -s <workspace> -d <model>' or pass -s/-d explicitly, or set up workspace mode with 'tx connect --workspace <endpoint>'."));
 
         if (!target.IsRemote)
-            return TomixResult<RefreshModelResult>.Fail(
+            return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_REFRESH_NO_REMOTE_TARGET",
                 $"Resolved target '{target.Value}' is not a remote endpoint. Only deployed models can be refreshed.",
                 exitCode: 2,
-                hint: "Use -s <workspace> -d <model> to target a deployed model.");
+                hint: "Use -s <workspace> -d <model> to target a deployed model."));
 
         var provider = _providers.ResolveSingleProvider(target);
         if (provider is null)
-            return TomixResult<RefreshModelResult>.Fail(
+            return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_NO_PROVIDER",
                 $"No provider can open remote endpoint: {target.Value}",
-                exitCode: 2);
+                exitCode: 2));
 
-        if (request.PolicyOnly)
-            return await ApplyPolicyOnlyAsync(provider, target, request, cancellationToken).ConfigureAwait(false);
-
-        var sessionRequest = new ModelRefreshRequest(
-            Database: target.Database,
-            RefreshType: request.RefreshType,
-            Tables: request.Tables,
-            Partitions: request.Partitions,
-            ApplyRefreshPolicy: request.ApplyRefreshPolicy,
-            EffectiveDate: request.EffectiveDate,
-            MaxParallelism: request.MaxParallelism);
-
-        // --dry-run: emit TMSL without executing. We still need to open the session so the
-        // provider can resolve the live model for partition validation, but never call RefreshAsync.
-        if (request.DryRun)
-        {
-            try
-            {
-                await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
-                if (session is not IModelRefreshSession refresher)
-                    return TomixResult<RefreshModelResult>.Fail(
-                        "TOMIX_REFRESH_UNSUPPORTED",
-                        $"Provider cannot generate refresh script for: {target.Value}",
-                        exitCode: 2);
-
-                var script = refresher.GenerateRefreshScript(sessionRequest);
-                return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(
-                    target.Value, target.Database, NormalizeType(request.RefreshType), 0, Array.Empty<RefreshTableResult>(), null, script));
-            }
-            catch (ModelConnectionException ex)
-            {
-                return ProviderConnectionGuard.ConnectionFailure<RefreshModelResult>(target, ex);
-            }
-            catch (AuthenticationRequiredException ex)
-            {
-                return AuthFail(ex);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_FAILED", ex.Message, exitCode: 1);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_FAILED", ex.Message, exitCode: 1);
-            }
-        }
-
+        IModelSession session;
         try
         {
-            await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
-            if (session is not IModelRefreshSession refresher)
-                return TomixResult<RefreshModelResult>.Fail(
+            session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return RefreshOperation.Failed(MapFailure(ex, target, request.PolicyOnly));
+        }
+
+        if (request.PolicyOnly
+            ? session is not (IRefreshPolicyApplySession and IRefreshPolicyMutationSession)
+            : session is not IModelRefreshSession)
+        {
+            await session.DisposeAsync().ConfigureAwait(false);
+            return RefreshOperation.Failed(request.PolicyOnly
+                ? TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_UNSUPPORTED",
+                    "Provider does not support inspecting and applying refresh policies on deployed models.", exitCode: 2)
+                : TomixResult<RefreshModelResult>.Fail(
                     "TOMIX_REFRESH_UNSUPPORTED",
                     $"Provider session does not support refresh: {target.Value}",
                     exitCode: 2,
-                    hint: "Refresh is only supported on deployed models connected via XMLA (-s <workspace> -d <model>).");
+                    hint: "Refresh is only supported on deployed models connected via XMLA (-s <workspace> -d <model>)."));
+        }
 
-            var result = await refresher.RefreshAsync(sessionRequest, progress, traceWriter, cancellationToken).ConfigureAwait(false);
+        return new RefreshOperation(session, target, request);
+    }
 
-            return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(
-                result.Server, result.Database, result.RefreshType, result.DurationMs, result.Tables, result.Totals, Script: null,
-                Phases: result.Phases));
-        }
-        catch (ModelConnectionException ex)
+    /// <summary>Maps a failure while connecting, previewing, or refreshing to its diagnostic.</summary>
+    internal static TomixResult<RefreshModelResult> MapFailure(Exception ex, ModelReference target, bool policyOnly)
+    {
+        switch (ex)
         {
-            return ProviderConnectionGuard.ConnectionFailure<RefreshModelResult>(target, ex);
+            case ModelConnectionException connection:
+                return ProviderConnectionGuard.ConnectionFailure<RefreshModelResult>(target, connection);
+            case AuthenticationRequiredException auth:
+                return AuthFail(auth);
         }
-        catch (AuthenticationRequiredException ex)
-        {
-            return AuthFail(ex);
-        }
-        catch (InvalidOperationException ex)
-        {
+
+        if (policyOnly)
+            return ex switch
+            {
+                ObjectNotFoundException notFound =>
+                    TomixResult<RefreshModelResult>.Fail("TOMIX_OBJECT_NOT_FOUND", notFound.Message, hint: notFound.Hint),
+                RefreshPolicyNotFoundException =>
+                    TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_NOT_FOUND", ex.Message),
+                _ => TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_APPLY_FAILED",
+                    $"Applying the refresh policy failed: {ex.InnerException?.Message ?? ex.Message}", exitCode: 1),
+            };
+
+        if (ex is InvalidOperationException)
             return TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_REFRESH_FAILED",
                 ex.Message,
                 exitCode: 1,
                 hint: "Verify the table/partition names and that you have refresh permissions on the dataset.");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            var msg = ex.InnerException?.Message ?? ex.Message;
-            return TomixResult<RefreshModelResult>.Fail(
-                "TOMIX_REFRESH_FAILED",
-                $"Refresh of '{target.Database ?? target.Value}' failed: {msg}",
-                exitCode: 1);
-        }
+
+        return TomixResult<RefreshModelResult>.Fail(
+            "TOMIX_REFRESH_FAILED",
+            $"Refresh of '{target.Database ?? target.Value}' failed: {ex.InnerException?.Message ?? ex.Message}",
+            exitCode: 1);
     }
 
     /// <summary>Validates policy-only flags before confirmation or any connection/trace side effects.</summary>
@@ -181,52 +170,6 @@ public sealed class RefreshModelHandler
         return null;
     }
 
-    private static async Task<TomixResult<RefreshModelResult>> ApplyPolicyOnlyAsync(
-        IModelProvider provider, ModelReference target, RefreshModelRequest request, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
-            if (session is not IRefreshPolicyApplySession applier || session is not IRefreshPolicyMutationSession policies)
-                return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_UNSUPPORTED",
-                    "Provider does not support inspecting and applying refresh policies on deployed models.", exitCode: 2);
-            var table = request.Tables![0];
-            var policy = policies.GetRefreshPolicy(table)
-                ?? throw new RefreshPolicyNotFoundException($"Table '{table}' has no refresh policy. Save a policy on the deployed model first.");
-            var effectiveDate = request.EffectiveDate ?? DateOnly.FromDateTime(DateTime.Today);
-            if (request.DryRun)
-                return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(target.Value, target.Database,
-                    "policyOnly", 0, [], null, null,
-                    PolicyPreview: new PolicyOnlyPreview(policy.Table, effectiveDate, request.MaxParallelism)));
-
-            var result = await applier.ApplyRefreshPolicyAsync(new RefreshPolicyApplyRequest(
-                policy.Table, effectiveDate, Refresh: false, request.MaxParallelism), cancellationToken).ConfigureAwait(false);
-            return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(result.Server, result.Database,
-                "policyOnly", result.DurationMs, [], null, null, PolicyApplication: result));
-        }
-        catch (ModelConnectionException ex)
-        {
-            return ProviderConnectionGuard.ConnectionFailure<RefreshModelResult>(target, ex);
-        }
-        catch (AuthenticationRequiredException ex)
-        {
-            return AuthFail(ex);
-        }
-        catch (ObjectNotFoundException ex)
-        {
-            return TomixResult<RefreshModelResult>.Fail("TOMIX_OBJECT_NOT_FOUND", ex.Message, hint: ex.Hint);
-        }
-        catch (RefreshPolicyNotFoundException ex)
-        {
-            return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_NOT_FOUND", ex.Message);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return TomixResult<RefreshModelResult>.Fail("TOMIX_REFRESH_POLICY_APPLY_FAILED",
-                $"Applying the refresh policy failed: {ex.InnerException?.Message ?? ex.Message}", exitCode: 1);
-        }
-    }
-
     private static TomixResult<RefreshModelResult>? ValidateRefreshType(string? refreshType)
     {
         var value = string.IsNullOrWhiteSpace(refreshType) ? "automatic" : refreshType;
@@ -238,7 +181,7 @@ public sealed class RefreshModelHandler
             exitCode: 2);
     }
 
-    private static string NormalizeType(string refreshType)
+    internal static string NormalizeType(string refreshType)
     {
         var value = string.IsNullOrWhiteSpace(refreshType) ? "automatic" : refreshType;
         return value.ToLowerInvariant() switch

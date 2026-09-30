@@ -9,7 +9,7 @@ namespace Tomix.Cli.Output;
 
 /// <summary>
 /// Rendering for the <c>refresh</c> command: header + per-table statistics table with partition
-/// sub-rows and a model-phase table (text), CSV rows, and the <c>--dry-run</c> TMSL script
+/// sub-rows and a model-phase table (text), CSV rows, and the preview TMSL script
 /// pretty-print.
 /// </summary>
 internal static class RefreshRenderer
@@ -20,7 +20,7 @@ internal static class RefreshRenderer
         {
             AnsiConsole.MarkupLine(Styling.Guidance(
                 $"Would apply refresh policy: {preview.Table} on {result.Database} (effective {preview.EffectiveDate:yyyy-MM-dd}). No data loading. Expired partitions may be removed."));
-            StdErr.MarkupLine(Styling.Guidance("Dry run: no policy was applied. Partition changes are determined on execution."));
+            StdErr.MarkupLine(Styling.Guidance("Preview: no policy was applied. Partition changes are determined on execution."));
             return;
         }
         if (result.PolicyApplication is { } policy)
@@ -159,7 +159,7 @@ internal static class RefreshRenderer
         }
         if (result.PolicyPreview is { } preview)
         {
-            Console.WriteLine("table,effective_date,loads_data,dry_run");
+            Console.WriteLine("table,effective_date,loads_data,preview");
             Console.WriteLine($"{Csv(preview.Table)},{preview.EffectiveDate:yyyy-MM-dd},false,true");
             return;
         }

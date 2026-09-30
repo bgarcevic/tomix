@@ -62,7 +62,6 @@ internal sealed class FormatCommand : ICommandModule
         var saveOption = LifecycleOptions.Save();
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
-        var dryRunOption = LifecycleOptions.DryRun();
         var stageOption = LifecycleOptions.Stage();
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
@@ -79,7 +78,6 @@ internal sealed class FormatCommand : ICommandModule
             saveOption,
             forceOption,
             overwriteOption,
-            dryRunOption,
             stageOption,
             revertOption,
             noSyncOption
@@ -130,8 +128,7 @@ internal sealed class FormatCommand : ICommandModule
                         Overwrite: parseResult.GetValue(overwriteOption),
                         Stage: parseResult.GetValue(stageOption),
                         Revert: parseResult.GetValue(revertOption),
-                        NoSync: parseResult.GetValue(noSyncOption),
-                        DryRun: parseResult.GetValue(dryRunOption)),
+                        NoSync: parseResult.GetValue(noSyncOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
@@ -197,9 +194,7 @@ internal sealed class FormatCommand : ICommandModule
             case ObjectFormatResult obj:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
                     HighlightLanguage(obj.Language), obj.Formatted));
-                if (obj.DryRun)
-                    StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
-                else if (obj.Saved)
+                if (obj.Saved)
                     MutationOutput.RenderSaved(obj.Outcome);
                 MutationOutput.RenderSync(obj.Outcome);
                 break;
@@ -216,8 +211,6 @@ internal sealed class FormatCommand : ICommandModule
                     MutationOutput.RenderSaved(model.Outcome);
                 else if (model.Status == MutationStatus.Staged)
                     AnsiConsole.MarkupLine(Styling.Success("Mutation staged."));
-                else if (model.DryRun)
-                    StdErr.MarkupLine(Styling.Guidance("Dry run: nothing was saved."));
                 else if (model.Formatted > 0 && model.Failed == 0)
                     AnsiConsole.MarkupLine(Styling.Muted("Not saved — re-run with --save to persist or --stage to stage."));
 

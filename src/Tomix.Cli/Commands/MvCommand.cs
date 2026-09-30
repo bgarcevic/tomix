@@ -39,7 +39,6 @@ internal sealed class MvCommand : ICommandModule
         };
         var overwriteOption = LifecycleOptions.Overwrite();
         var forceOption = LifecycleOptions.Force();
-        var dryRunOption = LifecycleOptions.DryRun();
         var typeOption = new Option<string?>("--type")
         {
             Description = "Type to pick when the path matches several objects under a table"
@@ -67,7 +66,6 @@ internal sealed class MvCommand : ICommandModule
             modelArgument,
             overwriteOption,
             forceOption,
-            dryRunOption,
             typeOption,
             stageOption,
             revertOption,
@@ -151,7 +149,6 @@ internal sealed class MvCommand : ICommandModule
                         parseResult.GetValue(strictRefsOption),
                         FixRefs: !parseResult.GetValue(noFixRefsOption),
                         Overwrite: parseResult.GetValue(overwriteOption),
-                        DryRun: parseResult.GetValue(dryRunOption),
                         Force: parseResult.GetValue(forceOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));

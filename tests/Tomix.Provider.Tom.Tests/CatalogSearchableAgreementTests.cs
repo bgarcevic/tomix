@@ -9,7 +9,7 @@ namespace Tomix.Provider.Tom.Tests;
 /// Drift guard between find and replace: find enumerates the catalog's searchable descriptors
 /// over the snapshot, so every searchable site on a snapshot object must also be rewritten by
 /// <see cref="TomModelMutator.ReplaceText"/> in the same scope, at the same path and property.
-/// A site find can show but replace cannot rewrite makes the dry-run preview lie. If this test
+/// A site find can show but replace cannot rewrite makes the replace preview lie. If this test
 /// fails after adding a catalog descriptor, extend the walk in TomTextReplacer (or the
 /// summarizer, when the value is missing from the snapshot) with the new property.
 /// </summary>

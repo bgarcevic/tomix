@@ -73,11 +73,6 @@ internal sealed class RefreshCommand : ICommandModule
             Description = "Apply one table's saved refresh policy without loading data; may remove expired partitions. Requires --table."
         };
 
-        var dryRunOption = new Option<bool>("--dry-run")
-        {
-            Description = "Preview without executing: TMSL for refresh, or a validated operation summary with --policy-only"
-        };
-
         var noProgressOption = new Option<bool>("--no-progress")
         {
             Description = "Turn off live progress tracking (useful in CI and when piping)"
@@ -98,7 +93,6 @@ internal sealed class RefreshCommand : ICommandModule
             skipRefreshPolicyOption,
             effectiveDateOption,
             maxParallelismOption,
-            dryRunOption,
             policyOnlyOption,
             noProgressOption,
             traceOption
@@ -132,7 +126,6 @@ internal sealed class RefreshCommand : ICommandModule
             var applyPolicy = ResolveApplyPolicy(parseResult.GetValue(applyRefreshPolicyOption), parseResult.GetValue(skipRefreshPolicyOption));
             var effectiveDate = parseResult.GetValue(effectiveDateOption);
             var maxParallelism = parseResult.GetValue(maxParallelismOption);
-            var dryRun = parseResult.GetValue(dryRunOption);
             var noProgress = parseResult.GetValue(noProgressOption);
             // ArgumentArity.ZeroOrOne surfaces both "absent" and "bare --trace" as null from GetValue.
             // Gate on GetResult so absent stays off, while bare --trace resolves to stderr ("-").
@@ -168,7 +161,7 @@ internal sealed class RefreshCommand : ICommandModule
                 ApplyRefreshPolicy: applyPolicy,
                 EffectiveDate: effectiveDate,
                 MaxParallelism: maxParallelism,
-                DryRun: dryRun,
+                Preview: false,
                 NoProgress: noProgress,
                 TracePath: tracePath,
                 PolicyOnly: parseResult.GetValue(policyOnlyOption),
@@ -191,74 +184,63 @@ internal sealed class RefreshCommand : ICommandModule
                 ? new RefreshModelHandler(_providers, _loadCurrentSession)
                 : new RefreshModelHandler(_providers, recentSession);
 
-            // Partition-risky variants confirm before executing: clearvalues wipes partition
-            // data, and bypassing or overriding the incremental-refresh policy can rebuild or
-            // drop historical partitions. Routine policy refreshes stay unprompted, and
-            // --dry-run never executes. Resolved with the handler's own logic so the prompt
-            // names the exact target and never fires when there is nothing remote to refresh.
-            var partitionRisky =
-                string.Equals(type, "clearvalues", StringComparison.OrdinalIgnoreCase)
-                || !applyPolicy
-                || effectiveDate is not null
-                || request.PolicyOnly;
-            if (!dryRun && partitionRisky)
-            {
-                var target = RefreshModelHandler.ResolveTarget(
-                    request, new ActiveModelResolver(recentSession ?? _loadCurrentSession));
-                if (target is not null && !ConfirmationHelper.ConfirmOrAbort(
-                        request.PolicyOnly ? "Apply refresh policy without loading data (may remove expired partitions)" : "Refresh",
-                        $"{target.Database ?? "model"} on {target.Value} ({type})",
-                        parseResult,
-                        format))
-                    return 1;
-            }
-
             // Progress + trace sinks: live spinner display via AnsiConsole.Status, plus optional --trace file/stderr.
             var suppressProgress = noProgress || quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || CliSpinner.ShouldSuppress();
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
             using var traceWriter = TraceWriter.Open(tracePath, quiet);
+            RefreshOperation? operation = null;
             try
             {
-                // --dry-run never executes; no live display, just emit the script.
-                if (request.PolicyOnly)
+                // Partition-risky variants preview first: clearvalues wipes partition data, and
+                // bypassing or overriding the incremental-refresh policy (or applying it without
+                // loading) can rebuild or drop historical partitions. They show the TMSL the refresh
+                // would send (or the validated policy-only operation), then confirm. Routine
+                // refreshes run straight away. The preview never executes, so it has no live display.
+                var partitionRisky =
+                    string.Equals(type, "clearvalues", StringComparison.OrdinalIgnoreCase)
+                    || !applyPolicy
+                    || effectiveDate is not null
+                    || request.PolicyOnly;
+                // A routine refresh connects inside its live display. A previewed one keeps the
+                // preview's session open and refreshes on it, so it connects only once.
+                Func<IProgress<RefreshProgress>?, Task<TomixResult<RefreshModelResult>>> run =
+                    progress => CreateHandler().HandleAsync(request, progress, traceWriter, cancellationToken);
+                if (partitionRisky && PreviewGate.PreviewFirst(parseResult))
                 {
-                    var policyResult = await CreateHandler().HandleAsync(request, null, null, cancellationToken).ConfigureAwait(false);
-                    return CommandOutput.Render(policyResult, format, RefreshRenderer.Render, data => data,
-                        RefreshRenderer.RenderCsv, errorFormat: GlobalOptions.ErrorFormatValue(parseResult, format));
+                    operation = await CreateHandler().OpenAsync(request, cancellationToken).ConfigureAwait(false);
+                    var preview = await operation.PreviewAsync(cancellationToken).ConfigureAwait(false);
+                    var previewExit = RenderPreview(preview, format, errorFormat);
+                    if (!preview.Success || previewExit != 0)
+                        return previewExit;
+
+                    var decision = PreviewGate.Decide(
+                        request.PolicyOnly ? "Apply refresh policy without loading data (may remove expired partitions) to" : "Refresh",
+                        $"{preview.Data!.Database ?? "model"} on {preview.Data.Server}" + (request.PolicyOnly ? "" : $" ({type})"),
+                        parseResult,
+                        format);
+                    if (decision != PreviewDecision.Apply)
+                        return PreviewGate.ExitCode(decision);
+
+                    var confirmed = operation;
+                    run = progress => confirmed.ApplyAsync(progress, traceWriter, cancellationToken);
                 }
 
-                if (dryRun)
+                if (request.PolicyOnly)
                 {
-                    var dryResult = await CreateHandler()
-                        .HandleAsync(request, progress: null, traceWriter, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (dryResult.Success && dryResult.Data?.Script is not null)
-                    {
-                        if (OutputFormats.IsJson(format))
-                            JsonOutput.Write(new CommandEnvelope<object>(dryResult.Data, dryResult.Diagnostics));
-                        else
-                            RefreshRenderer.WriteTmsl(dryResult.Data.Script);
-                    }
-                    else
-                    {
-                        ErrorOutput.Write(dryResult.Diagnostics, GlobalOptions.ErrorFormatValue(parseResult, format));
-                    }
-                    return dryResult.ExitCode == 0 && dryResult.Success ? 0 : dryResult.ExitCode;
+                    var policyResult = await run(null).ConfigureAwait(false);
+                    return CommandOutput.Render(policyResult, format, RefreshRenderer.Render, data => data,
+                        RefreshRenderer.RenderCsv, errorFormat: errorFormat);
                 }
 
                 TomixResult<RefreshModelResult> result;
                 if (suppressProgress)
                 {
-                    result = await CreateHandler()
-                        .HandleAsync(request, progress: null, traceWriter, cancellationToken)
-                        .ConfigureAwait(false);
+                    result = await run(null).ConfigureAwait(false);
                 }
                 else
                 {
                     var display = new RefreshLiveDisplay();
-                    result = await display.RunAsync(
-                        BuildSpinnerLabel(request),
-                        () => CreateHandler().HandleAsync(request, display.Progress, traceWriter, cancellationToken))
+                    result = await display.RunAsync(BuildSpinnerLabel(request), () => run(display.Progress))
                         .ConfigureAwait(false);
                 }
 
@@ -268,16 +250,41 @@ internal sealed class RefreshCommand : ICommandModule
                     RefreshRenderer.Render,
                     data => data,
                     RefreshRenderer.RenderCsv,
-                    errorFormat: GlobalOptions.ErrorFormatValue(parseResult, format));
+                    errorFormat: errorFormat);
             }
             finally
             {
+                if (operation is not null)
+                    await operation.DisposeAsync().ConfigureAwait(false);
                 if (traceWriter is not null)
                     await traceWriter.FlushAsync(CancellationToken.None).ConfigureAwait(false);
             }
         });
 
         return command;
+    }
+
+    /// <summary>
+    /// Renders a refresh preview: the validated operation summary for --policy-only, otherwise
+    /// the TMSL script (raw in text output, inside the envelope under JSON).
+    /// </summary>
+    private static int RenderPreview(TomixResult<RefreshModelResult> preview, string format, string? errorFormat)
+    {
+        if (preview.Data?.PolicyPreview is not null)
+            return CommandOutput.Render(preview, format, RefreshRenderer.Render, data => data,
+                RefreshRenderer.RenderCsv, errorFormat: errorFormat);
+
+        if (!preview.Success || preview.Data?.Script is null)
+        {
+            ErrorOutput.Write(preview.Diagnostics, errorFormat);
+            return preview.ExitCode == 0 ? 1 : preview.ExitCode;
+        }
+
+        if (OutputFormats.IsJson(format))
+            JsonOutput.Write(new CommandEnvelope<object>(preview.Data, preview.Diagnostics));
+        else
+            RefreshRenderer.WriteTmsl(preview.Data.Script);
+        return 0;
     }
 
     internal static IReadOnlyList<TablePartition>? ParsePartitions(string[]? raw, out string? badValue)

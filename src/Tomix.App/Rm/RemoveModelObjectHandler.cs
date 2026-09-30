@@ -21,29 +21,28 @@ public sealed class RemoveModelObjectHandler
         CancellationToken cancellationToken)
     {
         var options = new MutationOptions(
-            request.Save && !request.DryRun,
-            request.DryRun ? null : request.SaveTo,
-            request.Stage && !request.DryRun,
+            request.Save,
+            request.SaveTo,
+            request.Stage,
             request.Revert,
             request.Serialization,
             request.Force,
             request.Overwrite,
-            request.NoSync,
-            DryRun: request.DryRun);
+            request.NoSync);
 
         return await MutationRunner.RunAsync(
             _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "rm", _stores,
-            async (mutator, session, _) =>
+            async (mutator, session, context) =>
             {
                 // A removal cannot be fixed up like a rename — the referenced object is gone.
                 // DAX still referencing it blocks the removal; --force removes anyway and
-                // reports the referencing objects as broken. A dry run reports the block
-                // instead of failing: discovering the need for --force is the preview's job.
+                // reports the referencing objects as broken. A preview (no --save/--stage) reports
+                // the block instead of failing: discovering the need for --force is the preview's job.
                 var referencing = await RemoveGuard.ReferencingPathsAsync(
                     session, request.Path, request.Type, cancellationToken);
                 if (referencing.Count > 0 && !request.Force)
                 {
-                    if (!request.DryRun)
+                    if (context.Mode is MutationMode.Save or MutationMode.Stage)
                         throw new RemoveBrokenReferencesException(RemoveGuard.BlockedMessage(referencing));
 
                     // Guarded preview: report the would-be breakage without touching the model.

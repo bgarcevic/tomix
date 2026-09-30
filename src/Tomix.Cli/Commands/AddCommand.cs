@@ -36,8 +36,8 @@ internal sealed class AddCommand : ICommandModule
         };
         var typeOption = new Option<string?>("--type")
         {
-            Description = $"Type of object to create. Supported values: {ModelObjectTypeCatalog.CreationListText}. " +
-                          "Data sources always require -t (no path keyword infers them)."
+            Description = "Kind of object to create, for example Measure, Table, CalcColumn, or Relationship; " +
+                          "an invalid value lists them all. Data sources always need -t."
         };
         typeOption.Aliases.Add("-t");
         var expressionOption = new Option<string?>("--expression")
@@ -66,7 +66,6 @@ internal sealed class AddCommand : ICommandModule
         };
         var forceOption = LifecycleOptions.Force();
         var overwriteOption = LifecycleOptions.Overwrite();
-        var dryRunOption = LifecycleOptions.DryRun();
         var saveToOption = LifecycleOptions.SaveTo();
         var serializationOption = LifecycleOptions.Serialization();
         var saveOption = LifecycleOptions.Save();
@@ -157,7 +156,6 @@ internal sealed class AddCommand : ICommandModule
             ifNotExistsOption,
             forceOption,
             overwriteOption,
-            dryRunOption,
             saveToOption,
             serializationOption,
             saveOption,
@@ -222,8 +220,7 @@ internal sealed class AddCommand : ICommandModule
                         parseResult.GetValue(rangeStartOption),
                         parseResult.GetValue(rangeEndOption),
                         parseResult.GetValue(rangeGranularityOption),
-                        Overwrite: parseResult.GetValue(overwriteOption),
-                        DryRun: parseResult.GetValue(dryRunOption)),
+                        Overwrite: parseResult.GetValue(overwriteOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));
 
