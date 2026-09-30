@@ -27,6 +27,23 @@ Adapter around Microsoft Tabular Object Model.
 - `TomMutationPaths` — shared path/name/type normalization and the mutation-path regexes.
 - `TomRemoveCascade` — cascade collection for removals (remove dispatch stays on the facade).
 
+## Live session (planned)
+
+[ADR 0001](../../docs/design/adr-0001-live-model-session.md) adds `TomLiveModelSession`, used for
+TMDL, `.bim` and XMLA sources (`Tomix.Provider.Tmdl` reuses it):
+
+- One actor thread owns the TOM `Database`. No other thread touches TOM. Snapshot reads are
+  served from an immutable, versioned `ModelSnapshot`.
+- `TomChangeJournal` records every TOM write as a primitive (`SetProperty`, `Attach`, `Detach`,
+  `Rebind`). Undo, redo, rollback and change events all come from it. **Every TOM write in the
+  mutator collaborators must go through the journal**. A direct write leaves undo silently
+  incomplete, and the apply-then-undo golden tests are there to catch it.
+  Entries also carry the object's ID, path and `LineageTag` plus a provider-neutral form of the
+  operation, so unsaved transactions can be replayed onto a reloaded model (merge, #374).
+- `TomObjectIdMap` maps TOM instances to session `ObjectId`s. TOM cannot re-attach a removed
+  object, so any operation that replaces an instance (move, undo of a remove) must `Rebind` the
+  new instance to the old ID.
+
 ## Cross-folder dependencies
 
 - Depends on `/src/Tomix.Core`.

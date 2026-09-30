@@ -36,6 +36,10 @@ nav = [
     { "CLI UX guidelines" = "cli-ux-guidelines.md" },
     { "Color strategy" = "cli-color-strategy.md" },
     { "Live QA checklist" = "qa-live-checklist.md" },
+    { "Design decisions" = [
+      { "Overview" = "design/index.md" },
+      { "ADR 0001: Live model session" = "design/adr-0001-live-model-session.md" },
+    ] },
   ] },
 ]
 

@@ -30,6 +30,14 @@ Application use cases and command handlers.
   guarded session opening, and disposal. Specialized multi-session or staging lifecycles may stay
   explicit when they have different operation-level diagnostics.
 - One command should usually have one handler.
+- Live model session ([ADR 0001](../../docs/design/adr-0001-live-model-session.md), planned):
+  handlers must not care whether their session is one-shot or live. The runners
+  (`ModelSessionRunner`, `MutationRunner`) take their session from an `IModelSessionSource`:
+  `OneShotSessionSource` opens and disposes; `LiveSessionSource` leases the open session and
+  never disposes it. Under a live source, mutations run in `MutationMode.Live`, which applies in a
+  transaction without persisting. `SessionHost` owns the session registry, client attach/detach and
+  the approval policy. Front ends (`shell`, `serve`, `mcp`, `ui`) call handlers with the same
+  `*Request` records; they never get their own copy of command logic.
 - Formatting behavior:
   - DAX formatting is offline: the vendored SQLBI engine behind `Tomix.Core.Dax.DaxFormatter`,
     wrapped by `Format/OfflineDaxFormatterClient` — no network, no rate limits. The formatter
