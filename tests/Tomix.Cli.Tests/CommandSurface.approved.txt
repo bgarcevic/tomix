@@ -95,19 +95,11 @@ Add a custom rule to a rules file or a model
   opt --description <text>  Guidance shown with violations ("" removes it)
   opt --fix-expression <expr>  Fix applied by 'bpa run --fix' ("" removes it)
 
-# tx bpa rules disable
-Turn off a built-in rule for this user
-  arg <rule-id>  Rule ID
-  opt --allow-unknown  Accept a rule ID that no loaded rule has (for example, one from a remote rule file)
-
-# tx bpa rules enable
-Turn a disabled built-in rule back on
-  arg <rule-id>  Rule ID
-
 # tx bpa rules ignore
-Put a rule on the model's ignore list
+Ignore a rule in the model, or just for you
   arg <rule-id>  Rule ID
   arg [model]  Path to model
+  opt --user  Ignore the rule for you, on this machine, for every model, instead of in the model
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write the change to the model's source (default: preview only, nothing is written)
   opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
@@ -125,11 +117,10 @@ Create an empty rules file
 # tx bpa rules list
 List rules from every source, with each rule's status
   arg [model]  Path to model
-  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.
   opt --no-defaults  Leave the built-in ruleset out of the listing
-  opt --ignored  List only rules on the model's ignore list
-  opt --disabled  List only rules disabled for this user
-  opt --all  Include disabled and ignored rules in the listing
+  opt --ignored  List only ignored rules, whether you or the model ignores them
+  opt --all  Include ignored rules in the listing
 
 # tx bpa rules remove
 Delete a custom rule from a rules file or a model
@@ -168,13 +159,14 @@ Change a custom rule in a rules file or a model
 Show a rule's description, scope, expression, and fix
   arg <rule-id>  Rule ID
   arg [model]  Path to model
-  opt --ruleset <name>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <name>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.
   opt --no-defaults  Leave the built-in ruleset out of the lookup
 
 # tx bpa rules unignore
-Take a rule off the model's ignore list
+Stop ignoring a rule in the model, or for you
   arg <rule-id>  Rule ID
   arg [model]  Path to model
+  opt --user  Stop ignoring the rule for you, instead of in the model
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --save  Write the change to the model's source (default: preview only, nothing is written)
   opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
@@ -188,7 +180,7 @@ Take a rule off the model's ignore list
 Run best-practice rules against a model
   arg [model]  Optional path to the model; defaults to the active connection
   opt --rules, -r <file|url>  BPA rule files or URLs (JSON). Repeatable.
-  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es)
+  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.
   opt --no-model-rules  Skip rules embedded in the model's annotations
   opt --no-defaults  Exclude the selected standard BPA ruleset
   opt --fail-on <level>  Failure threshold: error or warning (default: error). Rules that cannot be evaluated count as error-severity findings.

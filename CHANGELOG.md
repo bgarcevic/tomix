@@ -19,6 +19,20 @@ and the API surface that major versions protect.
   and `--max-depth`, `--unused` with `--hidden`, `--paths-only`, and `--no-multiline`. `tx ls`
   and `tx deps` keep their flags and are now shortcuts for `get --ls` and `get --deps` /
   `get --unused`, with identical output (#335).
+- BPA rule sources beyond `--rules`: the `bpa.rules` config key and the `TOMIX_BPA_RULES`
+  environment variable add team rule files to `bpa run`, `bpa rules list`/`show`/`ignore`, and
+  the `deploy` BPA gate. `bpa run` prints a "Rules loaded" line saying where every rule came
+  from and how many a later source overrode (JSON: `ruleSources`) (#233).
+- `--ruleset` presets for default-off rule categories (for example `localization`), which
+  neither `standard` nor `full` includes. Repeat `--ruleset` or comma-separate it to combine
+  presets (#233).
+- `tx bpa rules ignore --user` and `unignore --user` turn a rule off (or back on) just for you,
+  on this machine, for every model; without `--user` they still write the model's ignore
+  annotation. `bpa rules list --ignored` shows rules ignored at either level, and `bpa run`
+  says which level ignored a rule (JSON: `userIgnoredRules`). `unignore` warns when the other
+  level still ignores the rule (`TOMIX_BPA_RULE_STILL_IGNORED_BY_MODEL`,
+  `TOMIX_BPA_RULE_STILL_IGNORED_BY_USER`) or when the rule isn't in the ruleset that runs
+  (`TOMIX_BPA_RULE_NOT_IN_RULESET`) (#233).
 
 ### Changed
 
@@ -51,6 +65,11 @@ and the API surface that major versions protect.
 - `tx get Measures` and other bare container paths now list the container instead of failing
   with `TOMIX_OBJECT_NOT_FOUND`, and `tx get ./model` lists the model's tables. `--query` or
   `--deps` on a path that selects a set fails with `TOMIX_SINGLE_OBJECT_REQUIRED` (#335).
+- `tx bpa rules list` shows each rule ID once, from the source that wins as in `bpa run`, and
+  says what a team or model rule overrides (JSON: `overrides`); `bpa rules show` still prints
+  every source's copy. Without a model, `list` and `show` use the active local connection (#233).
+- `tx bpa rules disable` and `enable` are hidden; they still work and do the same as
+  `ignore --user` and `unignore --user` (#233).
 
 ### Fixed
 

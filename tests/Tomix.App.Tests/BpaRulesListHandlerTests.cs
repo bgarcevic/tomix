@@ -112,7 +112,7 @@ public sealed class BpaRulesListHandlerTests
 
     [Theory]
     [InlineData(false, false, "RULE_C")]
-    [InlineData(true, false, "RULE_A")]
+    [InlineData(true, false, "RULE_A,RULE_B")] // --ignored covers both levels
     [InlineData(false, true, "RULE_B")]
     [InlineData(true, true, "RULE_A,RULE_B")]
     public async Task List_FiltersByStatus(bool ignoredOnly, bool disabledOnly, string expected)

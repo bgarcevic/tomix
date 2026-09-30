@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -113,6 +114,26 @@ public sealed class BpaRulesIgnoreHandler
             outcome => new BpaRulesIgnoreResult("", false, false, [], "") { Outcome = outcome },
             cancellationToken);
 
-        return unknownRule ?? result;
+        if (unknownRule is not null)
+            return unknownRule;
+
+        // Unignoring in the model only removes the model-level switch; say so when the user's own
+        // `ignore --user` still keeps the rule off.
+        if (!request.Ignore && result.Success && _configDirectory is not null
+            && new BpaUserRuleState(_configDirectory).GetDisabled().Contains(request.RuleId))
+            return result with
+            {
+                Diagnostics =
+                [
+                    .. result.Diagnostics,
+                    new TomixDiagnostic(
+                        "TOMIX_BPA_RULE_STILL_IGNORED_BY_USER",
+                        DiagnosticSeverity.Warning,
+                        $"The model no longer ignores rule '{request.RuleId}', but you still do, so bpa run skips it on this machine.",
+                        Hint: $"Stop ignoring it for you: tx bpa rules unignore {request.RuleId} --user")
+                ]
+            };
+
+        return result;
     }
 }

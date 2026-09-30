@@ -16,17 +16,20 @@ internal sealed class DeployCommand : ICommandModule
     private readonly CliStateStore _state;
     private readonly HttpClient? _httpClient;
     private readonly BpaUserRuleState? _bpaRules;
+    private readonly string? _configDirectory;
 
     public DeployCommand(
         IReadOnlyList<IModelProvider> providers,
         CliStateStore state,
         HttpClient? httpClient = null,
-        BpaUserRuleState? bpaRules = null)
+        BpaUserRuleState? bpaRules = null,
+        string? configDirectory = null)
     {
         _providers = providers;
         _state = state;
         _httpClient = httpClient;
         _bpaRules = bpaRules;
+        _configDirectory = configDirectory;
     }
 
     public Command Build()
@@ -223,7 +226,7 @@ internal sealed class DeployCommand : ICommandModule
             // once, and its warnings are reported with whichever result comes first.
             await using var operation = await CliSpinner.RunAsync(
                 "Preparing deployment...",
-                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient, bpaRules: _bpaRules).OpenAsync(
+                () => new DeployModelHandler(_providers, _state, httpClient: _httpClient, bpaRules: _bpaRules, configDirectory: _configDirectory).OpenAsync(
                     new DeployModelRequest(
                         reference,
                         server,

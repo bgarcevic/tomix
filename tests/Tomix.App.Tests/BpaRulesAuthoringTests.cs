@@ -161,7 +161,7 @@ public sealed class BpaRulesAuthoringTests
         var result = new BpaRulesRemoveHandler(dir.Path).Handle(new BpaRulesRemoveRequest("HIDE_FOREIGN_KEYS"));
 
         Assert.Equal("TOMIX_BPA_RULE_NOT_FOUND", result.Diagnostics[0].Code);
-        Assert.Contains("bpa rules disable HIDE_FOREIGN_KEYS", result.Diagnostics[0].Hint);
+        Assert.Contains("bpa rules ignore HIDE_FOREIGN_KEYS --user", result.Diagnostics[0].Hint);
     }
 
     [Fact]

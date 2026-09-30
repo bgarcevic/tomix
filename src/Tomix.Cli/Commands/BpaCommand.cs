@@ -57,10 +57,7 @@ internal sealed class BpaCommand : ICommandModule
             AllowMultipleArgumentsPerToken = true
         }.In("Rule options");
 
-        var rulesetOption = new Option<string?>("--ruleset")
-        {
-            Description = $"Standard BPA ruleset to use ({string.Join(", ", BpaRuleLoader.KnownRulesets)})"
-        }.In("Rule options");
+        var rulesetOption = RulesetOption("use").In("Rule options");
 
         var noModelRulesOption = new Option<bool>("--no-model-rules")
         {
@@ -235,7 +232,7 @@ internal sealed class BpaCommand : ICommandModule
                         ruleIds,
                         parseResult.GetValue(fixOption),
                         parseResult.GetValue(allowDeleteOption),
-                        parseResult.GetValue(rulesetOption),
+                        RulesetValue(parseResult, rulesetOption),
                         parseResult.GetValue(failOnOption),
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
@@ -297,10 +294,7 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Path to a BPA rules JSON file"
         };
 
-        var rulesetOption = new Option<string?>("--ruleset")
-        {
-            Description = $"Standard BPA ruleset to use ({string.Join(", ", BpaRuleLoader.KnownRulesets)})"
-        };
+        var rulesetOption = RulesetOption("use");
 
         var noDefaultsOption = new Option<bool>("--no-defaults")
         {
@@ -309,17 +303,19 @@ internal sealed class BpaCommand : ICommandModule
 
         var ignoredOption = new Option<bool>("--ignored")
         {
-            Description = "List only rules on the model's ignore list"
+            Description = "List only ignored rules, whether you or the model ignores them"
         };
 
+        // Superseded by --ignored, whose status column names the level; kept for scripts.
         var disabledOption = new Option<bool>("--disabled")
         {
-            Description = "List only rules disabled for this user"
+            Description = "List only rules you ignore (ignore --user)",
+            Hidden = true
         };
 
         var allOption = new Option<bool>("--all")
         {
-            Description = "Include disabled and ignored rules in the listing"
+            Description = "Include ignored rules in the listing"
         };
 
         var modelArgument = new Argument<string>("model")
@@ -351,12 +347,13 @@ internal sealed class BpaCommand : ICommandModule
 
             if (!TryResolveOptionalModel(parseResult, parseResult.GetValue(modelArgument), out var model, out var modelExit))
                 return modelExit;
+            model ??= LocalActiveModel(parseResult);
 
             var request = new BpaRulesListRequest(
                 Model: model,
                 All: parseResult.GetValue(allOption),
                 RulesFile: parseResult.GetValue(rulesFileOption),
-                Ruleset: parseResult.GetValue(rulesetOption),
+                Ruleset: RulesetValue(parseResult, rulesetOption),
                 NoDefaults: parseResult.GetValue(noDefaultsOption),
                 IgnoredOnly: parseResult.GetValue(ignoredOption),
                 DisabledOnly: parseResult.GetValue(disabledOption));
@@ -372,15 +369,16 @@ internal sealed class BpaCommand : ICommandModule
         });
 
         rulesCommand.Subcommands.Add(BuildRulesAddCommand(rulesFileOption));
-        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("disable", "Turn off a built-in rule for this user", rulesFileOption));
-        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("enable", "Turn a disabled built-in rule back on", rulesFileOption));
-        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("ignore", "Put a rule on the model's ignore list", ignore: true, rulesFileOption));
+        // disable/enable are the pre-`--user` spellings of ignore/unignore --user; hidden, kept for scripts.
+        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("disable", "Same as 'ignore --user'", rulesFileOption));
+        rulesCommand.Subcommands.Add(BuildRulesFlagCommand("enable", "Same as 'unignore --user'", rulesFileOption));
+        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("ignore", "Ignore a rule in the model, or just for you", ignore: true, rulesFileOption));
         rulesCommand.Subcommands.Add(BuildRulesInitCommand(rulesFileOption));
         rulesCommand.Subcommands.Add(listCommand);
         rulesCommand.Subcommands.Add(BuildRulesRemoveCommand(rulesFileOption));
         rulesCommand.Subcommands.Add(BuildRulesSetCommand(rulesFileOption));
         rulesCommand.Subcommands.Add(BuildRulesShowCommand(rulesFileOption));
-        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("unignore", "Take a rule off the model's ignore list", ignore: false, rulesFileOption));
+        rulesCommand.Subcommands.Add(BuildRulesIgnoreCommand("unignore", "Stop ignoring a rule in the model, or for you", ignore: false, rulesFileOption));
         return rulesCommand;
     }
 
@@ -388,10 +386,7 @@ internal sealed class BpaCommand : ICommandModule
     {
         var ruleIdArgument = new Argument<string>("rule-id") { Description = "Rule ID" };
         var modelArgument = OptionalModelArgument();
-        var rulesetOption = new Option<string?>("--ruleset")
-        {
-            Description = $"Standard BPA ruleset to look in ({string.Join(", ", BpaRuleLoader.KnownRulesets)})"
-        };
+        var rulesetOption = RulesetOption("look in");
         var noDefaultsOption = new Option<bool>("--no-defaults")
         {
             Description = "Leave the built-in ruleset out of the lookup"
@@ -413,12 +408,13 @@ internal sealed class BpaCommand : ICommandModule
 
             if (!TryResolveOptionalModel(parseResult, parseResult.GetValue(modelArgument), out var model, out var modelExit))
                 return modelExit;
+            model ??= LocalActiveModel(parseResult);
 
             var result = await new BpaRulesListHandler(_providers, _bpaRules, _httpClient, _configDirectory).HandleAsync(
                 new BpaRulesListRequest(
                     Model: model,
                     RulesFile: parseResult.GetValue(rulesFileOption),
-                    Ruleset: parseResult.GetValue(rulesetOption),
+                    Ruleset: RulesetValue(parseResult, rulesetOption),
                     NoDefaults: parseResult.GetValue(noDefaultsOption),
                     RuleId: parseResult.GetValue(ruleIdArgument)),
                 cancellationToken);
@@ -438,6 +434,24 @@ internal sealed class BpaCommand : ICommandModule
     /// The model for the read-only <c>bpa rules</c> commands: optional, so without one they
     /// list the rulesets alone; with <c>--recent</c> it comes from the recent list.
     /// </summary>
+    /// <summary>
+    /// For the read-only <c>bpa rules list</c> and <c>show</c>, the active connection when no model
+    /// was named, so a rule the connected model ignores shows as ignored. Only a local model that still exists:
+    /// a remote one would add sign-in and network to an offline listing, and a stale path would
+    /// fail a command that used to work without a model. Announced like any implicit target.
+    /// </summary>
+    private ModelReference? LocalActiveModel(ParseResult parseResult)
+    {
+        var active = new ActiveModelResolver(_state).Resolve(null);
+        if (active.Length == 0 || ModelReference.IsRemoteEndpoint(active)
+            || !(Directory.Exists(active) || File.Exists(active)))
+            return null;
+
+        var model = new ModelReference(active);
+        ConnectionBanner.Announce(parseResult, model);
+        return model;
+    }
+
     private bool TryResolveOptionalModel(ParseResult parseResult, string? modelArgument, out ModelReference? model, out int exitCode)
     {
         model = null;
@@ -466,26 +480,59 @@ internal sealed class BpaCommand : ICommandModule
         var disable = name.Equals("disable", StringComparison.OrdinalIgnoreCase);
         var allowUnknownOption = AllowUnknownOption();
         var command = new Command(name, description) { ruleIdArgument };
+        command.Hidden = true;
         if (disable)
             command.Options.Add(allowUnknownOption);
 
-        command.SetAction(parseResult =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             var format = GlobalOptions.OutputFormatValue(parseResult);
             if (!CommandOutput.TryValidateFormat(parseResult, format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
 
-            var result = new BpaRulesDisableHandler(_bpaRules, _configDirectory).Handle(
-                new BpaRulesDisableRequest(
-                    parseResult.GetValue(ruleIdArgument)!,
-                    Disable: disable,
-                    AllowUnknown: disable && parseResult.GetValue(allowUnknownOption),
-                    RulesFile: parseResult.GetValue(rulesFileOption)));
-
-            return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderDisable, BpaRulesRenderer.ToDisableJson);
+            return await RunUserIgnoreAsync(
+                parseResult,
+                format,
+                parseResult.GetValue(ruleIdArgument)!,
+                ignore: disable,
+                allowUnknown: disable && parseResult.GetValue(allowUnknownOption),
+                parseResult.GetValue(rulesFileOption),
+                cancellationToken);
         });
 
         return command;
+    }
+
+    /// <summary>
+    /// <c>ignore/unignore --user</c> (and the hidden <c>disable/enable</c>): switch a rule off or
+    /// back on for this user, on this machine, for every model.
+    /// </summary>
+    private async Task<int> RunUserIgnoreAsync(
+        ParseResult parseResult,
+        string format,
+        string ruleId,
+        bool ignore,
+        bool allowUnknown,
+        string? rulesFile,
+        CancellationToken cancellationToken)
+    {
+        // Unignoring warns when the active model still ignores the rule. Only a local model is
+        // read: a remote one would mean sign-in and network for a quick per-user toggle.
+        var activeModel = new ActiveModelResolver(_state).Resolve(null);
+        var localActiveModel = !ignore && activeModel.Length > 0 && !ModelReference.IsRemoteEndpoint(activeModel)
+            ? new ModelReference(activeModel)
+            : null;
+
+        var result = await new BpaRulesDisableHandler(_bpaRules, _configDirectory, _providers).HandleAsync(
+            new BpaRulesDisableRequest(
+                ruleId,
+                Disable: ignore,
+                AllowUnknown: allowUnknown,
+                RulesFile: rulesFile,
+                ActiveModel: localActiveModel),
+            cancellationToken);
+
+        return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderDisable, BpaRulesRenderer.ToDisableJson);
     }
 
     private Command BuildRulesIgnoreCommand(string name, string description, bool ignore, Option<string?> rulesFileOption)
@@ -501,11 +548,18 @@ internal sealed class BpaCommand : ICommandModule
         var noSyncOption = LifecycleOptions.NoSync();
         var forceOption = LifecycleOptions.Force();
         var allowUnknownOption = AllowUnknownOption();
+        var userOption = new Option<bool>("--user")
+        {
+            Description = ignore
+                ? "Ignore the rule for you, on this machine, for every model, instead of in the model"
+                : "Stop ignoring the rule for you, instead of in the model"
+        };
 
         var command = new Command(name, description)
         {
             ruleIdArgument,
             modelArgument,
+            userOption,
             overwriteOption,
             saveOption,
             saveToOption,
@@ -523,6 +577,35 @@ internal sealed class BpaCommand : ICommandModule
             var format = GlobalOptions.OutputFormatValue(parseResult);
             if (!CommandOutput.TryValidateFormat(parseResult, format, $"bpa rules {name}", OutputFormats.Text, OutputFormats.Json))
                 return 2;
+
+            if (parseResult.GetValue(userOption))
+            {
+                // The user level lives in the config directory, not in a model, so nothing
+                // model-bound applies; say so rather than silently dropping it.
+                Option[] modelBound =
+                [
+                    overwriteOption, saveOption, saveToOption, serializationOption,
+                    stageOption, revertOption, noSyncOption, forceOption
+                ];
+                if (GlobalOptions.ModelValue(parseResult) is not null
+                    || parseResult.GetValue(modelArgument) is not null
+                    || modelBound.Any(option => parseResult.GetResult(option) is { Implicit: false }))
+                {
+                    RecentConnections.WriteOptionConflict(
+                        $"--user applies to you on this machine, for every model; it cannot be combined with a model or with --save, --stage, or the other save options.",
+                        GlobalOptions.ErrorFormatValue(parseResult));
+                    return 2;
+                }
+
+                return await RunUserIgnoreAsync(
+                    parseResult,
+                    format,
+                    parseResult.GetValue(ruleIdArgument)!,
+                    ignore,
+                    allowUnknown: ignore && parseResult.GetValue(allowUnknownOption),
+                    parseResult.GetValue(rulesFileOption),
+                    cancellationToken);
+            }
 
             if (!RecentConnections.TryResolveModel(
                     parseResult,
@@ -762,6 +845,23 @@ internal sealed class BpaCommand : ICommandModule
 
         return CommandOutput.Render(parseResult, handle(), format, BpaRulesRenderer.RenderFile, BpaRulesRenderer.ToFileJson);
     }
+
+    /// <summary>
+    /// <c>--ruleset</c>: one preset per occurrence, repeatable, and each value may itself be a
+    /// comma list. Repeating needs no quoting, which matters in PowerShell, where an unquoted
+    /// <c>a,b</c> becomes two arguments. One token per occurrence, so a model path after
+    /// <c>--ruleset full</c> is still the model.
+    /// </summary>
+    private static Option<string[]> RulesetOption(string verb)
+        => new("--ruleset")
+        {
+            Description = $"Standard BPA ruleset to {verb} ({string.Join(", ", BpaRuleLoader.KnownRulesets)}). Repeat or comma-separate to combine.",
+            AllowMultipleArgumentsPerToken = false
+        };
+
+    /// <summary>Every <c>--ruleset</c> value as the comma list the loader takes; null when none.</summary>
+    private static string? RulesetValue(ParseResult parseResult, Option<string[]> option)
+        => parseResult.GetValue(option) is { Length: > 0 } values ? string.Join(",", values) : null;
 
     private static Option<bool> AllowUnknownOption()
         => new(BpaKnownRules.AllowUnknownOption)

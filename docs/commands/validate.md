@@ -41,12 +41,21 @@ small core of consumer-experience checks. Use `--ruleset full` for the entire
 bundled catalog (including style, advisory, and heuristic rules that fire on
 most models).
 
+The catalog grows through presets rather than through the default set: a
+category whose rules would bury real findings on most models ships
+default-off. Neither `standard` nor `full` includes a default-off category; its
+own `--ruleset` preset (the category name in kebab case) opts in, and presets
+combine with commas — for example `--ruleset standard,localization` once
+localization rules ship. Localization is the first such category: on a
+single-culture model, translation rules would report every visible object.
+
 `standard` also drives the [`deploy`](connect.md#deploy-deploy-to-a-workspace) BPA gate, which blocks on
 error-severity findings by default. Error severity is therefore reserved for
 findings that mean the model is broken: a data column with no source column,
 an expression-reliant object with no expression, invalid characters in a name
 or description, `USERELATIONSHIP` against a table with row-level security, and
-sort-by or hierarchy columns hidden from MDX. Everything else in `standard` is
+sort-by or hierarchy columns hidden from MDX (see
+[IsAvailableInMdx](#isavailableinmdx)). Everything else in `standard` is
 a warning or info that `bpa run` reports without blocking a deploy
 (`deploy --bpa-fail-on warning` blocks on warnings too).
 
@@ -62,8 +71,8 @@ statistics are read from its deployed mirror). A model file with no deployed cop
 can't be checked by these rules.
 
 The bundled catalog is embedded in the application and cannot be overridden by
-placing a file beside the executable. Use `--rules`, model rule annotations, or
-the `bpa rules` commands for explicit customization.
+placing a file beside the executable. Use `--rules`, `bpa.rules`, model rule
+annotations, or the `bpa rules` commands for explicit customization.
 
 Models can carry their own rules: the `BestPracticeAnalyzer` annotation embeds
 rule definitions directly, and the `BestPracticeAnalyzer_ExternalRuleFiles`
@@ -71,7 +80,7 @@ annotation lists rule files to load. Relative external-file paths resolve
 against the model's folder (not the current directory), and Windows-style
 separators (`..\.devops\bpa-rules.json`) work on every platform. When the same
 rule ID appears in more than one source, the higher-precedence source wins:
-ruleset < user rules (`--rules`, config-dir `bpa-rules.json`) < external files
+ruleset < user rules (the [rule-source chain](#rule-sources)) < external files
 < model-embedded — so a model's own rules always override the ruleset copy.
 Among multiple external files, earlier entries in the annotation win. To detach
 a model from an external rule file, remove the annotation:
@@ -83,7 +92,7 @@ tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save
 | Option | Description |
 |--------|-------------|
 | `-r, --rules <file>` | BPA rule files or URLs, as JSON. |
-| `--ruleset <name>` | Standard ruleset: `standard` (curated default), `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
+| `--ruleset <name>` | Standard ruleset: `standard` (curated default), `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`, or a default-off category preset. Combine presets by repeating the option (`--ruleset standard --ruleset full`) or with commas; in PowerShell, quote a comma list (`'standard,full'`). |
 | `--rule <id>` | Run only specific rule(s) by ID. |
 | `--path <path>` | Limit analysis to matched objects (literal names, wildcards, or paths). |
 | `--errors` / `--warnings` / `--info` | Show only rules of that severity (combinable). |
@@ -133,22 +142,21 @@ the prompt in scripts.
 
 | Subcommand | Description |
 |------------|-------------|
-| `bpa rules list` | List rules from every source, grouped by category, with each rule's severity, scope, status, and whether it is `fixable`. Includes the rules in your config-dir `bpa-rules.json` (source `user`). With a model, also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. A rule on the model's ignore list shows as `ignored`; one turned off with `bpa rules disable` shows as `disabled`. |
-| `bpa rules show <rule-id> [model]` | Show one rule in full: description, reference link, source, scope, expression, and fix expression. Accepts `--ruleset` and `--no-defaults` like `list`. An unknown ID fails with `TOMIX_BPA_RULE_NOT_FOUND` and suggests IDs that contain what you typed. |
-| `bpa rules enable` / `bpa rules disable` | Turn a built-in rule back on, or off, for this user. |
-| `bpa rules ignore` / `bpa rules unignore` | Add or remove a rule on the model's ignore list. |
+| `bpa rules list` | List the rules in effect, once per rule ID, grouped by category, with each rule's severity, scope, status, and whether it is `fixable`. Includes the rules in your config-dir `bpa-rules.json` (source `user`). With a model (or, when none is named, a local active connection), also lists the model's embedded and external-file rules (remote URLs are reported, not fetched) and any rule-load diagnostics. A rule the model ignores shows as `ignored (model)`, one you ignore with `--user` as `ignored (you)`, and one ignored both ways as `ignored (you, model)`. |
+| `bpa rules show <rule-id> [model]` | Show one rule in full: description, reference link, source, scope, expression, and fix expression. Accepts `--ruleset` and `--no-defaults` like `list`, and like `list` uses a local active connection when no model is named. An unknown ID fails with `TOMIX_BPA_RULE_NOT_FOUND` and suggests IDs that contain what you typed. |
+| `bpa rules ignore <rule-id> [model]` / `bpa rules unignore <rule-id> [model]` | Add or remove a rule on the model's ignore list. With `--user`, ignore it (or stop) just for you, on this machine, for every model. See [Ignoring rules](#ignoring-rules). |
 | `bpa rules add [model] --id <id> ...` | Add a custom rule to your rules file, or to the model's rules with a model. Needs `--name`, `--scope`, and `--expression`; see [Authoring rules](#authoring-rules). |
 | `bpa rules set <rule-id> [model] ...` | Change fields of a rule in your rules file or the model's rules. |
 | `bpa rules remove <rule-id> [model]` | Delete a rule from your rules file or the model's rules. |
 | `bpa rules init` | Create an empty rules file. |
 
-`disable` and `ignore` check the rule ID first, so a typo can't silently turn off
+`ignore` checks the rule ID first, so a typo can't silently turn off
 nothing. The ID must belong to the bundled catalog (every ruleset), your config-dir
 `bpa-rules.json`, the selected `--rules-file`, or, for `ignore`, the model's embedded
 or local external rules. An unknown ID fails with `TOMIX_BPA_RULE_NOT_FOUND` and suggests
 close matches. If a rule source can't be read (for example, a remote rule file,
 which is never fetched here), the check is skipped. Pass `--allow-unknown` to use an
-ID anyway. `enable` and `unignore` accept any ID, so you can always clean up an entry
+ID anyway. `unignore` accepts any ID, so you can always clean up an entry
 for a rule that no longer exists.
 
 `bpa rules --rules-file <file>` points the subcommands at a BPA rules JSON
@@ -156,16 +164,137 @@ file. `bpa rules list` narrows what is listed:
 
 | Option | Description |
 |--------|-------------|
-| `--ruleset <name>` | Standard BPA ruleset to list: `standard`, `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. |
+| `--ruleset <name>` | Standard BPA ruleset to list: `standard`, `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`. Repeat it to combine presets. |
 | `--no-defaults` | Leave the built-in ruleset out of the listing. |
-| `--ignored` / `--disabled` | List only rules on the model's ignore list / only rules disabled for this user. Pass both for either. |
-| `--all` | Include disabled and ignored rules in the listing. |
+| `--ignored` | List only ignored rules, whether you or the model ignores them. |
+| `--all` | Include ignored rules in the listing. |
 
 ```sh
 tx bpa rules list
 tx bpa rules list model.bim --all
 tx bpa rules show HIDE_FOREIGN_KEYS
 ```
+
+### IsAvailableInMdx
+
+The catalog has two rules about a column's `IsAvailableInMdx` property, and
+they point the same way:
+
+- **Set IsAvailableInMdx to true on necessary columns**
+  (`SET_ISAVAILABLEINMDX_TO_TRUE_ON_NECESSARY_COLUMNS`, error, in `standard`).
+  A column that sorts another column, is sorted by one, is a hierarchy level, or
+  is used in a variation needs its attribute hierarchy. Without it, queries
+  fail, so the deploy gate blocks on it.
+- **Set IsAvailableInMdx to false on non-attribute columns**
+  (`ISAVAILABLEINMDX_FALSE_NONATTRIBUTE_COLUMNS`, warning, `--ruleset full` only).
+  A hidden column that is none of those things doesn't need an attribute
+  hierarchy, and turning it off saves processing time and memory. It is an
+  optimization, so it never blocks a deploy.
+
+The second rule skips every column the first rule protects, so no column is
+flagged by both, and applying its fix never trips the first rule. A tested
+guarantee keeps it that way. Some community rule sets have a simpler variant,
+"false on every hidden column", with no exceptions. Don't combine that
+variant with these rules: it turns off hierarchies that sort-by columns and
+hierarchy levels need, so the two rules contradict each other on those
+columns.
+
+### Rule sources
+
+`bpa run` loads rules from a chain of sources. Each source is optional:
+
+1. The `--ruleset` presets (`standard` unless you choose another).
+2. Your config-dir `bpa-rules.json`, which `bpa rules add` writes.
+3. The `bpa.rules` config key: files or URLs separated by `;`. Relative paths
+   resolve against the config directory (`~/.tomix`, or `$TOMIX_CONFIG_DIR`).
+4. The `TOMIX_BPA_RULES` environment variable, in the same format. Use it in CI
+   pipelines. Relative paths resolve against the working directory.
+5. `--rules` on the command line.
+6. The model's own rule annotations (see below).
+
+```sh
+tx config set bpa.rules "team/bpa-rules.json;https://example.com/org-rules.json"
+TOMIX_BPA_RULES=.devops/bpa-rules.json tx bpa run .
+```
+
+When two sources define the same rule ID, the later source wins, so the
+command line overrides the pipeline, and the pipeline overrides your config.
+A missing file or failed download stops the run with
+`TOMIX_BPA_RULES_LOAD_FAILED` and names the setting that pointed at it.
+
+The other commands read the same settings:
+
+- `bpa rules list` and `show` list the rules from `bpa.rules` and
+  `TOMIX_BPA_RULES` with source `bpa.rules` or `TOMIX_BPA_RULES`. A source that
+  can't be loaded is reported as a diagnostic, and the listing still shows
+  every other source.
+- `bpa rules list` shows each rule ID once, from the source that wins by the
+  same order as `bpa run`. A team or model rule that replaces another source's
+  copy says so (`overrides standard`; JSON `overrides`). `bpa rules show` still
+  prints every source's copy, so you can compare an override with the original.
+- `bpa rules ignore` accepts IDs from their local files.
+- The `deploy` BPA gate checks the `standard` ruleset, then `bpa.rules`,
+  `TOMIX_BPA_RULES`, and `--bpa-rules`, with the same override order. It
+  doesn't load your personal config-dir `bpa-rules.json` or the model's rule
+  annotations.
+
+Every run says where its rules came from, so a pipeline log shows what was
+checked:
+
+```text
+Rules loaded: 29 from standard ruleset (26) + .devops/bpa-rules.json via TOMIX_BPA_RULES (2) + model annotations (1)
+```
+
+Each count is the number of rules that source contributed after overrides.
+When a higher-precedence source replaced some of them, the count says so: with
+`--ruleset standard,full`, the line reads `standard ruleset (0; all 26
+overridden) + full ruleset (70)`. In JSON, the same information is in
+`ruleSources`: one entry per source with `name`, `kind` (`machine`, `user`,
+`external`, or `modelEmbedded`), `origin` (`ruleset`, `userFile`, `config`,
+`environment`, `option`, or `model`), `rules`, and `overridden`.
+
+### Ignoring rules
+
+`bpa rules ignore` switches a whole rule off at one of two levels:
+
+| | `ignore` / `unignore` | `ignore --user` / `unignore --user` |
+|---|---|---|
+| Applies to | One model, for everyone who uses it | You, on this machine, for every model |
+| Stored in | The model's `BestPracticeAnalyzer_IgnoreRules` annotation (shared with Tabular Editor); needs `--save` like any model change | `bpa-disabled.json` in the config directory; takes effect at once |
+
+```sh
+tx bpa rules ignore HIDE_FOREIGN_KEYS --save
+tx bpa rules ignore HIDE_FOREIGN_KEYS --user
+```
+
+`--user` can't be combined with a model or with `--save`, `--stage`, and the
+other save options; that fails with `TOMIX_OPTION_CONFLICT`. `bpa rules disable`
+and `enable`, the earlier spellings of `ignore --user` and `unignore --user`, still
+work but are no longer listed in help.
+
+A rule runs only when neither level ignores it. Unignoring at one level leaves
+the other in force, so `unignore` checks the other level and warns:
+
+- `unignore --user` warns with `TOMIX_BPA_RULE_STILL_IGNORED_BY_MODEL` when your
+  active local model still ignores the rule, and shows the `unignore` command
+  to run.
+- `unignore` warns with `TOMIX_BPA_RULE_STILL_IGNORED_BY_USER` when you still
+  ignore the rule, and shows the `unignore --user` command to run.
+
+`unignore --user` doesn't add a rule to the ruleset. For a rule that's only in
+`--ruleset full` (or in a default-off category), it warns with
+`TOMIX_BPA_RULE_NOT_IN_RULESET` and names the `--ruleset` value that runs it.
+
+`bpa rules list` shows both levels, and `--ignored` lists rules ignored at
+either one. In JSON, each rule has `ignoredByUser` and `ignoredByModel`
+booleans next to `status`, which keeps its earlier single value (`disabled` for
+a rule you ignore, which wins over `ignored`). The summary counts a rule
+ignored both ways in both `disabled` and `ignored`.
+
+`bpa run` counts skipped rules in `disabledRules`. The JSON also lists them by
+level in `userIgnoredRules` and `modelIgnoredRules`; a rule ignored both ways
+is in both lists. `ignoredRules` counts findings on individual objects that an
+object-level ignore annotation suppresses, not whole rules.
 
 ### Authoring rules
 
@@ -188,8 +317,8 @@ edited (`TOMIX_BPA_RULES_FILE_REMOTE`). Fields tx does not know about are kept a
 With `set`, pass only the fields to change; an empty value (`--description ""`)
 removes an optional field. `add` creates the file when it doesn't exist; `set` and
 `remove` fail with `TOMIX_BPA_RULES_FILE_NOT_FOUND`. `init` won't replace an
-existing file unless you pass `--force`. Built-in rules can't be edited or removed.
-Turn one off with `bpa rules disable`, or override it by adding a rule with the same ID.
+existing file unless you pass `--overwrite`. Built-in rules can't be edited or removed.
+Turn one off with `bpa rules ignore`, or override it by adding a rule with the same ID.
 
 ```sh
 tx bpa rules add --id MEASURE_DESCRIPTIONS --name "Measures need a description" --scope Measure --expression "string.IsNullOrWhitespace(Description)"
@@ -222,8 +351,9 @@ tx bpa rules remove MEASURE_DESCRIPTIONS . --save
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
 `--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files,
 `--bpa-fail-on` to lower the blocking threshold to warnings — errors block by default).
-The deploy gate honors `bpa rules disable` for the rules it loads. `bpa run` can
-load additional user and model rules, so the commands may report different findings.
+The deploy gate loads `bpa.rules` and `TOMIX_BPA_RULES` (see [Rule sources](#rule-sources))
+and honors `bpa rules ignore --user` for the rules it loads. `bpa run` also loads your
+config-dir `bpa-rules.json` and the model's rules, so the commands may report different findings.
 A rule that cannot be compiled or evaluated is itself an error-severity finding
 ("rule could not be evaluated: \<reason\>"), so a typo in a rule expression fails
 `bpa run` and the gates instead of silently skipping the rule.

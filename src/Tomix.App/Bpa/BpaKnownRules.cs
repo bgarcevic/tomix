@@ -3,9 +3,9 @@ using Tomix.Core.Results;
 namespace Tomix.App.Bpa;
 
 /// <summary>
-/// The rule IDs a <c>bpa rules disable</c>/<c>ignore</c> target can name: the whole bundled catalog,
-/// the user's config-dir <c>bpa-rules.json</c>, the selected rules file, and, with a model,
-/// its embedded and local external rules. Guards against a typo silently disabling or ignoring nothing.
+/// The rule IDs a <c>bpa rules ignore</c> target can name: the whole bundled catalog, the user's
+/// config-dir <c>bpa-rules.json</c>, the files <c>bpa.rules</c> and <c>TOMIX_BPA_RULES</c> name,
+/// the selected rules file, and, with a model, its embedded and local external rules. Guards against a typo silently disabling or ignoring nothing.
 /// </summary>
 public sealed class BpaKnownRules
 {
@@ -26,7 +26,8 @@ public sealed class BpaKnownRules
     public bool Complete { get; }
 
     /// <summary>The bundled catalog plus the user's config-dir and selected rules files.</summary>
-    public static BpaKnownRules Load(string? configDirectory, string? rulesFile = null)
+    public static BpaKnownRules Load(
+        string? configDirectory, string? rulesFile = null, Func<string, string?>? environment = null)
     {
         var ids = new HashSet<string>(
             BpaRuleLoader.LoadBundledCatalog().Select(r => r.Id), StringComparer.OrdinalIgnoreCase);
@@ -37,6 +38,23 @@ public sealed class BpaKnownRules
             : Path.Combine(configDirectory, "bpa-rules.json");
         if (userRulesPath is not null && File.Exists(userRulesPath))
             complete &= AddFileRules(userRulesPath, ids);
+
+        // The configured rule sources bpa run loads (#233). A URL isn't fetched to validate an
+        // ID, so it leaves the check incomplete (permissive) like any unreadable source.
+        if (!string.IsNullOrWhiteSpace(configDirectory))
+        {
+            try
+            {
+                foreach (var entry in BpaRuleSources.Resolve(
+                             configDirectory, environment ?? Environment.GetEnvironmentVariable, optionFiles: null))
+                    complete &= AddFileRules(entry.Location, ids);
+            }
+            catch (InvalidOperationException)
+            {
+                // A corrupt config file: the configured sources are unknown, so stay permissive.
+                complete = false;
+            }
+        }
 
         // An explicit file may be missing or remote. Keep validation permissive when its IDs
         // cannot be checked; remote files are not fetched just to validate a mutation.

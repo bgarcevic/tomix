@@ -141,8 +141,8 @@ internal static class BpaRulesRenderer
 
         AnsiConsole.WriteLine();
         RenderField("Source", [rule.Source], labelPad);
-        if (rule.Status != "active")
-            AnsiConsole.MarkupLine(Styling.Muted("Status".PadRight(labelPad.Length)) + Styling.Warning(rule.Status));
+        if (BpaRunView.RuleStatusLabel(rule) is { Length: > 0 } status)
+            AnsiConsole.MarkupLine(Styling.Muted("Status".PadRight(labelPad.Length)) + Styling.Warning(status));
         RenderField("Applies to", [rule.Scope], labelPad);
         RenderField("Expression", ExpressionLines(rule.Expression), labelPad);
         RenderField("Fix", ExpressionLines(rule.FixExpression), labelPad);
@@ -162,12 +162,13 @@ internal static class BpaRulesRenderer
 
     private static void RenderMetaLine(BpaRuleInfo rule, int width, string indent, bool showSource)
     {
-        var status = rule.Status == "active" ? "" : rule.Status;
+        var status = BpaRunView.RuleStatusLabel(rule);
         var fixable = string.IsNullOrWhiteSpace(rule.FixExpression) ? "" : "fixable";
         var segments = new List<string> { rule.Id };
         segments.Add(BpaRunView.SeverityWord(rule.Severity).ToLowerInvariant());
         segments.Add(rule.Scope);
         if (showSource) segments.Add(rule.Source);
+        segments.Add(BpaRunView.OverridesLabel(rule));
         segments.Add(status);
         segments.Add(fixable);
 
@@ -185,8 +186,8 @@ internal static class BpaRulesRenderer
     {
         var summary = result.Summary;
         var parts = new List<string> { $"{summary.Active} active" };
-        if (summary.Disabled > 0) parts.Add($"{summary.Disabled} disabled");
-        if (summary.Ignored > 0) parts.Add($"{summary.Ignored} ignored");
+        if (summary.Disabled > 0) parts.Add($"{summary.Disabled} ignored by you");
+        if (summary.Ignored > 0) parts.Add($"{summary.Ignored} ignored by the model");
 
         var line = result.Rules.Count < summary.Total
             ? $"{result.Rules.Count} of {summary.Total} rules shown · {string.Join(" · ", parts)}"
@@ -196,7 +197,7 @@ internal static class BpaRulesRenderer
         AnsiConsole.MarkupLine(Styling.MarkupEscape(line));
 
         if (result.Rules.Count < summary.Total)
-            StdErr.MarkupLine(Styling.Guidance("Add --all to include disabled and ignored rules."));
+            StdErr.MarkupLine(Styling.Guidance("Add --all to include ignored rules."));
     }
 
     private static string SeverityDot(BpaSeverity severity) => severity switch
@@ -269,14 +270,14 @@ internal static class BpaRulesRenderer
         if (!result.Changed)
         {
             AnsiConsole.MarkupLine(Styling.Muted(
-                $"Rule '{result.RuleId}' was already {(result.Disabled ? "disabled" : "enabled")} — no change."));
+                $"You {(result.Disabled ? "already ignore" : "weren't ignoring")} rule '{result.RuleId}' — no change."));
             return;
         }
 
         AnsiConsole.MarkupLine(result.Disabled
-            ? $"Rule {Styling.Value(result.RuleId)} disabled for the current user."
-            : $"Rule {Styling.Value(result.RuleId)} re-enabled for the current user.");
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Disabled rules:", result.DisabledRuleIds.Count.ToString())}");
+            ? $"Rule {Styling.Value(result.RuleId)} ignored for you, on this machine, for every model."
+            : $"Rule {Styling.Value(result.RuleId)} no longer ignored for you.");
+        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules you ignore:", result.DisabledRuleIds.Count.ToString())}");
     }
 
     /// <summary><c>bpa rules add/set/remove/init</c>: what changed, and in which file.</summary>
@@ -389,6 +390,7 @@ internal static class BpaRulesRenderer
         => new
         {
             ruleId = result.RuleId,
+            level = "user",
             disabled = result.Disabled,
             changed = result.Changed,
             disabledRuleIds = result.DisabledRuleIds
@@ -452,6 +454,7 @@ internal static class BpaRulesRenderer
         => new
         {
             ruleId = result.RuleId,
+            level = "model",
             ignored = result.Ignored,
             changed = result.Changed,
             ruleIds = result.RuleIds,
@@ -471,6 +474,9 @@ internal static class BpaRulesRenderer
         {
             ["source"] = rule.Source,
             ["status"] = rule.Status,
+            // Both levels, since a rule can be off at both and status names only one.
+            ["ignoredByUser"] = rule.Disabled,
+            ["ignoredByModel"] = rule.Ignored,
             ["id"] = rule.Id,
             ["name"] = rule.Name,
             ["category"] = rule.Category,
@@ -478,6 +484,10 @@ internal static class BpaRulesRenderer
             ["severityLabel"] = rule.Severity.ToString(),
             ["scope"] = rule.Scope
         };
+
+        // The other sources that define this id; `list` shows the winning copy once (additive).
+        if (rule.Overrides is { Count: > 0 })
+            json["overrides"] = rule.Overrides;
 
         AddIfNotEmpty(json, "description", rule.Description);
         AddIfNotEmpty(json, "expression", rule.Expression);

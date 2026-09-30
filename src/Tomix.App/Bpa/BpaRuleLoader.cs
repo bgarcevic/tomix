@@ -20,7 +20,7 @@ public sealed partial class BpaRuleLoader
         Timeout = TimeSpan.FromSeconds(30)
     };
 
-    public static IReadOnlyList<string> KnownRulesets { get; } =
+    private static readonly IReadOnlyList<string> NamedRulesets =
     [
         StandardRuleset,
         FullRuleset,
@@ -29,6 +29,25 @@ public sealed partial class BpaRuleLoader
         "microsoft-ja",
         "microsoft-es"
     ];
+
+    private static readonly Lazy<IReadOnlyList<string>> KnownRulesetsLazy =
+        new(() => [.. NamedRulesets, .. CategoryPresets(LoadBundledRules())]);
+
+    /// <summary>
+    /// Every <c>--ruleset</c> preset: the named rulesets plus one preset per default-off category
+    /// the bundled catalog has rules for.
+    /// </summary>
+    public static IReadOnlyList<string> KnownRulesets => KnownRulesetsLazy.Value;
+
+    /// <summary>
+    /// Catalog categories that ship default-off (#233): neither <c>standard</c> nor <c>full</c>
+    /// includes them, and each is opted into through its own <c>--ruleset</c> preset (the category
+    /// name in kebab case), for example <c>--ruleset standard,localization</c>. A new category
+    /// whose rules would bury real findings on most models — localization rules fire on every
+    /// visible object of a single-culture model — belongs here rather than in <c>full</c>.
+    /// </summary>
+    public static IReadOnlySet<string> DefaultOffCategories { get; } =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Localization" };
 
     /// <summary>
     /// The curated subset of the bundled catalog that makes up the <c>standard</c> ruleset.
@@ -100,14 +119,85 @@ public sealed partial class BpaRuleLoader
         HttpClient? httpClient,
         CancellationToken cancellationToken)
     {
-        var source = ResolveRulesetSource(ruleset);
-        if (source == StandardRuleset)
-            return LoadBundledRules().Where(rule => CuratedRuleIds.Contains(rule.Id)).ToList();
+        var presets = SplitRulesets(ruleset);
+        var rules = new List<BpaRule>();
+        foreach (var preset in presets)
+            rules.AddRange(await LoadPresetAsync(preset, httpClient, cancellationToken).ConfigureAwait(false));
 
-        if (source == FullRuleset)
-            return LoadBundledRules();
+        return rules;
+    }
 
-        return await LoadFromSourceAsync(source, httpClient, cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// The presets a <c>--ruleset</c> value names: a comma-separated list, trimmed, with empty
+    /// entries dropped; no value at all means <c>standard</c>.
+    /// </summary>
+    public static IReadOnlyList<string> SplitRulesets(string? ruleset)
+    {
+        var presets = (ruleset ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return presets.Length == 0 ? [StandardRuleset] : presets;
+    }
+
+    /// <summary>
+    /// Selects a bundled preset from <paramref name="catalog"/>: <c>standard</c> (the curated
+    /// subset), <c>full</c> (everything outside the default-off categories), or a default-off
+    /// category's own preset. Returns null for a preset that is not bundled.
+    /// </summary>
+    internal static IReadOnlyList<BpaRule>? SelectBundled(IReadOnlyList<BpaRule> catalog, string preset)
+    {
+        var key = preset.Trim();
+        if (key.Equals("default", StringComparison.OrdinalIgnoreCase)
+            || key.Equals(StandardRuleset, StringComparison.OrdinalIgnoreCase))
+            return catalog.Where(rule => CuratedRuleIds.Contains(rule.Id) && !IsDefaultOff(rule)).ToList();
+
+        if (key.Equals(FullRuleset, StringComparison.OrdinalIgnoreCase)
+            || key.Equals("all", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("bundled", StringComparison.OrdinalIgnoreCase))
+            return catalog.Where(rule => !IsDefaultOff(rule)).ToList();
+
+        if (CategoryPresets(catalog).Contains(key, StringComparer.OrdinalIgnoreCase))
+            return catalog.Where(rule => PresetName(rule.Category).Equals(key, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        return null;
+    }
+
+    /// <summary>
+    /// The preset that brings a bundled rule into a run when <c>standard</c> does not: <c>full</c>,
+    /// or its default-off category's preset. Null for a rule in <c>standard</c> or not bundled.
+    /// </summary>
+    public static string? OptInPresetFor(string ruleId)
+    {
+        var catalog = LoadBundledRules();
+        var rule = catalog.FirstOrDefault(r => r.Id.Equals(ruleId, StringComparison.OrdinalIgnoreCase));
+        if (rule is null || SelectBundled(catalog, StandardRuleset)!.Contains(rule))
+            return null;
+
+        return IsDefaultOff(rule) ? PresetName(rule.Category) : FullRuleset;
+    }
+
+    /// <summary>One preset per default-off category that has at least one rule in the catalog.</summary>
+    internal static IReadOnlyList<string> CategoryPresets(IReadOnlyList<BpaRule> catalog)
+        => catalog
+            .Where(IsDefaultOff)
+            .Select(rule => PresetName(rule.Category))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static bool IsDefaultOff(BpaRule rule) => DefaultOffCategories.Contains(rule.Category);
+
+    private static string PresetName(string category)
+        => string.Join('-', category.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+
+    private static async Task<IReadOnlyList<BpaRule>> LoadPresetAsync(
+        string preset,
+        HttpClient? httpClient,
+        CancellationToken cancellationToken)
+    {
+        if (SelectBundled(LoadBundledRules(), preset) is { } bundled)
+            return bundled;
+
+        return await LoadFromSourceAsync(ResolveRemoteRuleset(preset), httpClient, cancellationToken).ConfigureAwait(false);
     }
 
     public static Task<IReadOnlyList<BpaRule>> LoadFromSourceAsync(
@@ -179,19 +269,9 @@ public sealed partial class BpaRuleLoader
             .Select(value => value.Trim())
             .ToList();
 
-    private static string ResolveRulesetSource(string? ruleset)
+    private static string ResolveRemoteRuleset(string preset)
     {
-        var key = string.IsNullOrWhiteSpace(ruleset) ? StandardRuleset : ruleset.Trim();
-
-        if (key.Equals("default", StringComparison.OrdinalIgnoreCase)
-            || key.Equals(StandardRuleset, StringComparison.OrdinalIgnoreCase))
-            return StandardRuleset;
-
-        if (key.Equals(FullRuleset, StringComparison.OrdinalIgnoreCase)
-            || key.Equals("all", StringComparison.OrdinalIgnoreCase)
-            || key.Equals("bundled", StringComparison.OrdinalIgnoreCase))
-            return FullRuleset;
-
+        var key = preset.Trim();
         return key.ToLowerInvariant() switch
         {
             "microsoft" or "microsoft-en" => MicrosoftRulesUrl,
@@ -199,8 +279,7 @@ public sealed partial class BpaRuleLoader
             "microsoft-ja" or "microsoft-japanese" => MicrosoftJapaneseRulesUrl,
             "microsoft-es" or "microsoft-spanish" => MicrosoftSpanishRulesUrl,
             _ => throw new ArgumentException(
-                $"Unknown BPA ruleset '{key}'. Known rulesets: {string.Join(", ", KnownRulesets)}. Use --rules for a custom file or URL.",
-                nameof(ruleset))
+                $"Unknown BPA ruleset '{key}'. Known rulesets: {string.Join(", ", KnownRulesets)}. Use --rules for a custom file or URL.")
         };
     }
 

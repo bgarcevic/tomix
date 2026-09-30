@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Tomix.App.State;
 using Tomix.Cli.Commands;
 using Tomix.Provider.Tmdl;
 
@@ -24,6 +25,44 @@ public sealed class BpaRulesCommandTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("SELECTED_RULE", result.Stdout);
+    }
+
+    [Fact]
+    public void IgnoreUser_RoundTrip_SwitchesTheRuleForTheUser()
+    {
+        using var dir = new TempDir();
+        var rulesFile = dir.WriteFile("selected.json", SelectedRuleJson);
+        var root = TestRoot.Full();
+
+        JsonElement Run(string verb)
+        {
+            var result = ConsoleCapture.Invoke(root.Parse(
+                ["bpa", "rules", "--rules-file", rulesFile, verb, "SELECTED_RULE", "--user", "--output-format", "json"]));
+            Assert.Equal(0, result.ExitCode);
+            return JsonDocument.Parse(result.Stdout).RootElement.GetProperty("data");
+        }
+
+        var ignored = Run("ignore");
+        Assert.Equal("user", ignored.GetProperty("level").GetString());
+        Assert.True(ignored.GetProperty("disabled").GetBoolean());
+        Assert.Contains("SELECTED_RULE", ignored.GetProperty("disabledRuleIds").EnumerateArray().Select(e => e.GetString()));
+
+        var unignored = Run("unignore");
+        Assert.False(unignored.GetProperty("disabled").GetBoolean());
+        Assert.True(unignored.GetProperty("changed").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData("ignore", "--save")]
+    [InlineData("unignore", "--stage")]
+    [InlineData("ignore", "some-model-folder")]
+    public void IgnoreUser_WithAModelOrSaveOption_IsAConflict(string verb, string extra)
+    {
+        var result = ConsoleCapture.Invoke(TestRoot.Full().Parse(
+            ["bpa", "rules", verb, "HIDE_FOREIGN_KEYS", "--user", extra, "--output-format", "json"]));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("\"TOMIX_OPTION_CONFLICT\"", result.Stderr);
     }
 
     [Fact]
@@ -110,6 +149,60 @@ public sealed class BpaRulesCommandTests
             ["bpa", "rules", "remove", "MY_RULE", model.Path, "--save"]), captureAnsiConsole: true);
         Assert.Equal(0, removed.ExitCode);
         Assert.Contains("Removed model rule", removed.Stdout);
+    }
+
+    [Fact]
+    public void List_NoModel_UsesTheLocalActiveConnection()
+    {
+        // `ignore --save` acts on the active model, so `list --ignored` must see that model too.
+        using var model = SampleModel.CopyToTemp();
+        var services = TestServices.Create();
+        services.State.SaveCurrentSession(new CliConnectionState(
+            Server: null, Database: null, Model: model.Path, Auth: null, Local: true, Profile: null));
+        var root = TestRoot.With(new BpaCommand(
+            [new TmdlModelProvider()], services.State, services.Mutations, services.BpaRules, services.ConfigDirectory).Build());
+
+        var ignore = ConsoleCapture.Invoke(root.Parse(
+            ["bpa", "rules", "ignore", "HIDE_FOREIGN_KEYS", "--save"]), captureAnsiConsole: true);
+        Assert.Equal(0, ignore.ExitCode);
+
+        var list = ConsoleCapture.Invoke(root.Parse(
+            ["bpa", "rules", "list", "--ignored", "--output-format", "json"]));
+
+        Assert.Equal(0, list.ExitCode);
+        var rule = Assert.Single(JsonDocument.Parse(list.Stdout).RootElement.GetProperty("data").GetProperty("rules").EnumerateArray());
+        Assert.Equal("HIDE_FOREIGN_KEYS", rule.GetProperty("id").GetString());
+        Assert.True(rule.GetProperty("ignoredByModel").GetBoolean());
+
+        var show = ConsoleCapture.Invoke(root.Parse(
+            ["bpa", "rules", "show", "HIDE_FOREIGN_KEYS", "--output-format", "json"]));
+
+        Assert.Equal(0, show.ExitCode);
+        var shown = Assert.Single(JsonDocument.Parse(show.Stdout).RootElement.GetProperty("data").GetProperty("rules").EnumerateArray());
+        Assert.True(shown.GetProperty("ignoredByModel").GetBoolean());
+    }
+
+    [Fact]
+    public void List_RepeatedRuleset_CombinesThePresets()
+    {
+        // PowerShell splits an unquoted `standard,full` into two arguments; repeating the option
+        // combines presets with no quoting at all.
+        var result = ConsoleCapture.Invoke(TestRoot.Full().Parse(
+            ["bpa", "rules", "list", "--ruleset", "standard", "--ruleset", "full", "--output-format", "json"]));
+
+        Assert.Equal(0, result.ExitCode);
+        var ids = JsonDocument.Parse(result.Stdout).RootElement.GetProperty("data").GetProperty("rules")
+            .EnumerateArray().Select(r => r.GetProperty("id").GetString()).ToList();
+        Assert.Contains("UNNECESSARY_COLUMNS", ids);
+    }
+
+    [Fact]
+    public void Run_Ruleset_TakesOneValue_SoTheModelStaysPositional()
+    {
+        var parse = TestRoot.Full().Parse(["bpa", "run", "--ruleset", "full", "some-model"]);
+
+        Assert.Empty(parse.Errors);
+        Assert.Equal(["full"], parse.GetValue<string[]>("--ruleset")!);
     }
 
     [Fact]

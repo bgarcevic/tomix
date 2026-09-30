@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.App.Deploy;
 using Tomix.App.State;
+using Tomix.Core.Configuration;
 using Tomix.Core.Models;
 using Tomix.Core.Properties;
 using Tomix.Core.Results;
@@ -734,6 +735,51 @@ public sealed class DeployModelHandlerTests
         Assert.True(proceeded.Success);
     }
 
+    /// <summary>
+    /// #233: a team rule shared through <c>TOMIX_BPA_RULES</c> or the <c>bpa.rules</c> key gates a
+    /// deploy just as it runs in <c>bpa run</c>, with no <c>--bpa-rules</c> on the command line.
+    /// </summary>
+    [Theory]
+    [InlineData(BpaRuleOrigin.Environment)]
+    [InlineData(BpaRuleOrigin.Config)]
+    public async Task HandleAsync_BpaGate_LoadsTheConfiguredRuleSources(BpaRuleOrigin origin)
+    {
+        using var rulesDir = new TempDir();
+        using var config = new TempConfigDir();
+        var rulesPath = WriteRuleFile(rulesDir, "TEAM_SHARED_RULE", severity: 3);
+        if (origin == BpaRuleOrigin.Config)
+            new Config.TomixConfigStore(Platform.Configuration.TomixPaths.ConfigFileIn(config.Path))
+                .Save(new Dictionary<string, string> { [ConfigKeys.BpaRules] = rulesPath });
+        Func<string, string?> environment = name =>
+            origin == BpaRuleOrigin.Environment && name == BpaRuleSources.EnvironmentVariable ? rulesPath : null;
+
+        var result = await DeployThroughGate(
+            rulesPath: null, bpaFailOn: null, configDirectory: config.Path, environment: environment);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_VIOLATIONS", result.Diagnostics[0].Code);
+
+        // Control: without the setting, the same deploy passes the gate.
+        using var emptyConfig = new TempConfigDir();
+        var unconfigured = await DeployThroughGate(rulesPath: null, bpaFailOn: null, configDirectory: emptyConfig.Path);
+        Assert.True(unconfigured.Success);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BpaGate_MissingConfiguredRuleFile_NamesTheSetting()
+    {
+        using var rulesDir = new TempDir();
+        var missing = rulesDir.Combine("missing.json");
+
+        var result = await DeployThroughGate(
+            rulesPath: null, bpaFailOn: null,
+            environment: name => name == BpaRuleSources.EnvironmentVariable ? missing : null);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_BPA_RULES_LOAD_FAILED", result.Diagnostics[0].Code);
+        Assert.Contains(BpaRuleSources.EnvironmentVariable, result.Diagnostics[0].Message);
+    }
+
     private static string WriteBrokenRuleFile(TempDir dir, string id)
     {
         var path = dir.Combine($"{id.ToLowerInvariant()}.json");
@@ -748,10 +794,16 @@ public sealed class DeployModelHandlerTests
     /// with the severity the test chose.
     /// </summary>
     private async Task<TomixResult<DeployModelResult>> DeployThroughGate(
-        string rulesPath, string? bpaFailOn, BpaUserRuleState? bpaRules = null)
+        string? rulesPath,
+        string? bpaFailOn,
+        BpaUserRuleState? bpaRules = null,
+        string? configDirectory = null,
+        Func<string, string?>? environment = null)
     {
         var session = new StubDeployOnlySession();
-        var handler = new DeployModelHandler([new StubDeployOnlyProvider(session)], TestState, bpaRules: bpaRules);
+        var handler = new DeployModelHandler(
+            [new StubDeployOnlyProvider(session)], TestState, bpaRules: bpaRules,
+            configDirectory: configDirectory, environment: environment ?? (_ => null));
         var result = await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("samples/basic-tmdl"),
@@ -761,7 +813,7 @@ public sealed class DeployModelHandlerTests
                 CreateOnly: false,
                 SkipBpa: false,
                 FixBpa: false,
-                BpaRules: [rulesPath],
+                BpaRules: rulesPath is null ? null : [rulesPath],
                 XmlaOutput: null,
                 Ci: null,
                 BpaFailOn: bpaFailOn),

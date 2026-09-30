@@ -16,19 +16,22 @@ public sealed class BpaRunHandler
     private readonly BpaUserRuleState _userRules;
     private readonly string _configDirectory;
     private readonly HttpClient? _httpClient;
+    private readonly Func<string, string?> _environment;
 
     public BpaRunHandler(
         IEnumerable<IModelProvider> providers,
         MutationStores stores,
         BpaUserRuleState userRules,
         string configDirectory,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        Func<string, string?>? environment = null)
     {
         _providers = providers.ToList();
         _stores = stores;
         _userRules = userRules;
         _configDirectory = configDirectory;
         _httpClient = httpClient;
+        _environment = environment ?? Environment.GetEnvironmentVariable;
     }
 
     public async Task<TomixResult<BpaRunResult>> HandleAsync(
@@ -90,13 +93,14 @@ public sealed class BpaRunHandler
                 ? BpaModelRuleLoader.ResolveBaseDirectory(session, request.Model)
                 : await ResolveStagedRuleBaseDirectoryAsync(request.Model, cancellationToken);
 
-            IReadOnlyList<BpaRule> rules;
+            BpaResolvedRules resolved;
             IReadOnlyList<string> loadDiagnostics;
             try
             {
-                (rules, loadDiagnostics) = await LoadRulesAsync(request, snapshot, ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
+                (resolved, loadDiagnostics) = await LoadRulesAsync(request, snapshot, ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
+            // InvalidOperationException: a corrupt config file, which carries the bpa.rules key.
+            catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
             {
                 return TomixResult<BpaRunResult>.Fail(
                     "TOMIX_BPA_RULES_LOAD_FAILED",
@@ -104,6 +108,7 @@ public sealed class BpaRunHandler
                     exitCode: 2);
             }
 
+            var rules = resolved.Rules;
             var userDisabled = _userRules.GetDisabled().ToList();
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -118,6 +123,7 @@ public sealed class BpaRunHandler
             var runResult = result with
             {
                 DurationMs = sw.ElapsedMilliseconds,
+                RuleSources = resolved.Sources,
                 RuleLoadDiagnostics = loadDiagnostics.Count > 0 ? loadDiagnostics : null
             };
 
@@ -228,7 +234,7 @@ public sealed class BpaRunHandler
         return BpaModelRuleLoader.ResolveBaseDirectory(session: null, model);
     }
 
-    private async Task<(IReadOnlyList<BpaRule> Rules, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
+    private async Task<(BpaResolvedRules Resolved, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
         BpaRunRequest request,
         ModelSnapshot snapshot,
         string? modelRuleBaseDirectory,
@@ -239,34 +245,30 @@ public sealed class BpaRunHandler
 
         if (!request.NoDefaults)
         {
-            var label = string.IsNullOrWhiteSpace(request.Ruleset) ? BpaRuleLoader.StandardRuleset : request.Ruleset;
-            collections.Add(new BpaRuleCollection(
-                BpaRuleSourceKind.Machine, label,
-                await BpaRuleLoader
-                    .LoadRulesetAsync(request.Ruleset, _httpClient, cancellationToken)
-                    .ConfigureAwait(false)));
+            foreach (var preset in BpaRuleLoader.SplitRulesets(request.Ruleset))
+                collections.Add(new BpaRuleCollection(
+                    BpaRuleSourceKind.Machine, preset,
+                    await BpaRuleLoader
+                        .LoadRulesetAsync(preset, _httpClient, cancellationToken)
+                        .ConfigureAwait(false),
+                    BpaRuleOrigin.Ruleset));
         }
 
-        if (request.RulesFiles is not null)
-        {
-            foreach (var file in request.RulesFiles)
-            {
-                if (!string.IsNullOrWhiteSpace(file))
-                    collections.Add(new BpaRuleCollection(
-                        BpaRuleSourceKind.User, file,
-                        await BpaRuleLoader
-                            .LoadFromSourceAsync(file, _httpClient, cancellationToken)
-                            .ConfigureAwait(false)));
-            }
-        }
-
+        // The rule-source chain (#233), lowest precedence first: all links are user rules, so a
+        // later link overrides an earlier one for the same id.
         var userRulesPath = Path.Combine(_configDirectory, "bpa-rules.json");
         if (File.Exists(userRulesPath))
         {
             var userRules = BpaRuleLoader.LoadFromFile(userRulesPath);
             if (userRules.Count > 0)
-                collections.Add(new BpaRuleCollection(BpaRuleSourceKind.User, userRulesPath, userRules));
+                collections.Add(new BpaRuleCollection(BpaRuleSourceKind.User, userRulesPath, userRules, BpaRuleOrigin.UserFile));
         }
+
+        foreach (var entry in BpaRuleSources.Resolve(_configDirectory, _environment, request.RulesFiles))
+            collections.Add(new BpaRuleCollection(
+                BpaRuleSourceKind.User, entry.Location,
+                await BpaRuleSources.LoadEntryAsync(entry, _httpClient, cancellationToken).ConfigureAwait(false),
+                entry.Origin));
 
         if (!request.NoModelRules)
         {
@@ -282,6 +284,7 @@ public sealed class BpaRunHandler
             diagnostics.AddRange(model.Diagnostics);
         }
 
-        return (BpaRuleResolver.Resolve(collections), diagnostics);
+        return (BpaRuleResolver.ResolveWithSources(collections), diagnostics);
     }
+
 }

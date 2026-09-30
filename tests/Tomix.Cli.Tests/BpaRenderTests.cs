@@ -293,4 +293,89 @@ public class BpaRenderTests
         Assert.False(BpaRunView.MatchesFilter(BpaSeverity.Warning, errors: true, warnings: false, info: false));
         Assert.True(BpaRunView.MatchesFilter(BpaSeverity.Warning, errors: true, warnings: true, info: false));
     }
+
+    [Fact]
+    public void RulesLoadedLine_NamesEverySourceAndWhereItWasConfigured()
+    {
+        // #233: a CI log must say where the rules came from — the preset, the model's own
+        // annotations (collapsed into one entry), and each configured file with its setting.
+        var line = BpaRunView.RulesLoadedLine(
+        [
+            new BpaRuleSourceSummary("standard", BpaRuleSourceKind.Machine, BpaRuleOrigin.Ruleset, 26),
+            new BpaRuleSourceSummary("C:/tomix/bpa-rules.json", BpaRuleSourceKind.User, BpaRuleOrigin.UserFile, 1),
+            new BpaRuleSourceSummary("team.json", BpaRuleSourceKind.User, BpaRuleOrigin.Config, 2),
+            new BpaRuleSourceSummary("ci/rules.json", BpaRuleSourceKind.User, BpaRuleOrigin.Environment, 3),
+            new BpaRuleSourceSummary("extra.json", BpaRuleSourceKind.User, BpaRuleOrigin.Option, 4),
+            new BpaRuleSourceSummary("model-embedded", BpaRuleSourceKind.ModelEmbedded, BpaRuleOrigin.Model, 1),
+            new BpaRuleSourceSummary("../.devops/rules.json", BpaRuleSourceKind.External, BpaRuleOrigin.Model, 2),
+        ]);
+
+        Assert.Equal(
+            "Rules loaded: 39 from standard ruleset (26) + user rules file (1) + team.json via bpa.rules (2)"
+                + " + ci/rules.json via TOMIX_BPA_RULES (3) + extra.json via --rules (4) + model annotations (3)",
+            line);
+    }
+
+    [Theory]
+    [InlineData(0, 26, "standard ruleset (0; all 26 overridden) + full ruleset (70)")]
+    [InlineData(25, 1, "standard ruleset (25; 1 overridden) + full ruleset (70)")]
+    public void RulesLoadedLine_OverriddenSource_SaysSoInsteadOfLookingEmpty(int won, int overridden, string expected)
+    {
+        // `--ruleset standard,full`: full replaces standard's rules, which must not read as "(0)".
+        var line = BpaRunView.RulesLoadedLine(
+        [
+            new BpaRuleSourceSummary("standard", BpaRuleSourceKind.Machine, BpaRuleOrigin.Ruleset, won, overridden),
+            new BpaRuleSourceSummary("full", BpaRuleSourceKind.Machine, BpaRuleOrigin.Ruleset, 70),
+        ]);
+
+        Assert.EndsWith(expected, line);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, "")]
+    [InlineData(1, 0, 0, "1 rule by you")]
+    [InlineData(0, 2, 0, "2 rules by the model")]
+    [InlineData(1, 1, 3, "1 rule by you · 1 rule by the model · 3 findings")]
+    [InlineData(0, 0, 1, "1 finding")]
+    public void IgnoredLine_CountsRulesPerLevelThenFindings(int byUser, int byModel, int findings, string expected)
+        => Assert.Equal(expected, BpaRunView.IgnoredLine(byUser, byModel, findings));
+
+    [Theory]
+    [InlineData("TOMIX_BPA_RULES", new[] { "standard" }, "overrides standard")]
+    [InlineData("full", new[] { "standard" }, "")]
+    [InlineData("standard", new string[0], "")]
+    public void OverridesLabel_MentionsOnlyARuleThatReplacedAnotherSource(string source, string[] overrides, string expected)
+    {
+        var rule = new BpaRuleInfo(source, "active", "R", "R", "c", BpaSeverity.Warning, "Table",
+            Description: null, Expression: null, FixExpression: null, Enabled: true,
+            Overrides: overrides.Length > 0 ? overrides : null);
+
+        Assert.Equal(expected, BpaRunView.OverridesLabel(rule));
+    }
+
+    [Fact]
+    public void RulesLoadedLine_NoSources_SaysNoRulesWereLoaded()
+        => Assert.Equal("Rules loaded: none", BpaRunView.RulesLoadedLine([]));
+
+    [Theory]
+    [InlineData(false, false, "")]
+    [InlineData(true, false, "ignored (you)")]
+    [InlineData(false, true, "ignored (model)")]
+    [InlineData(true, true, "ignored (you, model)")]
+    public void RuleStatusLabel_NamesEveryLevelThatKeepsTheRuleOff(bool disabled, bool ignored, string expected)
+    {
+        var status = disabled ? "disabled" : ignored ? "ignored" : "active";
+        var rule = new BpaRuleInfo("bundled", status, "R", "R", "c", BpaSeverity.Warning, "Table",
+            Description: null, Expression: null, FixExpression: null, Enabled: !disabled && !ignored,
+            Disabled: disabled, Ignored: ignored);
+
+        Assert.Equal(expected, BpaRunView.RuleStatusLabel(rule));
+    }
+
+    [Theory]
+    [InlineData(BpaRuleSuppression.User, "ignored by you")]
+    [InlineData(BpaRuleSuppression.Model, "ignored by the model")]
+    [InlineData(BpaRuleSuppression.User | BpaRuleSuppression.Model, "ignored by you, ignored by the model")]
+    public void SuppressionLabel_NamesTheLevel(BpaRuleSuppression level, string expected)
+        => Assert.Equal(expected, BpaRunView.SuppressionLabel(level));
 }

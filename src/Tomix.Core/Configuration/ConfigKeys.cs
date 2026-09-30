@@ -23,6 +23,12 @@ public static class ConfigKeys
     /// <summary>Full authority URL override (e.g. a sovereign cloud login endpoint).</summary>
     public const string AuthAuthority = "auth.authority";
 
+    /// <summary>
+    /// BPA rule files or URLs loaded by every <c>bpa run</c>, separated by <c>;</c>. Relative paths
+    /// resolve against the config directory. <c>TOMIX_BPA_RULES</c> and <c>--rules</c> layer on top.
+    /// </summary>
+    public const string BpaRules = "bpa.rules";
+
     public static readonly IReadOnlyList<string> All =
     [
         DefaultFormat,
@@ -31,7 +37,8 @@ public static class ConfigKeys
         ValidateOnSave,
         AuthClientId,
         AuthTenant,
-        AuthAuthority
+        AuthAuthority,
+        BpaRules
     ];
 
     public static bool IsKnown(string key) => All.Contains(key, StringComparer.OrdinalIgnoreCase);

@@ -5,7 +5,9 @@ namespace Tomix.Core.Bpa;
 /// <see cref="Violation"/> payload is populated and <see cref="IsIgnored"/> indicates whether the
 /// violating object suppresses this rule via an object-level ignore annotation. For the sentinel
 /// kinds (disabled / invalid-compatibility / compilation / evaluation) the payload is null and
-/// <see cref="ErrorMessage"/> / <see cref="ErrorScope"/> carry the diagnostic detail.
+/// <see cref="ErrorMessage"/> / <see cref="ErrorScope"/> carry the diagnostic detail, and a
+/// <see cref="BpaResultKind.DisabledRule"/> sentinel names the level(s) that switched the rule off in
+/// <see cref="SuppressedBy"/>.
 /// </summary>
 public sealed record BpaResult(
     BpaResultKind Kind,
@@ -16,7 +18,8 @@ public sealed record BpaResult(
     BpaViolation? Violation = null,
     string? ErrorMessage = null,
     string? ErrorScope = null,
-    bool IsIgnored = false)
+    bool IsIgnored = false,
+    BpaRuleSuppression SuppressedBy = BpaRuleSuppression.None)
 {
     /// <summary>Creates a violation result from a fully-built <see cref="BpaViolation"/>.</summary>
     public static BpaResult ForViolation(BpaRule rule, BpaViolation violation, bool isIgnored = false)
@@ -27,4 +30,9 @@ public sealed record BpaResult(
     public static BpaResult Sentinel(BpaResultKind kind, BpaRule rule, string? errorMessage = null, string? errorScope = null)
         => new(kind, rule.Id, rule.Name, rule.Category, rule.Severity,
             ErrorMessage: errorMessage, ErrorScope: errorScope);
+
+    /// <summary>Creates the sentinel for a rule switched off at the given level(s).</summary>
+    public static BpaResult Disabled(BpaRule rule, BpaRuleSuppression suppressedBy)
+        => new(BpaResultKind.DisabledRule, rule.Id, rule.Name, rule.Category, rule.Severity,
+            SuppressedBy: suppressedBy);
 }

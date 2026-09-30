@@ -28,16 +28,16 @@ public sealed class BpaEngine
 
         var model = BpaModelBuilder.Build(snapshot);
 
-        // Rules disabled globally via the model-level ignore annotation, or by the user (machine-wide
-        // disable), are not evaluated.
-        var disabledRuleIds = new HashSet<string>(BpaIgnoreStore.ReadRuleIds(model.Source), StringComparer.OrdinalIgnoreCase);
-        if (options.DisabledRuleIds is { Count: > 0 })
-            disabledRuleIds.UnionWith(options.DisabledRuleIds);
+        // Rules ignored by the model-level annotation, or disabled by the user (machine-wide), are
+        // not evaluated. The levels are kept apart so results can say which one applied.
+        var suppression = new Suppression(
+            BpaIgnoreStore.ReadRuleIds(model.Source),
+            new HashSet<string>(options.DisabledRuleIds ?? [], StringComparer.OrdinalIgnoreCase));
         var results = new List<BpaResult>();
         var hasVertipaqStats = HasVertipaqStats(snapshot);
 
         foreach (var rule in activeRules)
-            EvaluateRule(rule, model, snapshot, disabledRuleIds, hasVertipaqStats, options.PathFilter, results);
+            EvaluateRule(rule, model, snapshot, suppression, hasVertipaqStats, options.PathFilter, results);
 
         return new BpaRunResult(results, snapshot.Name, activeRules.Count);
     }
@@ -46,15 +46,15 @@ public sealed class BpaEngine
         BpaRule rule,
         BpaModel model,
         ModelSnapshot snapshot,
-        IReadOnlySet<string> disabledRuleIds,
+        Suppression suppression,
         bool hasVertipaqStats,
         string? pathFilter,
         List<BpaResult> results)
     {
         // A globally disabled rule is recorded as a sentinel and never evaluated.
-        if (disabledRuleIds.Contains(rule.Id))
+        if (suppression.For(rule.Id) is var suppressedBy and not BpaRuleSuppression.None)
         {
-            results.Add(BpaResult.Sentinel(BpaResultKind.DisabledRule, rule));
+            results.Add(BpaResult.Disabled(rule, suppressedBy));
             return;
         }
 
@@ -212,6 +212,13 @@ public sealed class BpaEngine
         BpaRole => Eq(token, "ModelRole"),
         _ => false
     };
+
+    private sealed record Suppression(IReadOnlySet<string> ModelIgnored, IReadOnlySet<string> UserDisabled)
+    {
+        public BpaRuleSuppression For(string ruleId)
+            => (UserDisabled.Contains(ruleId) ? BpaRuleSuppression.User : BpaRuleSuppression.None)
+                | (ModelIgnored.Contains(ruleId) ? BpaRuleSuppression.Model : BpaRuleSuppression.None);
+    }
 
     private static bool Eq(string a, string b) => a.Equals(b, StringComparison.OrdinalIgnoreCase);
 

@@ -70,9 +70,13 @@ Rules that need VertiPaq statistics the model doesn't have are not checked. The 
 still proceeds, with a `TOMIX_BPA_VERTIPAQ_STATS_MISSING` warning that names them and
 says how to collect the statistics: `tx vertipaq --annotate --save` on a deployed model,
 or on a local model connected to one in workspace mode.
-The gate honors `bpa rules disable`: it skips any rule you disabled locally when that
-rule is among the gate's loaded rules. `bpa run` can load additional user and model
-rules, so the commands may report different findings.
+Besides the built-in `standard` ruleset, the gate loads the rule files that the `bpa.rules`
+config key and the `TOMIX_BPA_RULES` environment variable name, then `--bpa-rules`; a later
+source overrides an earlier one for the same rule ID (see
+[rule sources](validate.md#rule-sources)). Set `TOMIX_BPA_RULES` in a pipeline to gate every
+deploy on the team's rules. The gate honors `bpa rules ignore --user`: it skips any rule you
+ignore locally when that rule is among the gate's loaded rules. `bpa run` also loads your
+config-dir `bpa-rules.json` and the model's rules, so the commands may report different findings.
 
 Without `-s/--server`, the target comes from the active connection: a remote connection
 deploys to itself, and a local connection with a workspace-mode mirror deploys to the
@@ -92,7 +96,7 @@ script, so it neither previews nor asks.
 | `--xmla <file>` | Write the deployment as a TMSL script to a file instead of deploying (`-` for stdout). |
 | `--create-only` | Create the target model only if it does not exist; fail when it does. |
 | `--skip-bpa` / `--fix-bpa` | Skip the BPA gate, or apply rule fixes before deploying. |
-| `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset. |
+| `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset, `bpa.rules`, and `TOMIX_BPA_RULES`; they override those for the same rule ID. |
 | `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. Rules that cannot be evaluated count as error-severity findings. |
 | `-p, --profile <name>` | Use a saved remote profile for this deploy only. List profiles with `tx profile list`; create one with `tx profile set <name> -s <workspace> -d <database>`. |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr. |

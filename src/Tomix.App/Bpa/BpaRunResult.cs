@@ -27,6 +27,12 @@ public sealed record BpaRunResult(
     public MutationOutcome FixOutcome { get; init; } = MutationOutcome.Unchanged;
 
     /// <summary>
+    /// Every rule source the run loaded, in load order, with the number of effective rules each
+    /// contributed (#233). Feeds the "Rules loaded" attribution line and the JSON <c>ruleSources</c>.
+    /// </summary>
+    public IReadOnlyList<BpaRuleSourceSummary> RuleSources { get; init; } = [];
+
+    /// <summary>
     /// Visible violations after <c>--fix</c> edits were applied, from a second evaluation of the
     /// mutated model; null when no fix was applied. <see cref="Violations"/> stays the pre-fix list.
     /// </summary>
@@ -76,6 +82,19 @@ public sealed record BpaRunResult(
 
     /// <summary>Number of rules skipped because they are globally disabled.</summary>
     public int DisabledRules => Results.Count(r => r.Kind == BpaResultKind.DisabledRule);
+
+    /// <summary>Rules skipped because the current user ignores them (<c>bpa rules ignore --user</c>).</summary>
+    public IReadOnlyList<string> UserIgnoredRules => SuppressedRuleIds(BpaRuleSuppression.User);
+
+    /// <summary>Rules skipped because the model's ignore annotation lists them (<c>bpa rules ignore</c>).</summary>
+    public IReadOnlyList<string> ModelIgnoredRules => SuppressedRuleIds(BpaRuleSuppression.Model);
+
+    private IReadOnlyList<string> SuppressedRuleIds(BpaRuleSuppression level)
+        => Results
+            .Where(r => r.Kind == BpaResultKind.DisabledRule && r.SuppressedBy.HasFlag(level))
+            .Select(r => r.RuleId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     /// <summary>Number of rules skipped because the model compatibility level is too low.</summary>
     public int InvalidCompatibilityRules => Results.Count(r => r.Kind == BpaResultKind.InvalidCompatibilityLevel);

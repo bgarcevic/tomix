@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Spectre.Console;
 using Tomix.App.Bpa;
 using Tomix.App.Mutations;
@@ -18,6 +19,7 @@ internal static class BpaRunRenderer
     {
         // The title is commentary: stderr keeps `tx bpa run > file` down to the findings.
         StdErr.MarkupLine(Styling.Title($"BPA analysis · {result.ModelName}"));
+        StdErr.MarkupLine(Styling.Muted(BpaRunView.RulesLoadedLine(result.RuleSources)));
 
         var groups = BpaRunView.OrderRuleGroups(result.Violations);
         var visible = groups
@@ -303,16 +305,21 @@ internal static class BpaRunRenderer
 
         RenderMissingVertipaqStats(result, view);
 
-        var parts = new List<string>(4);
+        var parts = new List<string>(2);
         if (result.RuleErrors > 0) parts.Add($"{result.RuleErrors} rule errors");
-        if (result.DisabledRules > 0) parts.Add($"{result.DisabledRules} disabled");
         if (result.InvalidCompatibilityRules > 0) parts.Add($"{result.InvalidCompatibilityRules} skipped (compat level)");
-        if (result.IgnoredViolations > 0) parts.Add($"{result.IgnoredViolations} ignored");
 
-        if (parts.Count == 0)
+        // Ignoring is a choice, not a problem, so it gets its own line rather than "Diagnostics".
+        var ignored = BpaRunView.IgnoredLine(
+            result.UserIgnoredRules.Count, result.ModelIgnoredRules.Count, result.IgnoredViolations);
+
+        if (parts.Count == 0 && ignored.Length == 0)
             return;
 
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Diagnostics:", string.Join(" · ", parts))}");
+        if (parts.Count > 0)
+            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Diagnostics:", string.Join(" · ", parts))}");
+        if (ignored.Length > 0)
+            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Ignored:", ignored)}");
 
         if (!view.Details)
         {
@@ -338,7 +345,10 @@ internal static class BpaRunRenderer
             };
 
             var scope = string.IsNullOrWhiteSpace(diag.ErrorScope) ? "" : $" ({diag.ErrorScope})";
-            var detail = string.IsNullOrWhiteSpace(diag.ErrorMessage) ? "" : $" — {diag.ErrorMessage}";
+            var message = diag.Kind == BpaResultKind.DisabledRule
+                ? BpaRunView.SuppressionLabel(diag.SuppressedBy)
+                : diag.ErrorMessage;
+            var detail = string.IsNullOrWhiteSpace(message) ? "" : $" — {message}";
             AnsiConsole.MarkupLine(
                 "    {0} {1}{2}{3}",
                 Styling.Muted($"[{label}]"),
@@ -402,6 +412,18 @@ internal static class BpaRunRenderer
             fixesPending = result.Preview ? result.FixChanges.Count : 0,
             wouldRemain = result.Preview ? result.ProjectedViolations?.Count ?? result.Violations.Count : (int?)null,
             ruleLoadDiagnostics = result.RuleLoadDiagnostics ?? Array.Empty<string>(),
+            // #233 attribution: every source loaded, in load order, with its effective rule count.
+            ruleSources = result.RuleSources.Select(s => new
+            {
+                name = s.Name,
+                kind = JsonNamingPolicy.CamelCase.ConvertName(s.Kind.ToString()),
+                origin = JsonNamingPolicy.CamelCase.ConvertName(s.Origin.ToString()),
+                rules = s.Rules,
+                overridden = s.Overridden
+            }),
+            // Which level switched each skipped rule off; a rule off at both is in both lists.
+            userIgnoredRules = result.UserIgnoredRules,
+            modelIgnoredRules = result.ModelIgnoredRules,
             status = result.FixOutcome.Status,
             saved = result.FixOutcome.Saved,
             savedTo = result.FixOutcome.SavedTo,

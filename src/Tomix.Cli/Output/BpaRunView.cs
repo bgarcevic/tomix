@@ -1,5 +1,6 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
+using Tomix.Core.Configuration;
 
 namespace Tomix.Cli.Output;
 
@@ -101,6 +102,119 @@ internal static class BpaRunView
         => group.FixableCount <= 0 ? ""
             : group.FixableCount >= group.Objects.Count ? "fixable"
             : $"{group.FixableCount} fixable";
+
+    /// <summary>
+    /// The status shown for a listed rule: empty when it runs, otherwise every level that keeps
+    /// it off — "ignored (you)" (<c>ignore --user</c>), "ignored (model)", or both.
+    /// </summary>
+    internal static string RuleStatusLabel(BpaRuleInfo rule)
+        => (rule.Disabled, rule.Ignored) switch
+        {
+            (true, true) => "ignored (you, model)",
+            (true, false) => "ignored (you)",
+            (false, true) => "ignored (model)",
+            // A caller that set only Status (not the flags) still gets its value shown.
+            _ => rule.Status == "active" ? "" : rule.Status
+        };
+
+    /// <summary>
+    /// The footer's "Ignored:" value, e.g. <c>1 rule by you · 2 rules by the model · 3 findings</c>:
+    /// whole rules per level, then findings an object-level annotation hid. Empty when none.
+    /// </summary>
+    internal static string IgnoredLine(int rulesByUser, int rulesByModel, int findings)
+    {
+        var parts = new List<string>(3);
+        if (rulesByUser > 0) parts.Add($"{Plural(rulesByUser, "rule")} by you");
+        if (rulesByModel > 0) parts.Add($"{Plural(rulesByModel, "rule")} by the model");
+        if (findings > 0) parts.Add(Plural(findings, "finding"));
+        return string.Join(" · ", parts);
+
+        static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
+    }
+
+    /// <summary>
+    /// "overrides standard" for a listed rule that replaced another source's copy. A preset
+    /// overriding a preset (<c>full</c> over <c>standard</c>) is the same rule and says nothing,
+    /// so it is left out; a team or model rule replacing a built-in one is worth a mention.
+    /// </summary>
+    internal static string OverridesLabel(BpaRuleInfo rule)
+    {
+        if (rule.Overrides is not { Count: > 0 } overrides || IsPreset(rule.Source))
+            return "";
+
+        return $"overrides {string.Join(", ", overrides)}";
+
+        static bool IsPreset(string source)
+            => BpaRuleLoader.KnownRulesets.Contains(source, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Which level(s) switched a whole rule off, for <c>bpa run --details</c>.</summary>
+    internal static string SuppressionLabel(BpaRuleSuppression suppressedBy)
+    {
+        var levels = new List<string>(2);
+        if (suppressedBy.HasFlag(BpaRuleSuppression.User)) levels.Add("ignored by you");
+        if (suppressedBy.HasFlag(BpaRuleSuppression.Model)) levels.Add("ignored by the model");
+        return string.Join(", ", levels);
+    }
+
+    /// <summary>
+    /// The attribution line (#233), e.g. <c>Rules loaded: 29 from standard ruleset (26) +
+    /// ci/rules.json via TOMIX_BPA_RULES (2) + model annotations (1)</c>. Each count is the
+    /// effective rules that source contributed after overrides; the model's embedded and
+    /// external-file rules collapse into one "model annotations" entry.
+    /// </summary>
+    internal static string RulesLoadedLine(IReadOnlyList<BpaRuleSourceSummary> sources)
+    {
+        if (sources.Count == 0)
+            return "Rules loaded: none";
+
+        var parts = new List<string>();
+        var modelIndex = -1;
+        foreach (var source in sources)
+        {
+            // The model's sources collapse into one entry, placed where the first one appeared.
+            if (source.Origin == BpaRuleOrigin.Model)
+            {
+                if (modelIndex < 0)
+                {
+                    modelIndex = parts.Count;
+                    parts.Add("");
+                }
+
+                continue;
+            }
+
+            var count = SourceCount(source.Rules, source.Overridden);
+            parts.Add(source.Origin switch
+            {
+                BpaRuleOrigin.Ruleset => $"{source.Name} ruleset ({count})",
+                BpaRuleOrigin.UserFile => $"user rules file ({count})",
+                BpaRuleOrigin.Config => $"{source.Name} via {ConfigKeys.BpaRules} ({count})",
+                BpaRuleOrigin.Environment => $"{source.Name} via {BpaRuleSources.EnvironmentVariable} ({count})",
+                _ => $"{source.Name} via --rules ({count})",
+            });
+        }
+
+        if (modelIndex >= 0)
+        {
+            var model = sources.Where(s => s.Origin == BpaRuleOrigin.Model).ToList();
+            parts[modelIndex] = $"model annotations ({SourceCount(model.Sum(s => s.Rules), model.Sum(s => s.Overridden))})";
+        }
+
+        return $"Rules loaded: {sources.Sum(s => s.Rules)} from {string.Join(" + ", parts)}";
+    }
+
+    /// <summary>
+    /// A source's count in the attribution line: the rules in effect, plus how many a
+    /// higher-precedence source replaced — "26", "25; 1 overridden", or "0; all 26 overridden".
+    /// </summary>
+    private static string SourceCount(int rules, int overridden)
+        => (rules, overridden) switch
+        {
+            (_, <= 0) => $"{rules}",
+            (0, _) => $"0; all {overridden} overridden",
+            _ => $"{rules}; {overridden} overridden"
+        };
 
     /// <summary>
     /// The one-line run summary, e.g. <c>3 errors · 32 warnings in 5 of 27 rules · 22 passed · 326ms</c>

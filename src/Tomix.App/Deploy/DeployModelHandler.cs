@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Tomix.App.Bpa;
 using Tomix.App.Diff;
 using Tomix.App.Models;
@@ -17,19 +18,27 @@ public sealed class DeployModelHandler
     private readonly Func<CliConnectionState?> _resolveSession;
     private readonly HttpClient? _httpClient;
     private readonly BpaUserRuleState? _bpaRules;
+    private readonly string? _configDirectory;
+    private readonly Func<string, string?> _environment;
 
+    /// <param name="configDirectory">Where the gate reads <c>bpa.rules</c>; null skips it.</param>
+    /// <param name="environment">Reads <c>TOMIX_BPA_RULES</c>; defaults to the process environment.</param>
     public DeployModelHandler(
         IEnumerable<IModelProvider> providers,
         CliStateStore state,
         Func<CliConnectionState?>? sessionOverride = null,
         HttpClient? httpClient = null,
-        BpaUserRuleState? bpaRules = null)
+        BpaUserRuleState? bpaRules = null,
+        string? configDirectory = null,
+        Func<string, string?>? environment = null)
     {
         _providers = providers.ToList();
         _state = state;
         _resolveSession = sessionOverride ?? state.LoadCurrentSession;
         _httpClient = httpClient;
         _bpaRules = bpaRules;
+        _configDirectory = configDirectory;
+        _environment = environment ?? Environment.GetEnvironmentVariable;
     }
 
     /// <summary>Previews (<see cref="DeployModelRequest.Preview"/>) or runs one deploy.</summary>
@@ -189,25 +198,13 @@ public sealed class DeployModelHandler
         IReadOnlyList<BpaRule> rules;
         try
         {
-            rules = await BpaRuleLoader
-                .LoadRulesetAsync(null, _httpClient, cancellationToken)
-                .ConfigureAwait(false);
-            if (request.BpaRules is not null)
-            {
-                foreach (var file in request.BpaRules)
-                {
-                    if (!string.IsNullOrWhiteSpace(file))
-                        rules =
-                        [
-                            .. rules,
-                            .. await BpaRuleLoader
-                                .LoadFromSourceAsync(file, _httpClient, cancellationToken)
-                                .ConfigureAwait(false)
-                        ];
-                }
-            }
+            // #233: the team's shared rules (bpa.rules, TOMIX_BPA_RULES) gate a deploy the same way
+            // they reach `bpa run`, so a pipeline that sets them checks what it deploys.
+            rules = (await BpaRuleSources.LoadGateRulesAsync(
+                    _configDirectory, _environment, request.BpaRules, "--bpa-rules", _httpClient, cancellationToken)
+                .ConfigureAwait(false)).Rules;
         }
-        catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException)
+        catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
         {
             return (TomixResult<DeployModelResult>.Fail(
                 "TOMIX_BPA_RULES_LOAD_FAILED",
@@ -217,7 +214,7 @@ public sealed class DeployModelHandler
 
         var snapshot = await session.GetSnapshotAsync(cancellationToken);
         var engine = new BpaEngine();
-        // Issue #254: user-level disables (`bpa rules disable`) must reach the gate exactly as
+        // Issue #254: user-level disables (`bpa rules ignore --user`) must reach the gate exactly as
         // they reach `bpa run`, so the two agree on the same machine. A handler built without
         // the state disables nothing; the path/rule filters stay empty — a gate evaluates all.
         var userDisabled = _bpaRules?.GetDisabled().ToList();

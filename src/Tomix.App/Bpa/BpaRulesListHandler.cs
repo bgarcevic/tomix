@@ -2,6 +2,7 @@ using System.Text.Json;
 using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.Core.Bpa;
+using Tomix.Core.Configuration;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -39,7 +40,10 @@ public sealed record BpaRuleInfo(
     string? Description,
     string? Expression,
     string? FixExpression,
-    bool Enabled);
+    bool Enabled,
+    bool Disabled = false,
+    bool Ignored = false,
+    IReadOnlyList<string>? Overrides = null);
 
 public sealed class BpaRulesListHandler
 {
@@ -47,31 +51,37 @@ public sealed class BpaRulesListHandler
     private readonly BpaUserRuleState _userRules;
     private readonly HttpClient? _httpClient;
     private readonly string? _configDirectory;
+    private readonly Func<string, string?> _environment;
 
     /// <param name="configDirectory">
-    /// Where the user's <c>bpa-rules.json</c> lives; its rules are listed with source <c>user</c>,
-    /// as <c>bpa run</c> loads them. Null leaves the user file out.
+    /// Where the user's <c>bpa-rules.json</c> and the <c>bpa.rules</c> key live; their rules are
+    /// listed as <c>bpa run</c> loads them. Null leaves the user file and the configured rule
+    /// sources (including <c>TOMIX_BPA_RULES</c>) out.
     /// </param>
+    /// <param name="environment">Reads <c>TOMIX_BPA_RULES</c>; defaults to the process environment.</param>
     public BpaRulesListHandler(
         IEnumerable<IModelProvider>? providers,
         BpaUserRuleState userRules,
         HttpClient? httpClient = null,
-        string? configDirectory = null)
+        string? configDirectory = null,
+        Func<string, string?>? environment = null)
     {
         _providers = providers?.ToList() ?? [];
         _userRules = userRules;
         _httpClient = httpClient;
         _configDirectory = configDirectory;
+        _environment = environment ?? Environment.GetEnvironmentVariable;
     }
 
     public async Task<TomixResult<BpaRulesListResult>> HandleAsync(
         BpaRulesListRequest request,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<LoadedRule> rules;
+        IReadOnlyList<BpaRuleCollection> rules;
+        var sourceDiagnostics = new List<string>();
         try
         {
-            rules = await LoadRulesAsync(request, _httpClient, _configDirectory, cancellationToken).ConfigureAwait(false);
+            rules = await LoadRulesAsync(request, sourceDiagnostics, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
         {
@@ -89,8 +99,8 @@ public sealed class BpaRulesListHandler
             // reports them as skipped.
             var disabled = new HashSet<string>(_userRules.GetDisabled(), StringComparer.OrdinalIgnoreCase);
             var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var diagnostics = new List<string>();
-            var loaded = new List<LoadedRule>(rules);
+            var diagnostics = new List<string>(sourceDiagnostics);
+            var loaded = new List<BpaRuleCollection>(rules);
 
             if (request.Model is not null && _providers.ResolveSingleProvider(request.Model) is { } provider)
             {
@@ -105,52 +115,67 @@ public sealed class BpaRulesListHandler
                     BpaRuleHintContext.List,
                     _httpClient,
                     cancellationToken).ConfigureAwait(false);
-                loaded.AddRange(model.Collections.SelectMany(
-                    c => c.Rules.Select(r => new LoadedRule(c.DisplayName, r))));
+                loaded.AddRange(model.Collections);
                 diagnostics.AddRange(model.Diagnostics);
             }
 
-            // A user-level disable wins over the model's ignore list: it applies to every model.
-            var allRules = loaded.Select(r =>
+            // Status names one level for compatibility — a user-level disable wins because it applies
+            // to every model — while Disabled and Ignored report both, since turning one level back
+            // on leaves the other in force.
+            BpaRuleInfo Info(BpaRuleCollection source, BpaRule rule, IReadOnlyList<string>? overrides)
             {
-                var status = disabled.Contains(r.Rule.Id) ? "disabled"
-                    : ignored.Contains(r.Rule.Id) ? "ignored"
+                var isDisabled = disabled.Contains(rule.Id);
+                var isIgnored = ignored.Contains(rule.Id);
+                var status = isDisabled ? "disabled"
+                    : isIgnored ? "ignored"
                     : "active";
                 return new BpaRuleInfo(
-                    r.Source,
+                    source.DisplayName,
                     Status: status,
-                    r.Rule.Id,
-                    r.Rule.Name,
-                    r.Rule.Category,
-                    r.Rule.Severity,
-                    string.Join(", ", r.Rule.Scope),
-                    r.Rule.Description,
-                    r.Rule.Expression,
-                    r.Rule.FixExpression,
-                    Enabled: status == "active");
-            }).ToList();
+                    rule.Id,
+                    rule.Name,
+                    rule.Category,
+                    rule.Severity,
+                    string.Join(", ", rule.Scope),
+                    rule.Description,
+                    rule.Expression,
+                    rule.FixExpression,
+                    Enabled: status == "active",
+                    Disabled: isDisabled,
+                    Ignored: isIgnored,
+                    Overrides: overrides);
+            }
 
+            // `show` returns every source's copy of the rule, so an override can be compared with
+            // what it replaced.
             if (!string.IsNullOrWhiteSpace(request.RuleId))
-                return FindRule(allRules, request.RuleId, diagnostics);
+                return FindRule(
+                    loaded.SelectMany(c => c.Rules.Select(r => Info(c, r, overrides: null))).ToList(),
+                    request.RuleId,
+                    diagnostics);
 
+            // `list` shows each rule once, from the source that wins as in `bpa run`, and names the
+            // sources it overrides (for example `full` over `standard`, or a team file over both).
+            var allRules = BpaRuleResolver.ResolveEffective(loaded)
+                .Select(e => Info(
+                    e.Source,
+                    e.Rule,
+                    e.Overrides.Count > 0 ? e.Overrides.Select(o => o.DisplayName).Distinct().ToList() : null))
+                .ToList();
+
+            // --ignored covers both levels (the status names which); the hidden --disabled keeps
+            // listing only the user level for scripts written before `ignore --user`.
             var filteredRules = (request.DisabledOnly, request.IgnoredOnly, request.All) switch
             {
-                (true, true, _) => allRules.Where(r => !r.Enabled).ToList(),
-                (true, _, _) => allRules.Where(r => r.Status == "disabled").ToList(),
-                (_, true, _) => allRules.Where(r => r.Status == "ignored").ToList(),
+                (true, false, _) => allRules.Where(r => r.Disabled).ToList(),
+                (_, true, _) => allRules.Where(r => r.Disabled || r.Ignored).ToList(),
                 (_, _, true) => allRules,
                 _ => allRules.Where(r => r.Enabled).ToList()
             };
 
-            var disabledCount = allRules.Count(r => r.Status == "disabled");
-            var ignoredCount = allRules.Count(r => r.Status == "ignored");
             var result = new BpaRulesListResult(
                 filteredRules,
-                new BpaRulesSummary(
-                    Total: allRules.Count,
-                    Active: allRules.Count - disabledCount - ignoredCount,
-                    Disabled: disabledCount,
-                    Ignored: ignoredCount),
+                Summarize(allRules),
                 Diagnostics: diagnostics.Count > 0 ? diagnostics : null);
 
             return TomixResult<BpaRulesListResult>.Ok(result);
@@ -183,40 +208,43 @@ public sealed class BpaRulesListHandler
                     : "Run 'tx bpa rules list --all' to see every rule ID.");
         }
 
-        var summary = new BpaRulesSummary(
-            Total: matches.Count,
-            Active: matches.Count(r => r.Status == "active"),
-            Disabled: matches.Count(r => r.Status == "disabled"),
-            Ignored: matches.Count(r => r.Status == "ignored"));
+        var summary = Summarize(matches);
         return TomixResult<BpaRulesListResult>.Ok(
             new BpaRulesListResult(matches, summary, diagnostics.Count > 0 ? diagnostics : null));
     }
 
-    private static async Task<IReadOnlyList<LoadedRule>> LoadRulesAsync(
+    /// <summary>
+    /// Disabled and Ignored count every rule off at that level, so a rule off at both levels is
+    /// counted in each, and Active + Disabled + Ignored can exceed Total.
+    /// </summary>
+    private static BpaRulesSummary Summarize(IReadOnlyList<BpaRuleInfo> rules)
+        => new(
+            Total: rules.Count,
+            Active: rules.Count(r => r.Enabled),
+            Disabled: rules.Count(r => r.Disabled),
+            Ignored: rules.Count(r => r.Ignored));
+
+    /// <summary>
+    /// The listed sources in precedence order, as <c>bpa run</c> loads them: each preset, the
+    /// user file, <c>bpa.rules</c>, <c>TOMIX_BPA_RULES</c>, then the selected <c>--rules-file</c>
+    /// (last, so the file being authored shows as it is).
+    /// </summary>
+    private async Task<IReadOnlyList<BpaRuleCollection>> LoadRulesAsync(
         BpaRulesListRequest request,
-        HttpClient? httpClient,
-        string? configDirectory,
+        List<string> diagnostics,
         CancellationToken cancellationToken)
     {
-        var rules = new List<LoadedRule>();
+        var httpClient = _httpClient;
+        var configDirectory = _configDirectory;
+        var rules = new List<BpaRuleCollection>();
 
         if (!request.NoDefaults)
         {
-            var source = string.IsNullOrWhiteSpace(request.Ruleset)
-                ? BpaRuleLoader.StandardRuleset
-                : request.Ruleset;
-            rules.AddRange((await BpaRuleLoader
-                    .LoadRulesetAsync(request.Ruleset, httpClient, cancellationToken)
-                    .ConfigureAwait(false))
-                .Select(rule => new LoadedRule(source, rule)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.RulesFile))
-        {
-            rules.AddRange((await BpaRuleLoader
-                    .LoadFromSourceAsync(request.RulesFile, httpClient, cancellationToken)
-                    .ConfigureAwait(false))
-                .Select(rule => new LoadedRule("custom", rule)));
+            foreach (var preset in BpaRuleLoader.SplitRulesets(request.Ruleset))
+                rules.Add(new BpaRuleCollection(
+                    BpaRuleSourceKind.Machine,
+                    preset,
+                    await BpaRuleLoader.LoadRulesetAsync(preset, httpClient, cancellationToken).ConfigureAwait(false)));
         }
 
         // The user file is listed unless --rules-file already selected it.
@@ -227,11 +255,39 @@ public sealed class BpaRulesListHandler
                 ? Path.GetFullPath(file)
                 : null;
             if (File.Exists(userFile) && !string.Equals(userFile, selected, StringComparison.OrdinalIgnoreCase))
-                rules.AddRange(BpaRuleLoader.LoadFromFile(userFile).Select(rule => new LoadedRule("user", rule)));
+                rules.Add(new BpaRuleCollection(
+                    BpaRuleSourceKind.User, "user", BpaRuleLoader.LoadFromFile(userFile), BpaRuleOrigin.UserFile));
+
+            // The configured rule sources bpa run also loads (#233), listed under the setting that
+            // names them. One that can't be loaded is reported, not fatal: the listing still
+            // answers for every other source.
+            foreach (var entry in BpaRuleSources.Resolve(configDirectory, _environment, optionFiles: null))
+            {
+                var source = entry.Origin == BpaRuleOrigin.Config ? ConfigKeys.BpaRules : BpaRuleSources.EnvironmentVariable;
+                try
+                {
+                    rules.Add(new BpaRuleCollection(
+                        BpaRuleSourceKind.User,
+                        source,
+                        await BpaRuleSources.LoadEntryAsync(entry, httpClient, cancellationToken).ConfigureAwait(false),
+                        entry.Origin));
+                }
+                catch (Exception ex) when (ex is FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
+                {
+                    diagnostics.Add(ex.Message);
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.RulesFile))
+        {
+            rules.Add(new BpaRuleCollection(
+                BpaRuleSourceKind.User,
+                "custom",
+                await BpaRuleLoader.LoadFromSourceAsync(request.RulesFile, httpClient, cancellationToken).ConfigureAwait(false),
+                BpaRuleOrigin.Option));
         }
 
         return rules;
     }
-
-    private sealed record LoadedRule(string Source, BpaRule Rule);
 }

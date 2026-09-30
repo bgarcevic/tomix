@@ -105,7 +105,7 @@ public static class BpaModelRuleLoader
         {
             var rules = BpaRuleLoader.LoadFromJson(json);
             if (rules.Count > 0)
-                collections.Add(new BpaRuleCollection(BpaRuleSourceKind.ModelEmbedded, "model-embedded", rules));
+                collections.Add(new BpaRuleCollection(BpaRuleSourceKind.ModelEmbedded, "model-embedded", rules, BpaRuleOrigin.Model));
         }
         catch (JsonException ex)
         {
@@ -164,7 +164,7 @@ public static class BpaModelRuleLoader
                         .LoadFromSourceAsync(entry, httpClient, cancellationToken)
                         .ConfigureAwait(false);
                     if (remote.Count > 0)
-                        collections.Add(new BpaRuleCollection(BpaRuleSourceKind.External, entry, remote));
+                        collections.Add(new BpaRuleCollection(BpaRuleSourceKind.External, entry, remote, BpaRuleOrigin.Model));
                     continue;
                 }
 
@@ -186,7 +186,7 @@ public static class BpaModelRuleLoader
 
                 var rules = BpaRuleLoader.LoadFromFile(path);
                 if (rules.Count > 0)
-                    collections.Add(new BpaRuleCollection(BpaRuleSourceKind.External, entry, rules));
+                    collections.Add(new BpaRuleCollection(BpaRuleSourceKind.External, entry, rules, BpaRuleOrigin.Model));
             }
             catch (Exception ex) when (ex is IOException or HttpRequestException or JsonException or ArgumentException or UriFormatException)
             {

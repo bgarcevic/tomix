@@ -64,7 +64,7 @@ public sealed partial class MarkupEscapeRendererTests
         });
 
         AssertLiteral(captured.Stdout,
-            "Rule '[Rule]' was already disabled",
+            "You already ignore rule '[Rule]'",
             "Rule [Rule] is now ignored for [Model].",
             "Synced: [Target]");
     }

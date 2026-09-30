@@ -8,7 +8,7 @@ public sealed record BpaRulesRemoveRequest(
 
 /// <summary>
 /// Deletes a rule from a rules file (<c>bpa rules remove</c>). Built-in rules are not in a file
-/// tx edits; turn those off with <c>bpa rules disable</c> or <c>ignore</c>.
+/// tx edits; turn those off with <c>bpa rules ignore</c> (with or without <c>--user</c>).
 /// </summary>
 public sealed class BpaRulesRemoveHandler
 {
@@ -49,7 +49,7 @@ public sealed class BpaRulesRemoveHandler
             $"No rule with ID '{ruleId}' in {path}.",
             exitCode: 2,
             hint: builtIn
-                ? $"'{ruleId}' is a built-in rule. Turn it off with 'tx bpa rules disable {ruleId}', or override it with 'tx bpa rules add --id {ruleId} ...'."
+                ? $"'{ruleId}' is a built-in rule. Turn it off with 'tx bpa rules ignore {ruleId} --user', or override it with 'tx bpa rules add --id {ruleId} ...'."
                 : "Run 'tx bpa rules list --all' to see every rule and its source.");
     }
 }

@@ -78,6 +78,50 @@ public sealed class BpaJsonContractTests
     }
 
     [Fact]
+    public void RunJson_RuleSources_ListsEachSourceWithOriginAndCount()
+    {
+        // #233: additive field — where each effective rule came from.
+        var result = SampleRunResult() with
+        {
+            RuleSources =
+            [
+                new BpaRuleSourceSummary("standard", BpaRuleSourceKind.Machine, BpaRuleOrigin.Ruleset, 3),
+                new BpaRuleSourceSummary("ci/rules.json", BpaRuleSourceKind.User, BpaRuleOrigin.Environment, 1),
+                new BpaRuleSourceSummary("model-embedded", BpaRuleSourceKind.ModelEmbedded, BpaRuleOrigin.Model, 0),
+            ]
+        };
+        var sources = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(result))).RootElement
+            .GetProperty("ruleSources").EnumerateArray().ToList();
+
+        Assert.Equal(
+            [("standard", "machine", "ruleset", 3), ("ci/rules.json", "user", "environment", 1), ("model-embedded", "modelEmbedded", "model", 0)],
+            sources.Select(s => (
+                s.GetProperty("name").GetString(),
+                s.GetProperty("kind").GetString(),
+                s.GetProperty("origin").GetString(),
+                s.GetProperty("rules").GetInt32())));
+    }
+
+    [Fact]
+    public void RunJson_NamesWhichLevelSwitchedEachRuleOff()
+    {
+        var rule = SampleRule("OFF_BOTH");
+        var result = new BpaRunResult(
+            [
+                BpaResult.Disabled(SampleRule("OFF_USER"), BpaRuleSuppression.User),
+                BpaResult.Disabled(SampleRule("OFF_MODEL"), BpaRuleSuppression.Model),
+                BpaResult.Disabled(rule, BpaRuleSuppression.User | BpaRuleSuppression.Model)
+            ],
+            "M",
+            RulesEvaluated: 3);
+        var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(result))).RootElement;
+
+        Assert.Equal(3, root.GetProperty("disabledRules").GetInt32());
+        Assert.Equal(["OFF_USER", "OFF_BOTH"], root.GetProperty("userIgnoredRules").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal(["OFF_MODEL", "OFF_BOTH"], root.GetProperty("modelIgnoredRules").EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
     public void RunJson_Remaining_CountsPostFixViolations()
     {
         var result = SampleRunResult() with { RemainingViolations = [] };
@@ -182,6 +226,29 @@ public sealed class BpaJsonContractTests
     }
 
     [Fact]
+    public void RulesListJson_ReportsBothLevelsForARuleOffAtBoth()
+    {
+        // status keeps its single value for compatibility; disabled and ignored are additive.
+        var result = new BpaRulesListResult(
+            Rules:
+            [
+                new BpaRuleInfo(
+                    Source: "built-in", Status: "disabled", Id: "R1", Name: "Rule one",
+                    Category: "DAX", Severity: BpaSeverity.Warning, Scope: "Measure",
+                    Description: null, Expression: "true", FixExpression: null, Enabled: false,
+                    Disabled: true, Ignored: true)
+            ],
+            Summary: new BpaRulesSummary(Total: 1, Active: 0, Disabled: 1, Ignored: 1));
+
+        var rule = JsonDocument.Parse(JsonOutput.Serialize(BpaRulesRenderer.ToListJson(result))).RootElement
+            .GetProperty("rules")[0];
+
+        Assert.Equal("disabled", rule.GetProperty("status").GetString());
+        Assert.True(rule.GetProperty("ignoredByUser").GetBoolean());
+        Assert.True(rule.GetProperty("ignoredByModel").GetBoolean());
+    }
+
+    [Fact]
     public void RulesListJson_OmitsEmptyOptionalFields()
     {
         var result = new BpaRulesListResult(
@@ -245,6 +312,7 @@ public sealed class BpaJsonContractTests
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRulesRenderer.ToDisableJson(result))).RootElement;
 
         Assert.Equal("R1", root.GetProperty("ruleId").GetString());
+        Assert.Equal("user", root.GetProperty("level").GetString());
         Assert.True(root.GetProperty("disabled").GetBoolean());
         Assert.True(root.GetProperty("changed").GetBoolean());
         Assert.Equal(1, root.GetProperty("disabledRuleIds").GetArrayLength());
@@ -259,6 +327,7 @@ public sealed class BpaJsonContractTests
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRulesRenderer.ToIgnoreJson(result))).RootElement;
 
         Assert.Equal("R1", root.GetProperty("ruleId").GetString());
+        Assert.Equal("model", root.GetProperty("level").GetString());
         Assert.True(root.GetProperty("ignored").GetBoolean());
         Assert.True(root.GetProperty("changed").GetBoolean());
         Assert.Equal(1, root.GetProperty("ruleIds").GetArrayLength());

@@ -27,9 +27,10 @@ tx config paths --output-format json
 Supported keys are `defaultFormat` (`text` or `json`), `noColor`, `updateCheck`,
 `validateOnSave` (`true` by default; set `false` to allow mutation saves that
 introduce validation errors),
-and the non-secret authentication settings `auth.clientId`, `auth.tenant`, and
-`auth.authority`. An explicit `--output-format` always overrides
-`defaultFormat`; the legacy value `human` is read as `text`.
+the non-secret authentication settings `auth.clientId`, `auth.tenant`, and
+`auth.authority`, and `bpa.rules` (BPA rule files or URLs that every `bpa run`
+and the `deploy` gate load, separated by `;`; see [rule sources](validate.md#rule-sources)). An
+explicit `--output-format` always overrides `defaultFormat`; the legacy value `human` is read as `text`.
 
 Unknown legacy entries are preserved when another setting is changed and are
 shown with `(unsupported)` by `config show`. If `config.json` is corrupt,
