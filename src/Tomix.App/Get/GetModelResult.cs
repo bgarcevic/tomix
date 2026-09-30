@@ -1,11 +1,14 @@
-using System.Text.Json.Serialization;
-using Tomix.Core.Models;
+using Tomix.App.Deps;
+using Tomix.App.Get;
 
 namespace Tomix.App.Get;
 
+/// <summary>
+/// The outcome of a read: exactly one member is set, matching <see cref="Mode"/>
+/// (<see cref="GetMode.Deps"/> and <see cref="GetMode.Unused"/> both fill <see cref="Deps"/>).
+/// </summary>
 public sealed record GetModelResult(
-    string Type,
-    string Path,
-    IReadOnlyDictionary<string, object?> Properties,
-    [property: JsonIgnore] ModelObject Object,
-    [property: JsonIgnore] IReadOnlySet<string>? MeasureNames = null);
+    GetMode Mode,
+    GetObjectResult? Object = null,
+    GetListResult? List = null,
+    GetDepsResult? Deps = null);

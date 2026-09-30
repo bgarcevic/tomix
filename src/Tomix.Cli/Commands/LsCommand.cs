@@ -1,10 +1,7 @@
 using System.CommandLine;
-using Spectre.Console;
-using Tomix.App.Ls;
+using Tomix.App.Get;
 using Tomix.App.State;
-using Tomix.Cli.Output;
 using Tomix.Core.Models;
-using Tomix.Core.Properties;
 
 namespace Tomix.Cli.Commands;
 
@@ -67,143 +64,92 @@ internal sealed class LsCommand : ICommandModule
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var firstValue = parseResult.GetValue(pathArgument);
-            var secondValue = parseResult.GetValue(modelArgument);
+            var invocation = new GetInvocation(
+                "ls",
+                Path: parseResult.GetValue(pathArgument),
+                Mode: GetMode.List,
+                TypeValue: parseResult.GetValue(typeOption),
+                PathsOnly: parseResult.GetValue(pathsOnlyOption),
+                NoMultiline: parseResult.GetValue(noMultilineOption));
 
-            // Canonical order is `ls [path-filter] [model]`, matching `get <path> [model]`.
-            // The legacy `ls <model> [path-filter]` order stays accepted: a first positional
-            // that actually opens as a model is treated as the model.
-            var firstIsModel = !string.IsNullOrWhiteSpace(firstValue)
-                && _providers.Any(p => p.CanOpen(new ModelReference(firstValue)));
-
-            // Resolved before --recent is applied, and passed to it: TryResolveModel rejects
-            // --recent combined with an explicit model, and handing it only --model would let
-            // the positional form slip past that guard -- `ls --recent 1 ./model` then exited 0
-            // having silently ignored the --recent selection, while `-m ./model` was rejected.
-            var positionalModel = firstIsModel ? firstValue : secondValue;
-            // Blank-checked rather than ?? : the guard downstream tests IsNullOrWhiteSpace, so a
-            // present-but-empty --model would otherwise win the coalesce and hide the positional.
-            var explicitModel = GlobalOptions.ModelValue(parseResult) is { } m && !string.IsNullOrWhiteSpace(m)
-                ? m
-                : positionalModel;
-
-            if (!RecentConnections.TryResolveModel(
-                    parseResult,
-                    explicitModel,
-                    _state,
-                    out var activeReference,
-                    out var recentExit))
-                return recentExit;
-            var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
-
-            ModelReference reference;
-            string? pathFilter;
-
-            // --database rides along: a positional endpoint rebuilt without it would open the
-            // server and then fail to resolve a catalog, or silently pick the only one there.
-            var database = parseResult.GetValue(GlobalOptions.Database);
-
-            if (firstIsModel)
-            {
-                reference = new ModelReference(firstValue!, database);
-                pathFilter = secondValue;
-            }
-            else if (!string.IsNullOrWhiteSpace(secondValue))
-            {
-                reference = new ModelReference(secondValue, database);
-                pathFilter = firstValue;
-            }
-            else if (hasContextModel)
-            {
-                reference = activeReference;
-                pathFilter = firstValue;
-            }
-            else
-            {
-                reference = new ModelReference(firstValue ?? "");
-                pathFilter = null;
-            }
-            var typeValue = parseResult.GetValue(typeOption);
-            var pathsOnly = parseResult.GetValue(pathsOnlyOption);
-            var noMultiline = parseResult.GetValue(noMultilineOption);
-            var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
-
-            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "ls", OutputFormats.Text, OutputFormats.Json, OutputFormats.Csv))
-                return 2;
-
-            ModelObjectKind? type = null;
-            if (!string.IsNullOrWhiteSpace(typeValue))
-            {
-                if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
-                {
-                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
-                }
-
-                type = parsed;
-            }
-
-            var handler = new LsModelHandler(_providers);
-            var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            var result = await CliSpinner.RunAsync(
-                "Loading model...",
-                () => handler.HandleAsync(
-                    new LsModelRequest(reference, pathFilter, type),
-                    cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
-
-            return CommandOutput.Render(
-                result,
-                formatValue,
-                data => LsRenderer.Render(data, pathsOnly, noMultiline),
-                ToReferenceJson,
-                RenderCsv,
-                errorFormat: errorFormat);
+            return await GetPipeline.RunAsync(
+                parseResult,
+                _providers,
+                invocation,
+                (string? firstValue, out ModelReference reference, out string? pathFilter, out int exitCode) =>
+                    TryResolve(parseResult, firstValue, parseResult.GetValue(modelArgument), out reference, out pathFilter, out exitCode),
+                cancellationToken);
         });
 
         return command;
     }
 
-    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ToReferenceJson(LsModelResult data)
-        => data.Objects.Select(ToReferenceJson).ToList();
-
-    private static IReadOnlyDictionary<string, object?> ToReferenceJson(LsObject obj)
+    /// <summary>
+    /// Canonical order is <c>ls [path-filter] [model]</c>, matching <c>get</c>. The legacy
+    /// <c>ls &lt;model&gt; [path-filter]</c> order stays accepted: a first positional that
+    /// actually opens as a model is treated as the model.
+    /// </summary>
+    private bool TryResolve(
+        ParseResult parseResult,
+        string? firstValue,
+        string? secondValue,
+        out ModelReference reference,
+        out string? pathFilter,
+        out int exitCode)
     {
-        var row = new Dictionary<string, object?>
+        var firstIsModel = !string.IsNullOrWhiteSpace(firstValue)
+            && _providers.Any(p => p.CanOpen(new ModelReference(firstValue)));
+
+        // Resolved before --recent is applied, and passed to it: TryResolveModel rejects
+        // --recent combined with an explicit model, and handing it only --model would let
+        // the positional form slip past that guard -- `ls --recent 1 ./model` then exited 0
+        // having silently ignored the --recent selection, while `-m ./model` was rejected.
+        var positionalModel = firstIsModel ? firstValue : secondValue;
+        // Blank-checked rather than ?? : the guard downstream tests IsNullOrWhiteSpace, so a
+        // present-but-empty --model would otherwise win the coalesce and hide the positional.
+        var explicitModel = GlobalOptions.ModelValue(parseResult) is { } m && !string.IsNullOrWhiteSpace(m)
+            ? m
+            : positionalModel;
+
+        if (!RecentConnections.TryResolveModel(
+                parseResult,
+                explicitModel,
+                _state,
+                out var activeReference,
+                out exitCode))
         {
-            ["type"] = obj.Kind.ToString(),
-            ["path"] = obj.Path
-        };
-        foreach (var (key, value) in obj.Projected)
-            row[key] = value;
-        return row;
-    }
+            reference = null!;
+            pathFilter = null;
+            return false;
+        }
 
-    private static void RenderCsv(LsModelResult data)
-    {
-        var objects = data.Objects;
+        var hasContextModel = !string.IsNullOrWhiteSpace(activeReference.Value);
 
-        // Homogeneous results get their kind's full catalog columns. Mixed kinds fall back to
-        // the generic descriptors; their values come from LsObject's own fields because each
-        // row's Projected dictionary is keyed by its OWN kind's catalog (a Column projection
-        // has "dataType", not "detail").
-        var homogeneous = objects.Count > 0 && objects.All(o => o.Kind == objects[0].Kind);
+        // --database rides along: a positional endpoint rebuilt without it would open the
+        // server and then fail to resolve a catalog, or silently pick the only one there.
+        var database = parseResult.GetValue(GlobalOptions.Database);
 
-        PropertyCsvRenderer.Write(
-            homogeneous ? ModelPropertyCatalog.For(objects[0].Kind) : ModelPropertyCatalog.GenericDescriptors,
-            objects.Select(o => (
-                (IReadOnlyList<object?>)[o.Path],
-                homogeneous ? o.Projected : GenericProjection(o))),
-            "Path");
-    }
-
-    private static IReadOnlyDictionary<string, object?> GenericProjection(LsObject obj)
-        => new Dictionary<string, object?>
+        if (firstIsModel)
         {
-            ["name"] = obj.Name,
-            ["description"] = obj.Description ?? "",
-            ["isHidden"] = obj.Hidden,
-            ["detail"] = obj.Detail ?? "",
-            ["expression"] = obj.Expression ?? ""
-        };
+            reference = new ModelReference(firstValue!, database);
+            pathFilter = secondValue;
+        }
+        else if (!string.IsNullOrWhiteSpace(secondValue))
+        {
+            reference = new ModelReference(secondValue, database);
+            pathFilter = firstValue;
+        }
+        else if (hasContextModel)
+        {
+            reference = activeReference;
+            pathFilter = firstValue;
+        }
+        else
+        {
+            reference = new ModelReference(firstValue ?? "");
+            pathFilter = null;
+        }
+
+        return true;
+    }
 }

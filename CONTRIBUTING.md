@@ -52,10 +52,12 @@ they're short, and reviewers will assume you have. Start with
 
 ## Adding a command
 
-`LsCommand` is the model citizen; copy its shape (`src/Tomix.Cli/Commands/LsCommand.cs`
-→ `Tomix.App.Ls.LsModelHandler`). It shows the current conventions: an optional
+`GetCommand` is the model citizen; copy its shape (`src/Tomix.Cli/Commands/GetCommand.cs`
+→ `Tomix.App.Get.GetModelHandler`). It shows the current conventions: an optional
 model argument that falls back to the session-resolved connection, path
-filtering, and machine-friendly output flags. If your command mutates the
+filtering, and machine-friendly output flags. A new read belongs in `get` (a mode
+or option over its path resolution) rather than in a new command; `ls` and `deps`
+show how a shortcut forwards into it through `GetPipeline`. If your command mutates the
 model, also look at how `set`/`rm` route changes through the staging flow
 (`stage` → `commit`/`discard`) rather than writing directly.
 

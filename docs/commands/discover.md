@@ -2,8 +2,9 @@
 
 Read-only commands for exploring a model. All of them work against the
 [active connection](../guides/connections.md) or an explicit model argument,
-and all print JSON with `--output-format json`. `ls`, `get`, and `query` also
-print CSV; `get` additionally emits `tmdl`, `bim`, and `tmsl`.
+and all print JSON with `--output-format json`. `get` is the one read command;
+`ls` and `deps` are shortcuts into it. Lists, single objects, and `query` also
+print CSV; a single object additionally emits `tmdl`, `bim`, and `tmsl`.
 
 ## `summary` — what is this model
 
@@ -39,7 +40,7 @@ AdventureWorks Sales  Model
     cultures            1
 ```
 
-The labels are the JSON keys, laid out like the [`get`](#get-properties-of-one-object)
+The labels are the JSON keys, laid out like the [`get`](#get-read-model-objects)
 view; the next-step hint goes to stderr and is hidden by `--quiet`.
 
 ```sh
@@ -48,41 +49,67 @@ tx summary ./model.tmdl
 tx summary --output-format json      # counts under "counts"
 ```
 
-## `ls` — list model objects
+## `get` — read model objects
 
-Alias: `list`.
+`get` is the one read command. The path decides what comes back: a path that
+names one object shows its properties, and a path that selects a set — a
+wildcard, a container, or no path at all — lists every match. The selection
+and analysis options below combine over the same path resolution, and
+[`ls`](#ls-list-model-objects) and [`deps`](#deps-dependency-analysis) are
+shortcuts for `get --ls` and `get --deps` / `get --unused`.
 
 ```
-tx ls [path-filter] [model] [options]
+tx get [path] [model] [options]
 ```
+
+| Path | Result |
+|------|--------|
+| `Sales`, `Sales/Amount`, `"'Sales'[Amount]"`, `"[Total Sales]"` | One object's properties. |
+| `.` | The model root's properties. |
+| `Sa*`, `Sales/*Amount`, `*/Amount` | Every match, as a list. |
+| `Tables`, `Measures`, `Sales/Measures`, `Sales/Partitions` | Every object in the container, as a list. |
+| *(omitted)* | The model's tables, as a list. |
 
 | Option | Description |
 |--------|-------------|
-| `-t, --type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `level`, `partition`, `calculationitem`, `member`, `relationship`, `role`, `perspective`, `culture`, `datasource`, `kpi`, `tablepermission`, `calendar`, `expression`, `function`. `column` matches data and calculated columns; `calculatedcolumn` narrows to calculated ones. |
-| `--paths-only` | One object path per line, ready for piping. |
-| `--no-multiline` | Show multi-line cell content (e.g. measure expressions) on one line. Text output only. |
+| `--query <property>` | Read just one property of one object (e.g. `--query expression`). |
+| `-t, --type <type>` | Pick one object when the path matches several, or filter a list. Same vocabulary as `ls --type`. |
+| `--all` | List every property of one object, including unset ones. Text output only; JSON and CSV always carry all. |
+| `--ls` | List the objects the path selects, as a compact table. `tx get Sales --ls` lists Sales's children, like `tx ls Sales`. |
+| `--where <prop=value>` | Keep objects whose property matches, case-insensitively. `*` is the only wildcard: `Name=*margin*` (contains), `Name=margin*` (starts with), `Name=*margin` (ends with), `Name=margin` (the whole value). Repeat to AND filters. The path is the scope; with no path the filter runs over the tables, so name a container (`Measures`) or pass `--type` to reach deeper. |
+| `--deps [upstream\|downstream]` | Trace what one object uses and what uses it (default: both). |
+| `--deep` | With `--deps`: walk the dependency chain recursively. |
+| `--max-depth <n>` | With `--deps --deep`: how deep to walk (default: 10). |
+| `--unused` | List measures and columns that nothing depends on, across the whole model (no path). |
+| `--hidden` | With `--unused`: only unused objects that are hidden. |
+| `--paths-only` | List one object path per line, ready for piping. |
+| `--no-multiline` | List multi-line cell content on one line. Text output only. |
+
+`--query` and `--deps` need a single object, so a wildcard or container path
+fails with `TOMIX_SINGLE_OBJECT_REQUIRED`. Options that cannot apply together —
+`--deps` with `--unused`, a listing option with `--deps`, `--deep` without
+`--deps`, `--hidden` without `--unused` — fail with `TOMIX_USAGE`. A list
+prints as text, JSON, or CSV; a single object additionally as `tmdl`, `bim`,
+or `tmsl`; dependencies as text or JSON.
 
 ```sh
-tx ls                                # everything
-tx list --type table --paths-only    # 'list' is an alias of 'ls'
-tx ls Sales/Measures                 # children of a container
-tx ls Expressions                    # shared M expressions (parameters)
-tx ls Functions                      # DAX user-defined functions
-tx ls "Sa*"                          # wildcard filter
-tx ls --type calculatedcolumn        # only calculated columns
+tx get                                          # the tables (same as tx ls)
+tx get "Sa*"                                    # every table starting with Sa
+tx get Sales/Measures                           # a container: Sales's measures
+tx get Measures --where "Name=*margin*"         # measures whose name contains margin
+tx get --type measure --where "Name=margin*"    # select a kind instead of a path
+tx get Columns --where DataType=String --where IsHidden=true
+tx get Sales --ls                               # Sales's children, as tx ls Sales
+tx get "Sales/Total Sales" --deps               # what it uses and what uses it
+tx get "Sales/Amount" --deps downstream --deep  # everything that depends on it
+tx get --unused --hidden                        # prune candidates
 ```
 
-## `get` — properties of one object
+`get` returns objects; to search property text and get the match sites back,
+use [`find`](#find-search-across-the-model). Name filtering deliberately
+overlaps between the two.
 
-```
-tx get <path> [model] [options]
-```
-
-| Option | Description |
-|--------|-------------|
-| `--query <property>` | Read just one property (e.g. `--query expression`). |
-| `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
-| `--all` | List every property, including unset ones. Text output only; JSON and CSV always carry all. |
+### One object
 
 The text view shows what was authored. Properties still at their default are
 left out, so a column reads as its data type, source, and the few settings
@@ -136,6 +163,32 @@ property through `--query`. A `--query` that names no property of the object
 fails with `TOMIX_PROPERTY_NOT_FOUND` and suggests the closest one; an unset
 `annotation:` or `translation:` token reads back empty.
 
+## `ls` — list model objects
+
+Alias: `list`. A shortcut for [`get --ls`](#get-read-model-objects): both run
+the same read pipeline and print identical output.
+
+```
+tx ls [path-filter] [model] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --type <type>` | Filter by type: `table`, `measure`, `column`, `calculatedcolumn`, `hierarchy`, `level`, `partition`, `calculationitem`, `member`, `relationship`, `role`, `perspective`, `culture`, `datasource`, `kpi`, `tablepermission`, `calendar`, `expression`, `function`. `column` matches data and calculated columns; `calculatedcolumn` narrows to calculated ones. |
+| `--paths-only` | One object path per line, ready for piping. |
+| `--no-multiline` | Show multi-line cell content (e.g. measure expressions) on one line. Text output only. |
+
+```sh
+tx ls                                # the tables
+tx list --type table --paths-only    # 'list' is an alias of 'ls'
+tx ls Sales                          # a table's children (get Sales reads the table itself)
+tx ls Sales/Measures                 # children of a container
+tx ls Expressions                    # shared M expressions (parameters)
+tx ls Functions                      # DAX user-defined functions
+tx ls "Sa*"                          # wildcard filter
+tx ls --type calculatedcolumn        # only calculated columns
+```
+
 ## `find` — search across the model
 
 ```
@@ -167,21 +220,24 @@ tx find "Qty" -t measure --paths-only
 
 ## `deps` — dependency analysis
 
+A shortcut for [`get --deps` / `get --unused`](#get-read-model-objects): both
+run the same read pipeline and print identical output.
+
 ```
 tx deps [path] [model] [options]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--upstream` | Trace only what this object uses. |
-| `--downstream` | Trace only what uses this object. |
+| `--upstream` | Trace only what this object uses (`get --deps upstream`). |
+| `--downstream` | Trace only what uses this object (`get --deps downstream`). |
 | `--deep` | Walk the dependency chain recursively. |
 | `--max-depth <n>` | How deep `--deep` walks (default: 10). |
-
-![tx deps showing the measures Sales/Profit uses and the measure that uses it](../assets/media/explore.png)
 | `--unused` | List measures and columns that nothing depends on. |
 | `--hidden` | With `--unused`: restrict the list to unused objects that are hidden. |
 | `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
+
+![tx deps showing the measures Sales/Profit uses and the measure that uses it](../assets/media/explore.png)
 
 ```sh
 tx deps "Sales/Total Sales" --upstream

@@ -1,9 +1,10 @@
 using Tomix.App.Deps;
+using Tomix.App.Get;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Tests;
 
-public sealed class DepsModelHandlerTests
+public sealed class GetDepsTests
 {
     [Fact]
     public async Task DirectUpstream_ResolvesQualifiedAndLoneReferences()
@@ -198,10 +199,13 @@ public sealed class DepsModelHandlerTests
         Assert.Equal("TOMIX_DEPS_PATH_REQUIRED", result.Diagnostics[0].Code);
     }
 
-    private static Task<Core.Results.TomixResult<DepsModelResult>> Run(DepsModelRequest request)
-        => new DepsModelHandler([new StubModelProvider()]).HandleAsync(request, CancellationToken.None);
+    private static async Task<Core.Results.TomixResult<GetDepsResult>> Run(GetModelRequest request)
+    {
+        var result = await new GetModelHandler([new StubModelProvider()]).HandleAsync(request, CancellationToken.None);
+        return new(result.Success, result.Data?.Deps, result.Diagnostics, result.ExitCode);
+    }
 
-    private static DepsModelRequest Request(
+    private static GetModelRequest Request(
         string? path,
         bool deep = false,
         bool unused = false,
@@ -209,7 +213,16 @@ public sealed class DepsModelHandlerTests
         bool upstreamOnly = false,
         bool downstreamOnly = false,
         int maxDepth = 10)
-        => new(new ModelReference("any"), path, Type: null, upstreamOnly, downstreamOnly, deep, unused, hiddenOnly, maxDepth);
+        => new(
+            new ModelReference("any"),
+            path,
+            Query: null,
+            Type: null,
+            Mode: unused ? GetMode.Unused : GetMode.Deps,
+            Direction: upstreamOnly ? DepsDirection.Upstream : downstreamOnly ? DepsDirection.Downstream : DepsDirection.Both,
+            Deep: deep,
+            MaxDepth: maxDepth,
+            HiddenOnly: hiddenOnly);
 
     private static List<string> Paths(IEnumerable<DependencyObject> deps)
     {

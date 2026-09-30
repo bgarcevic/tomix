@@ -95,7 +95,7 @@ public sealed class GetRendererTests
                 ["expression"] = obj.Expression ?? "",
                 ["formatString"] = "\"$\"#,0",
             };
-        var result = new GetModelResult(obj.Kind.ToString(), obj.Path, dictionary, obj, measureNames);
+        var result = new GetObjectResult(obj.Kind.ToString(), obj.Path, dictionary, obj, measureNames);
 
         return ConsoleCapture.Run(
             () => { GetRenderer.Render(result, "text", all); return 0; },
@@ -261,7 +261,7 @@ public sealed class GetRendererTests
     /// renderer decides the shape from the kind alone.</summary>
     private static string RenderFragment(ModelObject obj, string format)
     {
-        var result = new GetModelResult(obj.Kind.ToString(), obj.Path, new Dictionary<string, object?>(), obj, null);
+        var result = new GetObjectResult(obj.Kind.ToString(), obj.Path, new Dictionary<string, object?>(), obj, null);
 
         return ConsoleCapture.Run(
             () => { GetRenderer.Render(result, format); return 0; }).Stdout;

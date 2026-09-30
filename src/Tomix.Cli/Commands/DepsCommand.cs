@@ -1,8 +1,6 @@
 using System.CommandLine;
-using Spectre.Console;
-using Tomix.App.Deps;
+using Tomix.App.Get;
 using Tomix.App.State;
-using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
 namespace Tomix.Cli.Commands;
@@ -82,67 +80,38 @@ internal sealed class DepsCommand : ICommandModule
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var formatValue = GlobalOptions.OutputFormatValue(parseResult);
-            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
-            var typeValue = parseResult.GetValue(typeOption);
-            var upstreamRequested = parseResult.GetValue(upstreamOption);
-            var downstreamRequested = parseResult.GetValue(downstreamOption);
-            var upstreamOnly = upstreamRequested && !downstreamRequested;
-            var downstreamOnly = downstreamRequested && !upstreamRequested;
-            var deep = parseResult.GetValue(deepOption);
+            var upstream = parseResult.GetValue(upstreamOption);
+            var downstream = parseResult.GetValue(downstreamOption);
+            var unused = parseResult.GetValue(unusedOption);
 
-            if (!CommandOutput.TryValidateFormat(parseResult, formatValue, "deps", OutputFormats.Text, OutputFormats.Json))
-                return 2;
+            var invocation = new GetInvocation(
+                "deps",
+                parseResult.GetValue(pathArgument),
+                Mode: unused ? GetMode.Unused : GetMode.Deps,
+                TypeValue: parseResult.GetValue(typeOption),
+                Direction: upstream == downstream ? DepsDirection.Both
+                    : upstream ? DepsDirection.Upstream : DepsDirection.Downstream,
+                Deep: parseResult.GetValue(deepOption),
+                MaxDepth: parseResult.GetValue(maxDepthOption),
+                HiddenOnly: parseResult.GetValue(hiddenOption));
 
-            ModelObjectKind? type = null;
-            if (!string.IsNullOrWhiteSpace(typeValue))
-            {
-                if (!ModelObjectKindParser.TryParse(typeValue, out var parsed))
+            return await GetPipeline.RunAsync(
+                parseResult,
+                _providers,
+                invocation,
+                (string? path, out ModelReference reference, out string? resolvedPath, out int exitCode) =>
                 {
-                    return TypeValidation.WriteInvalidTypeError(GlobalOptions.ErrorFormatValue(parseResult, formatValue));
-                }
-
-                type = parsed;
-            }
-
-            if (!RecentConnections.TryResolveModel(
-                    parseResult,
-                    GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
-                    _state,
-                    out var model,
-                    out var recentExit))
-                return recentExit;
-
-            var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            var result = await CliSpinner.RunAsync(
-                "Analyzing dependencies...",
-                () => new DepsModelHandler(_providers).HandleAsync(
-                    new DepsModelRequest(
-                        model,
-                        parseResult.GetValue(pathArgument),
-                        type,
-                        upstreamOnly,
-                        downstreamOnly,
-                        parseResult.GetValue(deepOption),
-                        parseResult.GetValue(unusedOption),
-                        parseResult.GetValue(hiddenOption),
-                        parseResult.GetValue(maxDepthOption)),
-                    cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
-
-            if (result.Data is null && OutputFormats.IsTextLike(formatValue) && !quiet)
-            {
-                AnsiConsole.MarkupLine(Styling.Value("Running semantic analysis..."));
-                AnsiConsole.WriteLine();
-            }
-
-            return CommandOutput.Render(
-                result,
-                formatValue,
-                data => DepsRenderer.Render(data, showUpstream: !downstreamOnly, showDownstream: !upstreamOnly, deep: deep, quiet: quiet),
-                data => DepsRenderer.ToReferenceJson(data, includeUpstream: !downstreamOnly, includeDownstream: !upstreamOnly),
-                renderCsv: null,
-                errorFormat: errorFormat);
+                    resolvedPath = path;
+                    var ok = RecentConnections.TryResolveModel(
+                        parseResult,
+                        GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
+                        _state,
+                        out var resolved,
+                        out exitCode);
+                    reference = resolved!;
+                    return ok;
+                },
+                cancellationToken);
         });
 
         return command;

@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Tomix.App.Ls;
+using Tomix.App.Get;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -130,20 +130,20 @@ public sealed class LsRendererTests
         Assert.Contains(Moss + "[Qty]", output);
     }
 
-    private static string RenderTables(params LsObject[] objects) => Render(objects, noMultiline: true);
+    private static string RenderTables(params GetListObject[] objects) => Render(objects, noMultiline: true);
 
-    private static string RenderMultiline(params LsObject[] objects) => Render(objects, noMultiline: false);
+    private static string RenderMultiline(params GetListObject[] objects) => Render(objects, noMultiline: false);
 
-    private static string RenderWith(IReadOnlySet<string> measureNames, params LsObject[] objects)
+    private static string RenderWith(IReadOnlySet<string> measureNames, params GetListObject[] objects)
         => Render(objects, noMultiline: true, measureNames: measureNames);
 
-    private static string Render(LsObject[] objects, bool noMultiline, IReadOnlySet<string>? measureNames = null)
+    private static string Render(GetListObject[] objects, bool noMultiline, IReadOnlySet<string>? measureNames = null)
     {
         var captured = ConsoleCapture.Run(
             () =>
             {
                 LsRenderer.Render(
-                    new LsModelResult("Sample", 1550, objects, measureNames),
+                    new GetListResult("Sample", 1550, objects, measureNames),
                     pathsOnly: false,
                     noMultiline: noMultiline);
                 return 0;
@@ -154,7 +154,7 @@ public sealed class LsRendererTests
         return captured.Stdout;
     }
 
-    private static LsObject Table(string name, bool hidden, int calculatedColumns = 0) => new(
+    private static GetListObject Table(string name, bool hidden, int calculatedColumns = 0) => new(
         Path: $"Tables/{name}",
         Name: name,
         Kind: ModelObjectKind.Table,
@@ -172,7 +172,7 @@ public sealed class LsRendererTests
         },
         Projected: new Dictionary<string, object?>());
 
-    private static LsObject Measure(string name, string expression, bool hidden = false) => new(
+    private static GetListObject Measure(string name, string expression, bool hidden = false) => new(
         Path: $"Sales/{name}",
         Name: name,
         Kind: ModelObjectKind.Measure,
@@ -184,7 +184,7 @@ public sealed class LsRendererTests
         ChildCounts: new Dictionary<ModelObjectKind, int>(),
         Projected: new Dictionary<string, object?>());
 
-    private static LsObject Partition(string name, string detail, string expression) => new(
+    private static GetListObject Partition(string name, string detail, string expression) => new(
         Path: $"Sales/{name}",
         Name: name,
         Kind: ModelObjectKind.Partition,
@@ -196,7 +196,7 @@ public sealed class LsRendererTests
         ChildCounts: new Dictionary<ModelObjectKind, int>(),
         Projected: new Dictionary<string, object?>());
 
-    private static LsObject CalculationItem(string name, string expression) => new(
+    private static GetListObject CalculationItem(string name, string expression) => new(
         Path: $"CalcGroup/{name}",
         Name: name,
         Kind: ModelObjectKind.CalculationItem,

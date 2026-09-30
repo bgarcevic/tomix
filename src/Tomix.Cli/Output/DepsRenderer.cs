@@ -1,12 +1,13 @@
 using Spectre.Console;
 using Tomix.App.Deps;
+using Tomix.App.Get;
 
 namespace Tomix.Cli.Output;
 
 internal static class DepsRenderer
 {
     public static void Render(
-        DepsModelResult result,
+        GetDepsResult result,
         bool showUpstream,
         bool showDownstream,
         bool deep,
@@ -39,7 +40,7 @@ internal static class DepsRenderer
     }
 
     public static object ToReferenceJson(
-        DepsModelResult result,
+        GetDepsResult result,
         bool includeUpstream,
         bool includeDownstream)
     {

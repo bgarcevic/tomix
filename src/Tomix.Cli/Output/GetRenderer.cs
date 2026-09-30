@@ -10,7 +10,7 @@ namespace Tomix.Cli.Output;
 
 internal static class GetRenderer
 {
-    public static void Render(GetModelResult result, string format, bool all = false)
+    public static void Render(GetObjectResult result, string format, bool all = false)
     {
         if (IsScalarQuery(result))
         {
@@ -33,7 +33,7 @@ internal static class GetRenderer
         RenderProperties(result, all);
     }
 
-    public static void RenderCsv(GetModelResult result)
+    public static void RenderCsv(GetObjectResult result)
     {
         if (result.Properties.Count == 1)
         {
@@ -44,15 +44,15 @@ internal static class GetRenderer
         PropertyCsvRenderer.Write(ModelPropertyCatalog.For(result.Object.Kind), result.Properties);
     }
 
-    public static object? ToReferenceJson(GetModelResult result)
+    public static object? ToReferenceJson(GetObjectResult result)
         => IsScalarQuery(result) ? result.Properties.Values.First() : result;
 
-    private static bool IsScalarQuery(GetModelResult result)
+    private static bool IsScalarQuery(GetObjectResult result)
         => result.Properties.Count == 1;
 
     private const string Indent = "  ";
 
-    private static void RenderProperties(GetModelResult result, bool all)
+    private static void RenderProperties(GetObjectResult result, bool all)
     {
         // A terminal wraps at its width; redirected output stays unwrapped so a value (or an
         // expression line) is never split across lines for grep or a file.
@@ -74,7 +74,7 @@ internal static class GetRenderer
         }
     }
 
-    private static void RenderPropertiesCore(GetModelResult result, bool all)
+    private static void RenderPropertiesCore(GetObjectResult result, bool all)
     {
         var view = GetView.Build(result, all);
 
@@ -97,7 +97,7 @@ internal static class GetRenderer
     /// The stderr footer after the text view: how to set one of the folded properties and how
     /// to list them all. Commentary, so it never reaches a redirected stdout.
     /// </summary>
-    public static void RenderHint(GetModelResult result, bool all)
+    public static void RenderHint(GetObjectResult result, bool all)
     {
         if (all || IsScalarQuery(result) || GetView.Build(result, all).Unset.Count == 0)
             return;
@@ -107,7 +107,7 @@ internal static class GetRenderer
         StdErr.MarkupLine(Styling.Guidance($"  → Set one with 'tx set {quoted} --set <property>=<value>'; --all lists every property."));
     }
 
-    private static void RenderSection(string? heading, IReadOnlyList<GetViewRow> rows, GetModelResult result)
+    private static void RenderSection(string? heading, IReadOnlyList<GetViewRow> rows, GetObjectResult result)
     {
         if (rows.Count == 0)
             return;
@@ -151,7 +151,7 @@ internal static class GetRenderer
     /// not by property key: the display keys are the camelCase catalog keys while DaxExpressions
     /// reports the snapshot contract's PascalCase keys.
     /// </summary>
-    private static string ValueMarkup(GetViewRow row, GetModelResult result)
+    private static string ValueMarkup(GetViewRow row, GetObjectResult result)
     {
         if (row.IsDefault)
         {
@@ -214,7 +214,7 @@ internal static class GetRenderer
         _ => value.ToString() ?? ""
     };
 
-    private static void RenderTmdl(GetModelResult result, bool all)
+    private static void RenderTmdl(GetObjectResult result, bool all)
     {
         switch (result.Object.Kind)
         {
@@ -300,7 +300,7 @@ internal static class GetRenderer
         Console.WriteLine();
     }
 
-    private static void RenderBim(GetModelResult result, bool all)
+    private static void RenderBim(GetObjectResult result, bool all)
     {
         switch (result.Object.Kind)
         {

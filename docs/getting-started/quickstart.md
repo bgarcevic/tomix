@@ -31,7 +31,12 @@ tx ls --type table --paths-only
 tx ls Sales/Measures           # children of a container
 tx get "Sales/Total Sales"     # all properties of one object
 tx get "Sales/Total Sales" --query expression
+tx get Measures --where "Name=*margin*"   # filter any list by a property
 ```
+
+`get` is the one read command: a path naming one object shows its properties,
+and a wildcard or container path lists every match. `ls` and `deps` are
+shortcuts for `get --ls` and `get --deps`.
 
 Object paths are slash-separated (`Sales/Total Sales`); DAX-style forms like
 `'Sales'[Total Sales]` are accepted too. Quote names with spaces.

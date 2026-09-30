@@ -2,9 +2,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Spectre.Console;
 using Tomix.App.Dax;
-using Tomix.App.Ls;
+using Tomix.App.Get;
 using Tomix.App.M;
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 
 namespace Tomix.Cli.Output;
 
@@ -13,7 +14,7 @@ internal sealed partial class LsRenderer
     private const int MaxCollapsedDetail = 80;
     private const int MeasureExpressionPreviewLines = 3;
 
-    public static void Render(LsModelResult data, bool pathsOnly, bool noMultiline)
+    public static void Render(GetListResult data, bool pathsOnly, bool noMultiline)
     {
         if (data.Objects.Count == 0)
         {
@@ -21,7 +22,7 @@ internal sealed partial class LsRenderer
                 return;
 
             AnsiConsole.MarkupLine(Styling.Muted("No objects found."));
-            StdErr.MarkupLine(Styling.Guidance("  → Try: tx ls, tx ls --type table, or tx ls \"Sa*\""));
+            StdErr.MarkupLine(Styling.Guidance("  → Try: tx get, tx get --type table, or tx get \"Sa*\""));
             return;
         }
 
@@ -46,7 +47,51 @@ internal sealed partial class LsRenderer
         }
     }
 
-    private static void RenderTables(IReadOnlyList<LsObject> objects)
+    /// <summary>The JSON contract: one flat row per object, <c>type</c> and <c>path</c> first.</summary>
+    public static IReadOnlyList<IReadOnlyDictionary<string, object?>> ToReferenceJson(GetListResult data)
+        => data.Objects.Select(ToReferenceJson).ToList();
+
+    private static IReadOnlyDictionary<string, object?> ToReferenceJson(GetListObject obj)
+    {
+        var row = new Dictionary<string, object?>
+        {
+            ["type"] = obj.Kind.ToString(),
+            ["path"] = obj.Path
+        };
+        foreach (var (key, value) in obj.Projected)
+            row[key] = value;
+        return row;
+    }
+
+    public static void RenderCsv(GetListResult data)
+    {
+        var objects = data.Objects;
+
+        // Homogeneous results get their kind's full catalog columns. Mixed kinds fall back to
+        // the generic descriptors; their values come from GetListObject's own fields because each
+        // row's Projected dictionary is keyed by its OWN kind's catalog (a Column projection
+        // has "dataType", not "detail").
+        var homogeneous = objects.Count > 0 && objects.All(o => o.Kind == objects[0].Kind);
+
+        PropertyCsvRenderer.Write(
+            homogeneous ? ModelPropertyCatalog.For(objects[0].Kind) : ModelPropertyCatalog.GenericDescriptors,
+            objects.Select(o => (
+                (IReadOnlyList<object?>)[o.Path],
+                homogeneous ? o.Projected : GenericProjection(o))),
+            "Path");
+    }
+
+    private static IReadOnlyDictionary<string, object?> GenericProjection(GetListObject obj)
+        => new Dictionary<string, object?>
+        {
+            ["name"] = obj.Name,
+            ["description"] = obj.Description ?? "",
+            ["isHidden"] = obj.Hidden,
+            ["detail"] = obj.Detail ?? "",
+            ["expression"] = obj.Expression ?? ""
+        };
+
+    private static void RenderTables(IReadOnlyList<GetListObject> objects)
     {
         var table = NewTable("Name", "Columns", "Measures", "Partitions", "Hidden", "Description");
 
@@ -70,7 +115,7 @@ internal sealed partial class LsRenderer
     /// helper applies the single style pass, so markup-producing values must not be passed in.
     /// An expression cell goes through <see cref="ExpressionCell"/> instead.
     /// </summary>
-    private static string[] RowCells(LsObject o, params string[] cells)
+    private static string[] RowCells(GetListObject o, params string[] cells)
         => o.Hidden
             ? cells.Select(Styling.Muted).ToArray()
             : cells.Select(Styling.MarkupEscape).ToArray();
@@ -85,7 +130,7 @@ internal sealed partial class LsRenderer
     /// <paramref name="suffix"/> so it escapes plain inside a highlighted cell.
     /// </summary>
     private static string ExpressionCell(
-        LsObject o,
+        GetListObject o,
         string text,
         IReadOnlySet<string>? measureNames,
         string? suffix = null)
@@ -97,7 +142,7 @@ internal sealed partial class LsRenderer
                 measureNames,
                 suffix);
 
-    private static ExpressionLanguage HighlightLanguage(LsObject o)
+    private static ExpressionLanguage HighlightLanguage(GetListObject o)
     {
         if (o.Expression is null)
             return ExpressionLanguage.Plain;
@@ -107,14 +152,14 @@ internal sealed partial class LsRenderer
     }
 
     private static void RenderGrouped(
-        IReadOnlyList<LsObject> objects,
+        IReadOnlyList<GetListObject> objects,
         bool noMultiline,
         IReadOnlySet<string>? measureNames)
     {
         var groups = objects
             .GroupBy(o => GroupKey(o.Kind))
             .OrderBy(g => KindOrder(g.Key))
-            .Select(g => (Kind: g.Key, Items: (IReadOnlyList<LsObject>)g.ToList()))
+            .Select(g => (Kind: g.Key, Items: (IReadOnlyList<GetListObject>)g.ToList()))
             .ToList();
 
         var first = true;
@@ -150,7 +195,7 @@ internal sealed partial class LsRenderer
         }
     }
 
-    private static void RenderColumns(IReadOnlyList<LsObject> objects)
+    private static void RenderColumns(IReadOnlyList<GetListObject> objects)
     {
         var table = NewTable("Name", "SourceColumn", "DataType", "Description", "Hidden");
 
@@ -168,7 +213,7 @@ internal sealed partial class LsRenderer
     }
 
     private static void RenderMeasures(
-        IReadOnlyList<LsObject> objects,
+        IReadOnlyList<GetListObject> objects,
         bool noMultiline,
         IReadOnlySet<string>? measureNames)
     {
@@ -193,7 +238,7 @@ internal sealed partial class LsRenderer
         AnsiConsole.Write(table);
     }
 
-    private static void RenderHierarchies(IReadOnlyList<LsObject> objects)
+    private static void RenderHierarchies(IReadOnlyList<GetListObject> objects)
     {
         var table = NewTable("Name", "Levels", "Hidden");
         var showDescription = objects.Any(o => !string.IsNullOrEmpty(o.Description));
@@ -217,7 +262,7 @@ internal sealed partial class LsRenderer
     }
 
     private static void RenderPartitions(
-        IReadOnlyList<LsObject> objects,
+        IReadOnlyList<GetListObject> objects,
         bool noMultiline,
         IReadOnlySet<string>? measureNames)
     {
@@ -258,7 +303,7 @@ internal sealed partial class LsRenderer
         AnsiConsole.Write(table);
     }
 
-    private static void RenderLevels(IReadOnlyList<LsObject> objects)
+    private static void RenderLevels(IReadOnlyList<GetListObject> objects)
     {
         var showDescription = objects.Any(o => !string.IsNullOrEmpty(o.Description));
 
@@ -282,7 +327,7 @@ internal sealed partial class LsRenderer
     }
 
     private static void RenderGeneric(
-        IReadOnlyList<LsObject> objects,
+        IReadOnlyList<GetListObject> objects,
         bool noMultiline,
         IReadOnlySet<string>? measureNames)
     {
@@ -312,17 +357,17 @@ internal sealed partial class LsRenderer
     private static Table NewTable(params string[] headers)
         => Styling.NewTable(headers);
 
-    private static string Count(LsObject obj, params ModelObjectKind[] kinds)
+    private static string Count(GetListObject obj, params ModelObjectKind[] kinds)
         => kinds.Sum(kind => obj.ChildCounts.GetValueOrDefault(kind)).ToString();
 
     /// <summary>Plain "True"/"False" for <see cref="RowCells"/>; the row style provides the grey.</summary>
     private static string BoolText(bool value)
         => value ? "True" : "False";
 
-    private static string ColumnDataTypeDisplay(LsObject obj)
+    private static string ColumnDataTypeDisplay(GetListObject obj)
         => DataTypeDisplay(Projected(obj, "dataType"));
 
-    private static string Projected(LsObject obj, string jsonKey)
+    private static string Projected(GetListObject obj, string jsonKey)
         => obj.Projected.GetValueOrDefault(jsonKey) as string ?? "";
 
     private static string DataTypeDisplay(string value)
@@ -337,10 +382,10 @@ internal sealed partial class LsRenderer
             _ => value
         };
 
-    private static IReadOnlyList<string> ExpressionLines(LsObject obj, bool noMultiline)
+    private static IReadOnlyList<string> ExpressionLines(GetListObject obj, bool noMultiline)
         => DetailLines(obj.Expression ?? obj.Detail ?? "", noMultiline);
 
-    private static IReadOnlyList<string> DetailLines(LsObject obj, bool noMultiline)
+    private static IReadOnlyList<string> DetailLines(GetListObject obj, bool noMultiline)
         => DetailLines(obj.Expression ?? obj.Detail ?? "", noMultiline);
 
     private static IReadOnlyList<string> DetailLines(string detail, bool noMultiline)

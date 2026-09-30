@@ -91,7 +91,7 @@ internal static partial class ModelObjectLookup
         "'Sales/Total Sales', 'Sales/Measures/<name>', 'Relationships/<name>', or '.' " +
         "for the model root. Container keywords (" +
         string.Join(", ", PathSegment.KeywordNames) +
-        ") select within a path and cannot stand alone; use 'tx ls' to list objects.";
+        ") select within a path; to list objects, run 'tx get' with a container or wildcard, e.g. 'tx get Measures'.";
 
     private static bool TryParseLoneBracket(string path, out string name)
     {

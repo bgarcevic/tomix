@@ -26,7 +26,7 @@ internal sealed record GetView(
     private const string AnnotationPrefix = "annotation:";
     private const string TranslationPrefix = "translation:";
 
-    public static GetView Build(GetModelResult result, bool all)
+    public static GetView Build(GetObjectResult result, bool all)
     {
         var descriptors = ModelPropertyCatalog.For(result.Object.Kind)
             .ToDictionary(d => d.JsonKey, StringComparer.Ordinal);

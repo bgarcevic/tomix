@@ -1,4 +1,3 @@
-using Tomix.App.Deps;
 using Tomix.App.Diagnostics;
 using Tomix.App.Get;
 using Tomix.Core.Authentication;
@@ -129,13 +128,10 @@ public sealed class ProviderConnectionGuardTests
     [Fact]
     public async Task Deps_MapsRemoteFailure_ToConnectFailed()
     {
-        var handler = new DepsModelHandler([new ThrowingProvider(new InvalidOperationException("server down"))]);
+        var handler = new GetModelHandler([new ThrowingProvider(new InvalidOperationException("server down"))]);
 
         var result = await handler.HandleAsync(
-            new DepsModelRequest(
-                RemoteRef, "Sales", Type: null,
-                UpstreamOnly: false, DownstreamOnly: false, Deep: false,
-                Unused: false, HiddenOnly: false, MaxDepth: 0),
+            new GetModelRequest(RemoteRef, "Sales", Query: null, Type: null, Mode: GetMode.Deps),
             CancellationToken.None);
 
         Assert.False(result.Success);

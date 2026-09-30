@@ -1,5 +1,5 @@
+using Tomix.App.Get;
 using Tomix.App.Info;
-using Tomix.App.Ls;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
 
@@ -35,9 +35,9 @@ public sealed class RemoteOpenErrorTests
     [Fact]
     public async Task Ls_MapsAuthenticationRequired_ToDiagnostic()
     {
-        var handler = new LsModelHandler([new ThrowingProvider(new AuthenticationRequiredException("login please"))]);
+        var handler = new GetModelHandler([new ThrowingProvider(new AuthenticationRequiredException("login please"))]);
 
-        var result = await handler.HandleAsync(new LsModelRequest(RemoteRef, PathFilter: null, Type: null), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetModelRequest(RemoteRef, Path: null, Query: null, Type: null, Mode: GetMode.List), CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal("TOMIX_AUTH_REQUIRED", result.Diagnostics[0].Code);

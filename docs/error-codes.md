@@ -76,7 +76,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 |------|------|---------|
 | `TOMIX_OBJECT_NOT_FOUND` | 1 | The object path matched zero objects. Includes a hint. |
 | `TOMIX_OBJECT_AMBIGUOUS` | 1 | The object path matched more than one object. |
-| `TOMIX_PROPERTY_NOT_FOUND` | 1 | `get --query` named a property the object does not have. The hint suggests the closest property, or lists the valid ones when nothing is close. An `annotation:` or `translation:` token that is simply unset is not an error; it reads back empty. |
+| `TOMIX_PROPERTY_NOT_FOUND` | 1 | `get --query` named a property the object does not have, or no object in a `get --where` scope has the filtered property. The hint suggests the closest property, or lists the valid ones when nothing is close. An `annotation:` or `translation:` token that is simply unset is not an error; it reads back empty. |
 
 ## BPA Codes (`TOMIX_BPA_*`)
 
@@ -288,7 +288,10 @@ come from structural integrity checks.
 | `TOMIX_REMOTE_LIST_FAILED` | 1 | Listing workspaces or models failed (Power BI REST or XMLA error) during an interactive `connect` or `connect <server> --list`. |
 | `TOMIX_DATABASE_NOT_FOUND` | 1 | The database/model name was not found on the server. |
 | `TOMIX_DATABASE_REQUIRED` | 2 | The endpoint hosts more than one database/model and none was named. List them with `tx connect <server> --list`, then pass one with `-d/--database`. |
-| `TOMIX_DEPS_PATH_REQUIRED` | 2 | `deps` called without an object path. |
+| `TOMIX_DEPS_PATH_REQUIRED` | 2 | `get --deps` (or `deps`) called without an object path. |
+| `TOMIX_SINGLE_OBJECT_REQUIRED` | 2 | `get --query` or `get --deps` was given a path that selects a set (a wildcard such as `Sa*`, a container such as `Sales/Measures`, or `--ls`/`--where`). Name one object. |
+| `TOMIX_UNUSED_PATH` | 2 | `get --unused` (or `deps --unused`) was given a path; it scans the whole model. |
+| `TOMIX_INVALID_WHERE` | 2 | A `get --where` value is not `Prop=Value`. |
 | `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |
 | `TOMIX_UNKNOWN_OPTION` | 2 | An unrecognized `--option` would have been bound to a positional argument (e.g. a typo'd flag). Put `--` before positional values that must start with `-`. |
 | `TOMIX_UNKNOWN_COMMAND` | 2 | The subcommand name is not one `tx` (or the named command group) has, e.g. `tx lss`. The hint suggests the closest command. A command group run with no subcommand (e.g. `tx bpa`) is not an error: it prints the group's help and exits 0. |

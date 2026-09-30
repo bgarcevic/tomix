@@ -325,12 +325,21 @@ Pretty-print DAX and M expressions
   opt --no-sync  Skip workspace sync when workspace mode is active
 
 # tx get
-Read a model object's properties
-  arg <path>  The object to read, slash-separated: 'Sales', 'Sales/Amount'. DAX form works too.
+Read model objects and their properties
+  arg [path]  What to read. One object shows its properties: 'Sales', 'Sales/Amount', or DAX form "'Sales'[Amount]"; '.' is the model root. A wildcard ('Sa*', '*/Amount') or container ('Tables', 'Sales/Measures') lists every match; omitted lists the tables.
   arg [model]  Optional path to the model; defaults to the active connection
-  opt --query <property>  Read just one property (for example --query expression)
-  opt --type, -t <type>  Type to pick when the path matches several objects under a table
+  opt --query <property>  Read just one property of one object (for example --query expression)
+  opt --type, -t <type>  Object type: picks one when a path matches several objects, or filters a list. Values: table, measure, column, calculatedcolumn, hierarchy, level, partition, refreshpolicy, calculationitem, member, relationship, role, perspective, culture, datasource, kpi, tablepermission, calendar, expression, function.
   opt --all  List every property, including unset ones (text output; JSON and CSV always carry all)
+  opt --ls  List the objects the path selects, as a compact table (same as tx ls)
+  opt --where <prop=value>  Keep objects whose property matches Prop=Value, case-insensitively. '*' is the only wildcard (Name=*margin*, Name=margin*); no '*' means the whole value. Repeat to AND filters. The path is the scope (omitted: the tables).
+  opt --deps [<direction>]  Trace what one object uses and what uses it: upstream, downstream, or both (default: both)
+  opt --deep  With --deps: walk the dependency chain recursively
+  opt --max-depth <n>  With --deps --deep: how deep to walk (default: 10)
+  opt --unused  List measures and columns that nothing depends on (whole model, no path)
+  opt --hidden  With --unused: only unused objects that are hidden
+  opt --paths-only  List one object path per line, ready for piping
+  opt --no-multiline  List multi-line cell content (e.g. measure expressions) on one line, truncated. Applies to text output.
 
 # tx init
 Start a new empty semantic model

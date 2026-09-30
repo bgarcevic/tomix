@@ -7,7 +7,9 @@ using Tomix.Provider.Tmdl;
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// The get/ls parity contract: both commands project properties through
+/// <c>get</c> is the single read pipeline and <c>ls</c>/<c>deps</c> are shortcuts into it, so a
+/// selection read through <c>get</c> must equal the <c>ls</c> output and a <c>get --deps</c> read the
+/// <c>deps</c> output byte for byte. The older get/ls projection contract still holds on top: both commands project properties through
 /// <c>ModelPropertyCatalog</c>, so for the same object an ls JSON row (minus its
 /// <c>path</c>/<c>type</c> envelope) must equal get's <c>properties</c> object, and CSV headers
 /// must match modulo ls's leading <c>Path</c> column. A failure here means one command's output
@@ -78,7 +80,7 @@ public sealed class GetLsParityTests
     {
         // `ls Sales` lists a table's children — a mixed column/measure/partition set. The rows'
         // Projected dictionaries are keyed per-kind ("dataType", not "detail"), so the generic
-        // CSV columns must come from the LsObject fields, not the projections.
+        // CSV columns must come from the GetListObject fields, not the projections.
         var csv = Invoke("ls", "Sales", SampleTmdl, "--output-format", "csv");
         var lines = csv.TrimEnd().Split('\n').Select(l => l.TrimEnd('\r')).ToList();
 
@@ -121,17 +123,90 @@ public sealed class GetLsParityTests
         }
     }
 
+    public static TheoryData<string[], string[]> Shortcuts => new()
+    {
+        // get invocation, equivalent shortcut invocation (model appended to both)
+        { ["get"], ["ls"] },
+        { ["get", "Sa*"], ["ls", "Sa*"] },
+        { ["get", "Tables"], ["ls", "Tables"] },
+        { ["get", "Sales/Measures"], ["ls", "Sales/Measures"] },
+        { ["get", "*/Amount"], ["ls", "*/Amount"] },
+        { ["get", "Sales", "--ls"], ["ls", "Sales"] },
+        { ["get", "--type", "measure", "--ls"], ["ls", "--type", "measure"] },
+        { ["get", "Sales/Total Sales", "--deps"], ["deps", "Sales/Total Sales"] },
+        { ["get", "--deps", "Sales/Total Sales"], ["deps", "Sales/Total Sales"] },
+        { ["get", "Sales/Amount", "--deps", "downstream"], ["deps", "Sales/Amount", "--downstream"] },
+        { ["get", "Sales/Total Sales", "--deps", "upstream", "--deep"], ["deps", "Sales/Total Sales", "--upstream", "--deep"] },
+        { ["get", "--unused"], ["deps", "--unused"] },
+    };
+
+    [Theory]
+    [MemberData(nameof(Shortcuts))]
+    public void Shortcut_EqualsGet(string[] get, string[] shortcut)
+    {
+        string[] json = ["--model", SampleTmdl, "--output-format", "json"];
+
+        Assert.Equal(Invoke([.. shortcut, .. json]), Invoke([.. get, .. json]));
+    }
+
+    [Fact]
+    public void Get_LonePositionalModel_ListsTables()
+        => Assert.Equal(
+            Invoke("ls", "--model", SampleTmdl, "--output-format", "json"),
+            Invoke("get", SampleTmdl, "--output-format", "json"));
+
+    [Fact]
+    public void Where_FiltersTheScope()
+    {
+        var rows = CommandJson.DataArray(Invoke(
+            "get", "Measures", "--model", SampleTmdl, "--where", "Name=total*", "--output-format", "json"));
+
+        Assert.NotEmpty(rows);
+        Assert.All(rows, row => Assert.StartsWith(
+            "total", row!["name"]!.GetValue<string>(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("TOMIX_SINGLE_OBJECT_REQUIRED", "get", "Sa*", "--query", "name")]
+    [InlineData("TOMIX_SINGLE_OBJECT_REQUIRED", "get", "Sales/Measures", "--deps")]
+    [InlineData("TOMIX_UNUSED_PATH", "get", "Sales", "--unused")]
+    [InlineData("TOMIX_INVALID_WHERE", "get", "Measures", "--where", "Name")]
+    [InlineData("TOMIX_OUTPUT_FORMAT_UNSUPPORTED", "get", "Sa*", "--output-format", "tmdl")]
+    [InlineData("TOMIX_OUTPUT_FORMAT_UNSUPPORTED", "get", "Sales/Amount", "--deps", "--output-format", "csv")]
+    [InlineData("TOMIX_USAGE", "get", "Sales/Amount", "--deps", "--unused")]
+    [InlineData("TOMIX_USAGE", "get", "Sales", "--ls", "--deps")]
+    [InlineData("TOMIX_USAGE", "get", "Sales", "--deep")]
+    [InlineData("TOMIX_USAGE", "get", "Sales", "--max-depth", "2")]
+    [InlineData("TOMIX_USAGE", "get", "Sales", "--hidden")]
+    [InlineData("TOMIX_USAGE", "get", "Sales", "--where", "Name=x", "--all")]
+    [InlineData("TOMIX_USAGE", "get", "Sales/Amount", "--deps", "sideways")]
+    public void Get_RejectsOptionsThatCannotApply(string code, params string[] args)
+    {
+        var captured = InvokeRaw([.. args, "--model", SampleTmdl, "--error-format", "json"]);
+
+        Assert.Equal(2, captured.ExitCode);
+        Assert.Contains(code, captured.Stderr);
+    }
+
     private static string Invoke(params string[] args)
     {
-        var services = TestServices.Create();
-        var root = TestRoot.With(args[0] == "get"
-            ? new GetCommand(Providers, services.State).Build()
-            : new LsCommand(Providers, services.State).Build());
-
-        var captured = ConsoleCapture.Invoke(root.Parse(args));
+        var captured = InvokeRaw(args);
         Assert.True(captured.ExitCode == 0,
             $"'{string.Join(' ', args)}' exited {captured.ExitCode}: {captured.Stderr}");
         return captured.Stdout;
+    }
+
+    private static ConsoleCapture.Captured InvokeRaw(string[] args)
+    {
+        var services = TestServices.Create();
+        var root = TestRoot.With(args[0] switch
+        {
+            "get" => new GetCommand(Providers, services.State).Build(),
+            "deps" => new DepsCommand(Providers, services.State).Build(),
+            _ => new LsCommand(Providers, services.State).Build()
+        });
+
+        return ConsoleCapture.Invoke(root.Parse(args));
     }
 
     private static readonly string SampleTmdl = SampleModel.Locate();
