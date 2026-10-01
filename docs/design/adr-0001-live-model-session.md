@@ -1,6 +1,6 @@
 # ADR 0001: Live model session
 
-- **Status:** Proposed
+- **Status:** Accepted. §3, the threading parts of §4 and the order of work in Consequences are superseded by [ADR 0002](adr-0002-live-session-lease-gate-and-journal-first.md).
 - **Date:** 2026-09-30
 - **Issue:** [#342](https://github.com/bgarcevic/tomix-cli/issues/342), part of epic [#341](https://github.com/bgarcevic/tomix-cli/issues/341)
 - **Unblocks:** #343 (core abstraction), #344 (TOM live session), #345 (handler refactor), #346 (undo/redo), #348 (protocol), #350 (notifications), #351 (external changes), #370 (change sets), #374 (merge)

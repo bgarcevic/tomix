@@ -24,10 +24,12 @@ Core domain types and abstractions.
   description, expression, fix expression, docs link) and `RuleSeverity`. Every rule engine
   describes its rules with it: `BpaRule` derives from it, and so do `validate`'s built-in rules
   (`/src/Tomix.App/Validate/ValidationRules`). Add a rule field here, not per engine.
-- The live model session contracts (planned, [ADR 0001](../../docs/design/adr-0001-live-model-session.md)):
-  `ILiveModelSession`, `ObjectId`, `ModelChange`/`ModelChangeBatch`, `SessionState`, and the
-  transaction contract. They define identity, versions, transactions and change events only.
-  The actor, journal and ID map that implement them belong in the providers.
+- The live model session contracts ([ADR 0001](../../docs/design/adr-0001-live-model-session.md),
+  [ADR 0002](../../docs/design/adr-0002-live-session-lease-gate-and-journal-first.md)), in `Models/`:
+  `ILiveModelSession`, `ILiveSessionLease` (a lease is a transaction), `ObjectId`,
+  `ModelChange`/`ModelChangeBatch`, `SessionState`, and `LiveModelSnapshot`/`ModelObjectIndex`
+  for ID↔path lookups. They define identity, versions, transactions and change events only.
+  The lease gate, journal and ID map that implement them belong in the providers.
 - The M highlighting lexer (`M/MLanguage.Classify`) — a single synchronous lexical pass that
   classifies Power Query (M) text for syntax highlighting and never throws. It is not a parser:
   formatting and syntax errors come from the embedded powerquery engine in

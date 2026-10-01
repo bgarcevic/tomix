@@ -4,7 +4,8 @@ Architecture decision records (ADRs) capture decisions that shape several issues
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](adr-0001-live-model-session.md) | Live model session: lifecycle, identity, threading, undo, handler sharing, save and events | Proposed |
+| [0001](adr-0001-live-model-session.md) | Live model session: lifecycle, identity, threading, undo, handler sharing, save and events | Accepted; §3 and parts of §4 superseded by 0002 |
+| [0002](adr-0002-live-session-lease-gate-and-journal-first.md) | Live model session: lease gate instead of an actor, journal before the session | Proposed |
 
 ## Writing an ADR
 

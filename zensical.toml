@@ -39,6 +39,7 @@ nav = [
     { "Design decisions" = [
       { "Overview" = "design/index.md" },
       { "ADR 0001: Live model session" = "design/adr-0001-live-model-session.md" },
+      { "ADR 0002: Lease gate and journal first" = "design/adr-0002-live-session-lease-gate-and-journal-first.md" },
     ] },
   ] },
 ]

@@ -13,6 +13,8 @@ namespace Tomix.Core.Models;
 /// <param name="Hidden">Whether the object is hidden in the model.</param>
 /// <param name="Children">Child objects (e.g. a table's columns/measures, a role's members).</param>
 /// <param name="PolicyInfo">Policy properties and validation findings for a refresh-policy child.</param>
+/// <param name="Id">The object's ID in a live model session (<see cref="ILiveModelSession"/>);
+/// <c>null</c> in one-shot snapshots, and then left out of JSON.</param>
 public sealed record ModelObject(
     string Name,
     ModelObjectKind Kind,
@@ -25,7 +27,9 @@ public sealed record ModelObject(
     IReadOnlyList<ModelObject> Children,
     IReadOnlyDictionary<string, string>? Properties = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    RefreshPolicyInfo? PolicyInfo = null)
+    RefreshPolicyInfo? PolicyInfo = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    ObjectId? Id = null)
 {
     public string? Property(string key)
         => Properties is not null && Properties.TryGetValue(key, out var value) ? value : null;
