@@ -8,13 +8,20 @@ namespace Tomix.Provider.Tom;
 /// Object-creation logic for <see cref="TomModelMutator"/>. Every advertised <c>tx add --type</c>
 /// value maps to a builder here that creates the corresponding TOM object under the requested path
 /// and reports <c>Changed=true</c>. Builders honor <c>--if-not-exists</c> and the partition/data
-/// source options (mode, expression, columns, connection details).
+/// source options (mode, expression, columns, connection details). New objects are built
+/// detached and attached last through the <see cref="TomWriter"/>, which also makes every write
+/// to an existing object.
 /// </summary>
 internal sealed class TomObjectAdder
 {
     private readonly Database _database;
+    private readonly TomWriter _writer;
 
-    public TomObjectAdder(Database database) => _database = database;
+    public TomObjectAdder(Database database, TomWriter writer)
+    {
+        _database = database;
+        _writer = writer;
+    }
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
     {
@@ -132,7 +139,7 @@ internal sealed class TomObjectAdder
         }
 
         var table = new Table { Name = path };
-        table.Partitions.Add(new Partition
+        _writer.Attach(table.Partitions, new Partition
         {
             Name = path,
             Mode = ParseMode(request.Mode),
@@ -141,10 +148,10 @@ internal sealed class TomObjectAdder
                 Expression = request.PartitionExpression ?? "let Source = #table({}, {}) in Source"
             }
         });
-        AddColumns(table, request.Columns);
-        _database.Model.Tables.Add(table);
+        AddColumns(_writer, table, request.Columns);
+        _writer.Attach(_database.Model.Tables, table);
 
-        TomPropertyApplier.ApplyProperties(table, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, table, request.Properties);
         return new ModelObjectMutationResult(table.Name, Changed: true);
     }
 
@@ -178,9 +185,9 @@ internal sealed class TomObjectAdder
             Name = parts[1],
             Expression = request.Value ?? ""
         };
-        table.Measures.Add(measure);
+        _writer.Attach(table.Measures, measure);
 
-        TomPropertyApplier.ApplyProperties(measure, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, measure, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{measure.Name}", Changed: true);
     }
 
@@ -194,7 +201,7 @@ internal sealed class TomObjectAdder
             return ExistingOrThrow($"{existing.Name}", request.IfNotExists, path);
 
         var table = new Table { Name = path };
-        table.Partitions.Add(new Partition
+        _writer.Attach(table.Partitions, new Partition
         {
             Name = path,
             Mode = ParseMode(request.Mode),
@@ -203,9 +210,9 @@ internal sealed class TomObjectAdder
                 Expression = request.PartitionExpression ?? request.Value ?? "{1}"
             }
         });
-        _database.Model.Tables.Add(table);
+        _writer.Attach(_database.Model.Tables, table);
 
-        TomPropertyApplier.ApplyProperties(table, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, table, request.Properties);
         return new ModelObjectMutationResult(table.Name, Changed: true);
     }
 
@@ -220,15 +227,15 @@ internal sealed class TomObjectAdder
 
         var table = new Table { Name = path };
         table.CalculationGroup = new CalculationGroup();
-        table.Columns.Add(new DataColumn
+        _writer.Attach(table.Columns, new DataColumn
         {
             Name = "Name",
             DataType = DataType.String,
             SourceColumn = "Name"
         });
-        _database.Model.Tables.Add(table);
+        _writer.Attach(_database.Model.Tables, table);
 
-        TomPropertyApplier.ApplyProperties(table, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, table, request.Properties);
         return new ModelObjectMutationResult(table.Name, Changed: true);
     }
 
@@ -246,9 +253,9 @@ internal sealed class TomObjectAdder
             Name = name,
             Expression = request.Value ?? ""
         };
-        table.Columns.Add(column);
+        _writer.Attach(table.Columns, column);
 
-        TomPropertyApplier.ApplyProperties(column, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, column, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{column.Name}", Changed: true);
     }
 
@@ -267,9 +274,9 @@ internal sealed class TomObjectAdder
             DataType = DataType.String,
             SourceColumn = request.Value ?? name
         };
-        table.Columns.Add(column);
+        _writer.Attach(table.Columns, column);
 
-        TomPropertyApplier.ApplyProperties(column, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, column, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{column.Name}", Changed: true);
     }
 
@@ -286,10 +293,10 @@ internal sealed class TomObjectAdder
         // A hierarchy needs at least one level to serialize; seed it from the first real column.
         var seed = table.Columns.FirstOrDefault(c => c.Type != ColumnType.RowNumber);
         if (seed is not null)
-            hierarchy.Levels.Add(new Level { Name = seed.Name, Ordinal = 0, Column = seed });
-        table.Hierarchies.Add(hierarchy);
+            _writer.Attach(hierarchy.Levels, new Level { Name = seed.Name, Ordinal = 0, Column = seed });
+        _writer.Attach(table.Hierarchies, hierarchy);
 
-        TomPropertyApplier.ApplyProperties(hierarchy, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, hierarchy, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{hierarchy.Name}", Changed: true);
     }
 
@@ -320,9 +327,9 @@ internal sealed class TomObjectAdder
             Ordinal = hierarchy.Levels.Count,
             Column = column
         };
-        hierarchy.Levels.Add(level);
+        _writer.Attach(hierarchy.Levels, level);
 
-        TomPropertyApplier.ApplyProperties(level, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, level, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{hierarchy.Name}/{level.Name}", Changed: true);
     }
 
@@ -335,9 +342,9 @@ internal sealed class TomObjectAdder
             return ExistingOrThrow($"{table.Name}/{existing.Name}", request.IfNotExists, path);
 
         var calendar = new Calendar { Name = name };
-        table.Calendars.Add(calendar);
+        _writer.Attach(table.Calendars, calendar);
 
-        TomPropertyApplier.ApplyProperties(calendar, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, calendar, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{calendar.Name}", Changed: true);
     }
 
@@ -362,9 +369,9 @@ internal sealed class TomObjectAdder
             Expression = request.Value ?? "SELECTEDMEASURE()",
             Ordinal = table.CalculationGroup.CalculationItems.Count
         };
-        table.CalculationGroup.CalculationItems.Add(item);
+        _writer.Attach(table.CalculationGroup.CalculationItems, item);
 
-        TomPropertyApplier.ApplyProperties(item, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, item, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{item.Name}", Changed: true);
     }
 
@@ -382,13 +389,14 @@ internal sealed class TomObjectAdder
         if (measure.KPI is not null)
             return ExistingOrThrow($"{table.Name}/{measure.Name}", request.IfNotExists, path);
 
-        measure.KPI = new KPI
+        var kpi = new KPI
         {
             TargetExpression = request.Value ?? "0",
             StatusExpression = "0"
         };
+        _writer.Set(measure, m => m.KPI, kpi);
 
-        TomPropertyApplier.ApplyProperties(measure.KPI, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, kpi, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{measure.Name}", Changed: true);
     }
 
@@ -406,9 +414,9 @@ internal sealed class TomObjectAdder
             Mode = ParseMode(request.Mode),
             Source = BuildPartitionSource(kind, name, request)
         };
-        table.Partitions.Add(partition);
+        _writer.Attach(table.Partitions, partition);
 
-        TomPropertyApplier.ApplyProperties(partition, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, partition, request.Properties);
         return new ModelObjectMutationResult($"{table.Name}/{partition.Name}", Changed: true);
     }
 
@@ -484,9 +492,9 @@ internal sealed class TomObjectAdder
             Kind = ExpressionKind.M,
             Expression = request.Value ?? "1 meta [IsParameterQuery=false]"
         };
-        _database.Model.Expressions.Add(expression);
+        _writer.Attach(_database.Model.Expressions, expression);
 
-        TomPropertyApplier.ApplyProperties(expression, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, expression, request.Properties);
         return new ModelObjectMutationResult(expression.Name, Changed: true);
     }
 
@@ -503,9 +511,9 @@ internal sealed class TomObjectAdder
             Name = name,
             Expression = request.Value ?? "() => 1"
         };
-        _database.Model.Functions.Add(function);
+        _writer.Attach(_database.Model.Functions, function);
 
-        TomPropertyApplier.ApplyProperties(function, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, function, request.Properties);
         return new ModelObjectMutationResult(function.Name, Changed: true);
     }
 
@@ -518,9 +526,9 @@ internal sealed class TomObjectAdder
             return ExistingOrThrow(existing.Name, request.IfNotExists, path);
 
         var perspective = new Perspective { Name = name };
-        _database.Model.Perspectives.Add(perspective);
+        _writer.Attach(_database.Model.Perspectives, perspective);
 
-        TomPropertyApplier.ApplyProperties(perspective, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, perspective, request.Properties);
         return new ModelObjectMutationResult(perspective.Name, Changed: true);
     }
 
@@ -533,9 +541,9 @@ internal sealed class TomObjectAdder
             return ExistingOrThrow(existing.Name, request.IfNotExists, path);
 
         var culture = new Culture { Name = name };
-        _database.Model.Cultures.Add(culture);
+        _writer.Attach(_database.Model.Cultures, culture);
 
-        TomPropertyApplier.ApplyProperties(culture, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, culture, request.Properties);
         return new ModelObjectMutationResult(culture.Name, Changed: true);
     }
 
@@ -556,9 +564,9 @@ internal sealed class TomObjectAdder
         if (!string.IsNullOrWhiteSpace(request.Source))
             dataSource.Provider = request.Source;
 
-        _database.Model.DataSources.Add(dataSource);
+        _writer.Attach(_database.Model.DataSources, dataSource);
 
-        TomPropertyApplier.ApplyProperties(dataSource, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, dataSource, request.Properties);
         return new ModelObjectMutationResult(dataSource.Name, Changed: true);
     }
 
@@ -575,9 +583,9 @@ internal sealed class TomObjectAdder
             Name = name,
             ConnectionDetails = BuildConnectionDetails(request.SourceType, request.Endpoint, request.SourceDatabase)
         };
-        _database.Model.DataSources.Add(dataSource);
+        _writer.Attach(_database.Model.DataSources, dataSource);
 
-        TomPropertyApplier.ApplyProperties(dataSource, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, dataSource, request.Properties);
         return new ModelObjectMutationResult(dataSource.Name, Changed: true);
     }
 
@@ -590,9 +598,9 @@ internal sealed class TomObjectAdder
             return ExistingOrThrow(existing.Name, request.IfNotExists, path);
 
         var role = new ModelRole { Name = name, ModelPermission = ModelPermission.Read };
-        _database.Model.Roles.Add(role);
+        _writer.Attach(_database.Model.Roles, role);
 
-        TomPropertyApplier.ApplyProperties(role, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, role, request.Properties);
         return new ModelObjectMutationResult(role.Name, Changed: true);
     }
 
@@ -617,9 +625,9 @@ internal sealed class TomObjectAdder
             Table = table,
             FilterExpression = request.Value ?? ""
         };
-        role.TablePermissions.Add(permission);
+        _writer.Attach(role.TablePermissions, permission);
 
-        TomPropertyApplier.ApplyProperties(permission, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, permission, request.Properties);
         return new ModelObjectMutationResult($"{role.Name}/{permission.Name}", Changed: true);
     }
 
@@ -641,9 +649,9 @@ internal sealed class TomObjectAdder
             MemberName = parts[1],
             IdentityProvider = "AzureAD"
         };
-        role.Members.Add(member);
+        _writer.Attach(role.Members, member);
 
-        TomPropertyApplier.ApplyProperties(member, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, member, request.Properties);
         return new ModelObjectMutationResult($"{role.Name}/{member.MemberName}", Changed: true);
     }
 
@@ -693,9 +701,9 @@ internal sealed class TomObjectAdder
             FromCardinality = RelationshipEndCardinality.Many,
             ToCardinality = RelationshipEndCardinality.One
         };
-        _database.Model.Relationships.Add(relationship);
+        _writer.Attach(_database.Model.Relationships, relationship);
 
-        TomPropertyApplier.ApplyProperties(relationship, request.Properties);
+        TomPropertyApplier.ApplyProperties(_writer, relationship, request.Properties);
         return new ModelObjectMutationResult(RelationshipDisplay(relationship), Changed: true);
     }
 
@@ -755,7 +763,7 @@ internal sealed class TomObjectAdder
                 + "(measures, columns, and hierarchies share a namespace).");
     }
 
-    private static void AddColumns(Table table, string? columns)
+    private static void AddColumns(TomWriter writer, Table table, string? columns)
     {
         if (string.IsNullOrWhiteSpace(columns))
             return;
@@ -765,7 +773,7 @@ internal sealed class TomObjectAdder
             if (table.Columns.Any(c => NameEquals(c.Name, name)))
                 continue;
 
-            table.Columns.Add(new DataColumn
+            writer.Attach(table.Columns, new DataColumn
             {
                 Name = name,
                 DataType = DataType.String,

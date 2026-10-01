@@ -1,0 +1,3 @@
+M:Microsoft.AnalysisServices.Tabular.MetadataObjectCollection`2.Add(`0);Attach through TomWriter so the change journal records it
+M:Microsoft.AnalysisServices.Tabular.MetadataObjectCollection`2.Remove(`0);Detach through TomWriter so the change journal records it
+M:Microsoft.AnalysisServices.Tabular.NamedMetadataObjectCollection`2.Remove(System.String);Detach through TomWriter so the change journal records it

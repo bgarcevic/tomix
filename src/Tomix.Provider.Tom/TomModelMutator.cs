@@ -9,21 +9,29 @@ namespace Tomix.Provider.Tom;
 /// A thin facade over the mutation collaborators: <see cref="TomObjectAdder"/> (add),
 /// <see cref="TomMutationTargetResolver"/> (path → object), <see cref="TomPropertyApplier"/>
 /// (set/rewrite), <see cref="TomTextReplacer"/> (replace), and <see cref="TomRemoveCascade"/>
-/// (remove cascades).
+/// (remove cascades). Every TOM write goes through a <see cref="TomWriter"/>; the public
+/// constructor uses <see cref="TomWriter.Untracked"/>, a live session passes its journal's writer.
 /// </summary>
 public sealed class TomModelMutator
 {
     private readonly Database _database;
+    private readonly TomWriter _writer;
     private readonly TomObjectAdder _adder;
     private readonly TomMutationTargetResolver _resolver;
     private readonly TomTextReplacer _replacer;
 
     public TomModelMutator(Database database)
+        : this(database, TomWriter.Untracked)
+    {
+    }
+
+    internal TomModelMutator(Database database, TomWriter writer)
     {
         _database = database;
-        _adder = new TomObjectAdder(database);
+        _writer = writer;
+        _adder = new TomObjectAdder(database, writer);
         _resolver = new TomMutationTargetResolver(database);
-        _replacer = new TomTextReplacer(database);
+        _replacer = new TomTextReplacer(database, writer);
     }
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
@@ -36,7 +44,7 @@ public sealed class TomModelMutator
 
         if (RefreshPolicyPath.Table(request.Path, request.Type) is { } policyTable)
         {
-            var result = new TomRefreshPolicyManager(_database).SetProperties(policyTable, request.Properties, request.Force);
+            var result = new TomRefreshPolicyManager(_database, _writer).SetProperties(policyTable, request.Properties, request.Force);
             var lastProperty = request.Properties[^1];
             return new ModelObjectMutationResult($"{TomMutationPaths.Segment(result.Policy.Table)}/RefreshPolicy",
                 true, lastProperty.Property, lastProperty.Value, Policy: result.Policy,
@@ -49,7 +57,7 @@ public sealed class TomModelMutator
         ModelPropertyAssignment last = request.Properties[^1];
         foreach (var assignment in request.Properties)
         {
-            TomPropertyApplier.ApplyProperty(target.Target, assignment);
+            TomPropertyApplier.ApplyProperty(_writer, target.Target, assignment);
             last = assignment;
         }
 
@@ -66,7 +74,7 @@ public sealed class TomModelMutator
         {
             var resolved = _resolver.TryResolveForMutation(edit.Path, edit.Kind)
                            ?? throw TomMutationTargetResolver.NotFound(edit.Path);
-            TomPropertyApplier.ApplyExpressionEdit(resolved.Target, edit);
+            TomPropertyApplier.ApplyExpressionEdit(_writer, resolved.Target, edit);
         }
 
         return new ModelExpressionRewriteResult(edits.Count);
@@ -95,13 +103,15 @@ public sealed class TomModelMutator
                 $"A measure named '{newName}' already exists in table '{collision.Table.Name}'.");
 
         // TOM refuses to re-attach a removed object, so the move is clone → detach original →
-        // attach clone. Clone() deep-copies children (KPI, annotations, detail rows), but
-        // object-identity references — perspective membership and translations — point at the
-        // original and must be captured first and re-created against the clone.
+        // attach clone, and the clone takes over the original's ID. Clone() deep-copies children
+        // (KPI, annotations, detail rows), but object-identity references — perspective
+        // membership and translations — point at the original and must be captured first and
+        // re-created against the clone. The clone is not attached yet, so it is edited directly.
         var clone = measure.Clone();
         clone.Name = newName;
         if (request.NewDisplayFolder is not null)
             clone.DisplayFolder = request.NewDisplayFolder;
+        _writer.Rebind(measure, clone);
 
         var memberships = new List<Perspective>();
         foreach (var perspective in _database.Model.Perspectives)
@@ -109,7 +119,7 @@ public sealed class TomModelMutator
             var oldEntry = perspective.PerspectiveTables.FirstOrDefault(pt => pt.Table == sourceTable);
             if (oldEntry?.PerspectiveMeasures.FirstOrDefault(pm => pm.Measure == measure) is { } membership)
             {
-                oldEntry.PerspectiveMeasures.Remove(membership);
+                _writer.Detach(oldEntry.PerspectiveMeasures, membership);
                 memberships.Add(perspective);
             }
         }
@@ -120,13 +130,13 @@ public sealed class TomModelMutator
             foreach (var translation in culture.ObjectTranslations
                          .Where(t => ReferenceEquals(t.Object, measure)).ToList())
             {
-                culture.ObjectTranslations.Remove(translation);
+                _writer.Detach(culture.ObjectTranslations, translation);
                 translations.Add((culture, translation.Property, translation.Value));
             }
         }
 
-        sourceTable.Measures.Remove(measure);
-        targetTable.Measures.Add(clone);
+        _writer.Detach(sourceTable.Measures, measure);
+        _writer.Attach(targetTable.Measures, clone);
 
         foreach (var perspective in memberships)
         {
@@ -134,14 +144,14 @@ public sealed class TomModelMutator
             if (entry is null)
             {
                 entry = new PerspectiveTable { Table = targetTable };
-                perspective.PerspectiveTables.Add(entry);
+                _writer.Attach(perspective.PerspectiveTables, entry);
             }
 
-            entry.PerspectiveMeasures.Add(new PerspectiveMeasure { Measure = clone });
+            _writer.Attach(entry.PerspectiveMeasures, new PerspectiveMeasure { Measure = clone });
         }
 
         foreach (var (culture, property, value) in translations)
-            culture.ObjectTranslations.Add(new ObjectTranslation { Object = clone, Property = property, Value = value });
+            _writer.Attach(culture.ObjectTranslations, new ObjectTranslation { Object = clone, Property = property, Value = value });
 
         return new ModelObjectMutationResult($"{targetTable.Name}/{clone.Name}", Changed: true);
     }
@@ -150,7 +160,7 @@ public sealed class TomModelMutator
     {
         if (RefreshPolicyPath.Table(request.Path, request.Type) is { } policyTable)
         {
-            var manager = new TomRefreshPolicyManager(_database);
+            var manager = new TomRefreshPolicyManager(_database, _writer);
             var remaining = manager.Get(policyTable)?.PolicyPartitions;
             var result = manager.Remove(policyTable, request.IfExists);
             return result with
@@ -184,29 +194,29 @@ public sealed class TomModelMutator
         {
             case Table table:
                 {
-                    var cascade = TomRemoveCascade.ForTable(table);
-                    _database.Model.Tables.Remove(table);
+                    var cascade = TomRemoveCascade.ForTable(_writer, table);
+                    _writer.Detach(_database.Model.Tables, table);
                     return cascade;
                 }
 
             case Measure measure when resolved.Parent is Table table:
                 {
-                    var cascade = TomRemoveCascade.ForMeasure(measure);
-                    table.Measures.Remove(measure);
+                    var cascade = TomRemoveCascade.ForMeasure(_writer, measure);
+                    _writer.Detach(table.Measures, measure);
                     return cascade;
                 }
 
             case Column column when resolved.Parent is Table table:
                 {
-                    var cascade = TomRemoveCascade.ForColumn(column);
-                    table.Columns.Remove(column);
+                    var cascade = TomRemoveCascade.ForColumn(_writer, column);
+                    _writer.Detach(table.Columns, column);
                     return cascade;
                 }
 
             case Hierarchy hierarchy when resolved.Parent is Table table:
                 {
-                    var cascade = TomRemoveCascade.ForHierarchy(hierarchy);
-                    table.Hierarchies.Remove(hierarchy);
+                    var cascade = TomRemoveCascade.ForHierarchy(_writer, hierarchy);
+                    _writer.Detach(table.Hierarchies, hierarchy);
                     return cascade;
                 }
 
@@ -215,30 +225,30 @@ public sealed class TomModelMutator
                     throw new InvalidOperationException(
                         $"Cannot remove the last partition of table '{table.Name}'; a table must have at least one partition.");
 
-                table.Partitions.Remove(partition);
+                _writer.Detach(table.Partitions, partition);
                 return [];
 
             case ModelRole role:
-                _database.Model.Roles.Remove(role);
+                _writer.Detach(_database.Model.Roles, role);
                 return [];
 
             case SingleColumnRelationship relationship:
                 {
-                    var cascade = TomRemoveCascade.ForRelationship(relationship);
-                    _database.Model.Relationships.Remove(relationship);
+                    var cascade = TomRemoveCascade.ForRelationship(_writer, relationship);
+                    _writer.Detach(_database.Model.Relationships, relationship);
                     return cascade;
                 }
 
             case Level level when resolved.Parent is Hierarchy hierarchy:
                 {
                     var cascade = new List<string>();
-                    cascade.AddRange(TomRemoveCascade.ForLevel(level));
-                    hierarchy.Levels.Remove(level);
+                    cascade.AddRange(TomRemoveCascade.ForLevel(_writer, level));
+                    _writer.Detach(hierarchy.Levels, level);
                     if (hierarchy.Levels.Count == 0)
                     {
                         var table = hierarchy.Table;
-                        cascade.AddRange(TomRemoveCascade.ForHierarchy(hierarchy));
-                        table.Hierarchies.Remove(hierarchy);
+                        cascade.AddRange(TomRemoveCascade.ForHierarchy(_writer, hierarchy));
+                        _writer.Detach(table.Hierarchies, hierarchy);
                         cascade.Add($"hierarchy '{table.Name}'[{hierarchy.Name}] (no levels left)");
                     }
 
@@ -247,41 +257,41 @@ public sealed class TomModelMutator
 
             case CalculationItem item when resolved.Parent is Table calcGroupTable:
                 {
-                    var cascade = TomRemoveCascade.ForCalculationItem(item);
-                    calcGroupTable.CalculationGroup.CalculationItems.Remove(item);
+                    var cascade = TomRemoveCascade.ForCalculationItem(_writer, item);
+                    _writer.Detach(calcGroupTable.CalculationGroup.CalculationItems, item);
                     return cascade;
                 }
 
             case ModelRoleMember member when resolved.Parent is ModelRole memberRole:
-                memberRole.Members.Remove(member);
+                _writer.Detach(memberRole.Members, member);
                 return [];
 
             case KPI when resolved.Parent is Measure kpiMeasure:
-                kpiMeasure.KPI = null;
+                _writer.Set(kpiMeasure, p => p.KPI, null);
                 return [];
 
             case TablePermission permission when resolved.Parent is ModelRole permissionRole:
-                permissionRole.TablePermissions.Remove(permission);
+                _writer.Detach(permissionRole.TablePermissions, permission);
                 return [];
 
             case Calendar calendar when resolved.Parent is Table calendarTable:
-                calendarTable.Calendars.Remove(calendar);
+                _writer.Detach(calendarTable.Calendars, calendar);
                 return [];
 
             case Perspective perspective:
-                _database.Model.Perspectives.Remove(perspective);
+                _writer.Detach(_database.Model.Perspectives, perspective);
                 return [];
 
             case Culture culture:
-                _database.Model.Cultures.Remove(culture);
+                _writer.Detach(_database.Model.Cultures, culture);
                 return [];
 
             case NamedExpression expression:
-                _database.Model.Expressions.Remove(expression);
+                _writer.Detach(_database.Model.Expressions, expression);
                 return [];
 
             case Function function:
-                _database.Model.Functions.Remove(function);
+                _writer.Detach(_database.Model.Functions, function);
                 return [];
 
             case DataSource dataSource:
@@ -299,7 +309,7 @@ public sealed class TomModelMutator
                             $"Cannot remove data source '{dataSource.Name}'; it is used by partition(s): "
                             + $"{string.Join(", ", referencing)}. Repoint or remove those partitions first.");
 
-                    _database.Model.DataSources.Remove(dataSource);
+                    _writer.Detach(_database.Model.DataSources, dataSource);
                     return [];
                 }
 

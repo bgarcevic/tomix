@@ -14,8 +14,13 @@ namespace Tomix.Provider.Tom;
 internal sealed class TomTextReplacer
 {
     private readonly Database _database;
+    private readonly TomWriter _writer;
 
-    public TomTextReplacer(Database database) => _database = database;
+    public TomTextReplacer(Database database, TomWriter writer)
+    {
+        _database = database;
+        _writer = writer;
+    }
 
     public ModelReplaceResult Replace(ModelReplaceRequest request)
     {
@@ -58,14 +63,14 @@ internal sealed class TomTextReplacer
             foreach (var annotation in annotations)
             {
                 var target = annotation;
-                yield return Op(path, $"Annotation:{annotation.Name}", target.Value, v => target.Value = v);
+                yield return Op(path, $"Annotation:{annotation.Name}", target.Value, v => _writer.Set(target, p => p.Value, v));
             }
         }
 
         if (Included(ModelObjectKind.Model))
         {
             if (In("descriptions"))
-                yield return Op(".", "Description", _database.Model.Description, v => _database.Model.Description = v);
+                yield return Op(".", "Description", _database.Model.Description, v => _writer.Set(_database.Model, p => p.Description, v));
             if (In("annotations"))
             {
                 foreach (var op in AnnotationOps(".", _database.Model.Annotations))
@@ -79,25 +84,25 @@ internal sealed class TomTextReplacer
             if (Included(ModelObjectKind.Table))
             {
                 if (In("names"))
-                    yield return Op(tablePath, "Name", table.Name, v => table.Name = v);
+                    yield return Op(tablePath, "Name", table.Name, v => _writer.Set(table, p => p.Name, v));
                 if (In("descriptions"))
-                    yield return Op(tablePath, "Description", table.Description, v => table.Description = v);
+                    yield return Op(tablePath, "Description", table.Description, v => _writer.Set(table, p => p.Description, v));
                 if (In("expressions"))
                 {
                     if (table.DefaultDetailRowsDefinition is { } defaultDetailRows)
-                        yield return Op(tablePath, "DefaultDetailRowsExpression", defaultDetailRows.Expression, v => defaultDetailRows.Expression = v);
+                        yield return Op(tablePath, "DefaultDetailRowsExpression", defaultDetailRows.Expression, v => _writer.Set(defaultDetailRows, p => p.Expression, v));
                     if (table.RefreshPolicy is BasicRefreshPolicy policy)
                     {
-                        yield return Op(tablePath, "RefreshPolicySourceExpression", policy.SourceExpression, v => policy.SourceExpression = v);
-                        yield return Op(tablePath, "RefreshPolicyPollingExpression", policy.PollingExpression, v => policy.PollingExpression = v);
+                        yield return Op(tablePath, "RefreshPolicySourceExpression", policy.SourceExpression, v => _writer.Set(policy, p => p.SourceExpression, v));
+                        yield return Op(tablePath, "RefreshPolicyPollingExpression", policy.PollingExpression, v => _writer.Set(policy, p => p.PollingExpression, v));
                     }
 
                     if (table.CalculationGroup is { } group)
                     {
                         if (group.NoSelectionExpression is { } noSelection)
-                            yield return Op(tablePath, "NoSelectionExpression", noSelection.Expression, v => noSelection.Expression = v);
+                            yield return Op(tablePath, "NoSelectionExpression", noSelection.Expression, v => _writer.Set(noSelection, p => p.Expression, v));
                         if (group.MultipleOrEmptySelectionExpression is { } multiSelection)
-                            yield return Op(tablePath, "MultipleOrEmptySelectionExpression", multiSelection.Expression, v => multiSelection.Expression = v);
+                            yield return Op(tablePath, "MultipleOrEmptySelectionExpression", multiSelection.Expression, v => _writer.Set(multiSelection, p => p.Expression, v));
                     }
                 }
 
@@ -115,22 +120,22 @@ internal sealed class TomTextReplacer
 
                 var path = $"{tablePath}/{Segment(measure.Name)}";
                 if (In("names"))
-                    yield return Op(path, "Name", measure.Name, v => measure.Name = v);
+                    yield return Op(path, "Name", measure.Name, v => _writer.Set(measure, p => p.Name, v));
                 if (In("expressions"))
                 {
-                    yield return Op(path, "Expression", measure.Expression, v => measure.Expression = v);
+                    yield return Op(path, "Expression", measure.Expression, v => _writer.Set(measure, p => p.Expression, v));
                     if (measure.DetailRowsDefinition is { } detailRows)
-                        yield return Op(path, "DetailRowsExpression", detailRows.Expression, v => detailRows.Expression = v);
+                        yield return Op(path, "DetailRowsExpression", detailRows.Expression, v => _writer.Set(detailRows, p => p.Expression, v));
                     if (measure.FormatStringDefinition is { } formatStringDefinition)
-                        yield return Op(path, "FormatStringExpression", formatStringDefinition.Expression, v => formatStringDefinition.Expression = v);
+                        yield return Op(path, "FormatStringExpression", formatStringDefinition.Expression, v => _writer.Set(formatStringDefinition, p => p.Expression, v));
                 }
 
                 if (In("descriptions"))
-                    yield return Op(path, "Description", measure.Description, v => measure.Description = v);
+                    yield return Op(path, "Description", measure.Description, v => _writer.Set(measure, p => p.Description, v));
                 if (In("displayfolders"))
-                    yield return Op(path, "DisplayFolder", measure.DisplayFolder, v => measure.DisplayFolder = v);
+                    yield return Op(path, "DisplayFolder", measure.DisplayFolder, v => _writer.Set(measure, p => p.DisplayFolder, v));
                 if (In("formatstrings"))
-                    yield return Op(path, "FormatString", measure.FormatString, v => measure.FormatString = v);
+                    yield return Op(path, "FormatString", measure.FormatString, v => _writer.Set(measure, p => p.FormatString, v));
                 if (In("annotations"))
                 {
                     foreach (var op in AnnotationOps(path, measure.Annotations))
@@ -142,15 +147,15 @@ internal sealed class TomTextReplacer
                     var kpiPath = $"{path}/KPI";
                     if (In("expressions"))
                     {
-                        yield return Op(kpiPath, "TargetExpression", kpi.TargetExpression, v => kpi.TargetExpression = v);
-                        yield return Op(kpiPath, "StatusExpression", kpi.StatusExpression, v => kpi.StatusExpression = v);
-                        yield return Op(kpiPath, "TrendExpression", kpi.TrendExpression, v => kpi.TrendExpression = v);
+                        yield return Op(kpiPath, "TargetExpression", kpi.TargetExpression, v => _writer.Set(kpi, p => p.TargetExpression, v));
+                        yield return Op(kpiPath, "StatusExpression", kpi.StatusExpression, v => _writer.Set(kpi, p => p.StatusExpression, v));
+                        yield return Op(kpiPath, "TrendExpression", kpi.TrendExpression, v => _writer.Set(kpi, p => p.TrendExpression, v));
                     }
 
                     if (In("descriptions"))
-                        yield return Op(kpiPath, "Description", kpi.Description, v => kpi.Description = v);
+                        yield return Op(kpiPath, "Description", kpi.Description, v => _writer.Set(kpi, p => p.Description, v));
                     if (In("formatstrings"))
-                        yield return Op(kpiPath, "TargetFormatString", kpi.TargetFormatString, v => kpi.TargetFormatString = v);
+                        yield return Op(kpiPath, "TargetFormatString", kpi.TargetFormatString, v => _writer.Set(kpi, p => p.TargetFormatString, v));
                     if (In("annotations"))
                     {
                         foreach (var op in AnnotationOps(kpiPath, kpi.Annotations))
@@ -169,15 +174,15 @@ internal sealed class TomTextReplacer
 
                 var path = $"{tablePath}/{Segment(column.Name)}";
                 if (In("names"))
-                    yield return Op(path, "Name", column.Name, v => column.Name = v);
+                    yield return Op(path, "Name", column.Name, v => _writer.Set(column, p => p.Name, v));
                 if (In("expressions") && column is CalculatedColumn calculated)
-                    yield return Op(path, "Expression", calculated.Expression, v => calculated.Expression = v);
+                    yield return Op(path, "Expression", calculated.Expression, v => _writer.Set(calculated, p => p.Expression, v));
                 if (In("descriptions"))
-                    yield return Op(path, "Description", column.Description, v => column.Description = v);
+                    yield return Op(path, "Description", column.Description, v => _writer.Set(column, p => p.Description, v));
                 if (In("displayfolders"))
-                    yield return Op(path, "DisplayFolder", column.DisplayFolder, v => column.DisplayFolder = v);
+                    yield return Op(path, "DisplayFolder", column.DisplayFolder, v => _writer.Set(column, p => p.DisplayFolder, v));
                 if (In("formatstrings"))
-                    yield return Op(path, "FormatString", column.FormatString, v => column.FormatString = v);
+                    yield return Op(path, "FormatString", column.FormatString, v => _writer.Set(column, p => p.FormatString, v));
                 if (In("annotations"))
                 {
                     foreach (var op in AnnotationOps(path, column.Annotations))
@@ -192,11 +197,11 @@ internal sealed class TomTextReplacer
 
                 var path = $"{tablePath}/{Segment(hierarchy.Name)}";
                 if (In("names"))
-                    yield return Op(path, "Name", hierarchy.Name, v => hierarchy.Name = v);
+                    yield return Op(path, "Name", hierarchy.Name, v => _writer.Set(hierarchy, p => p.Name, v));
                 if (In("descriptions"))
-                    yield return Op(path, "Description", hierarchy.Description, v => hierarchy.Description = v);
+                    yield return Op(path, "Description", hierarchy.Description, v => _writer.Set(hierarchy, p => p.Description, v));
                 if (In("displayfolders"))
-                    yield return Op(path, "DisplayFolder", hierarchy.DisplayFolder, v => hierarchy.DisplayFolder = v);
+                    yield return Op(path, "DisplayFolder", hierarchy.DisplayFolder, v => _writer.Set(hierarchy, p => p.DisplayFolder, v));
                 if (In("annotations"))
                 {
                     foreach (var op in AnnotationOps(path, hierarchy.Annotations))
@@ -210,9 +215,9 @@ internal sealed class TomTextReplacer
 
                     var levelPath = $"{path}/{Segment(level.Name)}";
                     if (In("names"))
-                        yield return Op(levelPath, "Name", level.Name, v => level.Name = v);
+                        yield return Op(levelPath, "Name", level.Name, v => _writer.Set(level, p => p.Name, v));
                     if (In("descriptions"))
-                        yield return Op(levelPath, "Description", level.Description, v => level.Description = v);
+                        yield return Op(levelPath, "Description", level.Description, v => _writer.Set(level, p => p.Description, v));
                     if (In("annotations"))
                     {
                         foreach (var op in AnnotationOps(levelPath, level.Annotations))
@@ -227,16 +232,16 @@ internal sealed class TomTextReplacer
                 {
                     var path = $"{tablePath}/{Segment(item.Name)}";
                     if (In("names"))
-                        yield return Op(path, "Name", item.Name, v => item.Name = v);
+                        yield return Op(path, "Name", item.Name, v => _writer.Set(item, p => p.Name, v));
                     if (In("expressions"))
                     {
-                        yield return Op(path, "Expression", item.Expression, v => item.Expression = v);
+                        yield return Op(path, "Expression", item.Expression, v => _writer.Set(item, p => p.Expression, v));
                         if (item.FormatStringDefinition is { } formatStringDefinition)
-                            yield return Op(path, "FormatStringExpression", formatStringDefinition.Expression, v => formatStringDefinition.Expression = v);
+                            yield return Op(path, "FormatStringExpression", formatStringDefinition.Expression, v => _writer.Set(formatStringDefinition, p => p.Expression, v));
                     }
 
                     if (In("descriptions"))
-                        yield return Op(path, "Description", item.Description, v => item.Description = v);
+                        yield return Op(path, "Description", item.Description, v => _writer.Set(item, p => p.Description, v));
                 }
             }
 
@@ -247,9 +252,9 @@ internal sealed class TomTextReplacer
 
                 var path = $"{tablePath}/{Segment(calendar.Name)}";
                 if (In("names"))
-                    yield return Op(path, "Name", calendar.Name, v => calendar.Name = v);
+                    yield return Op(path, "Name", calendar.Name, v => _writer.Set(calendar, p => p.Name, v));
                 if (In("descriptions"))
-                    yield return Op(path, "Description", calendar.Description, v => calendar.Description = v);
+                    yield return Op(path, "Description", calendar.Description, v => _writer.Set(calendar, p => p.Description, v));
             }
 
             foreach (var partition in table.Partitions)
@@ -259,18 +264,18 @@ internal sealed class TomTextReplacer
 
                 var path = $"{tablePath}/{Segment(partition.Name)}";
                 if (In("names"))
-                    yield return Op(path, "Name", partition.Name, v => partition.Name = v);
+                    yield return Op(path, "Name", partition.Name, v => _writer.Set(partition, p => p.Name, v));
                 if (In("descriptions"))
-                    yield return Op(path, "Description", partition.Description, v => partition.Description = v);
+                    yield return Op(path, "Description", partition.Description, v => _writer.Set(partition, p => p.Description, v));
                 if (In("expressions"))
                 {
                     switch (partition.Source)
                     {
                         case MPartitionSource m:
-                            yield return Op(path, "Expression", m.Expression, v => m.Expression = v);
+                            yield return Op(path, "Expression", m.Expression, v => _writer.Set(m, p => p.Expression, v));
                             break;
                         case CalculatedPartitionSource calculated:
-                            yield return Op(path, "Expression", calculated.Expression, v => calculated.Expression = v);
+                            yield return Op(path, "Expression", calculated.Expression, v => _writer.Set(calculated, p => p.Expression, v));
                             break;
                     }
                 }
@@ -290,9 +295,9 @@ internal sealed class TomTextReplacer
             if (roleIncluded)
             {
                 if (In("names"))
-                    yield return Op(path, "Name", role.Name, v => role.Name = v);
+                    yield return Op(path, "Name", role.Name, v => _writer.Set(role, p => p.Name, v));
                 if (In("descriptions"))
-                    yield return Op(path, "Description", role.Description, v => role.Description = v);
+                    yield return Op(path, "Description", role.Description, v => _writer.Set(role, p => p.Description, v));
                 if (In("annotations"))
                 {
                     foreach (var op in AnnotationOps(path, role.Annotations))
@@ -312,7 +317,7 @@ internal sealed class TomTextReplacer
                         // alongside name ops, so no op can point at the discarded member).
                         var target = member;
                         yield return Op(memberPath, "Name", member.MemberName,
-                            v => TomPropertyApplier.ReplaceMember(target, newName: v));
+                            v => TomPropertyApplier.ReplaceMember(_writer, target, newName: v));
                     }
 
                     if (In("annotations"))
@@ -331,7 +336,7 @@ internal sealed class TomTextReplacer
                 {
                     var permissionPath = $"{path}/{Segment(permission.Name)}";
                     if (In("expressions"))
-                        yield return Op(permissionPath, "FilterExpression", permission.FilterExpression, v => permission.FilterExpression = v);
+                        yield return Op(permissionPath, "FilterExpression", permission.FilterExpression, v => _writer.Set(permission, p => p.FilterExpression, v));
                     if (In("annotations"))
                     {
                         foreach (var op in AnnotationOps(permissionPath, permission.Annotations))
@@ -357,9 +362,9 @@ internal sealed class TomTextReplacer
 
             var path = $"Perspectives/{Segment(perspective.Name)}";
             if (In("names"))
-                yield return Op(path, "Name", perspective.Name, v => perspective.Name = v);
+                yield return Op(path, "Name", perspective.Name, v => _writer.Set(perspective, p => p.Name, v));
             if (In("descriptions"))
-                yield return Op(path, "Description", perspective.Description, v => perspective.Description = v);
+                yield return Op(path, "Description", perspective.Description, v => _writer.Set(perspective, p => p.Description, v));
             if (In("annotations"))
             {
                 foreach (var op in AnnotationOps(path, perspective.Annotations))
@@ -374,7 +379,7 @@ internal sealed class TomTextReplacer
 
             var path = $"Cultures/{Segment(culture.Name)}";
             if (In("names"))
-                yield return Op(path, "Name", culture.Name, v => culture.Name = v);
+                yield return Op(path, "Name", culture.Name, v => _writer.Set(culture, p => p.Name, v));
             if (In("annotations"))
             {
                 foreach (var op in AnnotationOps(path, culture.Annotations))
@@ -389,9 +394,9 @@ internal sealed class TomTextReplacer
 
             var path = $"DataSources/{Segment(dataSource.Name)}";
             if (In("names"))
-                yield return Op(path, "Name", dataSource.Name, v => dataSource.Name = v);
+                yield return Op(path, "Name", dataSource.Name, v => _writer.Set(dataSource, p => p.Name, v));
             if (In("descriptions"))
-                yield return Op(path, "Description", dataSource.Description, v => dataSource.Description = v);
+                yield return Op(path, "Description", dataSource.Description, v => _writer.Set(dataSource, p => p.Description, v));
             if (In("annotations"))
             {
                 foreach (var op in AnnotationOps(path, dataSource.Annotations))
@@ -406,11 +411,11 @@ internal sealed class TomTextReplacer
 
             var path = $"Expressions/{Segment(expression.Name)}";
             if (In("names"))
-                yield return Op(path, "Name", expression.Name, v => expression.Name = v);
+                yield return Op(path, "Name", expression.Name, v => _writer.Set(expression, p => p.Name, v));
             if (In("expressions"))
-                yield return Op(path, "Expression", expression.Expression, v => expression.Expression = v);
+                yield return Op(path, "Expression", expression.Expression, v => _writer.Set(expression, p => p.Expression, v));
             if (In("descriptions"))
-                yield return Op(path, "Description", expression.Description, v => expression.Description = v);
+                yield return Op(path, "Description", expression.Description, v => _writer.Set(expression, p => p.Description, v));
             if (In("annotations"))
             {
                 foreach (var op in AnnotationOps(path, expression.Annotations))
@@ -425,11 +430,11 @@ internal sealed class TomTextReplacer
 
             var path = $"Functions/{Segment(function.Name)}";
             if (In("names"))
-                yield return Op(path, "Name", function.Name, v => function.Name = v);
+                yield return Op(path, "Name", function.Name, v => _writer.Set(function, p => p.Name, v));
             if (In("expressions"))
-                yield return Op(path, "Expression", function.Expression, v => function.Expression = v);
+                yield return Op(path, "Expression", function.Expression, v => _writer.Set(function, p => p.Expression, v));
             if (In("descriptions"))
-                yield return Op(path, "Description", function.Description, v => function.Description = v);
+                yield return Op(path, "Description", function.Description, v => _writer.Set(function, p => p.Description, v));
             if (In("annotations"))
             {
                 foreach (var op in AnnotationOps(path, function.Annotations))

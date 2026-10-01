@@ -1,6 +1,6 @@
 # ADR 0002: Lease gate and journal first for the live model session
 
-- **Status:** Proposed
+- **Status:** Accepted. §2 is superseded by [ADR 0003](adr-0003-live-session-checkpoint-rollback.md) where it makes the journal the source of rollback and undo.
 - **Date:** 2026-10-01
 - **Issue:** [#343](https://github.com/bgarcevic/tomix-cli/issues/343), part of epic [#341](https://github.com/bgarcevic/tomix-cli/issues/341)
 - **Supersedes:** [ADR 0001](adr-0001-live-model-session.md) §3 (threading model), the threading parts of §4 (cancellation and explicit grouping), and the order of work in its Consequences section. All other decisions in ADR 0001 stand.

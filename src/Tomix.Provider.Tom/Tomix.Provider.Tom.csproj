@@ -8,6 +8,12 @@
     <PackageReference Include="Microsoft.AnalysisServices" />
     <PackageReference Include="Microsoft.AnalysisServices.AdomdClient" />
     <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TOM collection writes go through TomWriter so the change journal sees them (ADR 0002). -->
+    <AdditionalFiles Include="BannedSymbols.txt" />
   </ItemGroup>
 
   <ItemGroup>

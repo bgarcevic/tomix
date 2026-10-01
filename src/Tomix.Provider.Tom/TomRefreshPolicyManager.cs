@@ -23,8 +23,18 @@ public sealed class TomRefreshPolicyManager
     private const int HybridCompatibilityLevel = 1565;
 
     private readonly Database _database;
+    private readonly TomWriter _writer;
 
-    public TomRefreshPolicyManager(Database database) => _database = database;
+    public TomRefreshPolicyManager(Database database)
+        : this(database, TomWriter.Untracked)
+    {
+    }
+
+    internal TomRefreshPolicyManager(Database database, TomWriter writer)
+    {
+        _database = database;
+        _writer = writer;
+    }
 
     public RefreshPolicyInfo? Get(string tableName)
     {
@@ -73,24 +83,24 @@ public sealed class TomRefreshPolicyManager
         var policy = existing ?? new BasicRefreshPolicy();
 
         if (request.Mode is not null)
-            policy.Mode = ParseMode(request.Mode);
+            _writer.Set(policy, p => p.Mode, ParseMode(request.Mode));
         if (request.RollingWindowGranularity is not null)
-            policy.RollingWindowGranularity = ParseGranularity(request.RollingWindowGranularity, "RollingWindowGranularity");
+            _writer.Set(policy, p => p.RollingWindowGranularity, ParseGranularity(request.RollingWindowGranularity, "RollingWindowGranularity"));
         if (request.RollingWindowPeriods is not null)
-            policy.RollingWindowPeriods = request.RollingWindowPeriods.Value;
+            _writer.Set(policy, p => p.RollingWindowPeriods, request.RollingWindowPeriods.Value);
         if (request.IncrementalGranularity is not null)
-            policy.IncrementalGranularity = ParseGranularity(request.IncrementalGranularity, "IncrementalGranularity");
+            _writer.Set(policy, p => p.IncrementalGranularity, ParseGranularity(request.IncrementalGranularity, "IncrementalGranularity"));
         if (request.IncrementalPeriods is not null)
-            policy.IncrementalPeriods = request.IncrementalPeriods.Value;
+            _writer.Set(policy, p => p.IncrementalPeriods, request.IncrementalPeriods.Value);
         if (request.IncrementalOffset is not null)
-            policy.IncrementalPeriodsOffset = request.IncrementalOffset.Value;
+            _writer.Set(policy, p => p.IncrementalPeriodsOffset, request.IncrementalOffset.Value);
         if (request.PollingExpression is not null)
-            policy.PollingExpression = string.IsNullOrWhiteSpace(request.PollingExpression) ? null : request.PollingExpression;
+            _writer.Set(policy, p => p.PollingExpression, string.IsNullOrWhiteSpace(request.PollingExpression) ? null : request.PollingExpression);
         if (request.SourceExpression is not null)
-            policy.SourceExpression = request.SourceExpression;
+            _writer.Set(policy, p => p.SourceExpression, request.SourceExpression);
 
         if (created)
-            table.RefreshPolicy = policy;
+            _writer.Set(table, p => p.RefreshPolicy, policy);
 
         var createdExpressions = created ? EnsureRangeParameters() : Array.Empty<string>();
 
@@ -119,7 +129,7 @@ public sealed class TomRefreshPolicyManager
                 $"Table '{table.Name}' has no incremental refresh policy.");
         }
 
-        table.RefreshPolicy = null;
+        _writer.Set(table, p => p.RefreshPolicy, null);
         return new ModelObjectMutationResult(table.Name, Changed: true);
     }
 
@@ -172,7 +182,7 @@ public sealed class TomRefreshPolicyManager
             if (_database.Model.Expressions.Any(e => string.Equals(e.Name, name, StringComparison.Ordinal)))
                 continue;
 
-            _database.Model.Expressions.Add(new NamedExpression
+            _writer.Attach(_database.Model.Expressions, new NamedExpression
             {
                 Name = name,
                 Kind = ExpressionKind.M,

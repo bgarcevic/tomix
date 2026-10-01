@@ -11,17 +11,17 @@ namespace Tomix.Provider.Tom;
 /// </summary>
 internal static class TomPropertyApplier
 {
-    internal static void ApplyProperties(object target, IReadOnlyList<ModelPropertyAssignment> properties)
+    internal static void ApplyProperties(TomWriter w, object target, IReadOnlyList<ModelPropertyAssignment> properties)
     {
         foreach (var property in properties)
-            ApplyProperty(target, property);
+            ApplyProperty(w, target, property);
     }
 
-    internal static void ApplyProperty(object target, ModelPropertyAssignment assignment)
+    internal static void ApplyProperty(TomWriter w, object target, ModelPropertyAssignment assignment)
     {
         // Annotation names are case-sensitive and their values are opaque (often JSON), so handle
         // them before the property name is normalized/lowercased.
-        if (TryApplyAnnotation(target, assignment) || TryApplyTranslation(target, assignment))
+        if (TryApplyAnnotation(w, target, assignment) || TryApplyTranslation(w, target, assignment))
             return;
 
         var property = TomMutationPaths.NormalizeProperty(assignment.Property);
@@ -30,65 +30,65 @@ internal static class TomPropertyApplier
         switch (target)
         {
             case Database database:
-                ApplyModelRootProperty(database, property, value, assignment.Property);
+                ApplyModelRootProperty(w, database, property, value, assignment.Property);
                 return;
             case Table table:
-                ApplyTableProperty(table, property, value, assignment.Property);
+                ApplyTableProperty(w, table, property, value, assignment.Property);
                 return;
             case Measure measure:
-                ApplyMeasureProperty(measure, property, value, assignment.Property);
+                ApplyMeasureProperty(w, measure, property, value, assignment.Property);
                 return;
             case Column column:
-                ApplyColumnProperty(column, property, value, assignment.Property);
+                ApplyColumnProperty(w, column, property, value, assignment.Property);
                 return;
             case Partition partition:
-                ApplyPartitionProperty(partition, property, value, assignment.Property);
+                ApplyPartitionProperty(w, partition, property, value, assignment.Property);
                 return;
             case ModelRole role:
-                ApplyRoleProperty(role, property, value, assignment.Property);
+                ApplyRoleProperty(w, role, property, value, assignment.Property);
                 return;
             case Hierarchy hierarchy:
-                ApplyHierarchyProperty(hierarchy, property, value, assignment.Property);
+                ApplyHierarchyProperty(w, hierarchy, property, value, assignment.Property);
                 return;
             case Level level:
-                ApplyLevelProperty(level, property, value, assignment.Property);
+                ApplyLevelProperty(w, level, property, value, assignment.Property);
                 return;
             case Calendar calendar:
                 ApplyNameDescription(property, value, assignment.Property,
-                    n => calendar.Name = n, d => calendar.Description = d);
+                    n => w.Set(calendar, p => p.Name, n), d => w.Set(calendar, p => p.Description, d));
                 return;
             case NamedExpression expression:
-                ApplyNamedExpressionProperty(expression, property, value, assignment.Property);
+                ApplyNamedExpressionProperty(w, expression, property, value, assignment.Property);
                 return;
             case Function function:
-                ApplyFunctionProperty(function, property, value, assignment.Property);
+                ApplyFunctionProperty(w, function, property, value, assignment.Property);
                 return;
             case CalculationItem item:
-                ApplyCalculationItemProperty(item, property, value, assignment.Property);
+                ApplyCalculationItemProperty(w, item, property, value, assignment.Property);
                 return;
             case Perspective perspective:
                 ApplyNameDescription(property, value, assignment.Property,
-                    n => perspective.Name = n, d => perspective.Description = d);
+                    n => w.Set(perspective, p => p.Name, n), d => w.Set(perspective, p => p.Description, d));
                 return;
             case Culture culture:
                 if (property is not "name")
                     throw new NotSupportedException($"Setting '{assignment.Property}' is not supported for cultures.");
-                culture.Name = value;
+                w.Set(culture, p => p.Name, value);
                 return;
             case DataSource dataSource:
-                ApplyDataSourceProperty(dataSource, property, value, assignment.Property);
+                ApplyDataSourceProperty(w, dataSource, property, value, assignment.Property);
                 return;
             case KPI kpi:
-                ApplyKpiProperty(kpi, property, value, assignment.Property);
+                ApplyKpiProperty(w, kpi, property, value, assignment.Property);
                 return;
             case TablePermission permission:
-                ApplyTablePermissionProperty(permission, property, value, assignment.Property);
+                ApplyTablePermissionProperty(w, permission, property, value, assignment.Property);
                 return;
             case ModelRoleMember member:
-                ApplyMemberProperty(member, property, value, assignment.Property);
+                ApplyMemberProperty(w, member, property, value, assignment.Property);
                 return;
             case SingleColumnRelationship relationship:
-                ApplyRelationshipProperty(relationship, property, value, assignment.Property);
+                ApplyRelationshipProperty(w, relationship, property, value, assignment.Property);
                 return;
             default:
                 throw new NotSupportedException(
@@ -96,28 +96,28 @@ internal static class TomPropertyApplier
         }
     }
 
-    internal static void ApplyExpressionEdit(object target, ModelExpressionEdit edit)
+    internal static void ApplyExpressionEdit(TomWriter w, object target, ModelExpressionEdit edit)
     {
         var isMainExpression = edit.Property == "Expression";
         switch (target)
         {
             case Measure measure:
-                ApplyMeasureExpressionEdit(measure, edit);
+                ApplyMeasureExpressionEdit(w, measure, edit);
                 break;
             case CalculatedColumn column when isMainExpression:
-                column.Expression = edit.Value;
+                w.Set(column, p => p.Expression, edit.Value);
                 break;
             case CalculationItem item when isMainExpression:
-                item.Expression = edit.Value;
+                w.Set(item, p => p.Expression, edit.Value);
                 break;
             case Function function when isMainExpression:
-                function.Expression = edit.Value;
+                w.Set(function, p => p.Expression, edit.Value);
                 break;
             case Partition { Source: CalculatedPartitionSource source } when isMainExpression:
-                source.Expression = edit.Value;
+                w.Set(source, p => p.Expression, edit.Value);
                 break;
             case Table { DefaultDetailRowsDefinition: { } detailRows } when edit.Property == "DefaultDetailRowsExpression":
-                detailRows.Expression = edit.Value;
+                w.Set(detailRows, p => p.Expression, edit.Value);
                 break;
             default:
                 throw new NotSupportedException(
@@ -125,27 +125,27 @@ internal static class TomPropertyApplier
         }
     }
 
-    private static void ApplyMeasureExpressionEdit(Measure measure, ModelExpressionEdit edit)
+    private static void ApplyMeasureExpressionEdit(TomWriter w, Measure measure, ModelExpressionEdit edit)
     {
         switch (edit.Property)
         {
             case "Expression":
-                measure.Expression = edit.Value;
+                w.Set(measure, p => p.Expression, edit.Value);
                 break;
             case "DetailRowsExpression" when measure.DetailRowsDefinition is { } detailRows:
-                detailRows.Expression = edit.Value;
+                w.Set(detailRows, p => p.Expression, edit.Value);
                 break;
             case "FormatStringExpression" when measure.FormatStringDefinition is { } formatString:
-                formatString.Expression = edit.Value;
+                w.Set(formatString, p => p.Expression, edit.Value);
                 break;
             case "KpiTargetExpression" when measure.KPI is { } kpi:
-                kpi.TargetExpression = edit.Value;
+                w.Set(kpi, p => p.TargetExpression, edit.Value);
                 break;
             case "KpiStatusExpression" when measure.KPI is { } kpi:
-                kpi.StatusExpression = edit.Value;
+                w.Set(kpi, p => p.StatusExpression, edit.Value);
                 break;
             case "KpiTrendExpression" when measure.KPI is { } kpi:
-                kpi.TrendExpression = edit.Value;
+                w.Set(kpi, p => p.TrendExpression, edit.Value);
                 break;
             default:
                 throw new NotSupportedException(
@@ -159,7 +159,7 @@ internal static class TomPropertyApplier
     /// Handles a <c>Annotation:&lt;Name&gt;</c> assignment by setting/replacing the annotation, or
     /// removing it when the value is empty. Returns false when the property is not an annotation.
     /// </summary>
-    private static bool TryApplyAnnotation(object target, ModelPropertyAssignment assignment)
+    private static bool TryApplyAnnotation(TomWriter w, object target, ModelPropertyAssignment assignment)
     {
         if (!assignment.Property.StartsWith(AnnotationPrefix, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -174,14 +174,14 @@ internal static class TomPropertyApplier
         if (string.IsNullOrEmpty(assignment.Value))
         {
             if (existing is not null)
-                annotations.Remove(existing);
+                w.Detach(annotations, existing);
             return true;
         }
 
         if (existing is not null)
-            existing.Value = assignment.Value;
+            w.Set(existing, p => p.Value, assignment.Value);
         else
-            annotations.Add(new Annotation { Name = name, Value = assignment.Value });
+            w.Attach(annotations, new Annotation { Name = name, Value = assignment.Value });
 
         return true;
     }
@@ -192,7 +192,7 @@ internal static class TomPropertyApplier
     /// The culture must already exist, so a mistyped culture name cannot create a new culture.
     /// Returns false when the property is not a translation.
     /// </summary>
-    private static bool TryApplyTranslation(object target, ModelPropertyAssignment assignment)
+    private static bool TryApplyTranslation(TomWriter w, object target, ModelPropertyAssignment assignment)
     {
         if (!assignment.Property.StartsWith(PropertyBagKeys.TranslationPrefix, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -237,15 +237,15 @@ internal static class TomPropertyApplier
         if (string.IsNullOrEmpty(assignment.Value))
         {
             if (existing is not null)
-                culture.ObjectTranslations.Remove(existing);
+                w.Detach(culture.ObjectTranslations, existing);
         }
         else if (existing is not null)
         {
-            existing.Value = assignment.Value;
+            w.Set(existing, p => p.Value, assignment.Value);
         }
         else
         {
-            culture.ObjectTranslations.Add(new ObjectTranslation
+            w.Attach(culture.ObjectTranslations, new ObjectTranslation
             {
                 Object = translatable,
                 Property = property,
@@ -281,102 +281,102 @@ internal static class TomPropertyApplier
     /// compatibility plus the TOM <c>Model</c> scalars. The root is not a snapshot object,
     /// so get reads these back through the snapshot's model-level properties bag.
     /// </summary>
-    private static void ApplyModelRootProperty(Database database, string property, string value, string displayName)
+    private static void ApplyModelRootProperty(TomWriter w, Database database, string property, string value, string displayName)
     {
         var model = database.Model;
         switch (property)
         {
             case "database.compatibilitylevel":
             case "compatibilitylevel":
-                database.CompatibilityLevel = ParseInt(value, displayName);
+                w.Set(database, p => p.CompatibilityLevel, ParseInt(value, displayName));
                 break;
             case "description":
-                model.Description = value;
+                w.Set(model, p => p.Description, value);
                 break;
             case "culture":
-                model.Culture = value;
+                w.Set(model, p => p.Culture, value);
                 break;
             case "collation":
-                model.Collation = value;
+                w.Set(model, p => p.Collation, value);
                 break;
             case "discourageimplicitmeasures":
-                model.DiscourageImplicitMeasures = ParseBool(value, displayName);
+                w.Set(model, p => p.DiscourageImplicitMeasures, ParseBool(value, displayName));
                 break;
             case "discouragecompositemodels":
-                model.DiscourageCompositeModels = ParseBool(value, displayName);
+                w.Set(model, p => p.DiscourageCompositeModels, ParseBool(value, displayName));
                 break;
             // DiscourageReportMeasures is deliberately absent: TOM's setter demands the
             // internal-only compatibility sentinel, so the hint must not advertise it.
             case "defaultmode":
-                model.DefaultMode = ParseEnum<ModeType>(value, displayName);
+                w.Set(model, p => p.DefaultMode, ParseEnum<ModeType>(value, displayName));
                 break;
             case "defaultdataview":
-                model.DefaultDataView = ParseEnum<DataViewType>(value, displayName);
+                w.Set(model, p => p.DefaultDataView, ParseEnum<DataViewType>(value, displayName));
                 break;
             case "maxparallelismperquery":
-                model.MaxParallelismPerQuery = ParseInt(value, displayName);
+                w.Set(model, p => p.MaxParallelismPerQuery, ParseInt(value, displayName));
                 break;
             case "maxparallelismperrefresh":
-                model.MaxParallelismPerRefresh = ParseInt(value, displayName);
+                w.Set(model, p => p.MaxParallelismPerRefresh, ParseInt(value, displayName));
                 break;
             case "sourcequeryculture":
-                model.SourceQueryCulture = value;
+                w.Set(model, p => p.SourceQueryCulture, value);
                 break;
             case "forceuniquenames":
-                model.ForceUniqueNames = ParseBool(value, displayName);
+                w.Set(model, p => p.ForceUniqueNames, ParseBool(value, displayName));
                 break;
             default:
                 throw UnsupportedProperty(displayName, "the model root", ModelObjectKind.Model);
         }
     }
 
-    private static void ApplyTableProperty(Table table, string property, string value, string displayName)
+    private static void ApplyTableProperty(TomWriter w, Table table, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                table.Name = value;
+                w.Set(table, p => p.Name, value);
                 break;
             case "description":
-                table.Description = value;
+                w.Set(table, p => p.Description, value);
                 break;
             case "ishidden":
-                table.IsHidden = ParseBool(value, displayName);
+                w.Set(table, p => p.IsHidden, ParseBool(value, displayName));
                 break;
             case "datacategory":
-                table.DataCategory = value;
+                w.Set(table, p => p.DataCategory, value);
                 break;
             case "lineagetag":
-                table.LineageTag = value;
+                w.Set(table, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                table.SourceLineageTag = value;
+                w.Set(table, p => p.SourceLineageTag, value);
                 break;
             case "isprivate":
-                table.IsPrivate = ParseBool(value, displayName);
+                w.Set(table, p => p.IsPrivate, ParseBool(value, displayName));
                 break;
             case "excludefrommodelrefresh":
-                table.ExcludeFromModelRefresh = ParseBool(value, displayName);
+                w.Set(table, p => p.ExcludeFromModelRefresh, ParseBool(value, displayName));
                 break;
             case "excludefromautomaticaggregations":
-                table.ExcludeFromAutomaticAggregations = ParseBool(value, displayName);
+                w.Set(table, p => p.ExcludeFromAutomaticAggregations, ParseBool(value, displayName));
                 break;
             case "alternatesourceprecedence":
-                table.AlternateSourcePrecedence = ParseInt(value, displayName);
+                w.Set(table, p => p.AlternateSourcePrecedence, ParseInt(value, displayName));
                 break;
             case "showasvariationsonly":
-                table.ShowAsVariationsOnly = ParseBool(value, displayName);
+                w.Set(table, p => p.ShowAsVariationsOnly, ParseBool(value, displayName));
                 break;
             case "systemmanaged":
-                table.SystemManaged = ParseBool(value, displayName);
+                w.Set(table, p => p.SystemManaged, ParseBool(value, displayName));
                 break;
             case "directlakeindexingbehavior":
-                table.DirectLakeIndexingBehavior = ParseEnum<DirectLakeIndexingBehavior>(value, displayName);
+                w.Set(table, p => p.DirectLakeIndexingBehavior, ParseEnum<DirectLakeIndexingBehavior>(value, displayName));
                 break;
             // Precedence lives on the CalculationGroup member of a calculation-group table,
             // so the hint hides it from plain tables (partition's source-bound precedent).
             case "precedence" when table.CalculationGroup is { } calculationGroup:
-                calculationGroup.Precedence = ParseInt(value, displayName);
+                w.Set(calculationGroup, p => p.Precedence, ParseInt(value, displayName));
                 break;
             case "precedence":
                 throw new NotSupportedException(
@@ -389,126 +389,126 @@ internal static class TomPropertyApplier
         }
     }
 
-    private static void ApplyMeasureProperty(Measure measure, string property, string value, string displayName)
+    private static void ApplyMeasureProperty(TomWriter w, Measure measure, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                measure.Name = value;
+                w.Set(measure, p => p.Name, value);
                 break;
             case "description":
-                measure.Description = value;
+                w.Set(measure, p => p.Description, value);
                 break;
             case "expression":
-                measure.Expression = value;
+                w.Set(measure, p => p.Expression, value);
                 break;
             case "formatstring":
-                measure.FormatString = value;
+                w.Set(measure, p => p.FormatString, value);
                 break;
             case "displayfolder":
-                measure.DisplayFolder = value;
+                w.Set(measure, p => p.DisplayFolder, value);
                 break;
             case "ishidden":
-                measure.IsHidden = ParseBool(value, displayName);
+                w.Set(measure, p => p.IsHidden, ParseBool(value, displayName));
                 break;
             case "datacategory":
-                measure.DataCategory = value;
+                w.Set(measure, p => p.DataCategory, value);
                 break;
             case "lineagetag":
-                measure.LineageTag = value;
+                w.Set(measure, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                measure.SourceLineageTag = value;
+                w.Set(measure, p => p.SourceLineageTag, value);
                 break;
             case "issimplemeasure":
-                measure.IsSimpleMeasure = ParseBool(value, displayName);
+                w.Set(measure, p => p.IsSimpleMeasure, ParseBool(value, displayName));
                 break;
             default:
                 throw UnsupportedProperty(displayName, "measures", ModelObjectKind.Measure);
         }
     }
 
-    private static void ApplyColumnProperty(Column column, string property, string value, string displayName)
+    private static void ApplyColumnProperty(TomWriter w, Column column, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                column.Name = value;
+                w.Set(column, p => p.Name, value);
                 break;
             case "description":
-                column.Description = value;
+                w.Set(column, p => p.Description, value);
                 break;
             case "expression" when column is CalculatedColumn calculated:
-                calculated.Expression = value;
+                w.Set(calculated, p => p.Expression, value);
                 break;
             case "formatstring":
-                column.FormatString = value;
+                w.Set(column, p => p.FormatString, value);
                 break;
             case "displayfolder":
-                column.DisplayFolder = value;
+                w.Set(column, p => p.DisplayFolder, value);
                 break;
             case "ishidden":
-                column.IsHidden = ParseBool(value, displayName);
+                w.Set(column, p => p.IsHidden, ParseBool(value, displayName));
                 break;
             case "sourcecolumn":
-                ApplySourceColumn(column, value, displayName);
+                ApplySourceColumn(w, column, value, displayName);
                 break;
             case "datacategory":
-                column.DataCategory = value;
+                w.Set(column, p => p.DataCategory, value);
                 break;
             case "lineagetag":
-                column.LineageTag = value;
+                w.Set(column, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                column.SourceLineageTag = value;
+                w.Set(column, p => p.SourceLineageTag, value);
                 break;
             case "sourceprovidertype":
-                column.SourceProviderType = value;
+                w.Set(column, p => p.SourceProviderType, value);
                 break;
             case "iskey":
-                column.IsKey = ParseBool(value, displayName);
+                w.Set(column, p => p.IsKey, ParseBool(value, displayName));
                 break;
             case "isnullable":
-                column.IsNullable = ParseBool(value, displayName);
+                w.Set(column, p => p.IsNullable, ParseBool(value, displayName));
                 break;
             case "isunique":
-                column.IsUnique = ParseBool(value, displayName);
+                w.Set(column, p => p.IsUnique, ParseBool(value, displayName));
                 break;
             case "isavailableinmdx":
-                column.IsAvailableInMDX = ParseBool(value, displayName);
+                w.Set(column, p => p.IsAvailableInMDX, ParseBool(value, displayName));
                 break;
             case "keepuniquerows":
-                column.KeepUniqueRows = ParseBool(value, displayName);
+                w.Set(column, p => p.KeepUniqueRows, ParseBool(value, displayName));
                 break;
             case "isdefaultlabel":
-                column.IsDefaultLabel = ParseBool(value, displayName);
+                w.Set(column, p => p.IsDefaultLabel, ParseBool(value, displayName));
                 break;
             case "isdefaultimage":
-                column.IsDefaultImage = ParseBool(value, displayName);
+                w.Set(column, p => p.IsDefaultImage, ParseBool(value, displayName));
                 break;
             case "isdatatypeinferred":
-                column.IsDataTypeInferred = ParseBool(value, displayName);
+                w.Set(column, p => p.IsDataTypeInferred, ParseBool(value, displayName));
                 break;
             case "tabledetailposition":
-                column.TableDetailPosition = ParseInt(value, displayName);
+                w.Set(column, p => p.TableDetailPosition, ParseInt(value, displayName));
                 break;
             case "displayordinal":
-                column.DisplayOrdinal = ParseInt(value, displayName);
+                w.Set(column, p => p.DisplayOrdinal, ParseInt(value, displayName));
                 break;
             case "datatype":
-                column.DataType = ParseDataType(value, displayName);
+                w.Set(column, p => p.DataType, ParseDataType(value, displayName));
                 break;
             case "summarizeby":
-                column.SummarizeBy = ParseEnum<AggregateFunction>(value, displayName);
+                w.Set(column, p => p.SummarizeBy, ParseEnum<AggregateFunction>(value, displayName));
                 break;
             case "alignment":
-                column.Alignment = ParseEnum<Alignment>(value, displayName);
+                w.Set(column, p => p.Alignment, ParseEnum<Alignment>(value, displayName));
                 break;
             case "encodinghint":
-                column.EncodingHint = ParseEnum<EncodingHintType>(value, displayName);
+                w.Set(column, p => p.EncodingHint, ParseEnum<EncodingHintType>(value, displayName));
                 break;
             case "sortbycolumn":
-                ApplySortByColumn(column, value, displayName);
+                ApplySortByColumn(w, column, value, displayName);
                 break;
             default:
                 throw UnsupportedProperty(displayName, "columns", ModelObjectKind.Column);
@@ -519,15 +519,15 @@ internal static class TomPropertyApplier
     /// <c>SourceColumn</c> exists only on data and calculated-table columns; a calculated
     /// column's values come from its DAX expression instead.
     /// </summary>
-    private static void ApplySourceColumn(Column column, string value, string displayName)
+    private static void ApplySourceColumn(TomWriter w, Column column, string value, string displayName)
     {
         switch (column)
         {
             case DataColumn dataColumn:
-                dataColumn.SourceColumn = value;
+                w.Set(dataColumn, p => p.SourceColumn, value);
                 break;
             case CalculatedTableColumn tableColumn:
-                tableColumn.SourceColumn = value;
+                w.Set(tableColumn, p => p.SourceColumn, value);
                 break;
             default:
                 throw new NotSupportedException(
@@ -536,20 +536,20 @@ internal static class TomPropertyApplier
     }
 
     /// <summary>Resolves the sort-by column by name within the same table; empty clears it.</summary>
-    private static void ApplySortByColumn(Column column, string value, string displayName)
+    private static void ApplySortByColumn(TomWriter w, Column column, string value, string displayName)
     {
         if (string.IsNullOrEmpty(value))
         {
-            column.SortByColumn = null;
+            w.Set(column, p => p.SortByColumn, null);
             return;
         }
 
         if (column.Table is not { } table)
             throw new NotSupportedException($"Cannot set '{displayName}' on a column that is not attached to a table.");
 
-        column.SortByColumn = table.Columns.Find(value)
+        w.Set(column, p => p.SortByColumn, table.Columns.Find(value)
             ?? throw new ArgumentException(
-                $"Column '{value}' does not exist in table '{table.Name}'; '{displayName}' must name a column in the same table.");
+                $"Column '{value}' does not exist in table '{table.Name}'; '{displayName}' must name a column in the same table."));
     }
 
     /// <summary>Parses a data type, accepting the same friendly aliases the catalog normalizes (e.g. <c>bool</c>).</summary>
@@ -559,34 +559,34 @@ internal static class TomPropertyApplier
         return ParseEnum<DataType>(normalized.Length == 0 ? value : normalized, displayName);
     }
 
-    private static void ApplyPartitionProperty(Partition partition, string property, string value, string displayName)
+    private static void ApplyPartitionProperty(TomWriter w, Partition partition, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                partition.Name = value;
+                w.Set(partition, p => p.Name, value);
                 break;
             case "description":
-                partition.Description = value;
+                w.Set(partition, p => p.Description, value);
                 break;
             case "mode":
-                partition.Mode = ParseEnum<ModeType>(value, displayName);
+                w.Set(partition, p => p.Mode, ParseEnum<ModeType>(value, displayName));
                 break;
             case "dataview":
-                partition.DataView = ParseEnum<DataViewType>(value, displayName);
+                w.Set(partition, p => p.DataView, ParseEnum<DataViewType>(value, displayName));
                 break;
             case "retaindatatillforcecalculate" when partition.Source is CalculatedPartitionSource calculated:
-                calculated.RetainDataTillForceCalculate = ParseBool(value, displayName);
+                w.Set(calculated, p => p.RetainDataTillForceCalculate, ParseBool(value, displayName));
                 break;
             case "retaindatatillforcecalculate":
                 throw new NotSupportedException(
                     "Setting 'retainDataTillForceCalculate' is only supported for partitions with a calculated source; " +
                     $"this partition's source is {partition.SourceType}.");
             case "querygroup":
-                ApplyQueryGroup(partition, value, displayName);
+                ApplyQueryGroup(w, partition, value, displayName);
                 break;
             case "expression" when partition.Source is MPartitionSource m:
-                m.Expression = value;
+                w.Set(m, p => p.Expression, value);
                 break;
             case "expression":
                 throw new NotSupportedException(
@@ -606,20 +606,20 @@ internal static class TomPropertyApplier
     }
 
     /// <summary>Resolves the query group by name on the model; empty clears it.</summary>
-    private static void ApplyQueryGroup(Partition partition, string value, string displayName)
+    private static void ApplyQueryGroup(TomWriter w, Partition partition, string value, string displayName)
     {
         if (string.IsNullOrEmpty(value))
         {
-            partition.QueryGroup = null;
+            w.Set(partition, p => p.QueryGroup, null);
             return;
         }
 
         if (partition.Model is not { } model)
             throw new NotSupportedException($"Cannot set '{displayName}' on a partition that is not attached to a model.");
 
-        partition.QueryGroup = model.QueryGroups.Find(value)
+        w.Set(partition, p => p.QueryGroup, model.QueryGroups.Find(value)
             ?? throw new ArgumentException(
-                $"Query group '{value}' does not exist in the model; '{displayName}' must name an existing query group.");
+                $"Query group '{value}' does not exist in the model; '{displayName}' must name an existing query group."));
     }
 
     private static NotSupportedException UnsupportedProperty(
@@ -634,18 +634,18 @@ internal static class TomPropertyApplier
         return new NotSupportedException($"Setting '{displayName}' is not supported for {kindPlural}.{hint}");
     }
 
-    private static void ApplyRoleProperty(ModelRole role, string property, string value, string displayName)
+    private static void ApplyRoleProperty(TomWriter w, ModelRole role, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                role.Name = value;
+                w.Set(role, p => p.Name, value);
                 break;
             case "description":
-                role.Description = value;
+                w.Set(role, p => p.Description, value);
                 break;
             case "modelpermission":
-                role.ModelPermission = ParseEnum<ModelPermission>(value, displayName);
+                w.Set(role, p => p.ModelPermission, ParseEnum<ModelPermission>(value, displayName));
                 break;
             default:
                 throw UnsupportedProperty(displayName, "roles", ModelObjectKind.Role);
@@ -667,168 +667,168 @@ internal static class TomPropertyApplier
         }
     }
 
-    private static void ApplyHierarchyProperty(Hierarchy hierarchy, string property, string value, string displayName)
+    private static void ApplyHierarchyProperty(TomWriter w, Hierarchy hierarchy, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                hierarchy.Name = value;
+                w.Set(hierarchy, p => p.Name, value);
                 break;
             case "description":
-                hierarchy.Description = value;
+                w.Set(hierarchy, p => p.Description, value);
                 break;
             case "displayfolder":
-                hierarchy.DisplayFolder = value;
+                w.Set(hierarchy, p => p.DisplayFolder, value);
                 break;
             case "ishidden":
-                hierarchy.IsHidden = ParseBool(value, displayName);
+                w.Set(hierarchy, p => p.IsHidden, ParseBool(value, displayName));
                 break;
             case "hidemembers":
-                hierarchy.HideMembers = ParseEnum<HierarchyHideMembersType>(value, displayName);
+                w.Set(hierarchy, p => p.HideMembers, ParseEnum<HierarchyHideMembersType>(value, displayName));
                 break;
             case "lineagetag":
-                hierarchy.LineageTag = value;
+                w.Set(hierarchy, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                hierarchy.SourceLineageTag = value;
+                w.Set(hierarchy, p => p.SourceLineageTag, value);
                 break;
             default:
                 throw UnsupportedProperty(displayName, "hierarchies", ModelObjectKind.Hierarchy);
         }
     }
 
-    private static void ApplyLevelProperty(Level level, string property, string value, string displayName)
+    private static void ApplyLevelProperty(TomWriter w, Level level, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                level.Name = value;
+                w.Set(level, p => p.Name, value);
                 break;
             case "description":
-                level.Description = value;
+                w.Set(level, p => p.Description, value);
                 break;
             case "ordinal":
-                level.Ordinal = ParseInt(value, displayName);
+                w.Set(level, p => p.Ordinal, ParseInt(value, displayName));
                 break;
             case "lineagetag":
-                level.LineageTag = value;
+                w.Set(level, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                level.SourceLineageTag = value;
+                w.Set(level, p => p.SourceLineageTag, value);
                 break;
             default:
                 throw UnsupportedProperty(displayName, "levels", ModelObjectKind.Level);
         }
     }
 
-    private static void ApplyNamedExpressionProperty(NamedExpression expression, string property, string value, string displayName)
+    private static void ApplyNamedExpressionProperty(TomWriter w, NamedExpression expression, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                expression.Name = value;
+                w.Set(expression, p => p.Name, value);
                 break;
             case "description":
-                expression.Description = value;
+                w.Set(expression, p => p.Description, value);
                 break;
             case "expression":
-                expression.Expression = value;
+                w.Set(expression, p => p.Expression, value);
                 break;
             case "kind":
-                expression.Kind = ParseEnum<ExpressionKind>(value, displayName);
+                w.Set(expression, p => p.Kind, ParseEnum<ExpressionKind>(value, displayName));
                 break;
             case "remoteparametername":
-                expression.RemoteParameterName = value;
+                w.Set(expression, p => p.RemoteParameterName, value);
                 break;
             case "lineagetag":
-                expression.LineageTag = value;
+                w.Set(expression, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                expression.SourceLineageTag = value;
+                w.Set(expression, p => p.SourceLineageTag, value);
                 break;
             default:
                 throw UnsupportedProperty(displayName, "expressions", ModelObjectKind.Expression);
         }
     }
 
-    private static void ApplyFunctionProperty(Function function, string property, string value, string displayName)
+    private static void ApplyFunctionProperty(TomWriter w, Function function, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                function.Name = value;
+                w.Set(function, p => p.Name, value);
                 break;
             case "description":
-                function.Description = value;
+                w.Set(function, p => p.Description, value);
                 break;
             case "expression":
-                function.Expression = value;
+                w.Set(function, p => p.Expression, value);
                 break;
             case "ishidden":
-                function.IsHidden = ParseBool(value, displayName);
+                w.Set(function, p => p.IsHidden, ParseBool(value, displayName));
                 break;
             case "lineagetag":
-                function.LineageTag = value;
+                w.Set(function, p => p.LineageTag, value);
                 break;
             case "sourcelineagetag":
-                function.SourceLineageTag = value;
+                w.Set(function, p => p.SourceLineageTag, value);
                 break;
             default:
                 throw UnsupportedProperty(displayName, "functions", ModelObjectKind.Function);
         }
     }
 
-    private static void ApplyCalculationItemProperty(CalculationItem item, string property, string value, string displayName)
+    private static void ApplyCalculationItemProperty(TomWriter w, CalculationItem item, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                item.Name = value;
+                w.Set(item, p => p.Name, value);
                 break;
             case "description":
-                item.Description = value;
+                w.Set(item, p => p.Description, value);
                 break;
             case "expression":
-                item.Expression = value;
+                w.Set(item, p => p.Expression, value);
                 break;
             case "ordinal":
-                item.Ordinal = ParseInt(value, displayName);
+                w.Set(item, p => p.Ordinal, ParseInt(value, displayName));
                 break;
             default:
                 throw UnsupportedProperty(displayName, "calculation items", ModelObjectKind.CalculationItem);
         }
     }
 
-    private static void ApplyDataSourceProperty(DataSource dataSource, string property, string value, string displayName)
+    private static void ApplyDataSourceProperty(TomWriter w, DataSource dataSource, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                dataSource.Name = value;
+                w.Set(dataSource, p => p.Name, value);
                 break;
             case "description":
-                dataSource.Description = value;
+                w.Set(dataSource, p => p.Description, value);
                 break;
             case "maxconnections":
-                dataSource.MaxConnections = ParseInt(value, displayName);
+                w.Set(dataSource, p => p.MaxConnections, ParseInt(value, displayName));
                 break;
             // Provider-only and structured-only fields guard on the source kind, and the
             // hint trims the tokens the targeted source cannot take.
             case "provider" when dataSource is ProviderDataSource provider:
-                provider.Provider = value;
+                w.Set(provider, p => p.Provider, value);
                 break;
             case "impersonationmode" when dataSource is ProviderDataSource provider:
-                provider.ImpersonationMode = ParseEnum<ImpersonationMode>(value, displayName);
+                w.Set(provider, p => p.ImpersonationMode, ParseEnum<ImpersonationMode>(value, displayName));
                 break;
             case "isolation" when dataSource is ProviderDataSource provider:
-                provider.Isolation = ParseEnum<DatasourceIsolation>(value, displayName);
+                w.Set(provider, p => p.Isolation, ParseEnum<DatasourceIsolation>(value, displayName));
                 break;
             case "timeout" when dataSource is ProviderDataSource provider:
                 // TOM stores the provider timeout as whole seconds.
-                provider.Timeout = ParseInt(value, displayName);
+                w.Set(provider, p => p.Timeout, ParseInt(value, displayName));
                 break;
             case "contextexpression" when dataSource is StructuredDataSource structured:
-                structured.ContextExpression = value;
+                w.Set(structured, p => p.ContextExpression, value);
                 break;
             // Credentials are secrets, and secrets are never accepted via argv
             // (docs/cli-ux-guidelines.md); scripted edits are the escape hatch.
@@ -854,82 +854,82 @@ internal static class TomPropertyApplier
         }
     }
 
-    private static void ApplyKpiProperty(KPI kpi, string property, string value, string displayName)
+    private static void ApplyKpiProperty(TomWriter w, KPI kpi, string property, string value, string displayName)
     {
         switch (property)
         {
             case "description":
-                kpi.Description = value;
+                w.Set(kpi, p => p.Description, value);
                 break;
             case "targetexpression":
-                kpi.TargetExpression = value;
+                w.Set(kpi, p => p.TargetExpression, value);
                 break;
             case "targetformatstring":
-                kpi.TargetFormatString = value;
+                w.Set(kpi, p => p.TargetFormatString, value);
                 break;
             case "statusexpression":
-                kpi.StatusExpression = value;
+                w.Set(kpi, p => p.StatusExpression, value);
                 break;
             case "trendexpression":
-                kpi.TrendExpression = value;
+                w.Set(kpi, p => p.TrendExpression, value);
                 break;
             case "statusgraphic":
-                kpi.StatusGraphic = value;
+                w.Set(kpi, p => p.StatusGraphic, value);
                 break;
             case "trendgraphic":
-                kpi.TrendGraphic = value;
+                w.Set(kpi, p => p.TrendGraphic, value);
                 break;
             case "statusdescription":
-                kpi.StatusDescription = value;
+                w.Set(kpi, p => p.StatusDescription, value);
                 break;
             case "targetdescription":
-                kpi.TargetDescription = value;
+                w.Set(kpi, p => p.TargetDescription, value);
                 break;
             case "trenddescription":
-                kpi.TrendDescription = value;
+                w.Set(kpi, p => p.TrendDescription, value);
                 break;
             default:
                 throw UnsupportedProperty(displayName, "KPIs", ModelObjectKind.Kpi);
         }
     }
 
-    private static void ApplyTablePermissionProperty(TablePermission permission, string property, string value, string displayName)
+    private static void ApplyTablePermissionProperty(TomWriter w, TablePermission permission, string property, string value, string displayName)
     {
         switch (property)
         {
             // No 'name' case: TOM derives the permission's name from its table and rejects the
             // assignment, so the catalog does not advertise it and the hint falls through here.
             case "filterexpression":
-                permission.FilterExpression = value;
+                w.Set(permission, p => p.FilterExpression, value);
                 break;
             case "metadatapermission":
-                permission.MetadataPermission = ParseEnum<MetadataPermission>(value, displayName);
+                w.Set(permission, p => p.MetadataPermission, ParseEnum<MetadataPermission>(value, displayName));
                 break;
             default:
                 throw UnsupportedProperty(displayName, "table permissions", ModelObjectKind.TablePermission);
         }
     }
 
-    private static void ApplyMemberProperty(ModelRoleMember member, string property, string value, string displayName)
+    private static void ApplyMemberProperty(TomWriter w, ModelRoleMember member, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
             case "membername":
-                ReplaceMember(member, newName: value);
+                ReplaceMember(w, member, newName: value);
                 break;
             case "memberid":
-                ReplaceMember(member, memberId: value);
+                ReplaceMember(w, member, memberId: value);
                 break;
             // Identity fields (MemberName, MemberID, IdentityProvider, MemberType) are all
             // frozen by TOM once the member is attached, so every one of them replaces the
             // member. The provider fields exist only on ExternalModelRoleMember; a Windows
             // member gets a tailored error and those tokens stay out of its hint.
             case "identityprovider" when member is ExternalModelRoleMember:
-                ReplaceMember(member, identityProvider: value);
+                ReplaceMember(w, member, identityProvider: value);
                 break;
             case "membertype" when member is ExternalModelRoleMember external:
-                ReplaceMember(member, memberType: ParseEnum<RoleMemberType>(value, displayName));
+                ReplaceMember(w, member, memberType: ParseEnum<RoleMemberType>(value, displayName));
                 break;
             case "identityprovider":
             case "membertype":
@@ -953,7 +953,7 @@ internal static class TomPropertyApplier
     /// (as clones — TOM refuses to reattach removed objects). Also used by TomTextReplacer.
     /// </summary>
     internal static ModelRoleMember ReplaceMember(
-        ModelRoleMember member,
+        TomWriter w, ModelRoleMember member,
         string? newName = null,
         string? memberId = null,
         string? identityProvider = null,
@@ -980,40 +980,42 @@ internal static class TomPropertyApplier
 
         // Clone the annotations: TOM's change tracker refuses to reattach removed objects.
         foreach (var annotation in member.Annotations)
-            renamed.Annotations.Add(new Annotation { Name = annotation.Name, Value = annotation.Value });
+            w.Attach(renamed.Annotations, new Annotation { Name = annotation.Name, Value = annotation.Value });
 
-        role.Members.Remove(member);
-        role.Members.Add(renamed);
+        // The replacement keeps the member's ID, so the swap reports as a change to one object.
+        w.Rebind(member, renamed);
+        w.Detach(role.Members, member);
+        w.Attach(role.Members, renamed);
         return renamed;
     }
 
-    private static void ApplyRelationshipProperty(SingleColumnRelationship relationship, string property, string value, string displayName)
+    private static void ApplyRelationshipProperty(TomWriter w, SingleColumnRelationship relationship, string property, string value, string displayName)
     {
         switch (property)
         {
             case "name":
-                relationship.Name = value;
+                w.Set(relationship, p => p.Name, value);
                 break;
             case "isactive":
-                relationship.IsActive = ParseBool(value, displayName);
+                w.Set(relationship, p => p.IsActive, ParseBool(value, displayName));
                 break;
             case "crossfilteringbehavior":
-                relationship.CrossFilteringBehavior = ParseEnum<CrossFilteringBehavior>(value, displayName);
+                w.Set(relationship, p => p.CrossFilteringBehavior, ParseEnum<CrossFilteringBehavior>(value, displayName));
                 break;
             case "fromcardinality":
-                relationship.FromCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
+                w.Set(relationship, p => p.FromCardinality, ParseEnum<RelationshipEndCardinality>(value, displayName));
                 break;
             case "tocardinality":
-                relationship.ToCardinality = ParseEnum<RelationshipEndCardinality>(value, displayName);
+                w.Set(relationship, p => p.ToCardinality, ParseEnum<RelationshipEndCardinality>(value, displayName));
                 break;
             case "securityfilteringbehavior":
-                relationship.SecurityFilteringBehavior = ParseEnum<SecurityFilteringBehavior>(value, displayName);
+                w.Set(relationship, p => p.SecurityFilteringBehavior, ParseEnum<SecurityFilteringBehavior>(value, displayName));
                 break;
             case "relyonreferentialintegrity":
-                relationship.RelyOnReferentialIntegrity = ParseBool(value, displayName);
+                w.Set(relationship, p => p.RelyOnReferentialIntegrity, ParseBool(value, displayName));
                 break;
             case "joinondatebehavior":
-                relationship.JoinOnDateBehavior = ParseEnum<DateTimeRelationshipBehavior>(value, displayName);
+                w.Set(relationship, p => p.JoinOnDateBehavior, ParseEnum<DateTimeRelationshipBehavior>(value, displayName));
                 break;
             default:
                 throw UnsupportedProperty(displayName, "relationships", ModelObjectKind.Relationship);

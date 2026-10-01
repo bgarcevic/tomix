@@ -71,7 +71,11 @@ public static class TomModelSummarizer
             Roles: model.Roles.Count);
     }
 
-    public static ModelSnapshot Snapshot(Database database, string name)
+    public static ModelSnapshot Snapshot(Database database, string name) => Snapshot(database, name, ids: null);
+
+    /// <summary>A snapshot whose objects carry their IDs from <paramref name="ids"/> (a live
+    /// session's), or none when it is <c>null</c>.</summary>
+    internal static ModelSnapshot Snapshot(Database database, string name, TomObjectIdMap? ids)
     {
         var model = database.Model;
 
@@ -82,18 +86,18 @@ public static class TomModelSummarizer
 
         var objects = new List<ModelObject>();
         foreach (var table in model.Tables)
-            objects.Add(BuildTable(table, relIndex, rlsIndex, hierarchyUsage, perspectiveMembership));
+            objects.Add(BuildTable(table, relIndex, rlsIndex, hierarchyUsage, perspectiveMembership, ids));
 
-        objects.AddRange(model.Relationships.Select(r => BuildRelationship(r)));
-        objects.AddRange(model.Roles.Select(BuildRole));
+        objects.AddRange(model.Relationships.Select(r => BuildRelationship(r, ids)));
+        objects.AddRange(model.Roles.Select(r => BuildRole(r, ids)));
         objects.AddRange(model.Perspectives.Select(p =>
             Leaf(p.Name, ModelObjectKind.Perspective, $"Perspectives/{Segment(p.Name)}", detail: null,
-                description: Desc(p.Description))));
+                description: Desc(p.Description), id: ids?.GetOrAdd(p))));
         objects.AddRange(model.Cultures.Select(c =>
-            Leaf(c.Name, ModelObjectKind.Culture, $"Cultures/{Segment(c.Name)}", detail: null)));
-        objects.AddRange(model.DataSources.Select(BuildDataSource));
-        objects.AddRange(model.Expressions.Select(BuildNamedExpression));
-        objects.AddRange(model.Functions.Select(BuildFunction));
+            Leaf(c.Name, ModelObjectKind.Culture, $"Cultures/{Segment(c.Name)}", detail: null, id: ids?.GetOrAdd(c))));
+        objects.AddRange(model.DataSources.Select(d => BuildDataSource(d, ids)));
+        objects.AddRange(model.Expressions.Select(e => BuildNamedExpression(e, ids)));
+        objects.AddRange(model.Functions.Select(f => BuildFunction(f, ids)));
 
         var modelProps = new Dictionary<string, string>
         {
@@ -122,7 +126,8 @@ public static class TomModelSummarizer
         Dictionary<string, HashSet<RelationshipEntry>> relIndex,
         Dictionary<string, List<string>> rlsIndex,
         Dictionary<string, List<string>> hierarchyUsage,
-        Dictionary<string, List<string>> perspectiveMembership)
+        Dictionary<string, List<string>> perspectiveMembership,
+        TomObjectIdMap? ids)
     {
         var path = Segment(table.Name);
         var children = new List<ModelObject>();
@@ -158,24 +163,25 @@ public static class TomModelSummarizer
         AddTranslations(tableProps, table, table.Model);
 
         foreach (var column in table.Columns.Where(c => c.Type != ColumnType.RowNumber))
-            children.Add(BuildColumn(column, path, relIndex, hierarchyUsage));
+            children.Add(BuildColumn(column, path, relIndex, hierarchyUsage, ids));
 
-        children.AddRange(table.Measures.Select(m => BuildMeasure(m, path)));
+        children.AddRange(table.Measures.Select(m => BuildMeasure(m, path, ids)));
 
-        children.AddRange(table.Hierarchies.Select(h => BuildHierarchy(h, path)));
+        children.AddRange(table.Hierarchies.Select(h => BuildHierarchy(h, path, ids)));
 
         if (isCalcGroup)
-            children.AddRange(table.CalculationGroup!.CalculationItems.Select(ci => BuildCalculationItem(ci, path)));
+            children.AddRange(table.CalculationGroup!.CalculationItems.Select(ci => BuildCalculationItem(ci, path, ids)));
 
-        children.AddRange(table.Calendars.Select(c => BuildCalendar(c, path)));
+        children.AddRange(table.Calendars.Select(c => BuildCalendar(c, path, ids)));
 
         foreach (var partition in table.Partitions)
-            children.Add(BuildPartition(partition, path));
+            children.Add(BuildPartition(partition, path, ids));
 
         if (table.RefreshPolicy is BasicRefreshPolicy)
             children.Add(new ModelObject("RefreshPolicy", ModelObjectKind.RefreshPolicy,
                 $"{path}/RefreshPolicy", "incremental refresh policy", null, null, false, null, [],
-                PolicyInfo: new TomRefreshPolicyManager((Database)table.Model.Database).Get(table.Name)));
+                PolicyInfo: new TomRefreshPolicyManager((Database)table.Model.Database).Get(table.Name),
+                Id: ids?.GetOrAdd(table.RefreshPolicy)));
 
         var tableDetail = table.Partitions.Any(p => p.SourceType == PartitionSourceType.Calculated)
             ? "calculated"
@@ -191,13 +197,15 @@ public static class TomModelSummarizer
             Hidden: table.IsHidden,
             SourceColumn: null,
             Children: children,
-            Properties: tableProps);
+            Properties: tableProps,
+            Id: ids?.GetOrAdd(table));
     }
 
     private static ModelObject BuildColumn(
         Column column, string tablePath,
         Dictionary<string, HashSet<RelationshipEntry>> relIndex,
-        Dictionary<string, List<string>> hierarchyUsage)
+        Dictionary<string, List<string>> hierarchyUsage,
+        TomObjectIdMap? ids)
     {
         var colPath = $"{tablePath}/{Segment(column.Name)}";
         var tableName = column.Table.Name;
@@ -269,10 +277,11 @@ public static class TomModelSummarizer
                 _ => null
             },
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(column));
     }
 
-    private static ModelObject BuildMeasure(Measure measure, string tablePath)
+    private static ModelObject BuildMeasure(Measure measure, string tablePath, TomObjectIdMap? ids)
     {
         var path = $"{tablePath}/{Segment(measure.Name)}";
         var props = new Dictionary<string, string>
@@ -304,11 +313,12 @@ public static class TomModelSummarizer
             Description: Desc(measure.Description),
             Hidden: measure.IsHidden,
             SourceColumn: null,
-            Children: measure.KPI is null ? [] : [BuildKpi(measure.KPI, path)],
-            Properties: props);
+            Children: measure.KPI is null ? [] : [BuildKpi(measure.KPI, path, ids)],
+            Properties: props,
+            Id: ids?.GetOrAdd(measure));
     }
 
-    private static ModelObject BuildKpi(KPI kpi, string measurePath)
+    private static ModelObject BuildKpi(KPI kpi, string measurePath, TomObjectIdMap? ids)
         => new(
             "KPI",
             ModelObjectKind.Kpi,
@@ -331,9 +341,10 @@ public static class TomModelSummarizer
                 [PropertyBagKeys.TargetDescription] = kpi.TargetDescription ?? "",
                 [PropertyBagKeys.TrendDescription] = kpi.TrendDescription ?? "",
                 [PropObjectType] = "KPI"
-            });
+            },
+            Id: ids?.GetOrAdd(kpi));
 
-    private static ModelObject BuildHierarchy(Hierarchy hierarchy, string tablePath)
+    private static ModelObject BuildHierarchy(Hierarchy hierarchy, string tablePath, TomObjectIdMap? ids)
     {
         var path = $"{tablePath}/{Segment(hierarchy.Name)}";
         var props = new Dictionary<string, string>
@@ -357,7 +368,8 @@ public static class TomModelSummarizer
                 Hidden: false,
                 SourceColumn: null,
                 Children: [],
-                Properties: LevelProperties(l)))
+                Properties: LevelProperties(l),
+                Id: ids?.GetOrAdd(l)))
             .ToList();
 
         return new ModelObject(
@@ -370,10 +382,11 @@ public static class TomModelSummarizer
             Hidden: hierarchy.IsHidden,
             SourceColumn: null,
             Children: levels,
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(hierarchy));
     }
 
-    private static ModelObject BuildPartition(Partition partition, string tablePath)
+    private static ModelObject BuildPartition(Partition partition, string tablePath, TomObjectIdMap? ids)
     {
         var (dataSourceName, dataSourceType) = PartitionDataSource(partition);
         var props = new Dictionary<string, string>
@@ -399,15 +412,16 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(partition));
     }
 
-    private static ModelObject BuildRelationship(Relationship relationship)
+    private static ModelObject BuildRelationship(Relationship relationship, TomObjectIdMap? ids)
     {
         var path = $"Relationships/{Segment(relationship.Name)}";
 
         if (relationship is not SingleColumnRelationship single)
-            return Leaf(relationship.Name, ModelObjectKind.Relationship, path, detail: null);
+            return Leaf(relationship.Name, ModelObjectKind.Relationship, path, detail: null, id: ids?.GetOrAdd(relationship));
 
         var name = $"{single.FromColumn.Table.Name}[{single.FromColumn.Name}] -> " +
                    $"{single.ToColumn.Table.Name}[{single.ToColumn.Name}]";
@@ -440,17 +454,18 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(relationship));
     }
 
-    private static ModelObject BuildRole(ModelRole role)
+    private static ModelObject BuildRole(ModelRole role, TomObjectIdMap? ids)
     {
         var path = $"Roles/{Segment(role.Name)}";
         var children = role.Members
-            .Select(m => BuildRoleMember(m, path))
+            .Select(m => BuildRoleMember(m, path, ids))
             .ToList();
 
-        children.AddRange(role.TablePermissions.Select(tp => BuildTablePermission(tp, path)));
+        children.AddRange(role.TablePermissions.Select(tp => BuildTablePermission(tp, path, ids)));
 
         var rlsExpressions = new List<string>();
         foreach (var tp in role.TablePermissions)
@@ -476,10 +491,11 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: children,
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(role));
     }
 
-    private static ModelObject BuildRoleMember(ModelRoleMember member, string rolePath)
+    private static ModelObject BuildRoleMember(ModelRoleMember member, string rolePath, TomObjectIdMap? ids)
     {
         // Identity-provider fields exist only on external members; Windows members surface
         // them as empty, matching what set accepts for each member kind.
@@ -502,10 +518,11 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(member));
     }
 
-    private static ModelObject BuildTablePermission(TablePermission permission, string rolePath)
+    private static ModelObject BuildTablePermission(TablePermission permission, string rolePath, TomObjectIdMap? ids)
         => new(
             permission.Name,
             ModelObjectKind.TablePermission,
@@ -516,9 +533,10 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: new Dictionary<string, string> { [PropObjectType] = "TablePermission" });
+            Properties: new Dictionary<string, string> { [PropObjectType] = "TablePermission" },
+            Id: ids?.GetOrAdd(permission));
 
-    private static ModelObject BuildCalculationItem(CalculationItem item, string tablePath)
+    private static ModelObject BuildCalculationItem(CalculationItem item, string tablePath, TomObjectIdMap? ids)
         => new(
             item.Name,
             ModelObjectKind.CalculationItem,
@@ -533,9 +551,10 @@ public static class TomModelSummarizer
             {
                 [PropertyBagKeys.Ordinal] = item.Ordinal.ToString(),
                 [PropObjectType] = "CalculationItem"
-            });
+            },
+            Id: ids?.GetOrAdd(item));
 
-    private static ModelObject BuildCalendar(Calendar calendar, string tablePath)
+    private static ModelObject BuildCalendar(Calendar calendar, string tablePath, TomObjectIdMap? ids)
         => new(
             calendar.Name,
             ModelObjectKind.Calendar,
@@ -546,9 +565,10 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: new Dictionary<string, string> { [PropObjectType] = "Calendar" });
+            Properties: new Dictionary<string, string> { [PropObjectType] = "Calendar" },
+            Id: ids?.GetOrAdd(calendar));
 
-    private static ModelObject BuildDataSource(DataSource dataSource)
+    private static ModelObject BuildDataSource(DataSource dataSource, TomObjectIdMap? ids)
     {
         // Provider-only and structured-only fields surface as empty on the other kind,
         // matching what set accepts for each source (the hint follows the same split).
@@ -577,10 +597,11 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(dataSource));
     }
 
-    private static ModelObject BuildNamedExpression(NamedExpression expression)
+    private static ModelObject BuildNamedExpression(NamedExpression expression, TomObjectIdMap? ids)
     {
         var props = new Dictionary<string, string>
         {
@@ -602,10 +623,11 @@ public static class TomModelSummarizer
             Hidden: false,
             SourceColumn: null,
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(expression));
     }
 
-    private static ModelObject BuildFunction(Function function)
+    private static ModelObject BuildFunction(Function function, TomObjectIdMap? ids)
     {
         var props = new Dictionary<string, string>
         {
@@ -625,7 +647,8 @@ public static class TomModelSummarizer
             Hidden: function.IsHidden,
             SourceColumn: null,
             Children: [],
-            Properties: props);
+            Properties: props,
+            Id: ids?.GetOrAdd(function));
     }
 
     private static (string Name, string Type) PartitionDataSource(Partition partition)
@@ -784,8 +807,8 @@ public static class TomModelSummarizer
 
     private static ModelObject Leaf(
         string name, ModelObjectKind kind, string path, string? detail,
-        string? description = null, bool hidden = false)
-        => new(name, kind, path, detail, Expression: null, description, hidden, SourceColumn: null, Children: []);
+        string? description = null, bool hidden = false, ObjectId? id = null)
+        => new(name, kind, path, detail, Expression: null, description, hidden, SourceColumn: null, Children: [], Id: id);
 
     private static string? Desc(string? description)
         => string.IsNullOrWhiteSpace(description) ? null : description.Trim();
