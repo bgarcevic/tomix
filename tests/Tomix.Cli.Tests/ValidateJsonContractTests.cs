@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Tomix.App.Validate;
 using Tomix.Cli.Output;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -18,12 +19,12 @@ public sealed class ValidateJsonContractTests
         Errors:
         [
             new ValidationIssue(
-                ValidationSeverity.Error, "DAX0001", "Table 'X' cannot be found.", "Sales[Total]", "SUM('X'[Y])")
+                RuleSeverity.Error, "DAX0001", "Table 'X' cannot be found.", "Sales[Total]", "SUM('X'[Y])")
         ],
         Warnings:
         [
             new ValidationIssue(
-                ValidationSeverity.Warning,
+                RuleSeverity.Warning,
                 "DAX0003",
                 "Measure or column [Y] cannot be found.",
                 "Sales[N]",

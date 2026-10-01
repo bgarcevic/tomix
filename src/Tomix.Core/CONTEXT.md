@@ -20,6 +20,10 @@ Core domain types and abstractions.
   `DaxSyntaxCheck` offline syntax analyzer, and the `DaxFormatter` offline formatter that powers
   `tx format`'s DAX. Pure BCL, model-agnostic: it knows syntax, never the model. Model-aware DAX
   analysis (reference extraction, validation) lives in `/src/Tomix.App/Dax`.
+- The shared rule shape (`Rules/`) — `RuleDefinition` (id, name, category, severity, scope,
+  description, expression, fix expression, docs link) and `RuleSeverity`. Every rule engine
+  describes its rules with it: `BpaRule` derives from it, and so do `validate`'s built-in rules
+  (`/src/Tomix.App/Validate/ValidationRules`). Add a rule field here, not per engine.
 - The live model session contracts (planned, [ADR 0001](../../docs/design/adr-0001-live-model-session.md)):
   `ILiveModelSession`, `ObjectId`, `ModelChange`/`ModelChangeBatch`, `SessionState`, and the
   transaction contract. They define identity, versions, transactions and change events only.

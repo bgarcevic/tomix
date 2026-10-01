@@ -1,5 +1,6 @@
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Bpa;
 
@@ -137,7 +138,7 @@ public sealed record BpaRunResult(
             first.RuleId,
             first.RuleName,
             first.Category,
-            BpaSeverity.Error,
+            RuleSeverity.Error,
             first.ErrorScope ?? "Rule",
             ObjectName: string.Empty,
             ObjectPath: string.Empty,

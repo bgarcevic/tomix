@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -8,7 +9,7 @@ public class BpaRenderTests
 {
     private static BpaViolation Violation(
         string ruleId,
-        BpaSeverity severity,
+        RuleSeverity severity,
         string objectName,
         string category = "Cat",
         string? ruleName = null,
@@ -28,10 +29,10 @@ public class BpaRenderTests
     {
         var violations = new[]
         {
-            Violation("INFO_B", BpaSeverity.Info, "o1", category: "Maintenance", ruleName: "B rule"),
-            Violation("ERR_A", BpaSeverity.Error, "o2", category: "DAX", ruleName: "A rule"),
-            Violation("WARN_C", BpaSeverity.Warning, "o3", category: "Perf", ruleName: "C rule"),
-            Violation("ERR_A", BpaSeverity.Error, "o4", category: "DAX", ruleName: "A rule"),
+            Violation("INFO_B", RuleSeverity.Info, "o1", category: "Maintenance", ruleName: "B rule"),
+            Violation("ERR_A", RuleSeverity.Error, "o2", category: "DAX", ruleName: "A rule"),
+            Violation("WARN_C", RuleSeverity.Warning, "o3", category: "Perf", ruleName: "C rule"),
+            Violation("ERR_A", RuleSeverity.Error, "o4", category: "DAX", ruleName: "A rule"),
         };
 
         var groups = BpaRunView.OrderRuleGroups(violations);
@@ -50,9 +51,9 @@ public class BpaRenderTests
     {
         var violations = new[]
         {
-            Violation("R2", BpaSeverity.Warning, "o1", category: "Zeta", ruleName: "Alpha"),
-            Violation("R1", BpaSeverity.Warning, "o2", category: "Alpha", ruleName: "Zeta"),
-            Violation("R3", BpaSeverity.Warning, "o3", category: "Alpha", ruleName: "Beta"),
+            Violation("R2", RuleSeverity.Warning, "o1", category: "Zeta", ruleName: "Alpha"),
+            Violation("R1", RuleSeverity.Warning, "o2", category: "Alpha", ruleName: "Zeta"),
+            Violation("R3", RuleSeverity.Warning, "o3", category: "Alpha", ruleName: "Beta"),
         };
 
         var groups = BpaRunView.OrderRuleGroups(violations);
@@ -90,9 +91,9 @@ public class BpaRenderTests
     {
         var violations = new[]
         {
-            Violation("R1", BpaSeverity.Warning, "a") with { CanFix = true },
-            Violation("R1", BpaSeverity.Warning, "b"),
-            Violation("R2", BpaSeverity.Warning, "c") with { CanFix = true },
+            Violation("R1", RuleSeverity.Warning, "a") with { CanFix = true },
+            Violation("R1", RuleSeverity.Warning, "b"),
+            Violation("R2", RuleSeverity.Warning, "c") with { CanFix = true },
         };
 
         var groups = BpaRunView.OrderRuleGroups(violations);
@@ -103,22 +104,22 @@ public class BpaRenderTests
 
     [Fact]
     public void FixableLabel_NoneFixable_IsEmpty()
-        => Assert.Equal("", BpaRunView.FixableLabel(BpaRunView.OrderRuleGroups([Violation("R1", BpaSeverity.Error, "a")])[0]));
+        => Assert.Equal("", BpaRunView.FixableLabel(BpaRunView.OrderRuleGroups([Violation("R1", RuleSeverity.Error, "a")])[0]));
 
     [Fact]
     public void SeveritySections_GroupsBySeverityWithObjectCounts()
     {
         var violations = new[]
         {
-            Violation("I1", BpaSeverity.Info, "a"),
-            Violation("E1", BpaSeverity.Error, "b"),
-            Violation("E1", BpaSeverity.Error, "c"),
-            Violation("E2", BpaSeverity.Error, "d"),
+            Violation("I1", RuleSeverity.Info, "a"),
+            Violation("E1", RuleSeverity.Error, "b"),
+            Violation("E1", RuleSeverity.Error, "c"),
+            Violation("E2", RuleSeverity.Error, "d"),
         };
 
         var sections = BpaRunView.SeveritySections(BpaRunView.OrderRuleGroups(violations));
 
-        Assert.Equal([BpaSeverity.Error, BpaSeverity.Info], sections.Select(s => s.Severity));
+        Assert.Equal([RuleSeverity.Error, RuleSeverity.Info], sections.Select(s => s.Severity));
         Assert.Equal(2, sections[0].Groups.Count);
         Assert.Equal(3, sections[0].ObjectCount);
         Assert.Equal(1, sections[1].ObjectCount);
@@ -282,16 +283,16 @@ public class BpaRenderTests
     [Fact]
     public void MatchesFilter_NoFlags_ShowsEverything()
     {
-        Assert.True(BpaRunView.MatchesFilter(BpaSeverity.Error, false, false, false));
-        Assert.True(BpaRunView.MatchesFilter(BpaSeverity.Info, false, false, false));
+        Assert.True(BpaRunView.MatchesFilter(RuleSeverity.Error, false, false, false));
+        Assert.True(BpaRunView.MatchesFilter(RuleSeverity.Info, false, false, false));
     }
 
     [Fact]
     public void MatchesFilter_RespectsSelectedSeverities()
     {
-        Assert.True(BpaRunView.MatchesFilter(BpaSeverity.Error, errors: true, warnings: false, info: false));
-        Assert.False(BpaRunView.MatchesFilter(BpaSeverity.Warning, errors: true, warnings: false, info: false));
-        Assert.True(BpaRunView.MatchesFilter(BpaSeverity.Warning, errors: true, warnings: true, info: false));
+        Assert.True(BpaRunView.MatchesFilter(RuleSeverity.Error, errors: true, warnings: false, info: false));
+        Assert.False(BpaRunView.MatchesFilter(RuleSeverity.Warning, errors: true, warnings: false, info: false));
+        Assert.True(BpaRunView.MatchesFilter(RuleSeverity.Warning, errors: true, warnings: true, info: false));
     }
 
     [Fact]
@@ -346,7 +347,7 @@ public class BpaRenderTests
     [InlineData("standard", new string[0], "")]
     public void OverridesLabel_MentionsOnlyARuleThatReplacedAnotherSource(string source, string[] overrides, string expected)
     {
-        var rule = new BpaRuleInfo(source, "active", "R", "R", "c", BpaSeverity.Warning, "Table",
+        var rule = new BpaRuleInfo(source, "active", "R", "R", "c", RuleSeverity.Warning, "Table",
             Description: null, Expression: null, FixExpression: null, Enabled: true,
             Overrides: overrides.Length > 0 ? overrides : null);
 
@@ -365,7 +366,7 @@ public class BpaRenderTests
     public void RuleStatusLabel_NamesEveryLevelThatKeepsTheRuleOff(bool disabled, bool ignored, string expected)
     {
         var status = disabled ? "disabled" : ignored ? "ignored" : "active";
-        var rule = new BpaRuleInfo("bundled", status, "R", "R", "c", BpaSeverity.Warning, "Table",
+        var rule = new BpaRuleInfo("bundled", status, "R", "R", "c", RuleSeverity.Warning, "Table",
             Description: null, Expression: null, FixExpression: null, Enabled: !disabled && !ignored,
             Disabled: disabled, Ignored: ignored);
 

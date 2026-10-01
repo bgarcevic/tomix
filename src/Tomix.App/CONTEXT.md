@@ -64,6 +64,13 @@ Application use cases and command handlers.
 - A `--local` session is stored as `Server = "localhost:<port>"` with `Local = true`; `State/ActiveModelResolver` resolves it from `Server` and never reads `Local`, so `ConnectHandler.Set` must keep a local-instance endpoint rather than assume `Local` implies a file path.
 - `CliConnectionState.ReportName`/`ReportPortFile` cache the Desktop report name for display. `ConnectHandler.Show` revalidates with `PowerBiDesktopDiscovery.StillServes` and clears both fields when it fails, so no caller can render a stale name. `StillServes` requires **both** that the port file still holds this session's port (distinguishing the original instance from a different report that reused the port) and that something is still listening (msmdsrv does not reliably delete its port file on exit) — it must stay consistent with the staleness filter in `DiscoverInstances`. The cache exists because re-reading the window title per invocation costs ~220ms. Ports change on every Desktop restart, so the stale path is the common one.
 - The cache is **not** part of the connection contract: `ConnectShowResult`/`ConnectSetResult` serialize a `ToPublic()` projection (which also drops the session-file `Scope`), and `CliStateStore.AddRecentConnection` strips it. `ReportPortFile` is an absolute path inside the user's profile, so it must never reach command output or the recents file. Only the session file holds it.
+- Rule engines share `Tomix.Core.Rules.RuleDefinition` and `RuleSeverity`. BPA rules are
+  data (`BpaRule`, a Dynamic-LINQ `Expression` evaluated by `Bpa/BpaEngine`); `validate` rules
+  are code in `Validate/ModelValidation`, each described by an entry in `Validate/ValidationRules`.
+  A validate issue is raised only through its rule (`ValidationRule.Issue`), so the rule owns the
+  code and severity; a new rule goes in that catalog and in `docs/error-codes.md` (pinned by
+  `RuleDefinitionTests`). `Dax/` is the model-aware DAX analysis those rules build on
+  (sites, tokenizer, reference extraction), not a rule engine of its own.
 - BPA default rules use the embedded `Bpa/Rules/bpa-rules.json` catalog as the single offline source.
 - BPA rule loading may support selectable upstream Microsoft Analysis Services BestPracticeRules catalogs from https://github.com/microsoft/Analysis-Services/tree/master/BestPracticeRules.
 - Keep licensing-sensitive compatibility work free of versioned third-party product names or abbreviations in source, docs, help, and output.

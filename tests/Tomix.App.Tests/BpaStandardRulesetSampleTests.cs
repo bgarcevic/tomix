@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
@@ -34,7 +35,7 @@ public sealed class BpaStandardRulesetSampleTests
         var violations = await EvaluateStandardAsync(sample);
 
         var errors = violations
-            .Where(v => v.Severity == BpaSeverity.Error)
+            .Where(v => v.Severity == RuleSeverity.Error)
             .Select(v => $"{v.RuleId} {v.ObjectPath}");
         Assert.Empty(errors);
     }
@@ -46,7 +47,7 @@ public sealed class BpaStandardRulesetSampleTests
         // defect (Excel cannot sort by it), and auto-fixable, so the gate should still see it.
         var violations = await EvaluateStandardAsync("Artificial Intelligence Sample.SemanticModel");
 
-        var error = Assert.Single(violations, v => v.Severity == BpaSeverity.Error);
+        var error = Assert.Single(violations, v => v.Severity == RuleSeverity.Error);
         Assert.Equal("SET_ISAVAILABLEINMDX_TO_TRUE_ON_NECESSARY_COLUMNS", error.RuleId);
     }
 

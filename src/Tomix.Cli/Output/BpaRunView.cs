@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Configuration;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Output;
 
@@ -33,14 +34,14 @@ internal static class BpaRunView
         string RuleId,
         string RuleName,
         string Category,
-        BpaSeverity Severity,
+        RuleSeverity Severity,
         string? Description,
         IReadOnlyList<string> Objects,
         int FixableCount = 0);
 
     /// <summary>The rule groups of one severity, with the number of objects they flag.</summary>
     internal sealed record SeveritySection(
-        BpaSeverity Severity,
+        RuleSeverity Severity,
         IReadOnlyList<RuleGroup> Groups,
         int ObjectCount);
 
@@ -398,20 +399,20 @@ internal static class BpaRunView
     /// Whether a severity should be shown given the display filters. When no flag is set,
     /// everything is shown.
     /// </summary>
-    internal static bool MatchesFilter(BpaSeverity severity, bool errors, bool warnings, bool info)
+    internal static bool MatchesFilter(RuleSeverity severity, bool errors, bool warnings, bool info)
     {
         if (!errors && !warnings && !info)
             return true;
 
-        return (errors && severity == BpaSeverity.Error)
-            || (warnings && severity == BpaSeverity.Warning)
-            || (info && severity == BpaSeverity.Info);
+        return (errors && severity == RuleSeverity.Error)
+            || (warnings && severity == RuleSeverity.Warning)
+            || (info && severity == RuleSeverity.Info);
     }
 
-    internal static string SeverityWord(BpaSeverity severity) => severity switch
+    internal static string SeverityWord(RuleSeverity severity) => severity switch
     {
-        BpaSeverity.Error => "Error",
-        BpaSeverity.Warning => "Warning",
+        RuleSeverity.Error => "Error",
+        RuleSeverity.Warning => "Warning",
         _ => "Info"
     };
 

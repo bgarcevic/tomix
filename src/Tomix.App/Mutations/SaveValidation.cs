@@ -2,6 +2,7 @@ using Tomix.App.Validate;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Mutations;
 
@@ -51,11 +52,11 @@ public static class SaveValidation
             => (issue.Code, issue.ObjectName, issue.Message);
 
         var oldErrors = ModelValidation.Analyze(before).Issues
-            .Where(issue => issue.Severity == ValidationSeverity.Error)
+            .Where(issue => issue.Severity == RuleSeverity.Error)
             .Select(Key)
             .ToHashSet();
         var errors = ModelValidation.Analyze(after).Issues
-            .Where(issue => issue.Severity == ValidationSeverity.Error)
+            .Where(issue => issue.Severity == RuleSeverity.Error)
             .ToList();
         var introduced = errors
             .Where(issue => !oldErrors.Contains(Key(issue)))

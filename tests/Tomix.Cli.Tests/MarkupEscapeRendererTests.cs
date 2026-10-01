@@ -9,6 +9,7 @@ using Tomix.Cli.Commands;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 using Tomix.Core.Update;
 
 namespace Tomix.Cli.Tests;
@@ -73,11 +74,11 @@ public sealed partial class MarkupEscapeRendererTests
     public void BpaRun_UsesLiteralViolationAndSyncNames()
     {
         var violation = new BpaViolation(
-            "[Rule]", "[Rule]", "[Category]", BpaSeverity.Error,
+            "[Rule]", "[Rule]", "[Category]", RuleSeverity.Error,
             "Column", "[Column]", "[Table]/[Column]", "[Description]", CanFix: true);
         var result = new BpaRunResult(
             [new BpaResult(BpaResultKind.Violation, "[Rule]", "[Rule]", "[Category]",
-                BpaSeverity.Error, Violation: violation)],
+                RuleSeverity.Error, Violation: violation)],
             "[Model]", RulesEvaluated: 1, FixesApplied: 1)
         { FixOutcome = new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, new SyncOutcome(SyncStatus.Succeeded, "[Target]")) };
         var options = new BpaRunView.RunOptions(false, true, true, false, false, false);

@@ -1,5 +1,6 @@
 using Tomix.App.Validate;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
@@ -266,10 +267,10 @@ public sealed class ValidateModelHandlerTests
 
         // Every error issue declares Error severity; warnings declare Warning (and only
         // warnings keep the model "valid").
-        Assert.All(result.Data!.Errors, e => Assert.Equal(ValidationSeverity.Error, e.Severity));
+        Assert.All(result.Data!.Errors, e => Assert.Equal(RuleSeverity.Error, e.Severity));
         var warning = Assert.Single(result.Data.Warnings);
         Assert.Equal("DAX0003", warning.Code);
-        Assert.Equal(ValidationSeverity.Warning, warning.Severity);
+        Assert.Equal(RuleSeverity.Warning, warning.Severity);
     }
 
     [Fact]

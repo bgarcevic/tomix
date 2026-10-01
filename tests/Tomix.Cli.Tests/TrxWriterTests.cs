@@ -3,6 +3,7 @@ using Tomix.App.Bpa;
 using Tomix.App.Validate;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -107,11 +108,11 @@ public sealed class TrxWriterTests : IDisposable
             DurationMs: 1,
             Errors:
             [
-                new ValidationIssue(ValidationSeverity.Error, "TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", "SUM('X'[Y])")
+                new ValidationIssue(RuleSeverity.Error, "TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", "SUM('X'[Y])")
             ],
             Warnings:
             [
-                new ValidationIssue(ValidationSeverity.Warning, "TOMIX_DAX_WARNING", "Deprecated function", "Sales[N]", null)
+                new ValidationIssue(RuleSeverity.Warning, "TOMIX_DAX_WARNING", "Deprecated function", "Sales[N]", null)
             ]);
 
         var tests = ValidateRenderer.ToTrxTests(result);
@@ -136,11 +137,11 @@ public sealed class TrxWriterTests : IDisposable
             DurationMs: 1,
             Errors:
             [
-                new ValidationIssue(ValidationSeverity.Error, "TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", null)
+                new ValidationIssue(RuleSeverity.Error, "TOMIX_DAX_ERROR", "Unknown column", "Sales[M]", null)
             ],
             Warnings:
             [
-                new ValidationIssue(ValidationSeverity.Info, "TOMIX_DAX_INFO", "Consider a variable", "Sales[N]", null)
+                new ValidationIssue(RuleSeverity.Info, "TOMIX_DAX_INFO", "Consider a variable", "Sales[N]", null)
             ]);
 
         var tests = ValidateRenderer.ToTrxTests(result);
@@ -161,19 +162,19 @@ public sealed class TrxWriterTests : IDisposable
     [Fact]
     public void BpaProjection_GroupsViolationsPerRule_AndMapsSentinelsToError()
     {
-        var v1 = new BpaViolation("R1", "Avoid floats", "Performance", BpaSeverity.Warning,
+        var v1 = new BpaViolation("R1", "Avoid floats", "Performance", RuleSeverity.Warning,
             "Column", "Amount", "tables/Sales/columns/Amount", "Use fixed decimal.");
         var v2 = v1 with { ObjectName = "Qty", ObjectPath = "tables/Sales/columns/Qty" };
         var result = new BpaRunResult(
             Results:
             [
-                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", BpaSeverity.Warning, Violation: v1),
-                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", BpaSeverity.Warning, Violation: v2),
-                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", BpaSeverity.Warning,
+                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", RuleSeverity.Warning, Violation: v1),
+                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", RuleSeverity.Warning, Violation: v2),
+                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", RuleSeverity.Warning,
                     Violation: v1 with { ObjectPath = "tables/Sales/columns/Ignored" }, IsIgnored: true),
-                new BpaResult(BpaResultKind.CompilationError, "R2", "Broken rule", "Meta", BpaSeverity.Error,
+                new BpaResult(BpaResultKind.CompilationError, "R2", "Broken rule", "Meta", RuleSeverity.Error,
                     ErrorMessage: "syntax error", ErrorScope: "Measure"),
-                new BpaResult(BpaResultKind.EvaluationError, "R2", "Broken rule", "Meta", BpaSeverity.Error,
+                new BpaResult(BpaResultKind.EvaluationError, "R2", "Broken rule", "Meta", RuleSeverity.Error,
                     ErrorMessage: "cast failed", ErrorScope: "Column")
             ],
             ModelName: "m",
@@ -203,13 +204,13 @@ public sealed class TrxWriterTests : IDisposable
     {
         // A rule with real objects that also fails evaluation mid-run: the Failed test reports
         // the matched objects, and the separate Error test keeps the per-scope failure reasons.
-        var violation = new BpaViolation("R1", "Avoid floats", "Performance", BpaSeverity.Warning,
+        var violation = new BpaViolation("R1", "Avoid floats", "Performance", RuleSeverity.Warning,
             "Column", "Amount", "tables/Sales/columns/Amount", "Use fixed decimal.");
         var result = new BpaRunResult(
             Results:
             [
-                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", BpaSeverity.Warning, Violation: violation),
-                new BpaResult(BpaResultKind.EvaluationError, "R1", "Avoid floats", "Performance", BpaSeverity.Error,
+                new BpaResult(BpaResultKind.Violation, "R1", "Avoid floats", "Performance", RuleSeverity.Warning, Violation: violation),
+                new BpaResult(BpaResultKind.EvaluationError, "R1", "Avoid floats", "Performance", RuleSeverity.Error,
                     ErrorMessage: "cast failed", ErrorScope: "Column")
             ],
             ModelName: "m",
@@ -231,9 +232,9 @@ public sealed class TrxWriterTests : IDisposable
         var result = new BpaRunResult(
             Results:
             [
-                new BpaResult(BpaResultKind.CompilationError, "R2", "Broken rule", "Meta", BpaSeverity.Error,
+                new BpaResult(BpaResultKind.CompilationError, "R2", "Broken rule", "Meta", RuleSeverity.Error,
                     ErrorMessage: "syntax error", ErrorScope: "Measure"),
-                new BpaResult(BpaResultKind.EvaluationError, "R2", "Broken rule", "Meta", BpaSeverity.Error,
+                new BpaResult(BpaResultKind.EvaluationError, "R2", "Broken rule", "Meta", RuleSeverity.Error,
                     ErrorMessage: "cast failed", ErrorScope: "Column")
             ],
             ModelName: "m",

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Bpa;
 
@@ -256,12 +257,12 @@ public sealed partial class BpaRuleLoader
             rule.CompatibilityLevel)).ToList();
     }
 
-    private static BpaSeverity MapSeverity(int severity) => severity switch
+    private static RuleSeverity MapSeverity(int severity) => severity switch
     {
-        1 => BpaSeverity.Info,
-        2 => BpaSeverity.Warning,
-        3 => BpaSeverity.Error,
-        _ => BpaSeverity.Info
+        1 => RuleSeverity.Info,
+        2 => RuleSeverity.Warning,
+        3 => RuleSeverity.Error,
+        _ => RuleSeverity.Info
     };
 
     private static IReadOnlyList<string> ParseScope(string scope)

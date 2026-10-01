@@ -1,5 +1,6 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -7,7 +8,7 @@ public sealed class BpaRuleResolverTests
 {
     // Category is used as a marker so a winning occurrence can be traced back to its source.
     private static BpaRule Rule(string id, string marker)
-        => new(id, id, marker, BpaSeverity.Warning, ["Table"], Expression: "true");
+        => new(id, id, marker, RuleSeverity.Warning, ["Table"], Expression: "true");
 
     private static BpaRule? Find(IReadOnlyList<BpaRule> rules, string id)
         => rules.FirstOrDefault(r => r.Id.Equals(id, StringComparison.OrdinalIgnoreCase));

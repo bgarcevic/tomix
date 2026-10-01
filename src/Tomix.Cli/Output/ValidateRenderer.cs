@@ -1,5 +1,6 @@
 using Spectre.Console;
 using Tomix.App.Validate;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Output;
 
@@ -112,7 +113,7 @@ internal static class ValidateRenderer
     {
         var annotations = result.Errors.Concat(result.Warnings)
             .Select(issue => new CiAnnotation(
-                IsError: issue.Severity == ValidationSeverity.Error,
+                IsError: issue.Severity == RuleSeverity.Error,
                 $"{issue.Message} [{issue.ObjectName}] ({issue.Code})"))
             .ToList();
 
@@ -140,9 +141,9 @@ internal static class ValidateRenderer
     }
 
     /// <summary>TRX has no Info outcome, so Info rides with Warning.</summary>
-    private static TrxWriter.TrxOutcome TrxOutcome(ValidationSeverity severity) => severity switch
+    private static TrxWriter.TrxOutcome TrxOutcome(RuleSeverity severity) => severity switch
     {
-        ValidationSeverity.Error => TrxWriter.TrxOutcome.Failed,
+        RuleSeverity.Error => TrxWriter.TrxOutcome.Failed,
         _ => TrxWriter.TrxOutcome.Warning,
     };
 

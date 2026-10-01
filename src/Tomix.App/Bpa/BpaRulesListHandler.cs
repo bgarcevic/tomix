@@ -5,6 +5,7 @@ using Tomix.Core.Bpa;
 using Tomix.Core.Configuration;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Bpa;
 
@@ -35,7 +36,7 @@ public sealed record BpaRuleInfo(
     string Id,
     string Name,
     string Category,
-    BpaSeverity Severity,
+    RuleSeverity Severity,
     string Scope,
     string? Description,
     string? Expression,

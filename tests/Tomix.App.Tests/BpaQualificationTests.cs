@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -72,7 +73,7 @@ public sealed class BpaQualificationTests
     {
         var rules = new List<BpaRule>
         {
-            new("RULE", "Rule", "DAX Expressions", BpaSeverity.Error, scope, Expression: expression)
+            new("RULE", "Rule", "DAX Expressions", RuleSeverity.Error, scope, Expression: expression)
         };
         return new BpaEngine().Evaluate(SalesModel(), new BpaEngineOptions(rules));
     }

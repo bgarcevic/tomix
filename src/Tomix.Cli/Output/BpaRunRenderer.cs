@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Bpa;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Output;
 
@@ -58,9 +59,9 @@ internal static class BpaRunRenderer
 
     private static void RenderSummary(BpaRunResult result, int failedRules, BpaRunView.RunOptions view)
     {
-        var errors = result.Violations.Count(v => v.Severity == BpaSeverity.Error);
-        var warnings = result.Violations.Count(v => v.Severity == BpaSeverity.Warning);
-        var info = result.Violations.Count(v => v.Severity == BpaSeverity.Info);
+        var errors = result.Violations.Count(v => v.Severity == RuleSeverity.Error);
+        var warnings = result.Violations.Count(v => v.Severity == RuleSeverity.Warning);
+        var info = result.Violations.Count(v => v.Severity == RuleSeverity.Info);
 
         var text = BpaRunView.SummaryLine(
             errors, warnings, info, failedRules, result.RulesEvaluated, result.DurationMs, result.MissingVertipaqStatsRules.Count);
@@ -536,7 +537,7 @@ internal static class BpaRunRenderer
                     : $"{v.RuleName}: {v.ObjectType} '{v.ObjectName}'";
                 if (!string.IsNullOrWhiteSpace(v.Description))
                     msg += $" - {CollapseDescription(v.Description)}";
-                return new CiAnnotation(v.Severity == BpaSeverity.Error, $"{msg} [{v.RuleId}]");
+                return new CiAnnotation(v.Severity == RuleSeverity.Error, $"{msg} [{v.RuleId}]");
             })
             .ToList();
 

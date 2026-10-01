@@ -8,6 +8,7 @@ using Tomix.Core.Bpa;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Deploy;
 
@@ -192,7 +193,7 @@ public sealed class DeployModelHandler
     private async Task<(TomixResult<DeployModelResult>? Failure, IReadOnlyList<BpaResult> NotChecked)> RunBpaGate(
         IModelSession session,
         DeployModelRequest request,
-        BpaSeverity failOn,
+        RuleSeverity failOn,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<BpaRule> rules;
@@ -267,7 +268,7 @@ public sealed class DeployModelHandler
         IReadOnlyList<BpaViolation> violations,
         IReadOnlyList<BpaViolation>? postFixViolations,
         bool fixBpa,
-        BpaSeverity failOn,
+        RuleSeverity failOn,
         IReadOnlyList<BpaViolation>? ruleErrors = null,
         IReadOnlyList<BpaResult>? notChecked = null)
     {
@@ -278,7 +279,7 @@ public sealed class DeployModelHandler
         if (blocking.Count == 0)
             return null;
 
-        var severityLabel = failOn == BpaSeverity.Warning ? "warning-severity or higher" : "error-severity";
+        var severityLabel = failOn == RuleSeverity.Warning ? "warning-severity or higher" : "error-severity";
         var phase = fixBpa ? " remaining after auto-fix" : string.Empty;
         var hint = fixBpa
             ? "Use --skip-bpa to bypass."

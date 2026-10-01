@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -26,7 +27,7 @@ public sealed class BpaRulesAuthoringTests
 
         var rule = Assert.Single(BpaRuleLoader.LoadFromFile(path));
         Assert.Equal("MY_RULE", rule.Id);
-        Assert.Equal(BpaSeverity.Error, rule.Severity);
+        Assert.Equal(RuleSeverity.Error, rule.Severity);
         Assert.Equal(["Measure", "CalculatedColumn"], rule.Scope);   // canonical casing
         Assert.Equal(BpaRulesAddHandler.DefaultCategory, rule.Category);
 
@@ -54,7 +55,7 @@ public sealed class BpaRulesAuthoringTests
         Assert.True(set.Success, set.Diagnostics.FirstOrDefault()?.Message);
         Assert.Equal(["Severity", "Scope", "FixExpression"], set.Data!.ChangedFields);
         var updated = Assert.Single(ListCustom(file));
-        Assert.Equal(BpaSeverity.Info, updated.Severity);
+        Assert.Equal(RuleSeverity.Info, updated.Severity);
         Assert.Equal("Table", updated.Scope);
         Assert.Equal("IsHidden = true", updated.FixExpression);
 

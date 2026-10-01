@@ -1,3 +1,4 @@
+using Tomix.Core.Rules;
 namespace Tomix.Core.Bpa;
 
 /// <summary>
@@ -14,7 +15,7 @@ public sealed record BpaResult(
     string RuleId,
     string RuleName,
     string Category,
-    BpaSeverity Severity,
+    RuleSeverity Severity,
     BpaViolation? Violation = null,
     string? ErrorMessage = null,
     string? ErrorScope = null,

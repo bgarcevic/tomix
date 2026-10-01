@@ -3,6 +3,7 @@ using Tomix.App.Bpa;
 using Tomix.App.Mutations;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -14,7 +15,7 @@ namespace Tomix.Cli.Tests;
 /// </summary>
 public sealed class BpaJsonContractTests
 {
-    private static BpaRule SampleRule(string id = "AVOID_FLOATS", BpaSeverity severity = BpaSeverity.Error)
+    private static BpaRule SampleRule(string id = "AVOID_FLOATS", RuleSeverity severity = RuleSeverity.Error)
         => new(id, $"[Performance] {id}", "Performance", severity, Scope: ["Column"], Expression: "true");
 
     private static BpaViolation SampleViolation(string objectName = "Sales[Amount]")
@@ -22,7 +23,7 @@ public sealed class BpaJsonContractTests
             RuleId: "AVOID_FLOATS",
             RuleName: "[Performance] Avoid floats",
             Category: "Performance",
-            Severity: BpaSeverity.Error,
+            Severity: RuleSeverity.Error,
             ObjectType: "Column",
             ObjectName: objectName,
             ObjectPath: $"model/tables/{objectName}",
@@ -193,7 +194,7 @@ public sealed class BpaJsonContractTests
         Assert.Equal("AVOID_FLOATS", item.GetProperty("ruleId").GetString());
         Assert.Equal("[Performance] Avoid floats", item.GetProperty("ruleName").GetString());
         Assert.Equal("Performance", item.GetProperty("category").GetString());
-        Assert.Equal((int)BpaSeverity.Error, item.GetProperty("severity").GetInt32());
+        Assert.Equal((int)RuleSeverity.Error, item.GetProperty("severity").GetInt32());
         Assert.Equal("Error", item.GetProperty("severityLabel").GetString());
         Assert.Equal("Sales[Amount]", item.GetProperty("objectName").GetString());
         Assert.Equal("Column", item.GetProperty("objectType").GetString());
@@ -234,7 +235,7 @@ public sealed class BpaJsonContractTests
             [
                 new BpaRuleInfo(
                     Source: "built-in", Status: "disabled", Id: "R1", Name: "Rule one",
-                    Category: "DAX", Severity: BpaSeverity.Warning, Scope: "Measure",
+                    Category: "DAX", Severity: RuleSeverity.Warning, Scope: "Measure",
                     Description: null, Expression: "true", FixExpression: null, Enabled: false,
                     Disabled: true, Ignored: true)
             ],
@@ -256,11 +257,11 @@ public sealed class BpaJsonContractTests
             [
                 new BpaRuleInfo(
                     Source: "built-in", Status: "active", Id: "R1", Name: "Rule one",
-                    Category: "DAX", Severity: BpaSeverity.Warning, Scope: "Measure",
+                    Category: "DAX", Severity: RuleSeverity.Warning, Scope: "Measure",
                     Description: "Guidance here.", Expression: "true", FixExpression: null, Enabled: true),
                 new BpaRuleInfo(
                     Source: "model", Status: "ignored", Id: "R2", Name: "Rule two",
-                    Category: "Naming", Severity: BpaSeverity.Info, Scope: "Column",
+                    Category: "Naming", Severity: RuleSeverity.Info, Scope: "Column",
                     Description: "  ", Expression: null, FixExpression: "fix()", Enabled: false)
             ],
             Summary: new BpaRulesSummary(Total: 2, Active: 1, Disabled: 0, Ignored: 1));
@@ -272,7 +273,7 @@ public sealed class BpaJsonContractTests
         Assert.Equal("built-in", first.GetProperty("source").GetString());
         Assert.Equal("active", first.GetProperty("status").GetString());
         Assert.Equal("R1", first.GetProperty("id").GetString());
-        Assert.Equal((int)BpaSeverity.Warning, first.GetProperty("severity").GetInt32());
+        Assert.Equal((int)RuleSeverity.Warning, first.GetProperty("severity").GetInt32());
         Assert.Equal("Warning", first.GetProperty("severityLabel").GetString());
         Assert.Equal("Measure", first.GetProperty("scope").GetString());
         Assert.Equal("Guidance here.", first.GetProperty("description").GetString());

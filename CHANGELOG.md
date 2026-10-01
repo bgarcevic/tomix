@@ -70,6 +70,8 @@ and the API surface that major versions protect.
   every source's copy. Without a model, `list` and `show` use the active local connection (#233).
 - `tx bpa rules disable` and `enable` are hidden; they still work and do the same as
   `ignore --user` and `unignore --user` (#233).
+- Internal: `validate` and `bpa` rules now share one rule shape and one severity scale, and every
+  `validate` issue code comes from a documented rule catalog. Output is unchanged (#230).
 
 ### Fixed
 

@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -12,7 +13,7 @@ namespace Tomix.App.Tests;
 public sealed class BpaCatalogPolicyTests
 {
     private static BpaRule Rule(string id, string category)
-        => new(id, id, category, BpaSeverity.Warning, ["Table"], Expression: "true");
+        => new(id, id, category, RuleSeverity.Warning, ["Table"], Expression: "true");
 
     private static readonly IReadOnlyList<BpaRule> Catalog =
     [
@@ -99,9 +100,9 @@ public sealed class BpaCatalogPolicyTests
         var standard = await BpaRuleLoader.LoadRulesetAsync("standard", CancellationToken.None);
         var catalog = BpaRuleLoader.LoadBundledCatalog();
 
-        Assert.Equal(BpaSeverity.Error, Assert.Single(standard, r => r.Id == TrueRuleId).Severity);
+        Assert.Equal(RuleSeverity.Error, Assert.Single(standard, r => r.Id == TrueRuleId).Severity);
         Assert.DoesNotContain(standard, r => r.Id == FalseRuleId);
-        Assert.Equal(BpaSeverity.Warning, catalog.Single(r => r.Id == FalseRuleId).Severity);
+        Assert.Equal(RuleSeverity.Warning, catalog.Single(r => r.Id == FalseRuleId).Severity);
     }
 
     public static TheoryData<string, bool, bool> ColumnShapes()

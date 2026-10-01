@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -115,7 +116,7 @@ public sealed class BpaRuleCoverageTests
     public void Diag_CurrentKeyword(string expression)
     {
         var snapshot = new ModelSnapshot("M", 1601, [Table("T", Column("c", "T"))]);
-        var rule = new BpaRule("R", "r", "c", BpaSeverity.Info, ["DataColumn"], Expression: expression);
+        var rule = new BpaRule("R", "r", "c", RuleSeverity.Info, ["DataColumn"], Expression: expression);
         Assert.Equal(["T/c"], Flagged(rule, snapshot));
     }
 

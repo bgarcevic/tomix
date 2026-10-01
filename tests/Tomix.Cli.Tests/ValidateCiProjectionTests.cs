@@ -1,5 +1,6 @@
 using Tomix.App.Validate;
 using Tomix.Cli.Output;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -22,15 +23,15 @@ public sealed class ValidateCiProjectionTests
             Errors: errors ?? [],
             Warnings: warnings ?? []);
 
-    private static ValidationIssue Issue(ValidationSeverity severity, string code, string message)
+    private static ValidationIssue Issue(RuleSeverity severity, string code, string message)
         => new(severity, code, message, "Sales[Total]", Expression: null);
 
     [Fact]
     public void EmitCi_Github_AnnotatesAtIssueSeverity()
     {
         var result = Result(
-            errors: [Issue(ValidationSeverity.Error, "DAX0001", "Table 'X' cannot be found.")],
-            warnings: [Issue(ValidationSeverity.Warning, "DAX0003", "Measure or column [Y] cannot be found.")]);
+            errors: [Issue(RuleSeverity.Error, "DAX0001", "Table 'X' cannot be found.")],
+            warnings: [Issue(RuleSeverity.Warning, "DAX0003", "Measure or column [Y] cannot be found.")]);
 
         var captured = ConsoleCapture.Run(() => ValidateRenderer.EmitCi("github", result));
 
@@ -44,7 +45,7 @@ public sealed class ValidateCiProjectionTests
     public void EmitCi_Vsts_WarningsOnly_OmitsFailedTrailer()
     {
         // Warnings annotate at warning level; without an error the task is not failed.
-        var result = Result(warnings: [Issue(ValidationSeverity.Warning, "DAX0003", "Loose reference.")]);
+        var result = Result(warnings: [Issue(RuleSeverity.Warning, "DAX0003", "Loose reference.")]);
 
         var captured = ConsoleCapture.Run(() => ValidateRenderer.EmitCi("vsts", result));
 

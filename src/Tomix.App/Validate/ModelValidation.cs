@@ -5,6 +5,7 @@ using Tomix.App.Mutations;
 using Tomix.Core.Dax;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Validate;
 
@@ -15,7 +16,7 @@ namespace Tomix.App.Validate;
 /// <see cref="DaxReferenceExtractor"/> so references inside string literals and comments are
 /// never reported, plus structural integrity checks (relationship endpoints, sort-by columns,
 /// hierarchy levels) that DAX scanning cannot see. Each issue carries its severity; consumers
-/// partition by <see cref="ValidationSeverity.Error"/>.
+/// partition by <see cref="RuleSeverity.Error"/>.
 /// </summary>
 internal static class ModelValidation
 {
@@ -53,9 +54,7 @@ internal static class ModelValidation
         if (syntax.Count > 0)
         {
             foreach (var issue in syntax)
-                issues.Add(new ValidationIssue(
-                    ValidationSeverity.Error,
-                    SyntaxCode(issue.Kind),
+                issues.Add(SyntaxRule(issue.Kind).Issue(
                     issue.Message,
                     obj.Path,
                     Line(site.Expression, issue.Start),
@@ -76,9 +75,7 @@ internal static class ModelValidation
                     || (reference.Shape == DaxReferenceShape.Qualified
                         && string.Equals(reference.Table, OwningTable(obj.Path), StringComparison.OrdinalIgnoreCase))))
             {
-                issues.Add(new ValidationIssue(
-                    ValidationSeverity.Error,
-                    "DAX0006",
+                issues.Add(ValidationRules.SelfReference.Issue(
                     $"{(obj.Kind == ModelObjectKind.Measure ? "Measure" : "Calculated column")} [{obj.Name}] references itself.",
                     obj.Path,
                     Line(site.Expression, reference.Start),
@@ -90,9 +87,7 @@ internal static class ModelValidation
             {
                 case DaxReferenceShape.Qualified:
                     if (!index.TableColumns.TryGetValue(reference.Table!, out var columns))
-                        issues.Add(new ValidationIssue(
-                            ValidationSeverity.Error,
-                            "DAX0001",
+                        issues.Add(ValidationRules.UnknownTable.Issue(
                             $"Table '{reference.Table}' cannot be found.",
                             obj.Path,
                             Line(site.Expression, reference.Start),
@@ -100,9 +95,7 @@ internal static class ModelValidation
                     else if (!columns.Contains(reference.Object!)
                         && !index.MeasureNames.Contains(reference.Object!)
                         && !index.UnknownColumnTables.Contains(reference.Table!))
-                        issues.Add(new ValidationIssue(
-                            ValidationSeverity.Error,
-                            "DAX0002",
+                        issues.Add(ValidationRules.UnknownColumn.Issue(
                             $"Column [{reference.Object}] cannot be found on table '{reference.Table}'.",
                             obj.Path,
                             Line(site.Expression, reference.Start),
@@ -113,9 +106,7 @@ internal static class ModelValidation
                 case DaxReferenceShape.Table:
                     if (!index.TableColumns.ContainsKey(reference.Table!)
                         && !index.CalendarNames.Contains(reference.Table!))
-                        issues.Add(new ValidationIssue(
-                            ValidationSeverity.Error,
-                            "DAX0001",
+                        issues.Add(ValidationRules.UnknownTable.Issue(
                             $"Table '{reference.Table}' cannot be found.",
                             obj.Path,
                             Line(site.Expression, reference.Start),
@@ -134,9 +125,7 @@ internal static class ModelValidation
                     if (scope == DaxQueryColumnScope.InScope)
                         break;
 
-                    issues.Add(new ValidationIssue(
-                        ValidationSeverity.Warning,
-                        "DAX0003",
+                    issues.Add(ValidationRules.UnresolvedReference.Issue(
                         scope == DaxQueryColumnScope.OutOfScope
                             ? $"Column [{reference.Object}] is built by this expression but used outside the table that has it."
                             : $"Measure or column [{reference.Object}] cannot be found in the model.",
@@ -156,13 +145,13 @@ internal static class ModelValidation
     /// DAX0004 for illegal characters and unbalanced groups, DAX0005 for unterminated
     /// literals/comments, and DAX0007–DAX0009 for the parser's grammar errors.
     /// </summary>
-    private static string SyntaxCode(DaxSyntaxErrorKind kind) => kind switch
+    private static ValidationRule SyntaxRule(DaxSyntaxErrorKind kind) => kind switch
     {
-        DaxSyntaxErrorKind.UnterminatedLiteral or DaxSyntaxErrorKind.UnterminatedComment => "DAX0005",
-        DaxSyntaxErrorKind.UnexpectedToken => "DAX0007",
-        DaxSyntaxErrorKind.MissingOperand => "DAX0008",
-        DaxSyntaxErrorKind.IncompleteVarBlock => "DAX0009",
-        _ => "DAX0004"
+        DaxSyntaxErrorKind.UnterminatedLiteral or DaxSyntaxErrorKind.UnterminatedComment => ValidationRules.UnterminatedLiteral,
+        DaxSyntaxErrorKind.UnexpectedToken => ValidationRules.UnexpectedToken,
+        DaxSyntaxErrorKind.MissingOperand => ValidationRules.MissingOperand,
+        DaxSyntaxErrorKind.IncompleteVarBlock => ValidationRules.IncompleteVarBlock,
+        _ => ValidationRules.InvalidSyntax
     };
 
     private static void CheckStructure(ModelObject obj, ModelNameIndex index, List<ValidationIssue> issues)
@@ -180,12 +169,9 @@ internal static class ModelValidation
                 if (!string.IsNullOrWhiteSpace(sortBy)
                     && index.TableColumns.TryGetValue(OwningTable(obj.Path), out var siblings)
                     && !siblings.Contains(sortBy!))
-                    issues.Add(new ValidationIssue(
-                        ValidationSeverity.Error,
-                        "TOMIX_BROKEN_SORT_BY",
+                    issues.Add(ValidationRules.BrokenSortBy.Issue(
                         $"Sort-by column '{sortBy}' cannot be found on table '{OwningTable(obj.Path)}'.",
-                        obj.Path,
-                        Expression: null));
+                        obj.Path));
                 break;
 
             // Detail carries the level's bound column name; empty means the provider had none.
@@ -193,12 +179,9 @@ internal static class ModelValidation
                 if (!string.IsNullOrWhiteSpace(obj.Detail)
                     && index.TableColumns.TryGetValue(OwningTable(obj.Path), out var tableColumns)
                     && !tableColumns.Contains(obj.Detail!))
-                    issues.Add(new ValidationIssue(
-                        ValidationSeverity.Error,
-                        "TOMIX_BROKEN_LEVEL",
+                    issues.Add(ValidationRules.BrokenLevel.Issue(
                         $"Hierarchy level '{obj.Name}' is bound to column '{obj.Detail}', which cannot be found on table '{OwningTable(obj.Path)}'.",
-                        obj.Path,
-                        Expression: null));
+                        obj.Path));
                 break;
         }
     }
@@ -215,12 +198,9 @@ internal static class ModelValidation
         if (index.TableColumns.TryGetValue(table, out var columns) && columns.Contains(column))
             return;
 
-        issues.Add(new ValidationIssue(
-            ValidationSeverity.Error,
-            "TOMIX_BROKEN_RELATIONSHIP",
+        issues.Add(ValidationRules.BrokenRelationship.Issue(
             $"Relationship endpoint '{table}'[{column}] refers to a missing column.",
-            relationship.Path,
-            Expression: null));
+            relationship.Path));
     }
 
     private static List<ValidationIssue> Distinct(List<ValidationIssue> issues)

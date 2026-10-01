@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -88,13 +89,13 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning,
+            new("HIDE_FK", "Hide FK", "Formatting", RuleSeverity.Warning,
                 ["Column"], FixExpression: "IsHidden = true")
         };
 
         var violations = new List<BpaViolation>
         {
-            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning,
+            new("HIDE_FK", "Hide FK", "Formatting", RuleSeverity.Warning,
                 "Column", "'Orders'[CustomerId]", "Orders/CustomerId",
                 CanFix: true, ObjectKind: ModelObjectKind.Column)
         };
@@ -117,13 +118,13 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("UNNECESSARY_COL", "Remove", "Performance", BpaSeverity.Warning,
+            new("UNNECESSARY_COL", "Remove", "Performance", RuleSeverity.Warning,
                 ["Column"], FixExpression: "Delete()")
         };
 
         var violations = new List<BpaViolation>
         {
-            new("UNNECESSARY_COL", "Remove", "Performance", BpaSeverity.Warning,
+            new("UNNECESSARY_COL", "Remove", "Performance", RuleSeverity.Warning,
                 "Column", "'Table'[Col]", "Table/Col",
                 CanFix: true, ObjectKind: ModelObjectKind.Column)
         };
@@ -144,13 +145,13 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("UNNECESSARY_COL", "Remove", "Performance", BpaSeverity.Warning,
+            new("UNNECESSARY_COL", "Remove", "Performance", RuleSeverity.Warning,
                 ["Column"], FixExpression: "Delete()")
         };
 
         var violations = new List<BpaViolation>
         {
-            new("UNNECESSARY_COL", "Remove", "Performance", BpaSeverity.Warning,
+            new("UNNECESSARY_COL", "Remove", "Performance", RuleSeverity.Warning,
                 "Column", "'Table'[Col]", "Table/Col",
                 CanFix: true, ObjectKind: ModelObjectKind.Column)
         };
@@ -171,18 +172,18 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning,
+            new("HIDE_FK", "Hide FK", "Formatting", RuleSeverity.Warning,
                 ["Column"], FixExpression: "IsHidden = true"),
-            new("UNNECESSARY_COL", "Remove", "Maintenance", BpaSeverity.Warning,
+            new("UNNECESSARY_COL", "Remove", "Maintenance", RuleSeverity.Warning,
                 ["Column"], FixExpression: "Delete()")
         };
 
         var violations = new List<BpaViolation>
         {
-            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning,
+            new("HIDE_FK", "Hide FK", "Formatting", RuleSeverity.Warning,
                 "Column", "'Orders'[CustomerId]", "Orders/CustomerId",
                 CanFix: true, ObjectKind: ModelObjectKind.Column),
-            new("UNNECESSARY_COL", "Remove", "Maintenance", BpaSeverity.Warning,
+            new("UNNECESSARY_COL", "Remove", "Maintenance", RuleSeverity.Warning,
                 "Column", "'Table'[Col]", "Table/Col",
                 CanFix: true, ObjectKind: ModelObjectKind.Column)
         };
@@ -203,13 +204,13 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("COMPLEX", "Complex fix", "Formatting", BpaSeverity.Warning,
+            new("COMPLEX", "Complex fix", "Formatting", RuleSeverity.Warning,
                 ["Column"], FixExpression: "Name = string.Concat(it.Name)")
         };
 
         var violations = new List<BpaViolation>
         {
-            new("COMPLEX", "Complex fix", "Formatting", BpaSeverity.Warning,
+            new("COMPLEX", "Complex fix", "Formatting", RuleSeverity.Warning,
                 "Column", "'T'[C]", "T/C",
                 CanFix: true, ObjectKind: ModelObjectKind.Column)
         };
@@ -229,18 +230,18 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("FIXABLE", "Fixable", "Formatting", BpaSeverity.Warning,
+            new("FIXABLE", "Fixable", "Formatting", RuleSeverity.Warning,
                 ["Column"], FixExpression: "IsHidden = true"),
-            new("NOT_FIXABLE", "Not fixable", "Formatting", BpaSeverity.Warning,
+            new("NOT_FIXABLE", "Not fixable", "Formatting", RuleSeverity.Warning,
                 ["Column"])
         };
 
         var violations = new List<BpaViolation>
         {
-            new("FIXABLE", "Fixable", "Formatting", BpaSeverity.Warning,
+            new("FIXABLE", "Fixable", "Formatting", RuleSeverity.Warning,
                 "Column", "'T'[A]", "T/A",
                 CanFix: true, ObjectKind: ModelObjectKind.Column),
-            new("NOT_FIXABLE", "Not fixable", "Formatting", BpaSeverity.Warning,
+            new("NOT_FIXABLE", "Not fixable", "Formatting", RuleSeverity.Warning,
                 "Column", "'T'[B]", "T/B",
                 CanFix: false)
         };
@@ -261,18 +262,18 @@ public sealed class BpaFixerTests
 
         var rules = new List<BpaRule>
         {
-            new("FIX1", "Fix 1", "Formatting", BpaSeverity.Warning,
+            new("FIX1", "Fix 1", "Formatting", RuleSeverity.Warning,
                 ["Column"], FixExpression: "FormatString = \"dd-mm-yyyy\""),
-            new("FIX2", "Fix 2", "Formatting", BpaSeverity.Warning,
+            new("FIX2", "Fix 2", "Formatting", RuleSeverity.Warning,
                 ["Column"], FixExpression: "SummarizeBy = AggregateFunction.None")
         };
 
         var violations = new List<BpaViolation>
         {
-            new("FIX1", "Fix 1", "Formatting", BpaSeverity.Warning,
+            new("FIX1", "Fix 1", "Formatting", RuleSeverity.Warning,
                 "Column", "'T'[Date]", "T/Date",
                 CanFix: true, ObjectKind: ModelObjectKind.Column),
-            new("FIX2", "Fix 2", "Formatting", BpaSeverity.Warning,
+            new("FIX2", "Fix 2", "Formatting", RuleSeverity.Warning,
                 "Column", "'T'[Amount]", "T/Amount",
                 CanFix: true, ObjectKind: ModelObjectKind.Column)
         };

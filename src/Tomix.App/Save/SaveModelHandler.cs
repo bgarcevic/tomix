@@ -4,6 +4,7 @@ using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Save;
 
@@ -141,7 +142,7 @@ public sealed class SaveModelHandler
         // block regardless of other applied fixes (issue #253). Other error-severity findings
         // block only when nothing could be auto-fixed.
         if (result.RuleErrorViolations.Count > 0 ||
-            (fixResult.FixesApplied == 0 && result.Violations.Any(v => v.Severity == BpaSeverity.Error)))
+            (fixResult.FixesApplied == 0 && result.Violations.Any(v => v.Severity == RuleSeverity.Error)))
         {
             var ruleErrorNotes = result.RuleErrorViolations is { Count: > 0 }
                 ? " " + string.Join(" ", result.RuleErrorViolations.Select(e => $"{e.Description} ('{e.RuleName}' [{e.RuleId}])."))

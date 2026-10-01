@@ -5,6 +5,7 @@ using Tomix.App.Validate;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Set;
 
@@ -77,7 +78,7 @@ public sealed class SetModelPropertyHandler
                 // through this closure.
                 var validationErrors = ModelValidation
                     .Analyze(await session.GetSnapshotAsync(cancellationToken).ConfigureAwait(false))
-                    .Issues.Count(issue => issue.Severity == ValidationSeverity.Error);
+                    .Issues.Count(issue => issue.Severity == RuleSeverity.Error);
 
                 var property = mutation.Property ?? request.Properties[^1].Property;
                 return (mutation.Changed, $"set {mutation.Path}.{property}",

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Tomix.Core.Bpa;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 using Tomix.Platform.Configuration;
 
 namespace Tomix.App.Bpa;
@@ -362,13 +363,13 @@ internal sealed class BpaRulesFile
     private static string? StringField(JsonObject rule, string field)
         => rule[field] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
-    internal static bool TryParseSeverity(string value, out BpaSeverity severity)
+    internal static bool TryParseSeverity(string value, out RuleSeverity severity)
     {
         severity = value.Trim().ToLowerInvariant() switch
         {
-            "error" or "3" => BpaSeverity.Error,
-            "warning" or "2" => BpaSeverity.Warning,
-            "info" or "1" => BpaSeverity.Info,
+            "error" or "3" => RuleSeverity.Error,
+            "warning" or "2" => RuleSeverity.Warning,
+            "info" or "1" => RuleSeverity.Info,
             _ => 0
         };
         return severity != 0;

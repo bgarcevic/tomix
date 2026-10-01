@@ -1,5 +1,6 @@
 using Tomix.App.Deploy;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -13,24 +14,24 @@ namespace Tomix.App.Tests;
 /// </summary>
 public sealed class DeployBpaGateTests
 {
-    private static readonly BpaViolation ErrorA = V("error-A", BpaSeverity.Error);
-    private static readonly BpaViolation ErrorB = V("error-B", BpaSeverity.Error);
-    private static readonly BpaViolation Warn = V("warn", BpaSeverity.Warning);
-    private static readonly BpaViolation Info = V("info", BpaSeverity.Info);
+    private static readonly BpaViolation ErrorA = V("error-A", RuleSeverity.Error);
+    private static readonly BpaViolation ErrorB = V("error-B", RuleSeverity.Error);
+    private static readonly BpaViolation Warn = V("warn", RuleSeverity.Warning);
+    private static readonly BpaViolation Info = V("info", RuleSeverity.Info);
 
-    private static BpaViolation V(string id, BpaSeverity severity)
+    private static BpaViolation V(string id, RuleSeverity severity)
         => new(id, id, "cat", severity, "Table", id, id);
 
     /// <summary>The single rule the threshold matrix turns on: the gate blocks at or above the threshold, never below it.</summary>
     [Theory]
-    [InlineData(BpaSeverity.Error, BpaSeverity.Info, false)]
-    [InlineData(BpaSeverity.Error, BpaSeverity.Warning, false)]
-    [InlineData(BpaSeverity.Error, BpaSeverity.Error, true)]
-    [InlineData(BpaSeverity.Warning, BpaSeverity.Info, false)]
-    [InlineData(BpaSeverity.Warning, BpaSeverity.Warning, true)]
-    [InlineData(BpaSeverity.Warning, BpaSeverity.Error, true)]
+    [InlineData(RuleSeverity.Error, RuleSeverity.Info, false)]
+    [InlineData(RuleSeverity.Error, RuleSeverity.Warning, false)]
+    [InlineData(RuleSeverity.Error, RuleSeverity.Error, true)]
+    [InlineData(RuleSeverity.Warning, RuleSeverity.Info, false)]
+    [InlineData(RuleSeverity.Warning, RuleSeverity.Warning, true)]
+    [InlineData(RuleSeverity.Warning, RuleSeverity.Error, true)]
     public void PreDeployGate_BlocksExactlyAtOrAboveThreshold(
-        BpaSeverity failOn, BpaSeverity severity, bool expectBlocked)
+        RuleSeverity failOn, RuleSeverity severity, bool expectBlocked)
     {
         var result = DeployModelHandler.EvaluateBpaGate([V("v", severity)], null, fixBpa: false, failOn);
 
@@ -38,9 +39,9 @@ public sealed class DeployBpaGateTests
     }
 
     [Theory]
-    [InlineData(BpaSeverity.Error)]
-    [InlineData(BpaSeverity.Warning)]
-    public void NoViolations_Proceeds_RegardlessOfThreshold(BpaSeverity failOn)
+    [InlineData(RuleSeverity.Error)]
+    [InlineData(RuleSeverity.Warning)]
+    public void NoViolations_Proceeds_RegardlessOfThreshold(RuleSeverity failOn)
     {
         Assert.Null(DeployModelHandler.EvaluateBpaGate([], null, fixBpa: false, failOn));
         Assert.Null(DeployModelHandler.EvaluateBpaGate([], null, fixBpa: true, failOn));
@@ -50,7 +51,7 @@ public sealed class DeployBpaGateTests
     public void DefaultThreshold_MixedFindings_FailsCountingOnlyErrors()
     {
         // Warnings and info ride along but only the error crosses the default threshold.
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, Warn, Info], null, fixBpa: false, BpaSeverity.Error);
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, Warn, Info], null, fixBpa: false, RuleSeverity.Error);
 
         Assert.NotNull(result);
         Assert.False(result!.Success);
@@ -63,7 +64,7 @@ public sealed class DeployBpaGateTests
     [Fact]
     public void WarningThreshold_MixedFindings_FailsCountingWarningsAndErrors()
     {
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, Warn, Info], null, fixBpa: false, BpaSeverity.Warning);
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, Warn, Info], null, fixBpa: false, RuleSeverity.Warning);
 
         Assert.NotNull(result);
         Assert.Contains("2 warning-severity or higher violation(s)", result.Diagnostics[0].Message);
@@ -74,27 +75,27 @@ public sealed class DeployBpaGateTests
     public void FixBpa_DefaultThreshold_AllErrorsRemediated_Proceeds()
     {
         // Pre-fix had two errors; post-fix re-evaluation found none.
-        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, ErrorB], [], fixBpa: true, BpaSeverity.Error));
+        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, ErrorB], [], fixBpa: true, RuleSeverity.Error));
     }
 
     [Fact]
     public void FixBpa_DefaultThreshold_OnlyWarningsRemain_Proceeds()
     {
         // Error was remediated; a warning survives but sits below the default threshold.
-        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, Warn], [Warn], fixBpa: true, BpaSeverity.Error));
+        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, Warn], [Warn], fixBpa: true, RuleSeverity.Error));
     }
 
     [Fact]
     public void FixBpa_DefaultThreshold_OnlyInfoRemains_Proceeds()
     {
-        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, Info], [Info], fixBpa: true, BpaSeverity.Error));
+        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, Info], [Info], fixBpa: true, RuleSeverity.Error));
     }
 
     [Fact]
     public void FixBpa_DefaultThreshold_ErrorRemains_Fails()
     {
         // One error fixed, one error could not be fixed -> must block the deploy.
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, ErrorB], [ErrorB], fixBpa: true, BpaSeverity.Error);
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, ErrorB], [ErrorB], fixBpa: true, RuleSeverity.Error);
 
         Assert.NotNull(result);
         Assert.False(result!.Success);
@@ -108,7 +109,7 @@ public sealed class DeployBpaGateTests
     public void FixBpa_WarningThreshold_WarningRemains_Fails()
     {
         // The warning survived the fixes and the user raised the post-fix threshold to warning.
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, Warn], [Warn], fixBpa: true, BpaSeverity.Warning);
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, Warn], [Warn], fixBpa: true, RuleSeverity.Warning);
 
         Assert.NotNull(result);
         Assert.Contains("1 warning-severity or higher violation(s) remaining after auto-fix", result.Diagnostics[0].Message);
@@ -117,13 +118,13 @@ public sealed class DeployBpaGateTests
     [Fact]
     public void FixBpa_WarningThreshold_InfoRemains_Proceeds()
     {
-        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, Info], [Info], fixBpa: true, BpaSeverity.Warning));
+        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA, Info], [Info], fixBpa: true, RuleSeverity.Warning));
     }
 
     [Fact]
     public void FixBpa_WarningThreshold_WarningAndErrorRemain_FailsCountingBoth()
     {
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, ErrorB, Warn], [ErrorA, Warn], fixBpa: true, BpaSeverity.Warning);
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA, ErrorB, Warn], [ErrorA, Warn], fixBpa: true, RuleSeverity.Warning);
 
         Assert.NotNull(result);
         Assert.Contains("2 warning-severity or higher violation(s) remaining after auto-fix", result!.Diagnostics[0].Message);
@@ -135,8 +136,8 @@ public sealed class DeployBpaGateTests
         // Defensive: RunBpaGate always supplies post-fix violations when fixBpa is set, but the
         // helper treats a null post-fix set as empty (nothing remains -> proceed). This pins
         // that contract so a future refactor cannot accidentally flip it to fail-open on errors.
-        Assert.Null(DeployModelHandler.EvaluateBpaGate([Warn], null, fixBpa: true, BpaSeverity.Error));
-        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: true, BpaSeverity.Error));
+        Assert.Null(DeployModelHandler.EvaluateBpaGate([Warn], null, fixBpa: true, RuleSeverity.Error));
+        Assert.Null(DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: true, RuleSeverity.Error));
     }
 
     // ----- Issue #253: a rule that cannot be evaluated blocks the deploy and names itself -----
@@ -145,14 +146,14 @@ public sealed class DeployBpaGateTests
     // message can name the broken rule and its reason instead of an anonymous count.
 
     private static readonly BpaViolation BrokenRule = new(
-        "BROKEN_RULE", "broken rule", "test", BpaSeverity.Error, "Column", "", "",
+        "BROKEN_RULE", "broken rule", "test", RuleSeverity.Error, "Column", "", "",
         Description: "Rule could not be evaluated: Column: Unexpected token '='");
 
     [Fact]
     public void RuleErrorOnly_BlockedByDefault_NamesRuleAndReason()
     {
         var result = DeployModelHandler.EvaluateBpaGate(
-            [BrokenRule], null, fixBpa: false, BpaSeverity.Error, ruleErrors: [BrokenRule]);
+            [BrokenRule], null, fixBpa: false, RuleSeverity.Error, ruleErrors: [BrokenRule]);
 
         Assert.NotNull(result);
         Assert.False(result!.Success);
@@ -169,7 +170,7 @@ public sealed class DeployBpaGateTests
     public void RuleError_BlocksAtWarningThresholdToo()
     {
         var result = DeployModelHandler.EvaluateBpaGate(
-            [BrokenRule], null, fixBpa: false, BpaSeverity.Warning, ruleErrors: [BrokenRule]);
+            [BrokenRule], null, fixBpa: false, RuleSeverity.Warning, ruleErrors: [BrokenRule]);
 
         Assert.NotNull(result);
         Assert.Equal(1, result!.ExitCode);
@@ -181,7 +182,7 @@ public sealed class DeployBpaGateTests
         // --fix-bpa cannot repair a rule that cannot be evaluated: the post-fix re-evaluation
         // still reports it, and the gate must block naming it.
         var result = DeployModelHandler.EvaluateBpaGate(
-            [BrokenRule], [BrokenRule], fixBpa: true, BpaSeverity.Error, ruleErrors: [BrokenRule]);
+            [BrokenRule], [BrokenRule], fixBpa: true, RuleSeverity.Error, ruleErrors: [BrokenRule]);
 
         Assert.NotNull(result);
         Assert.Contains("remaining after auto-fix", result!.Diagnostics[0].Message);
@@ -192,7 +193,7 @@ public sealed class DeployBpaGateTests
     public void RuleErrors_Absent_MessageStaysAnonymous()
     {
         // Real violations (no rule errors) keep the existing count-only message.
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: false, BpaSeverity.Error, ruleErrors: []);
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: false, RuleSeverity.Error, ruleErrors: []);
 
         Assert.NotNull(result);
         Assert.DoesNotContain("could not be evaluated", result!.Diagnostics[0].Message);
@@ -204,7 +205,7 @@ public sealed class DeployBpaGateTests
         // #266: a block must not imply the statistics rules passed; it names them with the fix.
         var notChecked = new[] { StatsSentinel("LARGE_TABLES_SHOULD_BE_PARTITIONED") };
 
-        var result = DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: false, BpaSeverity.Error,
+        var result = DeployModelHandler.EvaluateBpaGate([ErrorA], null, fixBpa: false, RuleSeverity.Error,
             notChecked: notChecked);
 
         Assert.NotNull(result);
@@ -231,5 +232,5 @@ public sealed class DeployBpaGateTests
 
     private static BpaResult StatsSentinel(string id)
         => BpaResult.Sentinel(BpaResultKind.MissingVertipaqStats,
-            new BpaRule(id, id, "Performance", BpaSeverity.Warning, ["Table"]));
+            new BpaRule(id, id, "Performance", RuleSeverity.Warning, ["Table"]));
 }

@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -13,7 +14,7 @@ public sealed class BpaEngineTests
         var engine = new BpaEngine();
         var rules = new List<BpaRule>
         {
-            new("HIDE_FK", "Hide FK", "Formatting", BpaSeverity.Warning, ["Column"])
+            new("HIDE_FK", "Hide FK", "Formatting", RuleSeverity.Warning, ["Column"])
         };
 
         var result = engine.Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -35,7 +36,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("AVOID_FLOATING_POINT_DATA_TYPES", "No float", "Performance", BpaSeverity.Warning,
+            new("AVOID_FLOATING_POINT_DATA_TYPES", "No float", "Performance", RuleSeverity.Warning,
                 ["DataColumn", "CalculatedColumn", "CalculatedTableColumn"],
                 Expression: "DataType = \"Double\"",
                 FixExpression: "DataType = DataType.Decimal")
@@ -62,10 +63,10 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("HAS_FIX", "With fix", "Test", BpaSeverity.Info, ["DataColumn"],
+            new("HAS_FIX", "With fix", "Test", RuleSeverity.Info, ["DataColumn"],
                 Expression: "not IsHidden",
                 FixExpression: "IsHidden = true"),
-            new("NO_FIX", "No fix", "Test", BpaSeverity.Info, ["DataColumn"],
+            new("NO_FIX", "No fix", "Test", RuleSeverity.Info, ["DataColumn"],
                 Expression: "not IsHidden")
         };
 
@@ -108,7 +109,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("AVOID_FLOATING_POINT_DATA_TYPES", "No float", "Performance", BpaSeverity.Warning,
+            new("AVOID_FLOATING_POINT_DATA_TYPES", "No float", "Performance", RuleSeverity.Warning,
                 ["DataColumn", "CalculatedColumn", "CalculatedTableColumn"],
                 Expression: "DataType = \"Double\"")
         };
@@ -132,8 +133,8 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("RULE_A", "Rule A", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden"),
-            new("RULE_B", "Rule B", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
+            new("RULE_A", "Rule A", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden"),
+            new("RULE_B", "Rule B", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
         };
 
         var engine = new BpaEngine();
@@ -163,7 +164,7 @@ public sealed class BpaEngineTests
         // Scoped to CalculatedColumn only — the always-true predicate must skip the DataColumn.
         var rules = new List<BpaRule>
         {
-            new("CALC_ONLY", "Calc only", "Test", BpaSeverity.Info, ["CalculatedColumn"], Expression: "not IsHidden")
+            new("CALC_ONLY", "Calc only", "Test", RuleSeverity.Info, ["CalculatedColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -193,7 +194,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("CALC_ONLY", "Calc only", "Test", BpaSeverity.Info, ["CalculatedColumn"], Expression: "not IsHidden")
+            new("CALC_ONLY", "Calc only", "Test", RuleSeverity.Info, ["CalculatedColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -221,7 +222,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("TABLE_RULE", "Table rule", "Test", BpaSeverity.Info, ["Table"], Expression: "not IsHidden")
+            new("TABLE_RULE", "Table rule", "Test", RuleSeverity.Info, ["Table"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -243,7 +244,7 @@ public sealed class BpaEngineTests
         var rules = new List<BpaRule>
         {
             // Expression would match every column, but the rule must not run on this old model.
-            new("NEEDS_1600", "Needs 1600", "Test", BpaSeverity.Warning, ["DataColumn"],
+            new("NEEDS_1600", "Needs 1600", "Test", RuleSeverity.Warning, ["DataColumn"],
                 Expression: "not IsHidden", CompatibilityLevel: 1600)
         };
 
@@ -267,7 +268,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("BAD_EXPR", "Bad expression", "Test", BpaSeverity.Warning, ["DataColumn"],
+            new("BAD_EXPR", "Bad expression", "Test", RuleSeverity.Warning, ["DataColumn"],
                 Expression: "ThisMemberDoesNotExist = 1")
         };
 
@@ -282,7 +283,7 @@ public sealed class BpaEngineTests
 
         var finding = Assert.Single(result.Violations);
         Assert.Equal("BAD_EXPR", finding.RuleId);
-        Assert.Equal(BpaSeverity.Error, finding.Severity);
+        Assert.Equal(RuleSeverity.Error, finding.Severity);
         Assert.False(finding.CanFix);
         Assert.Contains("could not be evaluated", finding.Description);
     }
@@ -307,7 +308,7 @@ public sealed class BpaEngineTests
         var rules = new List<BpaRule>
         {
             // Compiles fine; throws at runtime only for the non-numeric SourceColumn.
-            new("NUMERIC_SOURCE", "Numeric source", "Test", BpaSeverity.Info, ["DataColumn"],
+            new("NUMERIC_SOURCE", "Numeric source", "Test", RuleSeverity.Info, ["DataColumn"],
                 Expression: "Convert.ToInt64(SourceColumn) > 0")
         };
 
@@ -348,7 +349,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("HIGH_CARDINALITY", "High cardinality", "Performance", BpaSeverity.Warning, ["Column"],
+            new("HIGH_CARDINALITY", "High cardinality", "Performance", RuleSeverity.Warning, ["Column"],
                 Expression: "Convert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) > 100000")
         };
 
@@ -373,9 +374,9 @@ public sealed class BpaEngineTests
         var rules = new List<BpaRule>
         {
             // "<= 100000" would match every column if the rule ran against the missing value (0).
-            new("LOW_CARDINALITY", "Low cardinality", "Performance", BpaSeverity.Warning, ["Column"],
+            new("LOW_CARDINALITY", "Low cardinality", "Performance", RuleSeverity.Warning, ["Column"],
                 Expression: "Convert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) <= 100000"),
-            new("PLAIN", "Plain", "Test", BpaSeverity.Warning, ["Column"], Expression: "not IsHidden")
+            new("PLAIN", "Plain", "Test", RuleSeverity.Warning, ["Column"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -402,7 +403,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("LOW_CARDINALITY", "Low cardinality", "Performance", BpaSeverity.Warning, ["Column"],
+            new("LOW_CARDINALITY", "Low cardinality", "Performance", RuleSeverity.Warning, ["Column"],
                 Expression: "Convert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) <= 100000")
         };
 
@@ -433,7 +434,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("PROVIDE_FORMAT_STRING_FOR_MEASURES", "Format measures", "Formatting", BpaSeverity.Error, ["Measure"],
+            new("PROVIDE_FORMAT_STRING_FOR_MEASURES", "Format measures", "Formatting", RuleSeverity.Error, ["Measure"],
                 Expression: "not IsHidden \r\nand not Table.IsHidden \r\nand string.IsNullOrWhitespace(FormatString) \r\nand string.IsNullOrWhitespace(FormatStringExpression)")
         };
 
@@ -460,7 +461,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("RULE_A", "Rule A", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
+            new("RULE_A", "Rule A", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -487,7 +488,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("RULE_A", "Rule A", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
+            new("RULE_A", "Rule A", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -510,7 +511,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("RULE_A", "Rule A", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
+            new("RULE_A", "Rule A", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));
@@ -543,7 +544,7 @@ public sealed class BpaEngineTests
 
         var rules = new List<BpaRule>
         {
-            new("RULE_A", "Rule A", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
+            new("RULE_A", "Rule A", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(snapshot, new BpaEngineOptions(rules));

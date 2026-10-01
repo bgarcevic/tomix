@@ -3,6 +3,7 @@ using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
@@ -35,7 +36,7 @@ public sealed class BpaRunHandlerTests
         Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
         var finding = Assert.Single(result.Data!.Violations);
         Assert.Equal("BROKEN_RULE", finding.RuleId);
-        Assert.Equal(BpaSeverity.Error, finding.Severity);
+        Assert.Equal(RuleSeverity.Error, finding.Severity);
         Assert.False(finding.CanFix);
         Assert.Contains("could not be evaluated", finding.Description);
         Assert.Equal(1, result.ExitCode);

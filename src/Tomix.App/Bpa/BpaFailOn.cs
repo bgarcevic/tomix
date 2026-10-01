@@ -1,4 +1,5 @@
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Bpa;
 
@@ -10,30 +11,30 @@ namespace Tomix.App.Bpa;
 /// </summary>
 public static class BpaFailOn
 {
-    public static bool TryParse(string? value, string optionName, out BpaSeverity severity, out string? error)
+    public static bool TryParse(string? value, string optionName, out RuleSeverity severity, out string? error)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Equals("error", StringComparison.OrdinalIgnoreCase))
         {
-            severity = BpaSeverity.Error;
+            severity = RuleSeverity.Error;
             error = null;
             return true;
         }
 
         if (value.Equals("warning", StringComparison.OrdinalIgnoreCase))
         {
-            severity = BpaSeverity.Warning;
+            severity = RuleSeverity.Warning;
             error = null;
             return true;
         }
 
-        severity = BpaSeverity.Error;
+        severity = RuleSeverity.Error;
         error = $"Invalid {optionName} value '{value}'. Expected: error or warning.";
         return false;
     }
 
     /// <summary>The violations a gate with this threshold must block on.</summary>
-    public static IReadOnlyList<BpaViolation> Blocking(IReadOnlyList<BpaViolation> violations, BpaSeverity threshold)
-        => threshold == BpaSeverity.Warning
-            ? [.. violations.Where(v => v.Severity is BpaSeverity.Warning or BpaSeverity.Error)]
-            : [.. violations.Where(v => v.Severity == BpaSeverity.Error)];
+    public static IReadOnlyList<BpaViolation> Blocking(IReadOnlyList<BpaViolation> violations, RuleSeverity threshold)
+        => threshold == RuleSeverity.Warning
+            ? [.. violations.Where(v => v.Severity is RuleSeverity.Warning or RuleSeverity.Error)]
+            : [.. violations.Where(v => v.Severity == RuleSeverity.Error)];
 }

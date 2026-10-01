@@ -2,6 +2,7 @@ using Spectre.Console;
 using Tomix.App.Bpa;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Output;
 
@@ -200,10 +201,10 @@ internal static class BpaRulesRenderer
             StdErr.MarkupLine(Styling.Guidance("Add --all to include ignored rules."));
     }
 
-    private static string SeverityDot(BpaSeverity severity) => severity switch
+    private static string SeverityDot(RuleSeverity severity) => severity switch
     {
-        BpaSeverity.Error => Styling.Error("●"),
-        BpaSeverity.Warning => Styling.Warning("●"),
+        RuleSeverity.Error => Styling.Error("●"),
+        RuleSeverity.Warning => Styling.Warning("●"),
         _ => Styling.Muted("●")
     };
 

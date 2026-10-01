@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -117,7 +118,7 @@ public sealed class BpaRulesDisableTests
 
         var rules = new List<BpaRule>
         {
-            new("RULE_A", "Rule A", "Test", BpaSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
+            new("RULE_A", "Rule A", "Test", RuleSeverity.Warning, ["DataColumn"], Expression: "not IsHidden")
         };
 
         var result = new BpaEngine().Evaluate(

@@ -1,5 +1,6 @@
 using Tomix.App.Validate;
 using Tomix.Cli.Output;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -67,7 +68,7 @@ public sealed partial class ValidateRenderTests
             Errors:
             [
                 new ValidationIssue(
-                    ValidationSeverity.Warning,
+                    RuleSeverity.Warning,
                     "DAX0003", "Measure or column [Profit] cannot be found in the model.",
                     "Sales/Profit %", "1", "DIVIDE([Profit], 'Sales'[Qty])")
             ],
@@ -105,7 +106,7 @@ public sealed partial class ValidateRenderTests
             Errors:
             [
                 new ValidationIssue(
-                    ValidationSeverity.Error, "DAX0002", message,
+                    RuleSeverity.Error, "DAX0002", message,
                     "Column Axis (Forecast With A Long Table Name)/Forecast Column Value", "29",
                     "VAR Grp = SELECTEDVALUE ( 'Column Axis (Forecast With A Long Table Name)'[Group] )")
             ],
@@ -136,7 +137,7 @@ public sealed partial class ValidateRenderTests
             Errors:
             [
                 new ValidationIssue(
-                    ValidationSeverity.Error,
+                    RuleSeverity.Error,
                     "TOMIX_BROKEN_SORT_BY",
                     "Sort-by column 'MonthNo' cannot be found on table 'Sales'.",
                     "Sales/Month",
@@ -159,7 +160,7 @@ public sealed partial class ValidateRenderTests
         Errors:
         [
             new ValidationIssue(
-                ValidationSeverity.Error,
+                RuleSeverity.Error,
                 "DAX0002",
                 "Column [Missing] cannot be found on table 'Sales'.",
                 "Sales/Total Sales",

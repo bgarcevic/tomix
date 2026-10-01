@@ -1,5 +1,6 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -10,13 +11,13 @@ namespace Tomix.App.Tests;
 public sealed class BpaFailOnTests
 {
     [Theory]
-    [InlineData(null, BpaSeverity.Error)]
-    [InlineData("", BpaSeverity.Error)]
-    [InlineData("error", BpaSeverity.Error)]
-    [InlineData("ERROR", BpaSeverity.Error)]
-    [InlineData("warning", BpaSeverity.Warning)]
-    [InlineData("Warning", BpaSeverity.Warning)]
-    public void TryParse_AcceptsThresholdValues(string? value, BpaSeverity expected)
+    [InlineData(null, RuleSeverity.Error)]
+    [InlineData("", RuleSeverity.Error)]
+    [InlineData("error", RuleSeverity.Error)]
+    [InlineData("ERROR", RuleSeverity.Error)]
+    [InlineData("warning", RuleSeverity.Warning)]
+    [InlineData("Warning", RuleSeverity.Warning)]
+    public void TryParse_AcceptsThresholdValues(string? value, RuleSeverity expected)
     {
         var parsed = BpaFailOn.TryParse(value, "--fail-on", out var severity, out var error);
 
@@ -40,24 +41,24 @@ public sealed class BpaFailOnTests
     [Fact]
     public void Blocking_ErrorThreshold_ErrorsOnly()
     {
-        var blocking = BpaFailOn.Blocking(Violations(), BpaSeverity.Error);
+        var blocking = BpaFailOn.Blocking(Violations(), RuleSeverity.Error);
 
-        Assert.Equal([BpaSeverity.Error], blocking.Select(v => v.Severity).ToArray());
+        Assert.Equal([RuleSeverity.Error], blocking.Select(v => v.Severity).ToArray());
     }
 
     [Fact]
     public void Blocking_WarningThreshold_WarningsAndErrors()
     {
-        var blocking = BpaFailOn.Blocking(Violations(), BpaSeverity.Warning);
+        var blocking = BpaFailOn.Blocking(Violations(), RuleSeverity.Warning);
 
-        Assert.Equal([BpaSeverity.Warning, BpaSeverity.Error], blocking.Select(v => v.Severity).ToArray());
+        Assert.Equal([RuleSeverity.Warning, RuleSeverity.Error], blocking.Select(v => v.Severity).ToArray());
     }
 
     private static BpaViolation[] Violations()
     {
-        var info = new BpaViolation("i", "i", "cat", BpaSeverity.Info, "Table", "i", "i");
-        var warning = new BpaViolation("w", "w", "cat", BpaSeverity.Warning, "Table", "w", "w");
-        var error = new BpaViolation("e", "e", "cat", BpaSeverity.Error, "Table", "e", "e");
+        var info = new BpaViolation("i", "i", "cat", RuleSeverity.Info, "Table", "i", "i");
+        var warning = new BpaViolation("w", "w", "cat", RuleSeverity.Warning, "Table", "w", "w");
+        var error = new BpaViolation("e", "e", "cat", RuleSeverity.Error, "Table", "e", "e");
         return [info, warning, error];
     }
 
@@ -73,7 +74,7 @@ public sealed class BpaFailOnTests
 
         var finding = Assert.Single(result.Violations);
         Assert.Equal("BROKEN", finding.RuleId);
-        Assert.Equal(BpaSeverity.Error, finding.Severity);
+        Assert.Equal(RuleSeverity.Error, finding.Severity);
         Assert.False(finding.CanFix);
         Assert.Contains("could not be evaluated", finding.Description);
         Assert.Contains("Unexpected token '='", finding.Description);
@@ -98,10 +99,10 @@ public sealed class BpaFailOnTests
     {
         // A warning-severity rule that cannot be evaluated is still an error-severity finding:
         // the failure of the gate machinery must not inherit the broken rule's own threshold.
-        var warningRule = new BpaRule("BROKEN", "broken", "test", BpaSeverity.Warning, ["Column"]);
+        var warningRule = new BpaRule("BROKEN", "broken", "test", RuleSeverity.Warning, ["Column"]);
         var result = RunResult(BpaResult.Sentinel(BpaResultKind.CompilationError, warningRule, "boom", "Column"));
 
-        Assert.All(result.Violations, v => Assert.Equal(BpaSeverity.Error, v.Severity));
+        Assert.All(result.Violations, v => Assert.Equal(RuleSeverity.Error, v.Severity));
     }
 
     [Fact]
@@ -110,20 +111,20 @@ public sealed class BpaFailOnTests
         var result = RunResult(BpaResult.Sentinel(
             BpaResultKind.CompilationError, Rule("BROKEN"), "boom", "Model"));
 
-        Assert.Single(BpaFailOn.Blocking(result.Violations, BpaSeverity.Error));
-        Assert.Single(BpaFailOn.Blocking(result.Violations, BpaSeverity.Warning));
+        Assert.Single(BpaFailOn.Blocking(result.Violations, RuleSeverity.Error));
+        Assert.Single(BpaFailOn.Blocking(result.Violations, RuleSeverity.Warning));
     }
 
     [Fact]
     public void Blocking_PartialEvaluationError_RealViolationsPlusRuleError()
     {
         var result = RunResult(
-            BpaResult.ForViolation(Rule("REAL"), new BpaViolation("REAL", "real", "cat", BpaSeverity.Warning, "Table", "t", "t")),
+            BpaResult.ForViolation(Rule("REAL"), new BpaViolation("REAL", "real", "cat", RuleSeverity.Warning, "Table", "t", "t")),
             BpaResult.Sentinel(BpaResultKind.EvaluationError, Rule("BROKEN"), "threw", "Column"));
 
         Assert.Equal(2, result.Violations.Count);
         // Default threshold: only the error-severity rule-error finding crosses it.
-        var blocking = BpaFailOn.Blocking(result.Violations, BpaSeverity.Error);
+        var blocking = BpaFailOn.Blocking(result.Violations, RuleSeverity.Error);
         Assert.Equal(["BROKEN"], blocking.Select(v => v.RuleId).ToArray());
     }
 
@@ -137,12 +138,12 @@ public sealed class BpaFailOnTests
             BpaResult.Sentinel(BpaResultKind.InvalidCompatibilityLevel, Rule("OLD")));
 
         Assert.Empty(result.Violations);
-        Assert.Empty(BpaFailOn.Blocking(result.Violations, BpaSeverity.Warning));
+        Assert.Empty(BpaFailOn.Blocking(result.Violations, RuleSeverity.Warning));
     }
 
     private static BpaRunResult RunResult(params BpaResult[] results)
         => new(results, "model", RulesEvaluated: 1);
 
     private static BpaRule Rule(string id)
-        => new(id, id.ToLowerInvariant(), "test", BpaSeverity.Warning, ["Column"]);
+        => new(id, id.ToLowerInvariant(), "test", RuleSeverity.Warning, ["Column"]);
 }

@@ -2,6 +2,7 @@ using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 using Tomix.Provider.Tmdl;
 
 namespace Tomix.App.Tests;
@@ -128,11 +129,11 @@ public sealed class BpaDaxRewriteFixTests
     {
         var rules = new List<BpaRule>
         {
-            new("Q", "q", "DAX Expressions", BpaSeverity.Warning, ["Measure"], FixExpression: "QualifyColumnReferences()")
+            new("Q", "q", "DAX Expressions", RuleSeverity.Warning, ["Measure"], FixExpression: "QualifyColumnReferences()")
         };
         var violations = new List<BpaViolation>
         {
-            new("Q", "q", "DAX Expressions", BpaSeverity.Warning, "Measure", "[M]", "Sales/M",
+            new("Q", "q", "DAX Expressions", RuleSeverity.Warning, "Measure", "[M]", "Sales/M",
                 CanFix: true, ObjectKind: ModelObjectKind.Measure)
         };
 

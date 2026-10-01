@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Validate;
 
@@ -35,7 +36,7 @@ public sealed class ValidateModelHandler
             // is a validation failure, not a crash. Auth and remote-connect failures in the guard
             // stay diagnostics: they describe the connection, not the model.
             var findings = new ModelValidation.Findings(
-                [new ValidationIssue(ValidationSeverity.Error, "TOMIX_MODEL_LOAD_FAILED", ex.Message, request.Model.Value, Expression: null)],
+                [ValidationRules.ModelLoadFailed.Issue(ex.Message, request.Model.Value)],
                 null);
             return Complete(request, stopwatch, findings, request.Model.Value);
         }
@@ -50,10 +51,10 @@ public sealed class ValidateModelHandler
         stopwatch.Stop();
 
         var errors = findings.Issues
-            .Where(issue => issue.Severity == ValidationSeverity.Error)
+            .Where(issue => issue.Severity == RuleSeverity.Error)
             .ToList();
         var warnings = findings.Issues
-            .Where(issue => issue.Severity != ValidationSeverity.Error)
+            .Where(issue => issue.Severity != RuleSeverity.Error)
             .ToList();
 
         var result = new ValidateModelResult(

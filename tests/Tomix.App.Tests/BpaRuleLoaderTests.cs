@@ -1,5 +1,6 @@
 using Tomix.App.Bpa;
 using Tomix.Core.Bpa;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Tests;
 
@@ -57,7 +58,7 @@ public sealed class BpaRuleLoaderTests
         var standard = await BpaRuleLoader.LoadRulesetAsync("standard", CancellationToken.None);
 
         var misfiled = standard
-            .Where(r => r.Severity == BpaSeverity.Error && r.Category != "Error Prevention")
+            .Where(r => r.Severity == RuleSeverity.Error && r.Category != "Error Prevention")
             .Select(r => r.Id);
         Assert.Empty(misfiled);
     }
@@ -73,7 +74,7 @@ public sealed class BpaRuleLoaderTests
     {
         var rule = BpaRuleLoader.LoadBundledCatalog().Single(r => r.Id == ruleId);
 
-        Assert.Equal(BpaSeverity.Warning, rule.Severity);
+        Assert.Equal(RuleSeverity.Warning, rule.Severity);
     }
 
     [Fact]

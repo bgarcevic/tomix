@@ -5,6 +5,7 @@ using Tomix.App.Validate;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -63,7 +64,7 @@ public sealed partial class StdoutStderrSplitTests
     [InlineData(false, "Collect them from a deployed copy: tx connect <path> -w <workspace> <model> tx vertipaq --annotate --save")]
     public void MissingVertipaqStats_NamesRulesOnStdout_AndHintFitsTheModel(bool canCollect, string hint)
     {
-        var rule = new BpaRule("STATS_RULE", "Stats rule", "Performance", BpaSeverity.Warning, ["Table"]);
+        var rule = new BpaRule("STATS_RULE", "Stats rule", "Performance", RuleSeverity.Warning, ["Table"]);
         var captured = ConsoleCapture.Run(
             () =>
             {
@@ -88,23 +89,23 @@ public sealed partial class StdoutStderrSplitTests
         switch (command)
         {
             case "validate":
-                var issue = new ValidationIssue(ValidationSeverity.Error, "TOMIX_X", "Broken", "Sales/Total", Expression: null);
+                var issue = new ValidationIssue(RuleSeverity.Error, "TOMIX_X", "Broken", "Sales/Total", Expression: null);
                 ValidateRenderer.Render(
                     new ValidateModelResult("basic-tmdl", Valid: false, DurationMs: 1, Errors: [issue], Warnings: []),
                     errorsOnly: false, noMultiline: true, includeBanner: true);
                 break;
             case "bpa":
                 var violation = new BpaViolation(
-                    "R1", "Rule", "Category", BpaSeverity.Warning, "Column", "Amount", "Sales/Amount", "Why");
+                    "R1", "Rule", "Category", RuleSeverity.Warning, "Column", "Amount", "Sales/Amount", "Why");
                 BpaRunRenderer.Render(
                     new BpaRunResult(
-                        [new BpaResult(BpaResultKind.Violation, "R1", "Rule", "Category", BpaSeverity.Warning, Violation: violation)],
+                        [new BpaResult(BpaResultKind.Violation, "R1", "Rule", "Category", RuleSeverity.Warning, Violation: violation)],
                         "basic-tmdl", RulesEvaluated: 1),
                     new BpaRunView.RunOptions(false, false, false, false, false, false));
                 break;
             case "bpa rules list":
                 BpaRulesRenderer.RenderList(new BpaRulesListResult(
-                    [new BpaRuleInfo("standard", "active", "R1", "[Category] Rule", "Category", BpaSeverity.Warning,
+                    [new BpaRuleInfo("standard", "active", "R1", "[Category] Rule", "Category", RuleSeverity.Warning,
                         "Column", "Why", "true", "IsHidden = true", Enabled: true)],
                     new BpaRulesSummary(Total: 1, Active: 1, Disabled: 0, Ignored: 0)));
                 break;
