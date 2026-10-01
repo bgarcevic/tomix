@@ -25,7 +25,8 @@ namespace Tomix.Cli;
 
 internal static class Program
 {
-    private static int Main(string[] args) => Run(args);
+    private static int Main(string[] args)
+        => Run(OperatingSystem.IsWindows() ? WindowsArgumentRepair.Repair(args, Directory.Exists) : args);
 
     internal static int Run(string[] args)
     {

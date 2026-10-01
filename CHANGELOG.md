@@ -75,6 +75,10 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- A quoted folder path with a trailing backslash, such as `tx connect '.\My Model.SemanticModel\'`
+  in Windows PowerShell 5.1 or `".\My Model.SemanticModel\"` in cmd.exe, no longer fails with a
+  stray `"` at the end of the path. Windows reads `\"` as a literal quote; `tx` now restores the
+  path when the text before the quote is an existing folder.
 - `tx format` and `tx add` no longer wait on stdin when it is redirected but nothing is piped,
   as in a CI step, an ssh session, or a script whose parent holds stdin open. `format` reads a
   piped expression only when no model, `--path`, `--save`, `--save-to`, `--stage`, or
