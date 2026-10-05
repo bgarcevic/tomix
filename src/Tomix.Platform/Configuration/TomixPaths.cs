@@ -32,6 +32,9 @@ public static class TomixPaths
     /// <summary>The directory holding the MSAL token cache and auth metadata, <c>~/.tomix/auth</c>.</summary>
     public static string AuthDirectory => Path.Combine(ConfigDirectory, "auth");
 
+    /// <summary>One file per live session another process can join (<c>tx ui</c>), <c>~/.tomix/live</c>.</summary>
+    public static string LiveDirectory => Path.Combine(ConfigDirectory, "live");
+
     /// <summary>Sidecar metadata for the cached login (method/account/tenant), <c>~/.tomix/auth/auth-state.json</c>.</summary>
     public static string AuthStateFile => Path.Combine(AuthDirectory, AuthStateFileName);
 

@@ -7,6 +7,7 @@
     <ProjectReference Include="..\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
     <ProjectReference Include="..\Tomix.Provider.Vpax\Tomix.Provider.Vpax.csproj" />
     <ProjectReference Include="..\Tomix.Provider.Tmdl\Tomix.Provider.Tmdl.csproj" />
+    <ProjectReference Include="..\Tomix.Ui\Tomix.Ui.csproj" />
   </ItemGroup>
 
   <ItemGroup>

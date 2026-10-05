@@ -6,9 +6,10 @@ attached to a session sees the same model, the same undo history and the same
 change events as `tx interactive`.
 
 This page is the v0 specification. `tx serve` implements it on stdin and
-stdout ([`tx serve`](commands/modify.md#serve-serve-a-session-to-other-programs));
-the WebSocket transport of `tx ui` (#369) will carry the same messages. The
-design behind it is [ADR 0001](design/adr-0001-live-model-session.md).
+stdout ([`tx serve`](commands/modify.md#serve-serve-a-session-to-other-programs)).
+A localhost WebSocket carries the same messages to several clients of one
+session; `tx ui` opens it (#369). The design behind it is
+[ADR 0001](design/adr-0001-live-model-session.md).
 
 `tx serve` does not serve `query.run`, `$/progress` or `diagnostics.updated`
 yet. `initialize` lists what it does serve, so a client can check
@@ -16,8 +17,13 @@ yet. `initialize` lists what it does serve, so a client can check
 
 ## Transport
 
-- [JSON-RPC 2.0](https://www.jsonrpc.org/specification) over the server's stdin
-  and stdout. stderr carries logs only and is never part of the protocol.
+Messages are [JSON-RPC 2.0](https://www.jsonrpc.org/specification) on either
+transport.
+
+### stdio
+
+- JSON-RPC over the server's stdin and stdout. stderr carries logs only and is
+  never part of the protocol.
 - Each message is framed like the
   [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/base/0.9/specification/):
   a `Content-Length` header giving the body's length in bytes, a blank line,
@@ -34,6 +40,75 @@ yet. `initialize` lists what it does serve, so a client can check
 - The client may send several requests without waiting for answers. The server
   answers each one; answers can arrive in a different order from the requests.
 
+### WebSocket
+
+A session shared by several clients (the browser UI, agents, other tools)
+listens on `ws://127.0.0.1:<port>/ws`.
+
+- One JSON-RPC message per WebSocket text message, with no `Content-Length`
+  header. Binary messages are answered with error `-32600`.
+- Each connection is one client, with its own `initialize`, `clientId`,
+  requests and transaction. Every client receives every session event.
+- The server listens on `127.0.0.1` only. Every request must:
+  - carry the session token, as `Authorization: Bearer <token>` or, from a
+    browser, which cannot set headers on a WebSocket, as `?token=<token>`;
+  - name the server in `Host` (`127.0.0.1:<port>` or `localhost:<port>`);
+  - send no `Origin`, or the server's own (`http://127.0.0.1:<port>`).
+
+  A request without the token is answered with HTTP 401 and
+  `TOMIX_UI_UNAUTHORIZED`; one naming another host or origin with 403 and
+  `TOMIX_UI_FORBIDDEN`.
+
+### Status endpoint
+
+`GET http://127.0.0.1:<port>/status` answers a small JSON object for tools
+that poll, such as a status bar. It needs the token like every other request.
+It reads counters the session already keeps and never waits for the model, so
+polling it every second is fine. Fields may be added; none are renamed or
+removed within a protocol version.
+
+```json
+{
+  "protocolVersion": "0",
+  "model": "C:/models/Sales",
+  "state": "dirty",
+  "dirty": true,
+  "version": 42,
+  "undoSteps": 7,
+  "redoSteps": 0,
+  "transaction": { "id": "t18", "client": "mcp-1", "label": "rename measures" },
+  "clients": ["tomix-ui-1", "mcp-1"],
+  "lastChange": { "version": 42, "client": "mcp-1", "at": "2026-10-05T14:03:11Z" }
+}
+```
+
+- `state` is a session state (`clean`, `dirty`, …), or `closed` when no model is
+  open.
+- `transaction` is the open explicit transaction, or `null`.
+- `clients` lists the connected clients that have sent `initialize`.
+- `lastChange` is the last `model.changed` batch since the model was opened, or
+  `null`.
+
+### Discovery
+
+A process that shares a session writes one file per open model to
+`~/.tomix/live/` (only the current user can read it):
+
+```json
+{
+  "model": "C:/models/Sales",
+  "pid": 18244,
+  "port": 51873,
+  "url": "http://127.0.0.1:51873/",
+  "token": "q3V…",
+  "startedAt": "2026-10-05T14:00:02Z"
+}
+```
+
+The file is removed when the process ends. A file whose `pid` is no longer
+running is stale: ignore it (tx deletes such files when it finds them). No
+file, or a refused connection, means no session is open.
+
 ## Lifecycle
 
 1. The client sends `initialize`. Until it has an answer, any other request
@@ -46,7 +121,8 @@ yet. `initialize` lists what it does serve, so a client can check
 
 A client that disconnects without `shutdown` detaches. It never closes the
 session (only the host does), and an explicit transaction it left open is
-rolled back.
+rolled back; the other clients receive `transaction.closed` with outcome
+`rolledBack`.
 
 ## Conventions
 
@@ -204,7 +280,8 @@ Reserved for later versions: `session.reload` and `session.merge` (#351,
 #### `initialize`
 
 `clientInfo` names the client in change events (`origin.client`); the server
-returns the ID it will use for this client.
+returns the ID it will use for this client: the name, numbered per name in the
+session (`tomix-ui-1`, `tomix-ui-2`).
 
 ```json
 {
@@ -262,7 +339,8 @@ Opens a model, in the same forms `tx interactive` and `tx connect` take:
 `model` is a TMDL folder or `.bim` file, or `server` and `database` name a
 remote model. A session already open is closed first; when it has unsaved
 changes the request fails with `TOMIX_SESSION_DIRTY` unless `discard` is
-`true`. The result is the new session's status.
+`true`, and while other clients are connected it fails with
+`TOMIX_SESSION_IN_USE`. The result is the new session's status.
 
 ```json
 {
@@ -297,7 +375,8 @@ changes the request fails with `TOMIX_SESSION_DIRTY` unless `discard` is
 #### `session.close`
 
 Closes the session. With unsaved changes it fails with `TOMIX_SESSION_DIRTY`
-unless `save` or `discard` is `true`.
+unless `save` or `discard` is `true`. While other clients are connected it
+fails with `TOMIX_SESSION_IN_USE`: the session is theirs too.
 
 ```json
 {

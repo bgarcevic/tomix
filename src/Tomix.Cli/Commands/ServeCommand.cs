@@ -1,5 +1,4 @@
 using System.CommandLine;
-using Spectre.Console;
 using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Cli.Interactive;
@@ -76,29 +75,17 @@ internal sealed class ServeCommand : ICommandModule
 
             // stdout carries only frames: anything else written to the console goes to the log,
             // and nothing reads the console's stdin, which is the protocol's.
-            var originalOut = Console.Out;
-            var originalIn = Console.In;
-            var originalAnsi = AnsiConsole.Console;
-            Console.SetOut(log);
-            Console.SetIn(TextReader.Null);
-            AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
-            {
-                Out = new AnsiConsoleOutput(log),
-                Ansi = AnsiSupport.No,
-                ColorSystem = ColorSystemSupport.NoColors
-            });
+            using var routing = ConsoleRouting.Install(log);
+            var host = new SessionHost(_buildSessionRoot, opener, log, session);
             try
             {
-                var methods = new ServeSession(_buildSessionRoot, opener, log, session);
-                var server = new ProtocolServer(streams.Input, streams.Output, methods, _version, log);
+                var server = new ProtocolServer(streams.Input, streams.Output, host.Connect(), _version, log);
                 log.WriteLine($"[tx serve] listening on stdio{(session is null ? "" : $" with {session.Reference.Value} open")}");
                 return await server.RunAsync(cancellationToken);
             }
             finally
             {
-                Console.SetOut(originalOut);
-                Console.SetIn(originalIn);
-                AnsiConsole.Console = originalAnsi;
+                await host.CloseAsync();
             }
         });
 

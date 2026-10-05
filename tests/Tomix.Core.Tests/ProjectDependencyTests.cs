@@ -14,13 +14,15 @@ public sealed class ProjectDependencyTests
             ["Tomix.Provider.Tom"] = Set("Tomix.Core"),
             ["Tomix.Provider.Tmdl"] = Set("Tomix.Core", "Tomix.Provider.Tom"),
             ["Tomix.Provider.Vpax"] = Set("Tomix.Core"),
+            ["Tomix.Ui"] = Set(),
             ["Tomix.Cli"] = Set(
                 "Tomix.App",
                 "Tomix.Auth",
                 "Tomix.Core",
                 "Tomix.Provider.Tom",
                 "Tomix.Provider.Tmdl",
-                "Tomix.Provider.Vpax")
+                "Tomix.Provider.Vpax",
+                "Tomix.Ui")
         };
 
     [Fact]

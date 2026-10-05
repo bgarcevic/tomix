@@ -70,9 +70,7 @@ public sealed class ProtocolServerTests
 
         public IReadOnlyList<string> Notifications => [];
 
-        public void Attach(string clientId, Action<string, JsonNode?> notify)
-        {
-        }
+        public string Attach(string clientName, Action<string, JsonNode?> notify) => $"{clientName}-1";
 
         public async Task<JsonNode?> InvokeAsync(string method, JsonObject parameters, CancellationToken cancellationToken)
         {

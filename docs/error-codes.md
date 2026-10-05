@@ -134,7 +134,19 @@ Raised when a command runs against an open live session (`tx shell` and the othe
 | `TOMIX_SESSION_TRANSACTION_OPEN` | 2 | `begin` while a transaction is open; transactions do not nest. |
 | `TOMIX_SESSION_NO_TRANSACTION` | 2 | `commit` or `rollback` with no open transaction. |
 | `TOMIX_SESSION_TRANSACTION_ENDED` | 1 | The transaction was rolled back because it sat idle for 15 minutes. |
+| `TOMIX_SESSION_IN_USE` | 1 | A session client sent `session.open` or `session.close` while other clients are connected to the same session. Disconnect them first, or start another session for the other model. |
 | `TOMIX_PROTOCOL_VERSION` | 2 | A `tx serve` client asked for a session protocol version the server does not speak. `data.supported` lists the versions it does ([session protocol](protocol.md)). |
+
+## Local Endpoint Codes (`TOMIX_UI_*`)
+
+Answered by the localhost endpoint of a shared session ([session protocol](protocol.md#websocket)) as an HTTP status with a JSON body `{"code": "...", "error": "..."}`. They have no exit code.
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_UI_UNAUTHORIZED` | — | HTTP 401: the request carries no session token, or the wrong one. Read it from the session's file in `~/.tomix/live/`. |
+| `TOMIX_UI_FORBIDDEN` | — | HTTP 403: the `Host` header names another server, or `Origin` is another web origin. Only the session's own page and non-browser tools on this machine may connect. |
+| `TOMIX_UI_NOT_WEBSOCKET` | — | HTTP 400: a plain HTTP request to `/ws`, which takes WebSocket upgrades only. |
+| `TOMIX_UI_NOT_FOUND` | — | HTTP 404: nothing is served at that path. |
 
 ## Save Codes (`TOMIX_SAVE_*`)
 

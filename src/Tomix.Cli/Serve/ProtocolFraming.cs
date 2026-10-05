@@ -8,6 +8,35 @@ namespace Tomix.Cli.Serve;
 internal sealed record ProtocolFrame(byte[]? Body, string? Problem);
 
 /// <summary>
+/// How protocol messages travel: <c>Content-Length</c> frames on stdio (<see cref="StreamChannel"/>)
+/// or one message per WebSocket text message (<see cref="WebSocketChannel"/>).
+/// </summary>
+internal interface IMessageChannel
+{
+    /// <summary>The next message, or <c>null</c> when the client has gone.</summary>
+    Task<ProtocolFrame?> ReadAsync(CancellationToken cancellationToken);
+
+    /// <summary>Queues a message for the client; never blocks.</summary>
+    void Send(string json);
+
+    /// <summary>Writes what is queued, then stops sending.</summary>
+    Task CompleteAsync();
+}
+
+/// <summary>Frames over a pair of streams: stdin and stdout for <c>tx serve</c>.</summary>
+internal sealed class StreamChannel(Stream input, Stream output) : IMessageChannel
+{
+    private readonly FrameReader _reader = new(input);
+    private readonly FrameWriter _writer = new(output);
+
+    public Task<ProtocolFrame?> ReadAsync(CancellationToken cancellationToken) => _reader.ReadAsync(cancellationToken);
+
+    public void Send(string json) => _writer.Send(json);
+
+    public Task CompleteAsync() => _writer.CompleteAsync();
+}
+
+/// <summary>
 /// Reads Language Server Protocol frames (docs/protocol.md, Transport): header lines ending in a
 /// blank line, of which only <c>Content-Length</c> matters, then exactly that many bytes of UTF-8
 /// JSON. A header block without a usable length is reported as a <see cref="ProtocolFrame.Problem"/>

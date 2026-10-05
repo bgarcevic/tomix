@@ -17,8 +17,10 @@ internal interface IProtocolMethods
     IReadOnlyList<string> Notifications { get; }
 
     /// <summary>Called once <c>initialize</c> has named the client, before any other request.</summary>
+    /// <param name="clientName">The <c>clientInfo.name</c> the client gave, or <c>client</c>.</param>
     /// <param name="notify">Sends a notification to the client; never blocks.</param>
-    void Attach(string clientId, Action<string, JsonNode?> notify);
+    /// <returns>The client's ID in the session, for example <c>mcp-1</c>.</returns>
+    string Attach(string clientName, Action<string, JsonNode?> notify);
 
     /// <summary>Answers one request. Throws <see cref="ProtocolException"/> to answer with an error.</summary>
     Task<JsonNode?> InvokeAsync(string method, JsonObject parameters, CancellationToken cancellationToken);
@@ -39,8 +41,7 @@ internal sealed class ProtocolServer
 
     private static readonly JsonSerializerOptions WriteOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    private readonly FrameReader _reader;
-    private readonly FrameWriter _writer;
+    private readonly IMessageChannel _channel;
     private readonly IProtocolMethods _methods;
     private readonly string _serverVersion;
     private readonly TextWriter _log;
@@ -51,9 +52,13 @@ internal sealed class ProtocolServer
     private int? _exitCode;
 
     public ProtocolServer(Stream input, Stream output, IProtocolMethods methods, string serverVersion, TextWriter log)
+        : this(new StreamChannel(input, output), methods, serverVersion, log)
     {
-        _reader = new FrameReader(input);
-        _writer = new FrameWriter(output);
+    }
+
+    public ProtocolServer(IMessageChannel channel, IProtocolMethods methods, string serverVersion, TextWriter log)
+    {
+        _channel = channel;
         _methods = methods;
         _serverVersion = serverVersion;
         _log = log;
@@ -78,7 +83,7 @@ internal sealed class ProtocolServer
         finally
         {
             await _methods.DetachAsync();
-            await _writer.CompleteAsync();
+            await _channel.CompleteAsync();
         }
 
         // After 'exit' the reader may still be waiting on input that never comes; it is not awaited.
@@ -93,7 +98,7 @@ internal sealed class ProtocolServer
     {
         try
         {
-            while (await _reader.ReadAsync(cancellationToken) is { } frame)
+            while (await _channel.ReadAsync(cancellationToken) is { } frame)
             {
                 if (frame.Problem is not null)
                 {
@@ -248,8 +253,7 @@ internal sealed class ProtocolServer
         var name = parameters["clientInfo"]?["name"] is JsonValue clientName && clientName.TryGetValue<string>(out var given) && given.Length > 0
             ? given
             : "client";
-        var clientId = $"{name}-1";
-        _methods.Attach(clientId, Notify);
+        var clientId = _methods.Attach(name, Notify);
         _initialized = true;
         Log($"initialized for {clientId}");
 
@@ -328,7 +332,7 @@ internal sealed class ProtocolServer
         Send(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id?.DeepClone(), ["error"] = error });
     }
 
-    private void Send(JsonObject message) => _writer.Send(message.ToJsonString(WriteOptions));
+    private void Send(JsonObject message) => _channel.Send(message.ToJsonString(WriteOptions));
 
     private void Log(string line) => _log.WriteLine($"[tx serve] {line}");
 }

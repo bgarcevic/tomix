@@ -2,7 +2,6 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Spectre.Console;
 using Tomix.App.Models;
 using Tomix.App.Session;
 using Tomix.Cli.Interactive;
@@ -12,31 +11,25 @@ using Tomix.Core.Models;
 namespace Tomix.Cli.Serve;
 
 /// <summary>
-/// The session methods of <c>tx serve</c> (docs/protocol.md). Most run a command of the same
-/// command tree <c>tx interactive</c> uses, with JSON output captured as the result; opening,
-/// closing, the snapshot and the tree act on the session directly. One client, one session.
+/// One client's side of the shared session (docs/protocol.md): its name, its transaction and its
+/// requests. Most methods run a command of the same command tree <c>tx interactive</c> uses, with
+/// JSON output captured as the result; opening, closing, the snapshot and the tree act on the
+/// session directly. Notifications reach every client through the <see cref="SessionHost"/>.
 /// </summary>
 internal sealed class ServeSession : IProtocolMethods
 {
-    private readonly Func<SessionScope?, IEnumerable<Command>, RootCommand> _buildRoot;
-    private readonly SessionOpener _opener;
-    private readonly TextWriter _log;
+    private readonly SessionHost _host;
     private Action<string, JsonNode?> _notify = (_, _) => { };
     private string _client = "client";
+    private bool _joined;
+    private ILiveModelSession? _bound;
     private SessionScope? _scope;
     private LiveSessionHandler? _handler;
     private RootCommand? _root;
 
-    public ServeSession(
-        Func<SessionScope?, IEnumerable<Command>, RootCommand> buildRoot,
-        SessionOpener opener,
-        TextWriter log,
-        ILiveModelSession? session)
+    internal ServeSession(SessionHost host)
     {
-        _buildRoot = buildRoot;
-        _opener = opener;
-        _log = log;
-        Attach(session);
+        _host = host;
     }
 
     public IReadOnlyList<string> Methods { get; } =
@@ -50,13 +43,19 @@ internal sealed class ServeSession : IProtocolMethods
     public IReadOnlyList<string> Notifications { get; } =
         ["model.changed", "session.state", "session.saved", "transaction.opened", "transaction.closed"];
 
-    public void Attach(string clientId, Action<string, JsonNode?> notify)
+    public string Attach(string clientName, Action<string, JsonNode?> notify)
     {
-        _client = clientId;
         _notify = notify;
-        // Rebuilt for the client's name, which history and change events report.
-        Attach(_scope?.Session);
+        _client = _host.Reserve(clientName);
+        _joined = true;
+        _host.Join(this);
+        return _client;
     }
+
+    /// <summary>The client's ID once it has sent <c>initialize</c>.</summary>
+    internal string? Id => _joined ? _client : null;
+
+    internal void Notify(string method, JsonNode? parameters) => _notify(method, parameters);
 
     public async Task<JsonNode?> InvokeAsync(string method, JsonObject parameters, CancellationToken cancellationToken)
     {
@@ -68,7 +67,7 @@ internal sealed class ServeSession : IProtocolMethods
                 return await CloseAsync(parameters, cancellationToken);
         }
 
-        var scope = _scope ?? throw ProtocolException.Tomix(
+        var scope = Bind() ?? throw ProtocolException.Tomix(
             "TOMIX_SESSION_NO_MODEL", $"No model is open for '{method}'.", "Send 'session.open' first.", exitCode: 2);
         await ResolveIdAsync(scope, method, parameters, cancellationToken);
         if (method == "session.snapshot")
@@ -86,56 +85,45 @@ internal sealed class ServeSession : IProtocolMethods
         return result;
     }
 
+    /// <summary>
+    /// The client has gone: its open transaction is rolled back, and the session stays with the
+    /// host for the other clients. The host decides when the session itself closes.
+    /// </summary>
     public async ValueTask DetachAsync()
     {
-        if (_scope is null)
-            return;
-
-        if (_handler is { HasUnsavedWork: true })
+        if (Bind() is not null && _handler!.InTransaction)
         {
-            if (_handler.InTransaction)
-                _log.WriteLine("[tx serve] the client left with a transaction open; it is rolled back");
+            var transaction = _handler.Status().Data!.Transaction!.Id;
+            _host.Log.WriteLine($"[tx serve] {_client} left with a transaction open; it is rolled back");
             await _handler.RollbackOpenTransactionAsync(CancellationToken.None);
-            if (_scope.Session.IsDirty)
-                _log.WriteLine($"[tx serve] the client left; unsaved changes to {_scope.Model.Value} are discarded");
+            _host.Broadcast("transaction.closed", new JsonObject
+            {
+                ["transaction"] = transaction,
+                ["client"] = _client,
+                ["outcome"] = "rolledBack"
+            });
         }
 
-        await CloseSessionAsync();
+        if (_joined)
+            _host.Leave(this);
     }
 
-    /// <summary>Makes <paramref name="session"/> the open model, with its command tree and events.</summary>
-    private void Attach(ILiveModelSession? session)
+    /// <summary>
+    /// The host's session as this client sees it: a command tree and session commands that act
+    /// under this client's name, rebuilt when the host opens another model.
+    /// </summary>
+    private SessionScope? Bind()
     {
-        if (_scope is not null && !ReferenceEquals(_scope.Session, session))
-            Unsubscribe(_scope.Session);
+        var session = _host.Session;
+        if (ReferenceEquals(session, _bound) && _root is not null)
+            return _scope;
 
-        var subscribe = session is not null && !ReferenceEquals(_scope?.Session, session);
+        _bound = session;
         _scope = session is null ? null : new SessionScope(new LiveSessionSource(session, new LiveLeaseOptions(_client)));
         _handler = session is null ? null : new LiveSessionHandler(session, _client);
-        _root = _buildRoot(_scope, _handler is null ? [] : SessionCommands.Build(_handler));
-        if (subscribe)
-        {
-            session!.Changed += OnChanged;
-            session.StateChanged += OnStateChanged;
-        }
+        _root = _host.BuildRoot(_scope, _handler is null ? [] : SessionCommands.Build(_handler));
+        return _scope;
     }
-
-    private void Unsubscribe(ILiveModelSession session)
-    {
-        session.Changed -= OnChanged;
-        session.StateChanged -= OnStateChanged;
-    }
-
-    private void OnChanged(object? sender, ModelChangeBatch batch)
-        => _notify("model.changed", JsonSerializer.SerializeToNode(batch, ProtocolJsonContext.Default.ModelChangeBatch));
-
-    private void OnStateChanged(object? sender, SessionStateChange change)
-        => _notify("session.state", new JsonObject
-        {
-            ["previous"] = JsonSerializer.SerializeToNode(change.Previous, ProtocolJsonContext.Default.SessionState),
-            ["state"] = JsonSerializer.SerializeToNode(change.Current, ProtocolJsonContext.Default.SessionState),
-            ["version"] = change.Version
-        });
 
     private async Task<JsonNode> OpenAsync(JsonObject parameters, CancellationToken cancellationToken)
     {
@@ -147,24 +135,27 @@ internal sealed class ServeSession : IProtocolMethods
         if (model is null && server is null)
             throw ProtocolException.InvalidParams("session.open needs 'model', or 'server' and 'database'.");
 
+        Bind();
+        if (_host.Session is not null && _host.HasOthers(this))
+            throw InUse("open another model");
         if (_handler is { HasUnsavedWork: true } && !discard)
             throw Dirty("open another model");
 
-        var reference = _opener.Resolve(model, server, database);
+        var reference = _host.Opener.Resolve(model, server, database);
         var (session, failure) = await OpenOrFailAsync(reference, cancellationToken);
         if (failure is not null)
             throw ProtocolException.Tomix(failure.Code, failure.Message, failure.Hint, exitCode: 2);
 
-        await CloseSessionAsync();
-        Attach(session);
-        return Envelope(StatusData(), _scope!);
+        await _host.ReplaceAsync(session);
+        var scope = Bind()!;
+        return Envelope(StatusData(), scope);
     }
 
     private async Task<(ILiveModelSession?, TomixDiagnostic?)> OpenOrFailAsync(ModelReference reference, CancellationToken cancellationToken)
     {
         try
         {
-            return await _opener.TryOpenAsync(reference, showSpinner: false, cancellationToken);
+            return await _host.Opener.TryOpenAsync(reference, showSpinner: false, cancellationToken);
         }
         catch (ModelLoadException ex)
         {
@@ -181,10 +172,12 @@ internal sealed class ServeSession : IProtocolMethods
         var save = Flag(parameters, "save");
         var discard = Flag(parameters, "discard");
         Only(parameters, "session.close", "save", "discard");
-        var scope = _scope ?? throw ProtocolException.Tomix(
+        var scope = Bind() ?? throw ProtocolException.Tomix(
             "TOMIX_SESSION_NO_MODEL", "No model is open to close.", "Send 'session.open' first.", exitCode: 2);
         if (save && discard)
             throw ProtocolException.InvalidParams("session.close takes 'save' or 'discard', not both.");
+        if (_host.HasOthers(this))
+            throw InUse("close the session");
 
         if (save)
         {
@@ -204,7 +197,7 @@ internal sealed class ServeSession : IProtocolMethods
 
         var version = scope.Session.Version;
         await _handler!.RollbackOpenTransactionAsync(cancellationToken);
-        await CloseSessionAsync();
+        await _host.ReplaceAsync(null);
         return new JsonObject
         {
             ["data"] = new JsonObject { ["closed"] = true, ["saved"] = save },
@@ -213,22 +206,18 @@ internal sealed class ServeSession : IProtocolMethods
         };
     }
 
-    private async Task CloseSessionAsync()
-    {
-        if (_scope is null)
-            return;
-
-        var session = _scope.Session;
-        await session.DisposeAsync();
-        Unsubscribe(session);
-        Attach(null);
-    }
-
     private ProtocolException Dirty(string action)
         => ProtocolException.Tomix(
             "TOMIX_SESSION_DIRTY",
             $"The session has unsaved changes{(_handler!.InTransaction ? " or an open transaction" : "")}; '{action}' would discard them.",
             "Send 'session.save' first, or pass \"discard\": true.",
+            exitCode: 1);
+
+    private ProtocolException InUse(string action)
+        => ProtocolException.Tomix(
+            "TOMIX_SESSION_IN_USE",
+            $"Other clients are working in this session; '{action}' would take it from them.",
+            "Disconnect the other clients first, or start another 'tx ui' or 'tx serve' for the other model.",
             exitCode: 1);
 
     /// <summary>
@@ -239,7 +228,6 @@ internal sealed class ServeSession : IProtocolMethods
     private async Task<JsonObject> RunAsync(string method, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
         var scope = _scope!;
-        var route = ProtocolRoutes.All.GetValueOrDefault(method);
         scope.Source.Options = new LiveLeaseOptions(_client, method);
         string[] args = [.. arguments.TakeWhile(arg => arg != "--"), "--output-format", "json", "--error-format", "json", "--quiet", "--non-interactive", .. arguments.SkipWhile(arg => arg != "--")];
         var parseResult = _root!.Parse(args, new ParserConfiguration { ResponseFileTokenReplacer = null });
@@ -248,7 +236,7 @@ internal sealed class ServeSession : IProtocolMethods
 
         var stdout = new StringWriter();
         var stderr = new StringWriter();
-        var exitCode = await CapturedAsync(stdout, stderr, async () =>
+        var exitCode = await ConsoleRouting.CaptureAsync(stdout, stderr, async () =>
         {
             try
             {
@@ -268,7 +256,7 @@ internal sealed class ServeSession : IProtocolMethods
         cancellationToken.ThrowIfCancellationRequested();
 
         if (stderr.ToString() is { Length: > 0 } commentary && Json(commentary) is not JsonObject)
-            _log.Write(commentary);
+            _host.Log.Write(commentary);
         if (Json(stdout.ToString()) is JsonObject { } envelope && envelope.ContainsKey("data"))
         {
             envelope["version"] = scope.Session.Version;
@@ -286,33 +274,6 @@ internal sealed class ServeSession : IProtocolMethods
             ProtocolErrors.InternalError,
             $"{method} produced no result (exit code {exitCode}).",
             new JsonObject { ["code"] = "TOMIX_UNEXPECTED", ["output"] = stdout + stderr.ToString() });
-    }
-
-    /// <summary>Runs <paramref name="run"/> with stdout and stderr captured: stdout carries the
-    /// protocol, so a command must never write to it.</summary>
-    private static async Task<int> CapturedAsync(StringWriter stdout, StringWriter stderr, Func<Task<int>> run)
-    {
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var originalAnsi = AnsiConsole.Console;
-        Console.SetOut(stdout);
-        Console.SetError(stderr);
-        AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(stdout),
-            Ansi = AnsiSupport.No,
-            ColorSystem = ColorSystemSupport.NoColors
-        });
-        try
-        {
-            return await run();
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-            AnsiConsole.Console = originalAnsi;
-        }
     }
 
     private static JsonNode? Json(string text)
@@ -334,7 +295,7 @@ internal sealed class ServeSession : IProtocolMethods
         switch (method)
         {
             case "session.save" when !parameters.ContainsKey("outputFile"):
-                _notify("session.saved", new JsonObject
+                _host.Broadcast("session.saved", new JsonObject
                 {
                     ["version"] = result["version"]?.DeepClone(),
                     ["savedTo"] = data?["savedTo"]?.DeepClone(),
@@ -342,7 +303,7 @@ internal sealed class ServeSession : IProtocolMethods
                 });
                 break;
             case "transaction.begin":
-                _notify("transaction.opened", new JsonObject
+                _host.Broadcast("transaction.opened", new JsonObject
                 {
                     ["transaction"] = data?["transaction"]?.DeepClone(),
                     ["client"] = _client,
@@ -350,7 +311,7 @@ internal sealed class ServeSession : IProtocolMethods
                 });
                 break;
             case "transaction.commit" or "transaction.rollback":
-                _notify("transaction.closed", new JsonObject
+                _host.Broadcast("transaction.closed", new JsonObject
                 {
                     ["transaction"] = data?["transaction"]?.DeepClone(),
                     ["client"] = _client,

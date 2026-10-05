@@ -14,6 +14,8 @@ CLI entry point for `tx`.
 - Depends on `/src/Tomix.App` for command behavior.
 - Depends on `/src/Tomix.Core` for shared result and diagnostic types.
 - Renders output in `Output/` (see Structure below).
+- Depends on `/src/Tomix.Ui` for the localhost web endpoint of a shared session; `Serve/` plugs
+  the session into it, so `Tomix.Ui` itself knows nothing of sessions.
 - References `/src/Tomix.Provider.*` projects only so `Program` (the composition root) can
   construct providers and pass them to commands as `IModelProvider` lists. Feature logic must
   go through App/Core abstractions — never use provider-specific types in command modules.
@@ -35,12 +37,17 @@ CLI entry point for `tx`.
   they lease the live session (`SessionScope.SourceFor`) and default to its model
   (`SessionScope.TryResolveModel`). A module that can run in a session takes an optional
   `SessionScope`; one that needs more than the model stays out of the session tree.
-- `Serve/` - `tx serve`: the session protocol (docs/protocol.md) on stdio. `ProtocolServer` owns
-  framing, the lifecycle, validation, cancellation and error answers; `ServeSession` answers the
+- `Serve/` - the session protocol (docs/protocol.md) for `tx serve` (stdio) and the shared
+  localhost endpoint. `ProtocolServer` owns the lifecycle, validation, cancellation and error
+  answers over an `IMessageChannel` (`StreamChannel` frames on stdio, `WebSocketChannel`).
+  `SessionHost` owns the one live session of the process, hands out client IDs, broadcasts every
+  event and keeps the `/status` JSON; each connection is a `ServeSession`, which answers the
   methods, most by running the session command tree (the one `tx interactive` uses) with JSON
   output captured, so `data` is the command's own JSON. `ProtocolRoutes` maps parameters to
-  command-line arguments. Commands run one at a time because their output is captured by
-  redirecting the console; stdout carries only frames.
+  command-line arguments. `ConsoleRouting` gives each running command its own captured console
+  (async-local), so clients' requests run side by side and stdout carries only frames.
+  `WebEndpoint` puts a host on `Tomix.Ui`; `LiveRegistry` writes `~/.tomix/live/*.json` so other
+  processes find it.
 - `Output/` - shared output wiring used by every command. See `Output/CONTEXT.md` for details.
   - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
   - `JsonOutput` - the single JSON serializer (the `--format json` contract).
