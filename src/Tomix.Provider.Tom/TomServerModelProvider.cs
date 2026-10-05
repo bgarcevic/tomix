@@ -13,7 +13,7 @@ namespace Tomix.Provider.Tom;
 /// Supports read operations (summary, snapshot), mutation (add/set/rm/replace), deploy, and export.
 /// Mutations are persisted to the server via <c>Model.SaveChanges()</c> on save.
 /// </summary>
-public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
+public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider, IServerCatalog
 {
     private readonly IAccessTokenProvider? _tokenProvider;
 
@@ -32,6 +32,24 @@ public sealed class TomServerModelProvider : IModelProvider, IServerCatalog
         {
             // The session owns the server once constructed; until then a failed database
             // resolution must not leak the live connection.
+            if (server.Connected)
+                server.Disconnect();
+            server.Dispose();
+            throw;
+        }
+    }
+
+    public async Task<ILiveModelSession> OpenLiveAsync(ModelReference reference, CancellationToken cancellationToken)
+    {
+        var server = await ConnectServerAsync(reference, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return new TomLiveModelSession(
+                new TomServerModelSource(server, ResolveDatabase(server, reference.Database), reference, _tokenProvider));
+        }
+        catch
+        {
+            // Same ownership rule as OpenAsync: until the session exists, the connection is ours.
             if (server.Connected)
                 server.Disconnect();
             server.Dispose();
@@ -200,13 +218,23 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
         string serialization,
         bool overwrite,
         CancellationToken cancellationToken)
+        => SaveAsync(_database, ModelName(), outputPath, serialization, overwrite, cancellationToken);
+
+    /// <summary>Sends the model's local edits to the server; shared with live sessions.</summary>
+    internal static Task<ModelExportResult> SaveAsync(
+        TabularDatabase database,
+        string modelName,
+        string? outputPath,
+        string serialization,
+        bool overwrite,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         // Database.Update() without options alters only the database object itself; model-tree
         // changes (measures, properties, annotations) silently vanish. SaveChanges() sends the
         // incremental model edits, and its result can carry XMLA errors without throwing.
-        var result = _database.Model.SaveChanges();
+        var result = database.Model.SaveChanges();
         if (result.XmlaResults is { } xmlaResults)
         {
             var serverErrors = new List<string>();
@@ -217,10 +245,10 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
         }
 
         if (string.IsNullOrWhiteSpace(outputPath))
-            return Task.FromResult(new ModelExportResult(ModelName(), "remote"));
+            return Task.FromResult(new ModelExportResult(modelName, "remote"));
 
         return TomModelExporter.ExportAsync(
-            _database,
+            database,
             new ModelExportRequest(outputPath, string.IsNullOrWhiteSpace(serialization) ? "tmdl" : serialization, overwrite, SupportingFiles: false),
             cancellationToken);
     }
@@ -255,15 +283,26 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
         ModelQueryRequest request,
         TextWriter? traceWriter,
         CancellationToken cancellationToken)
+        => ExecuteQueryAsync(_reference, _database, ModelName(), _tokenProvider, request, traceWriter, cancellationToken);
+
+    /// <summary>Runs a DAX query against the session's database; shared with live sessions.</summary>
+    internal static Task<ModelQueryResult> ExecuteQueryAsync(
+        ModelReference reference,
+        TabularDatabase database,
+        string modelName,
+        IAccessTokenProvider? tokenProvider,
+        ModelQueryRequest request,
+        TextWriter? traceWriter,
+        CancellationToken cancellationToken)
         // Rebuild the connection string with the *resolved* database so single-database
         // endpoints opened without --database still target the right catalog over ADOMD.
         => TomModelQueryExecutor.ExecuteAsync(
-            TomServerModelProvider.BuildConnectionString(_reference with { Database = ModelName() }),
-            _reference,
-            ModelName(),
+            TomServerModelProvider.BuildConnectionString(reference with { Database = modelName }),
+            reference,
+            modelName,
             // ClearCache needs the database *ID* (DaxStudio prefers ID, falls back to Name).
-            string.IsNullOrWhiteSpace(_database.ID) ? ModelName() : _database.ID,
-            _tokenProvider,
+            string.IsNullOrWhiteSpace(database.ID) ? modelName : database.ID,
+            tokenProvider,
             request,
             traceWriter,
             cancellationToken);

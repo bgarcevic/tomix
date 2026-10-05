@@ -8,7 +8,7 @@ using TabularJsonSerializer = Microsoft.AnalysisServices.Tabular.JsonSerializer;
 
 namespace Tomix.Provider.Tom;
 
-public sealed class TomFileModelProvider : IModelProvider
+public sealed class TomFileModelProvider : IModelProvider, ILiveModelProvider
 {
     private readonly IAccessTokenProvider? _tokenProvider;
 
@@ -21,6 +21,14 @@ public sealed class TomFileModelProvider : IModelProvider
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult<IModelSession>(new TomFileModelSession(reference.Value, _tokenProvider));
+    }
+
+    public Task<ILiveModelSession> OpenLiveAsync(ModelReference reference, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var path = reference.Value;
+        return Task.FromResult<ILiveModelSession>(new TomLiveModelSession(
+            TomModelSource.File(reference, path, TomFileModelSession.InferSerialization(path), TomFileModelSession.Load, _tokenProvider)));
     }
 
     private static bool IsSupportedExtension(string path)
@@ -147,20 +155,21 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
         => TomModelDeployer.GeneratePlanAsync(GetDatabase(), request, _tokenProvider, cancellationToken);
 
     private TabularDatabase GetDatabase()
-    {
-        if (_database is not null)
-            return _database;
+        => _database ??= Load(_path);
 
+    /// <summary>Reads a <c>.bim</c> or TMSL file; shared with live sessions.</summary>
+    internal static TabularDatabase Load(string path)
+    {
         try
         {
-            return _database = TabularJsonSerializer.DeserializeDatabase(
-                ExtractDatabaseJson(File.ReadAllText(_path)),
+            return TabularJsonSerializer.DeserializeDatabase(
+                ExtractDatabaseJson(File.ReadAllText(path)),
                 new DeserializeOptions(),
                 CompatibilityMode.PowerBI);
         }
         catch (Exception ex)
         {
-            throw new ModelLoadException($"Cannot load model from '{_path}': {ex.Message}", ex);
+            throw new ModelLoadException($"Cannot load model from '{path}': {ex.Message}", ex);
         }
     }
 
@@ -185,7 +194,7 @@ internal sealed class TomFileModelSession : IModelSession, IModelExportSession, 
     private string ModelName(TabularDatabase database)
         => ModelDisplayName.Resolve(database.Name, _path);
 
-    private static string InferSerialization(string path)
+    internal static string InferSerialization(string path)
     {
         var extension = Path.GetExtension(path);
         return extension.Equals(".bim", StringComparison.OrdinalIgnoreCase) ||

@@ -1,10 +1,11 @@
 using System.Text.Json;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
+using Tomix.Provider.Tom;
 
 namespace Tomix.Provider.Tmdl;
 
-public sealed class TmdlModelProvider : IModelProvider
+public sealed class TmdlModelProvider : IModelProvider, ILiveModelProvider
 {
     private readonly IAccessTokenProvider? _tokenProvider;
 
@@ -19,6 +20,15 @@ public sealed class TmdlModelProvider : IModelProvider
             throw new DirectoryNotFoundException($"No TMDL model folder found for '{reference.Value}'.");
 
         return Task.FromResult<IModelSession>(new TmdlModelSession(folder, _tokenProvider));
+    }
+
+    public Task<ILiveModelSession> OpenLiveAsync(ModelReference reference, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryResolveFolder(reference.Value, out var folder))
+            throw new DirectoryNotFoundException($"No TMDL model folder found for '{reference.Value}'.");
+
+        return Task.FromResult(TomLiveModelSession.OpenTmdlFolder(reference, folder, _tokenProvider));
     }
 
     private static bool TryResolveFolder(string value, out string folder)

@@ -26,7 +26,8 @@ Core domain types and abstractions.
   (`/src/Tomix.App/Validate/ValidationRules`). Add a rule field here, not per engine.
 - The live model session contracts ([ADR 0001](../../docs/design/adr-0001-live-model-session.md),
   [ADR 0002](../../docs/design/adr-0002-live-session-lease-gate-and-journal-first.md)), in `Models/`:
-  `ILiveModelSession`, `ILiveSessionLease` (a lease is a transaction), `ObjectId`,
+  `ILiveModelSession`, `ILiveSessionLease` (a lease is a transaction), `ILiveModelProvider`
+  (providers that can open one), `ObjectId`,
   `ModelChange`/`ModelChangeBatch`, `SessionState`, and `LiveModelSnapshot`/`ModelObjectIndex`
   for ID↔path lookups. They define identity, versions, transactions and change events only.
   The lease gate, journal and ID map that implement them belong in the providers.
