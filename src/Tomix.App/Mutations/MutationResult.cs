@@ -17,6 +17,8 @@ public enum MutationStatus
     [JsonStringEnumMemberName("saved")] Saved,
     /// <summary>Staged work was discarded (<c>--revert</c>).</summary>
     [JsonStringEnumMemberName("reverted")] Reverted,
+    /// <summary>Kept in a live session's model; nothing was written until the session saves.</summary>
+    [JsonStringEnumMemberName("applied")] Applied,
 }
 
 /// <summary>Where a save landed, so callers know what survives. Serialized as <c>persistence</c>.</summary>
@@ -103,11 +105,12 @@ public sealed record MutationOutcome(
     public static readonly MutationOutcome Unchanged = new(MutationStatus.Unchanged);
     public static readonly MutationOutcome Staged = new(MutationStatus.Staged);
     public static readonly MutationOutcome Reverted = new(MutationStatus.Reverted);
+    public static readonly MutationOutcome Committed = new(MutationStatus.Applied);
 
     public bool Saved => Status == MutationStatus.Saved;
 
-    /// <summary>True when the edit reached disk or the model (saved or staged); results use past-tense keys only then.</summary>
-    public bool Applied => Status is MutationStatus.Saved or MutationStatus.Staged;
+    /// <summary>True when the edit was kept (saved, staged, or applied to a live session); results use past-tense keys only then.</summary>
+    public bool Applied => Status is MutationStatus.Saved or MutationStatus.Staged or MutationStatus.Applied;
 
     /// <summary>True when the edit was evaluated but not kept; results use <c>would*</c> keys then.</summary>
     public bool Previewed => Status == MutationStatus.Preview;
@@ -156,7 +159,7 @@ public abstract record MutationResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? NewValidationErrors => Outcome.Validation?.NewErrorCount;
 
-    /// <summary>The object path under its past-tense key: set only when the edit was saved or staged.</summary>
+    /// <summary>The object path under its past-tense key: set only when the edit was kept.</summary>
     protected string? IfApplied(string? path) => Outcome.Applied ? path : null;
 
     /// <summary>The object path under its <c>would*</c> key: set only for previews.</summary>

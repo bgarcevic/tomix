@@ -11,7 +11,7 @@ namespace Tomix.App.Bpa;
 
 public sealed class BpaRunHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
     private readonly BpaUserRuleState _userRules;
     private readonly string _configDirectory;
@@ -25,8 +25,19 @@ public sealed class BpaRunHandler
         string configDirectory,
         HttpClient? httpClient = null,
         Func<string, string?>? environment = null)
+        : this(new OneShotSessionSource(providers), stores, userRules, configDirectory, httpClient, environment)
     {
-        _providers = providers.ToList();
+    }
+
+    public BpaRunHandler(
+        IModelSessionSource sessions,
+        MutationStores stores,
+        BpaUserRuleState userRules,
+        string configDirectory,
+        HttpClient? httpClient = null,
+        Func<string, string?>? environment = null)
+    {
+        _sessions = sessions;
         _stores = stores;
         _userRules = userRules;
         _configDirectory = configDirectory;
@@ -57,7 +68,7 @@ public sealed class BpaRunHandler
         var connection = _stores.ResolveSession();
 
         var begin = await MutationLifecycle.BeginAsync(
-            _providers, request.Model, options, stagingStore, connection, cancellationToken);
+            _sessions, request.Model, options, stagingStore, connection, cancellationToken);
         if (begin.Error is { } error)
             return TomixResult<BpaRunResult>.Fail(error.Code, error.Message, error.ExitCode);
 
@@ -71,17 +82,28 @@ public sealed class BpaRunHandler
         }
 
         var context = begin.Context!;
-        var provider = _providers.ResolveSingleProvider(context.EffectiveModel);
-        if (provider is null)
-            return TomixResult<BpaRunResult>.Fail(
-                "TOMIX_NO_PROVIDER",
-                $"No provider can open model: {context.EffectiveModel.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
-
         return await ProviderConnectionGuard.RunAsync(request.Model, async () =>
         {
-            await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
+            ModelSessionLease lease;
+            try
+            {
+                lease = await _sessions.LeaseAsync(context.EffectiveModel, cancellationToken);
+            }
+            catch (ModelSessionUnavailableException ex)
+            {
+                return ModelSessionRunner.Unavailable<BpaRunResult>(ex);
+            }
+
+            // Ending the lease without a commit rolls a live session's fixes back.
+            await using var _ = lease;
+            var result = await RunAsync(lease.Session);
+            if (result.Success)
+                await lease.CommitAsync(cancellationToken);
+            return result;
+        });
+
+        async Task<TomixResult<BpaRunResult>> RunAsync(IModelSession session)
+        {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
             var validationBaseline = SaveValidation.ForSnapshot(
                 snapshot, context, _stores.ShouldValidateOnSave());
@@ -138,7 +160,7 @@ public sealed class BpaRunHandler
                 // Without --save/--stage the run is a preview: the fixes are applied to the
                 // in-memory model too, so it shows the values the provider would really write and
                 // what would remain, and the lifecycle then discards them.
-                var preview = context.Mode is not (MutationMode.Save or MutationMode.Stage);
+                var preview = !context.KeepsEdit;
                 var fixResult = fixer.ApplyFixes(mutationSession, runResult.Violations, rules, request.AllowDelete, snapshot);
 
                 runResult = runResult with
@@ -172,7 +194,7 @@ public sealed class BpaRunHandler
                 if (preview)
                     runResult = runResult with { FixOutcome = MutationOutcome.Preview };
 
-                if (fixResult.FixesApplied > 0 && context.Mode is MutationMode.Save or MutationMode.Stage)
+                if (fixResult.FixesApplied > 0 && context.KeepsEdit)
                 {
                     MutationOutcome outcome;
                     try
@@ -196,7 +218,7 @@ public sealed class BpaRunHandler
             }
 
             return TomixResult<BpaRunResult>.Ok(runResult, exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0);
-        });
+        }
     }
 
     /// <summary>
@@ -216,7 +238,9 @@ public sealed class BpaRunHandler
                 // Provider matching itself touches the filesystem — resolving a .pbip reference
                 // reads the file and enumerates sibling folders — so it stays inside the guard:
                 // this is a best-effort probe and an unreadable original must not fail the run.
-                if (_providers.ResolveSingleProvider(model) is { } provider)
+                // Only a one-shot source stages, so only it has providers to probe with.
+                if (_sessions is OneShotSessionSource { Providers: var providers }
+                    && providers.ResolveSingleProvider(model) is { } provider)
                 {
                     await using var probe = await provider.OpenAsync(model, cancellationToken);
                     return BpaModelRuleLoader.ResolveBaseDirectory(probe, model);

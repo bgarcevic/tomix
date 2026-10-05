@@ -19,10 +19,15 @@ public sealed class GetModelHandler
 {
     private const string NotFoundHint = "Run 'tx get' to list the tables, or 'tx get \"Sa*\"' to filter.";
 
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
 
     public GetModelHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(new OneShotSessionSource(providers))
+    {
+    }
+
+    public GetModelHandler(IModelSessionSource sessions)
+        => _sessions = sessions;
 
     /// <summary>
     /// The mode a request runs in once <see cref="GetMode.Auto"/> is settled. Pure, so the CLI
@@ -66,7 +71,7 @@ public sealed class GetModelHandler
         if (Validate(request, mode) is { } invalid)
             return invalid;
 
-        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
+        return await ModelSessionRunner.RunAsync(_sessions, request.Model, async session =>
         {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
 

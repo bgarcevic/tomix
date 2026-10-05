@@ -1,4 +1,5 @@
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
@@ -21,12 +22,17 @@ public sealed class MoveNoopException : Exception
 
 public sealed class MoveModelObjectHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
 
     public MoveModelObjectHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+        : this(new OneShotSessionSource(providers), stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public MoveModelObjectHandler(IModelSessionSource sessions, MutationStores stores)
+    {
+        _sessions = sessions;
         _stores = stores;
     }
 
@@ -42,7 +48,7 @@ public sealed class MoveModelObjectHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "mv", _stores,
+            _sessions, request.Model, options, "mv", _stores,
             async (mutator, session, _) =>
             {
                 // What the destination means depends on what the source IS: middle segments are

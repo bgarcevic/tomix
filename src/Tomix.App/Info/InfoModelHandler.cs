@@ -6,16 +6,21 @@ namespace Tomix.App.Info;
 
 public sealed class InfoModelHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
 
     public InfoModelHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(new OneShotSessionSource(providers))
+    {
+    }
+
+    public InfoModelHandler(IModelSessionSource sessions)
+        => _sessions = sessions;
 
     public async Task<TomixResult<InfoModelResult>> HandleAsync(
         InfoModelRequest request,
         CancellationToken cancellationToken)
     {
-        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
+        return await ModelSessionRunner.RunAsync(_sessions, request.Model, async session =>
         {
             var summary = await session.GetSummaryAsync(cancellationToken);
             return TomixResult<InfoModelResult>.Ok(new InfoModelResult(summary));

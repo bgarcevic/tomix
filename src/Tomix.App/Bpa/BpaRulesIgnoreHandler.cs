@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Diagnostics;
@@ -31,7 +32,7 @@ public sealed record BpaRulesIgnoreResult(
 
 public sealed class BpaRulesIgnoreHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
     private readonly string? _configDirectory;
 
@@ -40,8 +41,13 @@ public sealed class BpaRulesIgnoreHandler
     /// against the bundled catalog and the model's own rules only.
     /// </param>
     public BpaRulesIgnoreHandler(IEnumerable<IModelProvider> providers, MutationStores stores, string? configDirectory = null)
+        : this(new OneShotSessionSource(providers), stores, configDirectory)
     {
-        _providers = providers.ToList();
+    }
+
+    public BpaRulesIgnoreHandler(IModelSessionSource sessions, MutationStores stores, string? configDirectory = null)
+    {
+        _sessions = sessions;
         _stores = stores;
         _configDirectory = configDirectory;
     }
@@ -63,7 +69,7 @@ public sealed class BpaRulesIgnoreHandler
         TomixResult<BpaRulesIgnoreResult>? unknownRule = null;
 
         var result = await MutationRunner.RunAsync(
-            _providers, request.Model, options, "bpa-ignore", _stores,
+            _sessions, request.Model, options, "bpa-ignore", _stores,
             async (mutator, session, _) =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);

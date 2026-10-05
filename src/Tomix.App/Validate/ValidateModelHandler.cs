@@ -8,10 +8,15 @@ namespace Tomix.App.Validate;
 
 public sealed class ValidateModelHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
 
     public ValidateModelHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(new OneShotSessionSource(providers, noProviderHint: null))
+    {
+    }
+
+    public ValidateModelHandler(IModelSessionSource sessions)
+        => _sessions = sessions;
 
     public async Task<TomixResult<ValidateModelResult>> HandleAsync(
         ValidateModelRequest request,
@@ -20,7 +25,7 @@ public sealed class ValidateModelHandler
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
+            return await ModelSessionRunner.RunAsync(_sessions, request.Model, async session =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
 
@@ -28,7 +33,7 @@ public sealed class ValidateModelHandler
                     ? new ModelValidation.Findings([], null)
                     : ModelValidation.Analyze(snapshot);
                 return Complete(request, stopwatch, findings, snapshot.Name);
-            }, noProviderMessage: null, noProviderHint: null, cancellationToken);
+            }, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

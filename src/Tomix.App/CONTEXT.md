@@ -29,14 +29,23 @@ Application use cases and command handlers.
 - Standard single-model read handlers use `Models/ModelSessionRunner` for provider resolution,
   guarded session opening, and disposal. Specialized multi-session or staging lifecycles may stay
   explicit when they have different operation-level diagnostics.
+- Handlers must not assume they own the session lifecycle. A handler that runs through the
+  runners takes an `IModelSessionSource` (its `IEnumerable<IModelProvider>` constructor wraps the
+  providers in a `OneShotSessionSource`) and never opens, saves implicitly, or disposes a session
+  itself. A successful request is committed; a failed or throwing one is rolled back, which on a
+  live session restores the model. Check `MutationContext.KeepsEdit`, not `Mode is Save or Stage`,
+  when deciding whether an edit is kept or only previewed.
 - One command should usually have one handler.
-- Live model session ([ADR 0001](../../docs/design/adr-0001-live-model-session.md), planned):
+- Live model session ([ADR 0001](../../docs/design/adr-0001-live-model-session.md)):
   handlers must not care whether their session is one-shot or live. The runners
-  (`ModelSessionRunner`, `MutationRunner`) take their session from an `IModelSessionSource`:
-  `OneShotSessionSource` opens and disposes; `LiveSessionSource` leases the open session and
-  never disposes it. Under a live source, mutations run in `MutationMode.Live`, which applies in a
-  transaction without persisting. `SessionHost` owns the session registry, client attach/detach and
-  the approval policy. Front ends (`shell`, `serve`, `mcp`, `ui`) call handlers with the same
+  (`ModelSessionRunner`, `MutationRunner`, and `bpa run`, which drives the lifecycle itself) take
+  their session from an `IModelSessionSource`: `OneShotSessionSource` opens and disposes;
+  `LiveSessionSource` leases the open session and never disposes it, and serves only the model the
+  session holds (`TOMIX_SESSION_MODEL_MISMATCH`). Under a live source, mutations run in
+  `MutationMode.Live`, which applies in a transaction without persisting (status `applied`);
+  `--save` applies and saves in the same transaction; `--stage`/`--revert` fail with
+  `TOMIX_SESSION_STAGE_UNSUPPORTED`. Planned: `SessionHost` owns the session registry, client
+  attach/detach and the approval policy. Front ends (`shell`, `serve`, `mcp`, `ui`) call handlers with the same
   `*Request` records; they never get their own copy of command logic.
 - Formatting behavior:
   - DAX formatting is offline: the vendored SQLBI engine behind `Tomix.Core.Dax.DaxFormatter`,

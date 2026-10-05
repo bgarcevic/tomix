@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
@@ -51,12 +52,17 @@ public sealed record BpaRulesModelResult(
 /// </summary>
 public sealed class BpaRulesModelHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
 
     public BpaRulesModelHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+        : this(new OneShotSessionSource(providers), stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public BpaRulesModelHandler(IModelSessionSource sessions, MutationStores stores)
+    {
+        _sessions = sessions;
         _stores = stores;
     }
 
@@ -87,7 +93,7 @@ public sealed class BpaRulesModelHandler
         TomixResult<BpaRulesFileResult>? failure = null;
 
         var result = await MutationRunner.RunAsync(
-            _providers, request.Model, options, $"bpa-rules-{action}", _stores,
+            _sessions, request.Model, options, $"bpa-rules-{action}", _stores,
             async (mutator, session, _) =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);

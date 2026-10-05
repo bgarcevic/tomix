@@ -8,8 +8,26 @@ namespace Tomix.App.Mutations;
 
 public static class MutationRunner
 {
-    public static async Task<TomixResult<TResult>> RunAsync<TResult>(
+    public static Task<TomixResult<TResult>> RunAsync<TResult>(
         IReadOnlyList<IModelProvider> providers,
+        ModelReference model,
+        MutationOptions options,
+        string command,
+        MutationStores stores,
+        Func<IModelMutationSession, IModelSession, MutationContext, Task<(bool Changed, string Summary, Func<MutationOutcome, TResult> BuildResult)>> mutate,
+        Func<MutationOutcome, TResult> revertResult,
+        CancellationToken cancellationToken)
+        => RunAsync(
+            new OneShotSessionSource(providers), model, options, command, stores, mutate, revertResult, cancellationToken);
+
+    /// <summary>
+    /// Runs one mutation request. On a one-shot source it opens the model (or its staged working
+    /// copy), applies, and persists per the resolved mode. On a live source it applies in the
+    /// session's transaction and commits, saving only on <c>--save</c>; a request that fails or
+    /// throws leaves the live model as it found it.
+    /// </summary>
+    public static async Task<TomixResult<TResult>> RunAsync<TResult>(
+        IModelSessionSource sessions,
         ModelReference model,
         MutationOptions options,
         string command,
@@ -20,10 +38,10 @@ public static class MutationRunner
         => await ProviderConnectionGuard.RunAsync(
             model,
             () => RunCoreAsync(
-                providers, model, options, command, stores, mutate, revertResult, cancellationToken));
+                sessions, model, options, command, stores, mutate, revertResult, cancellationToken));
 
     private static async Task<TomixResult<TResult>> RunCoreAsync<TResult>(
-        IReadOnlyList<IModelProvider> providers,
+        IModelSessionSource sessions,
         ModelReference model,
         MutationOptions options,
         string command,
@@ -37,7 +55,7 @@ public static class MutationRunner
         var target = MutationTarget.For(model, connection);
 
         var begin = await MutationLifecycle.BeginAsync(
-            providers, model, options, stagingStore, connection, cancellationToken);
+            sessions, model, options, stagingStore, connection, cancellationToken);
         if (begin.Error is { } error)
             return TomixResult<TResult>.Fail(error.Code, error.Message, error.ExitCode);
 
@@ -56,15 +74,19 @@ public static class MutationRunner
         }
 
         var context = begin.Context!;
-        var provider = providers.ResolveSingleProvider(context.EffectiveModel);
-        if (provider is null)
-            return TomixResult<TResult>.Fail(
-                "TOMIX_NO_PROVIDER",
-                $"No provider can open model: {context.EffectiveModel.Value}",
-                exitCode: 2,
-                hint: "Supported formats: TMDL folder, .bim file. For remote models, use --server and --database.");
+        ModelSessionLease lease;
+        try
+        {
+            lease = await sessions.LeaseAsync(context.EffectiveModel, cancellationToken);
+        }
+        catch (ModelSessionUnavailableException ex)
+        {
+            return ModelSessionRunner.Unavailable<TResult>(ex);
+        }
 
-        await using var session = await provider.OpenAsync(context.EffectiveModel, cancellationToken);
+        // Ending the lease without a commit rolls a live session back; every failure below does.
+        await using var _ = lease;
+        var session = lease.Session;
         if (session is not IModelMutationSession mutator)
             return TomixResult<TResult>.Fail(
                 "TOMIX_MUTATION_UNSUPPORTED_PROVIDER",
@@ -77,11 +99,15 @@ public static class MutationRunner
             var (changed, summary, buildResult) = await mutate(mutator, session, context);
 
             if (!changed)
+            {
+                await lease.CommitAsync(cancellationToken);
                 return TomixResult<TResult>.Ok(buildResult(MutationOutcome.Unchanged with { Target = target }));
+            }
 
             var completed = await MutationLifecycle.CompleteAsync(
                 mutator, session, context, validationBaseline, command, summary, cancellationToken);
             var outcome = completed with { Target = MutationTarget.Merge(target, completed.Target) };
+            await lease.CommitAsync(cancellationToken);
 
             // A failed workspace sync leaves the mirror behind the source; render the saved
             // result but exit non-zero so CI catches the drift.

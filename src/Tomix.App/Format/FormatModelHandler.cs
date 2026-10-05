@@ -1,5 +1,6 @@
 using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -8,7 +9,7 @@ namespace Tomix.App.Format;
 
 public sealed class FormatModelHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly IExpressionFormatterClient _formatter;
     private readonly MutationStores _stores;
 
@@ -16,8 +17,16 @@ public sealed class FormatModelHandler
         IEnumerable<IModelProvider> providers,
         IExpressionFormatterClient formatter,
         MutationStores stores)
+        : this(new OneShotSessionSource(providers), formatter, stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public FormatModelHandler(
+        IModelSessionSource sessions,
+        IExpressionFormatterClient formatter,
+        MutationStores stores)
+    {
+        _sessions = sessions;
         _formatter = formatter;
         _stores = stores;
     }
@@ -36,7 +45,7 @@ public sealed class FormatModelHandler
         if (!string.IsNullOrWhiteSpace(request.Path))
         {
             return await MutationRunner.RunAsync(
-                _providers, request.Model, options, "format", _stores,
+                _sessions, request.Model, options, "format", _stores,
                 async (mutator, session, _) =>
                 {
                     var snapshot = await session.GetSnapshotAsync(cancellationToken);
@@ -80,7 +89,7 @@ public sealed class FormatModelHandler
         }
 
         var sweep = await MutationRunner.RunAsync(
-            _providers, request.Model, options, "format", _stores,
+            _sessions, request.Model, options, "format", _stores,
             async (mutator, session, _) =>
             {
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);

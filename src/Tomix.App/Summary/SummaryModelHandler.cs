@@ -12,16 +12,21 @@ namespace Tomix.App.Summary;
 /// </summary>
 public sealed class SummaryModelHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
 
     public SummaryModelHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(new OneShotSessionSource(providers))
+    {
+    }
+
+    public SummaryModelHandler(IModelSessionSource sessions)
+        => _sessions = sessions;
 
     public async Task<TomixResult<SummaryModelResult>> HandleAsync(
         SummaryModelRequest request,
         CancellationToken cancellationToken)
     {
-        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
+        return await ModelSessionRunner.RunAsync(_sessions, request.Model, async session =>
         {
             var summary = await session.GetSummaryAsync(cancellationToken);
             var snapshot = await session.GetSnapshotAsync(cancellationToken);

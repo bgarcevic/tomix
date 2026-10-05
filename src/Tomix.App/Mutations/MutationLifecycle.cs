@@ -1,9 +1,14 @@
+using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Mutations;
 
-public enum MutationMode { None, Save, Stage, Revert }
+/// <summary>
+/// How a mutation ends. <see cref="None"/> previews a one-shot edit; <see cref="Live"/> keeps it in
+/// a live session's model without persisting it (ADR 0001 §5).
+/// </summary>
+public enum MutationMode { None, Save, Stage, Revert, Live }
 
 /// <summary>The terminal-mode options shared by every mutation command (<c>--save</c>/<c>--stage</c>/<c>--revert</c>).</summary>
 public sealed record MutationOptions(
@@ -26,7 +31,11 @@ public sealed record MutationContext(
     StagingHandle? Staging,
     ModelReference? SyncTarget = null,
     bool Overwrite = false,
-    bool SyncSuppressed = false);
+    bool SyncSuppressed = false)
+{
+    /// <summary>True when the edit is kept (saved, staged, or applied to a live session) rather than previewed.</summary>
+    public bool KeepsEdit => Mode is MutationMode.Save or MutationMode.Stage or MutationMode.Live;
+}
 
 /// <summary>A failed pre-flight: the code/message/exit-code the handler should return verbatim.</summary>
 public sealed record MutationError(string Code, string Message, int ExitCode);
@@ -60,6 +69,42 @@ public static class MutationLifecycle
             mode = MutationMode.Save;
 
         return null;
+    }
+
+    /// <summary>
+    /// <see cref="BeginAsync(IReadOnlyList{IModelProvider}, ModelReference, MutationOptions, StagingStore, CliConnectionState?, CancellationToken)"/>
+    /// for a session source. A live session applies without persisting unless <c>--save</c> asks,
+    /// and has no staging: its working copy is the session itself.
+    /// </summary>
+    public static async Task<MutationBegin> BeginAsync(
+        IModelSessionSource sessions,
+        ModelReference source,
+        MutationOptions options,
+        StagingStore stagingStore,
+        CliConnectionState? connection,
+        CancellationToken cancellationToken)
+    {
+        if (!sessions.IsLive)
+            return await BeginAsync(
+                sessions is OneShotSessionSource oneShot ? oneShot.Providers : [],
+                source, options, stagingStore, connection, cancellationToken);
+
+        var error = ResolveMode(options, out var mode);
+        if (error is not null)
+            return new MutationBegin(null, error);
+
+        if (mode is MutationMode.Stage or MutationMode.Revert)
+            return new MutationBegin(null, new MutationError(
+                "TOMIX_SESSION_STAGE_UNSUPPORTED",
+                "A live session does not stage: its edits already stay in the session until you save.",
+                2));
+
+        if (mode == MutationMode.Save)
+            return await BeginAsync([], source, options, stagingStore, connection, cancellationToken);
+
+        return new MutationBegin(
+            new MutationContext(MutationMode.Live, source, null, options.Serialization, options.Force, null),
+            null);
     }
 
     /// <summary>
@@ -163,6 +208,9 @@ public static class MutationLifecycle
                     ? null
                     : new MutationTarget(context.EffectiveModel.Value, context.EffectiveModel.Database ?? export.SavedPath, null);
                 return new MutationOutcome(MutationStatus.Saved, savedTo, persistence, sync, target, validation);
+
+            case MutationMode.Live:
+                return MutationOutcome.Committed;
 
             case MutationMode.Stage:
                 // Flush the in-memory mutation into the working copy on disk, then record the op.

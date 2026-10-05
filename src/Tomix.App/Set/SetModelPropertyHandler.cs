@@ -1,5 +1,6 @@
 using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.App.Validate;
 using Tomix.Core.Models;
@@ -11,12 +12,17 @@ namespace Tomix.App.Set;
 
 public sealed class SetModelPropertyHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
 
     public SetModelPropertyHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+        : this(new OneShotSessionSource(providers), stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public SetModelPropertyHandler(IModelSessionSource sessions, MutationStores stores)
+    {
+        _sessions = sessions;
         _stores = stores;
     }
 
@@ -42,7 +48,7 @@ public sealed class SetModelPropertyHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, Force: request.Force, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "set", _stores,
+            _sessions, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "set", _stores,
             async (mutator, session, _) =>
             {
                 // Capture the pre-edit value of the reported assignment for the text preview.

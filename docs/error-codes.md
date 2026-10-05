@@ -115,6 +115,15 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | `TOMIX_STAGE_NOTHING_STAGED` | 1 | `--revert` called with no staged mutation for the model. |
 | `TOMIX_STAGE_MANIFEST_CORRUPT` | 2 | A staged manifest exists but no longer parses (torn write, manual edit). Run `tx stage discard` to reset staging for the model. |
 
+## Live Session Codes (`TOMIX_SESSION_*`)
+
+Raised when a command runs against an open live session (`tx shell` and the other session front ends) instead of opening the model itself.
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_SESSION_STAGE_UNSUPPORTED` | 2 | `--stage` or `--revert` on a live session. Its edits already stay in the session until it saves. |
+| `TOMIX_SESSION_MODEL_MISMATCH` | 2 | The command names a different model from the one the live session holds. |
+
 ## Save Codes (`TOMIX_SAVE_*`)
 
 | Code | Exit | Trigger |

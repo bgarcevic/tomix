@@ -1,3 +1,4 @@
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
@@ -7,12 +8,17 @@ namespace Tomix.App.Rm;
 
 public sealed class RemoveModelObjectHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
 
     public RemoveModelObjectHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+        : this(new OneShotSessionSource(providers), stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public RemoveModelObjectHandler(IModelSessionSource sessions, MutationStores stores)
+    {
+        _sessions = sessions;
         _stores = stores;
     }
 
@@ -31,7 +37,7 @@ public sealed class RemoveModelObjectHandler
             request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "rm", _stores,
+            _sessions, request.Model, options, RefreshPolicyPath.Table(request.Path, request.Type) is not null ? "refresh-policy" : "rm", _stores,
             async (mutator, session, context) =>
             {
                 // A removal cannot be fixed up like a rename — the referenced object is gone.
@@ -42,7 +48,7 @@ public sealed class RemoveModelObjectHandler
                     session, request.Path, request.Type, cancellationToken);
                 if (referencing.Count > 0 && !request.Force)
                 {
-                    if (context.Mode is MutationMode.Save or MutationMode.Stage)
+                    if (context.KeepsEdit)
                         throw new RemoveBrokenReferencesException(RemoveGuard.BlockedMessage(referencing));
 
                     // Guarded preview: report the would-be breakage without touching the model.

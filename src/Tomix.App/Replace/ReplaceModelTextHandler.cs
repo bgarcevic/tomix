@@ -1,3 +1,4 @@
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -6,12 +7,17 @@ namespace Tomix.App.Replace;
 
 public sealed class ReplaceModelTextHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
 
     public ReplaceModelTextHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+        : this(new OneShotSessionSource(providers), stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public ReplaceModelTextHandler(IModelSessionSource sessions, MutationStores stores)
+    {
+        _sessions = sessions;
         _stores = stores;
     }
 
@@ -36,10 +42,10 @@ public sealed class ReplaceModelTextHandler
             request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "replace", _stores,
+            _sessions, request.Model, options, "replace", _stores,
             async (mutator, _, context) =>
             {
-                var persist = context.Mode is MutationMode.Save or MutationMode.Stage;
+                var persist = context.KeepsEdit;
 
                 var replace = mutator.ReplaceText(new ModelReplaceRequest(
                     request.Pattern,

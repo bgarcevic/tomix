@@ -9,10 +9,15 @@ namespace Tomix.App.Find;
 
 public sealed class FindModelHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
 
     public FindModelHandler(IEnumerable<IModelProvider> providers)
-        => _providers = providers.ToList();
+        : this(new OneShotSessionSource(providers))
+    {
+    }
+
+    public FindModelHandler(IModelSessionSource sessions)
+        => _sessions = sessions;
 
     public async Task<TomixResult<FindModelResult>> HandleAsync(
         FindModelRequest request,
@@ -34,7 +39,7 @@ public sealed class FindModelHandler
             }
         }
 
-        return await ModelSessionRunner.RunAsync(_providers, request.Model, async session =>
+        return await ModelSessionRunner.RunAsync(_sessions, request.Model, async session =>
         {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
 

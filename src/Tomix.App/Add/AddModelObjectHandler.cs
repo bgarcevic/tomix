@@ -1,3 +1,4 @@
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -6,12 +7,17 @@ namespace Tomix.App.Add;
 
 public sealed class AddModelObjectHandler
 {
-    private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly IModelSessionSource _sessions;
     private readonly MutationStores _stores;
 
     public AddModelObjectHandler(IEnumerable<IModelProvider> providers, MutationStores stores)
+        : this(new OneShotSessionSource(providers), stores)
     {
-        _providers = providers.ToList();
+    }
+
+    public AddModelObjectHandler(IModelSessionSource sessions, MutationStores stores)
+    {
+        _sessions = sessions;
         _stores = stores;
     }
 
@@ -23,7 +29,7 @@ public sealed class AddModelObjectHandler
             request.Save, request.SaveTo, request.Stage, request.Revert, request.Serialization, request.Force, request.Overwrite, request.NoSync);
 
         return await MutationRunner.RunAsync(
-            _providers, request.Model, options, "add", _stores,
+            _sessions, request.Model, options, "add", _stores,
             async (mutator, _, _) =>
             {
                 var mutation = mutator.AddObject(new ModelObjectAddRequest(
