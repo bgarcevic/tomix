@@ -30,6 +30,7 @@ nav = [
   ] },
   { "Reference" = [
     { "Error & exit codes" = "error-codes.md" },
+    { "Session protocol" = "protocol.md" },
   ] },
   { "Contributing" = [
     { "How to contribute" = "contributing.md" },
