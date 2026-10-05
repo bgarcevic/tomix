@@ -13,6 +13,11 @@ You choose what happens next with one of three flags:
 | `--stage` | Record the mutation in the session's staging area. |
 | `--save-to <path>` | Persist to a different path, leaving the source untouched (implies `--save`). |
 
+For interactive work, [`tx interactive`](../commands/modify.md#interactive-edit-in-a-session)
+(alias `tx shell`) is usually the better fit: it holds the model in memory, keeps
+each command's edit, and gives you `undo`, `redo` and transactions until you
+`save`. Staging remains for one-shot commands and CI.
+
 ## Staging
 
 Staging lets you build up a batch of edits and commit (or abandon) them as a

@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Mutations;
 using Tomix.App.Set;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
@@ -12,12 +13,14 @@ namespace Tomix.Cli.Commands;
 internal sealed class SetCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
     private readonly MutationStores _mutations;
 
-    public SetCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
+    public SetCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
         _mutations = mutations;
@@ -105,7 +108,8 @@ internal sealed class SetCommand : ICommandModule
             }
 
             var assignments = AddCommand.ParseSetAssignments(parseResult.GetValue(setOption));
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -120,7 +124,7 @@ internal sealed class SetCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new SetModelPropertyHandler(_providers, _mutations).HandleAsync(
+                () => (_session is null ? new SetModelPropertyHandler(_providers, _mutations) : new SetModelPropertyHandler(_session.Source, _mutations)).HandleAsync(
                     new SetModelPropertyRequest(
                         reference,
                         parseResult.GetValue(pathArgument) ?? "",

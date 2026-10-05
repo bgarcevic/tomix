@@ -479,6 +479,88 @@ A piped expression is read only when nothing else names what to format: with a
 model, `--path`, `--save`, `--save-to`, `--stage`, or `--revert`, `format` leaves
 stdin alone and formats the model. Pass `-e -` to read stdin anyway.
 
+## `interactive` — edit in a session
+
+```
+tx interactive [model] [options]
+```
+
+Alias: `tx shell`. Opens the model once and keeps it in memory, then reads
+commands until `exit` or the end of input. With no model argument it opens the
+active connection's model, or starts with no model open when there is none. Every command works as it does on
+the command line, with its usual flags, and runs against the in-memory model;
+leave out the model argument and it uses the session's. Commands that need
+something other than the model (`deploy`, `refresh`, `query`, `test`, `stage`,
+...) are not available inside a session and say so.
+
+`connect` works inside a session exactly as it does outside, `--recent`,
+`--local` and `--remote` included: it sets the active connection, and the
+session then opens that model in place of the one it has open. Unsaved changes
+are handled as on `exit` (asked about at a terminal, refused in a script unless
+`--discard-on-exit` or `--yes`), and a model that fails to open leaves the
+current one and its changes as they were. `connect` with no arguments,
+`--list` and `--clear` only show or change the connection.
+
+Edits are kept, not previewed: `set`, `add`, `rm` and the other modify commands
+change the session's model, and nothing is written until you run `save`. The
+prompt marks unsaved changes with `*`, for example `basic-tmdl* >`. `save` is
+`tx save` on the session: with no `-o` it writes back to the source and clears
+the mark, and `-o`, `--serialization` and `--fix-bpa` work as usual.
+`--save` on a modify command applies the change and saves at once.
+`--stage` and `--revert` are rejected (`TOMIX_SESSION_STAGE_UNSUPPORTED`):
+undo and transactions take their place.
+
+Inside a session these commands also work:
+
+| Command | Description |
+|---------|-------------|
+| `undo` | Revert the last change as one step. A command that changed several objects (a rename and its reference fixups, a `replace`) undoes as one step. |
+| `redo` | Reapply the last undone change. A new change clears the redo steps. |
+| `begin [name]` | Group the following commands into one undo step. |
+| `commit` | Keep the open transaction's changes as one step. |
+| `rollback` | Discard the open transaction's changes. |
+| `status` | The model, unsaved changes, undo and redo steps, and the open transaction. |
+| `history` | The changes undo can revert and redo can reapply, labelled with the command that made them. |
+| `exit`, `quit` | Leave the session. |
+| `help` | List the commands that work in the session. |
+
+The session keeps the last 50 undo steps. A command that fails changes nothing.
+
+Leaving with unsaved changes (or an open transaction) asks first at a
+terminal. Anywhere else it fails with `TOMIX_SESSION_DIRTY` and exit code 1
+unless `--discard-on-exit` or `--yes` says to discard them.
+
+**Scripts.** Piped or redirected input runs as a script: no prompts, one
+command per line, blank lines and lines starting with `#` skipped. The script
+stops at the first failing command and exits with its code; `--no-batch` runs
+past failures and exits with the first failure's code. Global options given to
+`tx interactive` apply to every line that does not set them, so
+`--output-format json` gives one JSON result per command.
+
+| Option | Description |
+|--------|-------------|
+| `--autosave` | Save after every command that changes the model. |
+| `--discard-on-exit` | Leave without asking, discarding unsaved changes. `--yes` does the same. |
+| `--echo` | Print each command (to stderr) before it runs. |
+| `--no-batch` | Keep running a script after a command fails. |
+| `--no-banner` | Start without the welcome lines. |
+
+At a terminal the session starts with a welcome screen: the open model's name,
+compatibility level, object counts and where it saves (or how to open one),
+the keys to know, and a tip. `--no-banner` skips it. The prompt names the
+model, `tx [basic-tmdl]>`, adds `*` for unsaved changes, and is `tx>` with no
+model open. It has line editing, Up/Down history and Tab completion. Ctrl-C
+cancels the running command, not the session, and Ctrl-D (or Ctrl-Z on
+Windows) on an empty line leaves.
+
+```sh
+tx interactive ./model
+tx shell                                      # the active connection's model
+tx interactive ./model --echo < edits.txt     # run a script; stops at the first failure
+```
+
+An interactive session opens TMDL folders and `.bim` files.
+
 ## Refresh policies
 
 Policies are table child objects, inspected and edited with `get`, `set`, and `rm`:

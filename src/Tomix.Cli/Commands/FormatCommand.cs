@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Format;
 using Tomix.App.Mutations;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
@@ -12,6 +13,7 @@ namespace Tomix.Cli.Commands;
 internal sealed class FormatCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
     private readonly IExpressionFormatterClient _formatter;
 
     private readonly CliStateStore _state;
@@ -21,8 +23,10 @@ internal sealed class FormatCommand : ICommandModule
         IReadOnlyList<IModelProvider> providers,
         IExpressionFormatterClient formatter,
         CliStateStore state,
-        MutationStores mutations)
+        MutationStores mutations,
+        SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _formatter = formatter;
         _state = state;
@@ -112,7 +116,8 @@ internal sealed class FormatCommand : ICommandModule
                             || parseResult.GetValue(stageOption)
                             || parseResult.GetValue(revertOption)));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     modelValue,
                     _state,
@@ -122,7 +127,7 @@ internal sealed class FormatCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Formatting...",
-                () => new FormatModelHandler(_providers, _formatter, _mutations).HandleAsync(
+                () => (_session is null ? new FormatModelHandler(_providers, _formatter, _mutations) : new FormatModelHandler(_session.Source, _formatter, _mutations)).HandleAsync(
                     new FormatModelRequest(
                         model,
                         expression,

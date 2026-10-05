@@ -10,6 +10,9 @@ public sealed class LiveSessionSource(ILiveModelSession session, LiveLeaseOption
 {
     public ILiveModelSession Session { get; } = session;
 
+    /// <summary>The options of the next leases; a host that labels each request sets them per request.</summary>
+    public LiveLeaseOptions Options { get; set; } = options;
+
     public bool IsLive => true;
 
     public async Task<ModelSessionLease> LeaseAsync(ModelReference model, CancellationToken cancellationToken)
@@ -21,7 +24,7 @@ public sealed class LiveSessionSource(ILiveModelSession session, LiveLeaseOption
                 exitCode: 2,
                 "Leave the model out to use the session's model, or open a session on the other model.");
 
-        return ModelSessionLease.Live(await Session.LeaseAsync(options, cancellationToken));
+        return ModelSessionLease.Live(await Session.LeaseAsync(Options, cancellationToken));
     }
 
     internal static bool SameModel(ModelReference requested, ModelReference held)

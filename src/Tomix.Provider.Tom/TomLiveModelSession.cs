@@ -98,6 +98,15 @@ public sealed class TomLiveModelSession : ILiveModelSession
         get { lock (_sync) return _redo.Count > 0; }
     }
 
+    public IReadOnlyList<LiveHistoryStep> History
+    {
+        get
+        {
+            lock (_sync)
+                return [.. _undo.Select(step => step.ToHistory(undone: false)), .. _redo.Select(step => step.ToHistory(undone: true))];
+        }
+    }
+
     public event EventHandler<ModelChangeBatch>? Changed;
 
     public event EventHandler<SessionStateChange>? StateChanged;
@@ -332,7 +341,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
                         new ChangeOrigin(lease.Options.Client, ChangeOriginKind.Apply), changes);
                     var previous = _content;
                     _content = new object();
-                    _undo.AddLast(new UndoStep(before!, previous, _content, changes));
+                    _undo.AddLast(new UndoStep(before!, previous, _content, changes, lease.Transaction, lease.Options));
                     while (_undo.Count > UndoLimit)
                         _undo.RemoveFirst();
                     _redo.Clear();
@@ -578,7 +587,9 @@ public sealed class TomLiveModelSession : ILiveModelSession
     }
 
     /// <summary>One undo step: the model before and after a committed transaction, and its changes.</summary>
-    private sealed class UndoStep(TomCheckpoint before, object beforeContent, object afterContent, IReadOnlyList<ModelChange> changes)
+    private sealed class UndoStep(
+        TomCheckpoint before, object beforeContent, object afterContent, IReadOnlyList<ModelChange> changes,
+        string transaction, LiveLeaseOptions options)
     {
         public TomCheckpoint Before { get; } = before;
 
@@ -590,6 +601,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
         public object AfterContent { get; } = afterContent;
 
         public IReadOnlyList<ModelChange> Changes { get; } = changes;
+
+        public LiveHistoryStep ToHistory(bool undone) => new(transaction, options.Label, options.Client, Changes, undone);
     }
 
     /// <summary>The leases of one asynchronous flow: the innermost open one, if any.</summary>

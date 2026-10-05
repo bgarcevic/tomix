@@ -338,6 +338,15 @@ Start a new empty semantic model
   opt --serialization <format>  How the new model is written: tmdl, bim, or pbip (default: tmdl)
   opt --overwrite  Overwrite anything already at the target path
 
+# tx interactive (aliases: shell)
+Edit a model in a session with undo, then save
+  arg [model]  Model to open: a TMDL folder or .bim file; defaults to the active connection, else none
+  opt --autosave  Save after every command that changes the model, instead of only when you run 'save'
+  opt --discard-on-exit  Leave without asking, discarding unsaved changes (so does --yes)
+  opt --echo  Print each command before it runs, so a log of a scripted session reads in order
+  opt --no-batch  Keep running a script after a command fails (by default piped input stops at the first failure)
+  opt --no-banner  Start without the welcome lines
+
 # tx ls (aliases: list)
 List model objects
   arg [path-filter]  Which objects to list: a name ('Sales'), a container ('Sales/Measures'), or a wildcard ('Sa*'); quote names with spaces ("'Net Sales'")

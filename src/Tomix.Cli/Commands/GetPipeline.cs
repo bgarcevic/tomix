@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Spectre.Console;
 using Tomix.App.Get;
+using Tomix.App.Models;
 using Tomix.Cli.Output;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
@@ -48,7 +49,7 @@ internal static class GetPipeline
 
     public static async Task<int> RunAsync(
         ParseResult parseResult,
-        IReadOnlyList<IModelProvider> providers,
+        IModelSessionSource sessions,
         GetInvocation invocation,
         ModelResolver resolveModel,
         CancellationToken cancellationToken)
@@ -95,7 +96,7 @@ internal static class GetPipeline
 
         var result = await CliSpinner.RunAsync(
             tracesDeps ? "Analyzing dependencies..." : "Loading model...",
-            () => new GetModelHandler(providers).HandleAsync(request, cancellationToken),
+            () => new GetModelHandler(sessions).HandleAsync(request, cancellationToken),
             suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
         var showUpstream = invocation.Direction != DepsDirection.Downstream;

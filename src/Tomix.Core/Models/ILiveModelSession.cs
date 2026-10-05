@@ -39,6 +39,12 @@ public interface ILiveModelSession : IModelSession
 
     bool CanRedo { get; }
 
+    /// <summary>
+    /// The undo history: the steps <see cref="UndoAsync"/> can revert, oldest first, followed by
+    /// the steps <see cref="RedoAsync"/> can reapply, next redo first.
+    /// </summary>
+    IReadOnlyList<LiveHistoryStep> History { get; }
+
     /// <summary>Raised once per committed transaction, after <see cref="Version"/> has moved.
     /// Handlers run on the committing thread and must not block or lease the session.</summary>
     event EventHandler<ModelChangeBatch>? Changed;
@@ -78,6 +84,14 @@ public interface ILiveModelSession : IModelSession
     /// <returns>The batch describing the reapplication, or <c>null</c> when there is nothing to redo.</returns>
     Task<ModelChangeBatch?> RedoAsync(string? client, CancellationToken cancellationToken);
 }
+
+/// <summary>One committed transaction in <see cref="ILiveModelSession.History"/>.</summary>
+/// <param name="Transaction">The transaction's ID, for example <c>t17</c>.</param>
+/// <param name="Label">The <see cref="LiveLeaseOptions.Label"/> it was committed with, if any.</param>
+/// <param name="Client">The client that committed it; <c>null</c> for the host.</param>
+/// <param name="Changes">The changes it made.</param>
+/// <param name="Undone">True when it has been undone and redo would reapply it.</param>
+public sealed record LiveHistoryStep(string Transaction, string? Label, string? Client, IReadOnlyList<ModelChange> Changes, bool Undone);
 
 /// <param name="Client">The attached client the lease is for, for example <c>shell</c> or
 /// <c>mcp-1</c>; reported in <see cref="ChangeOrigin.Client"/>. <c>null</c> for the host itself.</param>

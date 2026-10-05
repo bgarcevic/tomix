@@ -12,6 +12,7 @@ using Tomix.App.State;
 using Tomix.App.Update;
 using Tomix.Auth;
 using Tomix.Cli.Commands;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Configuration;
 using Tomix.Core.Diagnostics;
@@ -120,47 +121,54 @@ internal static class Program
         {
             return parseResult.Invoke(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
         }
-        catch (OperationCanceledException)
-        {
-            return 130;
-        }
-        catch (ModelLoadException ex)
-        {
-            ErrorOutput.Write(
-                [new TomixDiagnostic(
-                    "TOMIX_MODEL_LOAD_FAILED",
-                    DiagnosticSeverity.Error,
-                    ex.Message,
-                    "Fix the model source and retry; the message lists what could not be loaded.")],
-                GlobalOptions.ErrorFormatValue(parseResult));
-            return 2;
-        }
-        catch (AmbiguousModelProviderException ex)
-        {
-            ErrorOutput.Write(
-                [new TomixDiagnostic(
-                    "TOMIX_PROVIDER_AMBIGUOUS",
-                    DiagnosticSeverity.Error,
-                    ex.Message,
-                    "Report this at https://github.com/bgarcevic/tomix-cli/issues.")],
-                GlobalOptions.ErrorFormatValue(parseResult));
-            return 1;
-        }
         catch (Exception ex)
         {
-            // Unexpected failures still follow the error contract: stable code via
-            // ErrorOutput, stack trace only under --debug (docs/cli-ux-guidelines.md).
-            // The trace rides inside the envelope in JSON mode so stderr stays parseable.
-            ErrorOutput.Write(
-                [new TomixDiagnostic(
-                    "TOMIX_UNEXPECTED",
-                    DiagnosticSeverity.Error,
-                    $"Unexpected error: {ex.Message}",
-                    "Re-run with --debug for the full stack trace; if this persists, report it at https://github.com/bgarcevic/tomix-cli/issues.")],
-                GlobalOptions.ErrorFormatValue(parseResult),
-                detail: parseResult.GetValue(GlobalOptions.Debug) ? ex.ToString() : null);
+            return ReportFailure(ex, parseResult);
+        }
+    }
 
-            return 1;
+    /// <summary>
+    /// Maps an exception that escaped a command to its diagnostic and exit code: shared by the
+    /// one-shot CLI and each command of <c>tx interactive</c>.
+    /// </summary>
+    internal static int ReportFailure(Exception exception, ParseResult parseResult)
+    {
+        switch (exception)
+        {
+            case OperationCanceledException:
+                return 130;
+            case ModelLoadException ex:
+                ErrorOutput.Write(
+                    [new TomixDiagnostic(
+                        "TOMIX_MODEL_LOAD_FAILED",
+                        DiagnosticSeverity.Error,
+                        ex.Message,
+                        "Fix the model source and retry; the message lists what could not be loaded.")],
+                    GlobalOptions.ErrorFormatValue(parseResult));
+                return 2;
+            case AmbiguousModelProviderException ex:
+                ErrorOutput.Write(
+                    [new TomixDiagnostic(
+                        "TOMIX_PROVIDER_AMBIGUOUS",
+                        DiagnosticSeverity.Error,
+                        ex.Message,
+                        "Report this at https://github.com/bgarcevic/tomix-cli/issues.")],
+                    GlobalOptions.ErrorFormatValue(parseResult));
+                return 1;
+            default:
+                // Unexpected failures still follow the error contract: stable code via
+                // ErrorOutput, stack trace only under --debug (docs/cli-ux-guidelines.md).
+                // The trace rides inside the envelope in JSON mode so stderr stays parseable.
+                ErrorOutput.Write(
+                    [new TomixDiagnostic(
+                        "TOMIX_UNEXPECTED",
+                        DiagnosticSeverity.Error,
+                        $"Unexpected error: {exception.Message}",
+                        "Re-run with --debug for the full stack trace; if this persists, report it at https://github.com/bgarcevic/tomix-cli/issues.")],
+                    GlobalOptions.ErrorFormatValue(parseResult),
+                    detail: parseResult.GetValue(GlobalOptions.Debug) ? exception.ToString() : null);
+
+                return 1;
         }
     }
 
@@ -217,6 +225,13 @@ internal static class Program
             new FormatCommand(providers, formatter, services.State, mutations),
             new GetCommand(providers, services.State),
             new InitCommand(),
+            new InteractiveCommand(
+                providers,
+                services.State,
+                services.Staging,
+                version,
+                (session, sessionCommands) => BuildSessionRootCommand(
+                    session, sessionCommands, providers, formatter, services, httpClient, workspaceCatalog, cachedUsername)),
             new LsCommand(providers, services.State),
             new MvCommand(providers, services.State, mutations),
             new ProfileCommand(services.State),
@@ -236,6 +251,59 @@ internal static class Program
 
         foreach (var module in modules)
             root.Subcommands.Add(module.Build());
+
+        ApplySpectreHelp(root);
+        return root;
+    }
+
+    /// <summary>
+    /// The command tree of a <c>tx interactive</c> session: the commands that can run on its live
+    /// model, built to lease it, plus the session's own commands. With no model open, only those.
+    /// </summary>
+    internal static RootCommand BuildSessionRootCommand(
+        SessionScope? session,
+        IEnumerable<Command> sessionCommands,
+        IReadOnlyList<IModelProvider> providers,
+        IExpressionFormatterClient formatter,
+        AppServices services,
+        HttpClient? httpClient,
+        IWorkspaceCatalog? workspaceCatalog = null,
+        Func<string?>? cachedUsername = null)
+    {
+        var root = new RootCommand("Commands of an interactive session. Each runs on the session's model; 'save' writes it.");
+        foreach (var option in GlobalOptions.All())
+            root.Options.Add(option);
+
+        var mutations = services.Mutations;
+        // 'connect' works with or without a model open: the session follows the connection it sets.
+        var connect = new ConnectCommand(
+            providers,
+            workspaceCatalog ?? EmptyWorkspaceCatalog.Instance,
+            cachedUsername ?? (() => null),
+            services.State);
+        var modules = session is null ? [connect] : new ICommandModule[]
+        {
+            connect,
+            new AddCommand(providers, services.State, mutations, session),
+            new BpaCommand(providers, services.State, mutations, services.BpaRules, services.ConfigDirectory, httpClient, session),
+            new DepsCommand(providers, services.State, session),
+            new FindCommand(providers, services.State, session),
+            new FormatCommand(providers, formatter, services.State, mutations, session),
+            new GetCommand(providers, services.State, session),
+            new LsCommand(providers, services.State, session),
+            new MvCommand(providers, services.State, mutations, session),
+            new ReplaceCommand(providers, services.State, mutations, session),
+            new RmCommand(providers, services.State, mutations, session),
+            new SaveCommand(providers, services.State, httpClient, session),
+            new SetCommand(providers, services.State, mutations, session),
+            new SummaryCommand(providers, services.State, session),
+            new ValidateCommand(providers, services.State, session)
+        };
+
+        foreach (var module in modules)
+            root.Subcommands.Add(module.Build());
+        foreach (var command in sessionCommands)
+            root.Subcommands.Add(command);
 
         ApplySpectreHelp(root);
         return root;

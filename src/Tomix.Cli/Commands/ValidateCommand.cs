@@ -2,6 +2,7 @@ using System.CommandLine;
 using Spectre.Console;
 using Tomix.App.State;
 using Tomix.App.Validate;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -10,11 +11,13 @@ namespace Tomix.Cli.Commands;
 internal sealed class ValidateCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
 
-    public ValidateCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
+    public ValidateCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
     }
@@ -71,7 +74,8 @@ internal sealed class ValidateCommand : ICommandModule
 
             var errorsOnly = parseResult.GetValue(errorsOnlyOption);
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -81,7 +85,7 @@ internal sealed class ValidateCommand : ICommandModule
 
             var result = await CliSpinner.RunAsync(
                 "Validating model...",
-                () => new ValidateModelHandler(_providers).HandleAsync(
+                () => (_session is null ? new ValidateModelHandler(_providers) : new ValidateModelHandler(_session.Source)).HandleAsync(
                     new ValidateModelRequest(
                         model,
                         errorsOnly,

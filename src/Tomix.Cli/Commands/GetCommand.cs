@@ -1,6 +1,8 @@
 using System.CommandLine;
 using Tomix.App.Get;
+using Tomix.App.Models;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -18,11 +20,13 @@ internal sealed class GetCommand : ICommandModule
     private static readonly string[] DepsDirections = ["upstream", "downstream", "both"];
 
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
 
-    public GetCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
+    public GetCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
     }
@@ -199,13 +203,13 @@ internal sealed class GetCommand : ICommandModule
 
             return await GetPipeline.RunAsync(
                 parseResult,
-                _providers,
+                SessionScope.SourceFor(_session, _providers),
                 invocation,
                 (string? p, out ModelReference reference, out string? resolvedPath, out int exitCode) =>
                 {
                     resolvedPath = p;
-                    var ok = RecentConnections.TryResolveModel(
-                        parseResult, GlobalOptions.ModelValue(parseResult) ?? model, _state, out var resolved, out exitCode);
+                    var ok = SessionScope.TryResolveModel(
+                        _session, parseResult, GlobalOptions.ModelValue(parseResult) ?? model, _state, out var resolved, out exitCode);
                     reference = resolved!;
                     return ok;
                 },

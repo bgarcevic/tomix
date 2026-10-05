@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Mutations;
 using Tomix.App.Save;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -11,6 +12,7 @@ namespace Tomix.Cli.Commands;
 internal sealed class SaveCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
     private readonly HttpClient? _httpClient;
@@ -18,8 +20,10 @@ internal sealed class SaveCommand : ICommandModule
     public SaveCommand(
         IReadOnlyList<IModelProvider> providers,
         CliStateStore state,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
         _httpClient = httpClient;
@@ -101,8 +105,11 @@ internal sealed class SaveCommand : ICommandModule
             // mirror saved with that entry, not the active session's — otherwise `save --recent`
             // could push the recent model to the wrong workspace mirror.
             var resolver = RecentConnections.CreateResolver(source, _state);
-            var reference = resolver.ResolveReference(source.Model, source.Database, source.Server);
-            if (source.IsImplicit)
+            // Inside a session, naming no model saves the session's.
+            var reference = _session is not null && source.IsImplicit
+                ? _session.Model
+                : resolver.ResolveReference(source.Model, source.Database, source.Server);
+            if (source.IsImplicit && _session is null)
                 ConnectionBanner.Announce(parseResult, reference, _state.LoadCurrentSession());
 
             // The mirror only applies when the model being saved is the session's primary —
@@ -112,7 +119,7 @@ internal sealed class SaveCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Saving model...",
-                () => new SaveModelHandler(_providers, _httpClient).HandleAsync(
+                () => (_session is null ? new SaveModelHandler(_providers, _httpClient) : new SaveModelHandler(_session.Source, _httpClient)).HandleAsync(
                     new SaveModelRequest(
                         reference,
                         outputPath,

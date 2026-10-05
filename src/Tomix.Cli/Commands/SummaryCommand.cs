@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Tomix.App.State;
 using Tomix.App.Summary;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -9,11 +10,13 @@ namespace Tomix.Cli.Commands;
 internal sealed class SummaryCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
 
-    public SummaryCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
+    public SummaryCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
     }
@@ -33,7 +36,8 @@ internal sealed class SummaryCommand : ICommandModule
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -49,7 +53,7 @@ internal sealed class SummaryCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Loading model...",
-                () => new SummaryModelHandler(_providers).HandleAsync(
+                () => (_session is null ? new SummaryModelHandler(_providers) : new SummaryModelHandler(_session.Source)).HandleAsync(
                     new SummaryModelRequest(reference),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue));

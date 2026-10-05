@@ -28,7 +28,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     internal static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["summary", "ls", "get", "find", "deps", "query"]),
-        ("Modify", ["add", "set", "mv", "rm", "replace", "format"]),
+        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "interactive"]),
         ("Connect", ["connect", "deploy", "refresh", "save", "auth"]),
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
@@ -49,6 +49,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["diff"] = "Exit codes: 0 = identical, 1 = differences found, 2 = error.",
         ["get"] = "One object shows its properties; a wildcard or container path lists every match. --ls, --where, --deps and --unused select and analyze. get returns objects; tx find searches property text and returns match sites (name filtering deliberately overlaps).",
         ["format"] = "Formats an inline expression (--expression), one object (--path), or every expression in the model.",
+        ["interactive"] = "Alias: shell. Edits stay in memory until 'save'. Inside the session, 'connect' switches models and 'undo', 'redo', 'begin', 'commit', 'rollback', 'status', 'history' and 'exit' also work. Piped input runs as a script that stops at the first failure.",
         ["ls"] = "A shortcut for tx get --ls; both run the same read pipeline.",
         ["query"] = "The query comes from the positional argument, --query, --file, or stdin.",
         ["refresh"] = "Runs an automatic refresh unless --refresh-type says otherwise.",
@@ -228,6 +229,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["profile set"] = [
             "tx profile set dev -s MyWorkspace -d Sales",
             "tx profile set dev --from-active",
+        ],
+        ["interactive"] = [
+            "tx interactive ./model",
+            "tx shell",
+            "tx interactive ./model --echo --discard-on-exit",
         ],
         ["init"] = [
             "tx init",

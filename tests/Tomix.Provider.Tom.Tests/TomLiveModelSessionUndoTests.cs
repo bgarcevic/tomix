@@ -213,6 +213,30 @@ public sealed class TomLiveModelSessionUndoTests
     }
 
     [Fact]
+    public async Task History_ListsUndoStepsOldestFirst_ThenRedoStepsNextFirst()
+    {
+        await using var session = OpenRich();
+        string[] labels = ["one", "two", "three"];
+        for (var i = 0; i < labels.Length; i++)
+        {
+            var expression = $"{i + 10}";
+            await Request(session, new LiveLeaseOptions("shell", labels[i]), m => m.SetProperty(Set("Sales/Revenue", "expression", expression)));
+        }
+        await session.UndoAsync("shell", None);
+        await session.UndoAsync("shell", None);
+
+        Assert.Equal(
+            ["one applied", "two undone", "three undone"],
+            session.History.Select(step => $"{step.Label} {(step.Undone ? "undone" : "applied")}"));
+        Assert.All(session.History, step => Assert.Equal("shell", step.Client));
+        Assert.All(session.History, step => Assert.Single(step.Changes));
+
+        await session.RedoAsync("shell", None);
+        Assert.Equal(["one", "two", "three"], session.History.Select(step => step.Label));
+        Assert.Equal([false, false, true], session.History.Select(step => step.Undone));
+    }
+
+    [Fact]
     public async Task TheUndoLimit_DropsTheOldestSteps()
     {
         await using var session = OpenRich(undoLimit: 2);

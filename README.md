@@ -119,7 +119,8 @@ command and is suppressed in CI and for JSON/CSV output. Opt out entirely with
 Discover: `summary` (where a model lives and what it contains), `ls`, `get`,
 `find`, `deps`, `query` (run DAX/DMV queries against a live model)
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
-formatter APIs).
+formatter APIs), `interactive` (alias `shell`: run commands against a model
+held in memory, with undo, redo and transactions, then `save`).
 Refresh policies use `get`/`set`/`rm` with `<table>/RefreshPolicy`;
 `refresh --policy-only` applies a saved policy without loading data.
 Connect: `connect` (interactive workspace/model pickers with `--remote`,

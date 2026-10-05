@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Mutations;
 using Tomix.App.Replace;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -11,12 +12,14 @@ namespace Tomix.Cli.Commands;
 internal sealed class ReplaceCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
     private readonly MutationStores _mutations;
 
-    public ReplaceCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
+    public ReplaceCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
         _mutations = mutations;
@@ -112,7 +115,8 @@ internal sealed class ReplaceCommand : ICommandModule
                 "Replace", $"'{pattern}'", parseResult, formatValue))
                 return 1;
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -122,7 +126,7 @@ internal sealed class ReplaceCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 "Replacing...",
-                () => new ReplaceModelTextHandler(_providers, _mutations).HandleAsync(
+                () => (_session is null ? new ReplaceModelTextHandler(_providers, _mutations) : new ReplaceModelTextHandler(_session.Source, _mutations)).HandleAsync(
                     new ReplaceModelTextRequest(
                         reference,
                         pattern,

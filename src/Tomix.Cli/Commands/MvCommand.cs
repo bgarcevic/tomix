@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Mutations;
 using Tomix.App.Mv;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -11,12 +12,14 @@ namespace Tomix.Cli.Commands;
 internal sealed class MvCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
     private readonly MutationStores _mutations;
 
-    public MvCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
+    public MvCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
         _mutations = mutations;
@@ -99,7 +102,8 @@ internal sealed class MvCommand : ICommandModule
                 type = parsed;
             }
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -134,7 +138,7 @@ internal sealed class MvCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new MoveModelObjectHandler(_providers, _mutations).HandleAsync(
+                () => (_session is null ? new MoveModelObjectHandler(_providers, _mutations) : new MoveModelObjectHandler(_session.Source, _mutations)).HandleAsync(
                     new MoveModelObjectRequest(
                         reference,
                         parseResult.GetValue(sourceArgument) ?? "",

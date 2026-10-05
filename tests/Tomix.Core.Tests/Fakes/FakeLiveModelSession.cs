@@ -44,6 +44,8 @@ internal sealed class FakeLiveModelSession : ILiveModelSession
 
     public bool CanRedo => false;
 
+    public IReadOnlyList<LiveHistoryStep> History => [];
+
     public event EventHandler<ModelChangeBatch>? Changed;
 
     public event EventHandler<SessionStateChange>? StateChanged { add { } remove { } }

@@ -3,6 +3,7 @@ using Spectre.Console;
 using Tomix.App.Mutations;
 using Tomix.App.Rm;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -11,12 +12,14 @@ namespace Tomix.Cli.Commands;
 internal sealed class RmCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
     private readonly MutationStores _mutations;
 
-    public RmCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations)
+    public RmCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, MutationStores mutations, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
         _mutations = mutations;
@@ -99,7 +102,8 @@ internal sealed class RmCommand : ICommandModule
                 "Remove", path, parseResult, formatValue))
                 return 1;
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -114,7 +118,7 @@ internal sealed class RmCommand : ICommandModule
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
                 label,
-                () => new RemoveModelObjectHandler(_providers, _mutations).HandleAsync(
+                () => (_session is null ? new RemoveModelObjectHandler(_providers, _mutations) : new RemoveModelObjectHandler(_session.Source, _mutations)).HandleAsync(
                     new RemoveModelObjectRequest(
                         reference,
                         path,

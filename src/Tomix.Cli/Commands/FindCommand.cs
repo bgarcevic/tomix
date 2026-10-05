@@ -2,6 +2,7 @@ using System.CommandLine;
 using Spectre.Console;
 using Tomix.App.Find;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -10,11 +11,13 @@ namespace Tomix.Cli.Commands;
 internal sealed class FindCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
 
-    public FindCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
+    public FindCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
     }
@@ -93,7 +96,8 @@ internal sealed class FindCommand : ICommandModule
                 type = parsed;
             }
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -102,7 +106,7 @@ internal sealed class FindCommand : ICommandModule
                 return recentExit;
             var result = await CliSpinner.RunAsync(
                 "Searching...",
-                () => new FindModelHandler(_providers).HandleAsync(
+                () => (_session is null ? new FindModelHandler(_providers) : new FindModelHandler(_session.Source)).HandleAsync(
                     new FindModelRequest(
                         reference,
                         pattern,

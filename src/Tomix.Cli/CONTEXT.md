@@ -29,6 +29,12 @@ CLI entry point for `tx`.
   factory for the shared mutation lifecycle flags (`--save`, `--save-to`, `--serialization`,
   `--stage`, `--revert`, `--no-sync`). Mutating commands must take these from the factory rather
   than declaring their own copies, so descriptions stay uniform.
+- `Interactive/` - `tx interactive` (alias `shell`): the read-run loop, the session-only commands
+  (undo, redo, begin/commit/rollback, status, history, exit), and the line editor. A session runs
+  the ordinary command modules, built by `Program.BuildSessionRootCommand` with a `SessionScope` so
+  they lease the live session (`SessionScope.SourceFor`) and default to its model
+  (`SessionScope.TryResolveModel`). A module that can run in a session takes an optional
+  `SessionScope`; one that needs more than the model stays out of the session tree.
 - `Output/` - shared output wiring used by every command. See `Output/CONTEXT.md` for details.
   - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
   - `JsonOutput` - the single JSON serializer (the `--format json` contract).

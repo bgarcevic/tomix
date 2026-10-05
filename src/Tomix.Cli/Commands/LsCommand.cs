@@ -1,6 +1,8 @@
 using System.CommandLine;
 using Tomix.App.Get;
+using Tomix.App.Models;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
 
@@ -9,11 +11,13 @@ namespace Tomix.Cli.Commands;
 internal sealed class LsCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
 
-    public LsCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state)
+    public LsCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
     }
@@ -73,7 +77,7 @@ internal sealed class LsCommand : ICommandModule
 
             return await GetPipeline.RunAsync(
                 parseResult,
-                _providers,
+                SessionScope.SourceFor(_session, _providers),
                 invocation,
                 (string? firstValue, out ModelReference reference, out string? pathFilter, out int exitCode) =>
                     TryResolve(parseResult, firstValue, parseResult.GetValue(modelArgument), out reference, out pathFilter, out exitCode),
@@ -96,7 +100,9 @@ internal sealed class LsCommand : ICommandModule
         out string? pathFilter,
         out int exitCode)
     {
-        var firstIsModel = !string.IsNullOrWhiteSpace(firstValue)
+        // Inside a session the legacy order is off: a filter must never open another model.
+        var firstIsModel = _session is null
+            && !string.IsNullOrWhiteSpace(firstValue)
             && _providers.Any(p => p.CanOpen(new ModelReference(firstValue)));
 
         // Resolved before --recent is applied, and passed to it: TryResolveModel rejects
@@ -110,7 +116,8 @@ internal sealed class LsCommand : ICommandModule
             ? m
             : positionalModel;
 
-        if (!RecentConnections.TryResolveModel(
+        if (!SessionScope.TryResolveModel(
+                _session,
                 parseResult,
                 explicitModel,
                 _state,

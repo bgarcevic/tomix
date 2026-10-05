@@ -1,7 +1,9 @@
 using System.CommandLine;
 using Tomix.App.Bpa;
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.App.State;
+using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
@@ -12,6 +14,7 @@ namespace Tomix.Cli.Commands;
 internal sealed class BpaCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
+    private readonly SessionScope? _session;
 
     private readonly CliStateStore _state;
     private readonly MutationStores _mutations;
@@ -25,8 +28,10 @@ internal sealed class BpaCommand : ICommandModule
         MutationStores mutations,
         BpaUserRuleState bpaRules,
         string configDirectory,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        SessionScope? session = null)
     {
+        _session = session;
         _providers = providers;
         _state = state;
         _mutations = mutations;
@@ -34,6 +39,9 @@ internal sealed class BpaCommand : ICommandModule
         _configDirectory = configDirectory;
         _httpClient = httpClient;
     }
+
+    /// <summary>The live session inside <c>tx interactive</c>, otherwise the providers.</summary>
+    private IModelSessionSource Sessions => SessionScope.SourceFor(_session, _providers);
 
     public Command Build()
     {
@@ -196,7 +204,8 @@ internal sealed class BpaCommand : ICommandModule
             var ruleFiles = parseResult.GetValue(rulesOption);
             var ruleIds = parseResult.GetValue(ruleOption);
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -223,7 +232,7 @@ internal sealed class BpaCommand : ICommandModule
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
                 () => new BpaRunHandler(
-                    _providers, _mutations, _bpaRules, _configDirectory, _httpClient).HandleAsync(
+                    Sessions, _mutations, _bpaRules, _configDirectory, _httpClient).HandleAsync(
                     new BpaRunRequest(
                         model,
                         ruleFiles,
@@ -607,7 +616,8 @@ internal sealed class BpaCommand : ICommandModule
                     cancellationToken);
             }
 
-            if (!RecentConnections.TryResolveModel(
+            if (!SessionScope.TryResolveModel(
+                    _session,
                     parseResult,
                     GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument),
                     _state,
@@ -615,7 +625,7 @@ internal sealed class BpaCommand : ICommandModule
                     out var recentExit))
                 return recentExit;
 
-            var result = await new BpaRulesIgnoreHandler(_providers, _mutations, _configDirectory).HandleAsync(
+            var result = await new BpaRulesIgnoreHandler(Sessions, _mutations, _configDirectory).HandleAsync(
                 new BpaRulesIgnoreRequest(
                     model,
                     parseResult.GetValue(ruleIdArgument)!,
@@ -808,7 +818,8 @@ internal sealed class BpaCommand : ICommandModule
                 BpaRulesRenderer.RenderModel,
                 BpaRulesRenderer.ToModelJson);
 
-        if (!RecentConnections.TryResolveModel(
+        if (!SessionScope.TryResolveModel(
+                _session,
                 parseResult,
                 GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(target.Model),
                 _state,
@@ -816,7 +827,7 @@ internal sealed class BpaCommand : ICommandModule
                 out var recentExit))
             return recentExit;
 
-        var result = await new BpaRulesModelHandler(_providers, _mutations).HandleAsync(
+        var result = await new BpaRulesModelHandler(Sessions, _mutations).HandleAsync(
             target.Request(parseResult, model, action, ruleId, fields), cancellationToken);
 
         return CommandOutput.Render(parseResult, result, format, BpaRulesRenderer.RenderModel, BpaRulesRenderer.ToModelJson);
