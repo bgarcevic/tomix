@@ -462,6 +462,11 @@ Write a model to disk in a chosen format
   opt --supporting-files  Write a {modelName}.SemanticModel/ folder (with .platform and definition.pbism) around the output. Only applies to tmdl/bim written to a bare target.
   opt --no-sync  Skip workspace sync when workspace mode is active
 
+# tx serve
+Serve a model session to editors and agents over stdio
+  arg [model]  Model to open at start: a TMDL folder or .bim file (default: none; the client sends session.open)
+  opt --log <file>  Append the server's log to this file instead of writing it to stderr
+
 # tx set
 Change a property on a model object
   arg <path>  The object to change, slash-separated. DAX form works too.

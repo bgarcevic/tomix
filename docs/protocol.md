@@ -5,9 +5,14 @@ open: editors, the tomix UI, and AI agents through `tx mcp`. Every client
 attached to a session sees the same model, the same undo history and the same
 change events as `tx interactive`.
 
-This page is the v0 specification. It is implemented by `tx serve` (#349); the
-WebSocket transport of `tx ui` (#369) carries the same messages. The design
-behind it is [ADR 0001](design/adr-0001-live-model-session.md).
+This page is the v0 specification. `tx serve` implements it on stdin and
+stdout ([`tx serve`](commands/modify.md#serve-serve-a-session-to-other-programs));
+the WebSocket transport of `tx ui` (#369) will carry the same messages. The
+design behind it is [ADR 0001](design/adr-0001-live-model-session.md).
+
+`tx serve` does not serve `query.run`, `$/progress` or `diagnostics.updated`
+yet. `initialize` lists what it does serve, so a client can check
+`capabilities` rather than this page.
 
 ## Transport
 

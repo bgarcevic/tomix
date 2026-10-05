@@ -59,7 +59,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 
 ## Development Commands
 
-- Dev tasks (work from any directory): `./scripts/dev.sh <task>` (`.\scripts\dev.ps1 <task>` on Windows) — tasks: `build`, `test`, `format`, `snapshot` (regenerate `CommandSurface.approved.txt`), `docs` (strict docs build); extra args pass through to the underlying command
+- Dev tasks (work from any directory): `./scripts/dev.sh <task>` (`.\scripts\dev.ps1 <task>` on Windows) — tasks: `build`, `test`, `format`, `snapshot` (regenerate `CommandSurface.approved.txt` and the `tx serve` snapshots), `docs` (strict docs build); extra args pass through to the underlying command
 - Build: `dotnet build`
 - Test: `dotnet test`
 - Format (required CI gate, checked on the Linux leg): `dotnet format` applies fixes; CI runs `dotnet format --verify-no-changes`, so run it before pushing

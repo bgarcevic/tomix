@@ -28,7 +28,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     internal static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["summary", "ls", "get", "find", "deps", "query"]),
-        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "interactive"]),
+        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "interactive", "serve"]),
         ("Connect", ["connect", "deploy", "refresh", "save", "auth"]),
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
@@ -53,6 +53,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["ls"] = "A shortcut for tx get --ls; both run the same read pipeline.",
         ["query"] = "The query comes from the positional argument, --query, --file, or stdin.",
         ["refresh"] = "Runs an automatic refresh unless --refresh-type says otherwise.",
+        ["serve"] = "Speaks the tomix session protocol (JSON-RPC 2.0, Content-Length framing) on stdin and stdout; see docs/protocol.md. Without a model, the client opens one with session.open. The log goes to stderr unless --log names a file.",
         ["test"] = "--update records snapshots; --trx and --ci produce pipeline output.",
         ["validate"] = "--ci prints CI log groups; --trx writes a test-results file.",
     };
@@ -234,6 +235,10 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx interactive ./model",
             "tx shell",
             "tx interactive ./model --echo --discard-on-exit",
+        ],
+        ["serve"] = [
+            "tx serve ./model",
+            "tx serve --log serve.log",
         ],
         ["init"] = [
             "tx init",

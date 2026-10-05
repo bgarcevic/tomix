@@ -240,6 +240,13 @@ internal static class Program
             new ReplaceCommand(providers, services.State, mutations),
             new RmCommand(providers, services.State, mutations),
             new SaveCommand(providers, services.State, httpClient),
+            new ServeCommand(
+                providers,
+                services.State,
+                services.Staging,
+                version,
+                (session, sessionCommands) => BuildSessionRootCommand(
+                    session, sessionCommands, providers, formatter, services, httpClient, workspaceCatalog, cachedUsername)),
             new SetCommand(providers, services.State, mutations),
             new SummaryCommand(providers, services.State),
             new StageCommand(providers, services.State, services.Staging, services.ConfigStore.ValidateOnSaveEnabled),

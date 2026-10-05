@@ -561,6 +561,42 @@ tx interactive ./model --echo < edits.txt     # run a script; stops at the first
 
 An interactive session opens TMDL folders and `.bim` files.
 
+## `serve` — serve a session to other programs
+
+```
+tx serve [model] [options]
+```
+
+Holds a model session like `tx interactive`, but for programs instead of a
+person: editors, the tomix UI and agents send requests on stdin and read
+answers and change events on stdout, in the [session protocol](../protocol.md)
+(JSON-RPC 2.0 with `Content-Length` framing). Each request runs the matching
+command on the session, so its result is that command's `--output-format json`
+payload; edits stay in memory until `session.save`, and undo, redo and
+transactions work as in `tx interactive`.
+
+With a model argument the session opens it at start; without one the client
+sends `session.open`. stdout carries only protocol frames. The server's log
+(one line per request) goes to stderr, or to a file with `--log`.
+
+| Option | Description |
+|--------|-------------|
+| `--log <file>` | Append the server's log to this file instead of writing it to stderr. |
+
+The server exits 0 after `shutdown` and `exit`, and 1 when `exit` comes
+without `shutdown`. When the client disconnects (the end of stdin), the server
+discards unsaved changes, says so in its log, and exits 0. Requests run one at
+a time in arrival order; `$/cancelRequest` cancels one that is waiting or
+running. `initialize` lists the methods this version serves: `query.run`,
+`$/progress` and `diagnostics.updated` are in the spec but not served yet.
+
+```sh
+tx serve ./model
+tx serve --log serve.log
+```
+
+`tx serve` opens TMDL folders and `.bim` files, as `tx interactive` does.
+
 ## Refresh policies
 
 Policies are table child objects, inspected and edited with `get`, `set`, and `rm`:

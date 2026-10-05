@@ -13,7 +13,7 @@ case "${1:-}" in
     echo "  build     dotnet build" >&2
     echo "  test      dotnet test" >&2
     echo "  format    dotnet format (applies fixes; CI verifies with --verify-no-changes)" >&2
-    echo "  snapshot  regenerate CommandSurface.approved.txt" >&2
+    echo "  snapshot  regenerate CommandSurface, ServeSurface and ServeTranscript snapshots" >&2
     echo "  docs      strict docs-site build (what CI runs; requires uv)" >&2
     exit 2
     ;;
@@ -30,6 +30,6 @@ case "$task" in
   format)  dotnet format "$@" ;;
   # Keep the env var, the filter, and the failure message in
   # CommandSurfaceSnapshotTests.cs pointing at this recipe.
-  snapshot) TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter CommandSurfaceSnapshotTests "$@" ;;
+  snapshot) TOMIX_UPDATE_SNAPSHOTS=1 dotnet test --filter "FullyQualifiedName~CommandSurfaceSnapshotTests|FullyQualifiedName~ServeSurfaceTests" "$@" ;;
   docs)    uv run zensical build --clean --strict "$@" ;;
 esac

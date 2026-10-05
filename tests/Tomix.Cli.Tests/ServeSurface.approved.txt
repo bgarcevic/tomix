@@ -1,0 +1,32 @@
+# methods
+session.open
+session.close
+session.status
+session.save
+session.snapshot
+session.history
+session.undo
+session.redo
+transaction.begin
+transaction.commit
+transaction.rollback
+model.summary
+model.tree
+object.get
+object.find
+deps.get
+object.add
+object.set
+object.remove
+object.move
+model.replace
+bpa.run
+bpa.fix
+dax.format
+dax.check
+# notifications
+model.changed
+session.state
+session.saved
+transaction.opened
+transaction.closed

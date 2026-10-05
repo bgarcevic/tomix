@@ -35,6 +35,12 @@ CLI entry point for `tx`.
   they lease the live session (`SessionScope.SourceFor`) and default to its model
   (`SessionScope.TryResolveModel`). A module that can run in a session takes an optional
   `SessionScope`; one that needs more than the model stays out of the session tree.
+- `Serve/` - `tx serve`: the session protocol (docs/protocol.md) on stdio. `ProtocolServer` owns
+  framing, the lifecycle, validation, cancellation and error answers; `ServeSession` answers the
+  methods, most by running the session command tree (the one `tx interactive` uses) with JSON
+  output captured, so `data` is the command's own JSON. `ProtocolRoutes` maps parameters to
+  command-line arguments. Commands run one at a time because their output is captured by
+  redirecting the console; stdout carries only frames.
 - `Output/` - shared output wiring used by every command. See `Output/CONTEXT.md` for details.
   - `OutputFormats` - the canonical `--format` option, aliases, and allowed values.
   - `JsonOutput` - the single JSON serializer (the `--format json` contract).
