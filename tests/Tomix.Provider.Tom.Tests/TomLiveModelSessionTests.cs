@@ -326,7 +326,7 @@ public sealed class TomLiveModelSessionTests
     /// <summary>Gives a request started on another thread time to reach the gate's queue.</summary>
     private static Task WaitUntilQueued() => Task.Delay(100);
 
-    private static TempDir CopyOfBasicTmdl()
+    internal static TempDir CopyOfBasicTmdl()
     {
         var dir = new TempDir();
         foreach (var file in Directory.GetFiles(BasicTmdl, "*", SearchOption.AllDirectories))
@@ -339,7 +339,7 @@ public sealed class TomLiveModelSessionTests
         return dir;
     }
 
-    private static void AssertSameFiles(string expected, string actual)
+    internal static void AssertSameFiles(string expected, string actual)
     {
         static string[] Files(string root) => Directory.GetFiles(root, "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(root, f)).Order(StringComparer.Ordinal).ToArray();

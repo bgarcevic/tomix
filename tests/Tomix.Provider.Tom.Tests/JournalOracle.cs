@@ -65,23 +65,56 @@ internal static class JournalOracle
         Assert.NotEqual(tmdlBefore, TmdlSerializer.SerializeDatabase(journal.Database));
         journal.Rollback();
 
+        AssertRestored(journal, restore, tmdlBefore, before);
+        Assert.Equal(0, journal.Depth);
+        Assert.Empty(journal.Entries);
+    }
+
+    /// <summary>
+    /// Undo and redo as the live session does them (ADR 0003 §3): commit keeps the checkpoint
+    /// taken before the mutation, undo captures the state after it and restores that checkpoint,
+    /// redo restores the capture. Each must come back exactly, IDs included, and a checkpoint
+    /// must survive being restored so it can be restored again.
+    /// </summary>
+    public static void AssertUndoRedoRestores(Database database, Action<TomModelMutator> mutate, TomCheckpointRestore restore)
+    {
+        var journal = new TomChangeJournal(database, restore);
+        var tmdlBefore = TmdlSerializer.SerializeDatabase(journal.Database);
+        var before = TomModelSummarizer.Snapshot(journal.Database, "M", journal.Ids);
+
+        journal.Begin();
+        mutate(new TomModelMutator(journal.Database, journal.Writer));
+        journal.Commit(out var checkpoint);
+        Assert.NotNull(checkpoint);
         var tmdlAfter = TmdlSerializer.SerializeDatabase(journal.Database);
         var after = TomModelSummarizer.Snapshot(journal.Database, "M", journal.Ids);
+        Assert.NotEqual(tmdlBefore, tmdlAfter);
+
+        var redo = journal.Capture();
+        journal.RestoreTo(checkpoint);
+        AssertRestored(journal, restore, tmdlBefore, before);
+        journal.RestoreTo(redo);
+        AssertRestored(journal, restore, tmdlAfter, after);
+        journal.RestoreTo(checkpoint);
+        AssertRestored(journal, restore, tmdlBefore, before);
+    }
+
+    private static void AssertRestored(TomChangeJournal journal, TomCheckpointRestore restore, string expectedTmdl, ModelSnapshot expected)
+    {
+        var tmdl = TmdlSerializer.SerializeDatabase(journal.Database);
+        var actual = TomModelSummarizer.Snapshot(journal.Database, "M", journal.Ids);
         if (restore == TomCheckpointRestore.Swap)
         {
-            Assert.Equal(tmdlBefore, tmdlAfter);
-            Assert.Equal(JsonSerializer.Serialize(before), JsonSerializer.Serialize(after));
+            Assert.Equal(expectedTmdl, tmdl);
+            Assert.Equal(JsonSerializer.Serialize(expected), JsonSerializer.Serialize(actual));
         }
         else
         {
             // CopyTo re-creates changed objects at the end of their collections: same content and
             // IDs, sibling order free.
-            Assert.Equal(SortedLines(tmdlBefore), SortedLines(tmdlAfter));
-            Assert.Equal(SnapshotDiff.Flatten(before), SnapshotDiff.Flatten(after));
+            Assert.Equal(SortedLines(expectedTmdl), SortedLines(tmdl));
+            Assert.Equal(SnapshotDiff.Flatten(expected), SnapshotDiff.Flatten(actual));
         }
-
-        Assert.Equal(0, journal.Depth);
-        Assert.Empty(journal.Entries);
     }
 
     private static List<string> SortedLines(string text)

@@ -65,16 +65,41 @@ internal sealed class TomChangeJournal
     /// the result is empty. A top-level commit returns the transaction's changes, cascades
     /// included, and clears the entries.
     /// </summary>
-    public IReadOnlyList<ModelChange> Commit()
+    public IReadOnlyList<ModelChange> Commit() => Commit(out _);
+
+    /// <inheritdoc cref="Commit()"/>
+    /// <param name="before">For a top-level commit, the model as it was when the transaction
+    /// began, or <c>null</c> when it wrote nothing; the session keeps it as the undo step
+    /// (ADR 0003 §3). Always <c>null</c> for a savepoint.</param>
+    public IReadOnlyList<ModelChange> Commit(out TomCheckpoint? before)
     {
         RequireTransaction();
-        _frames.Pop();
+        var frame = _frames.Pop();
+        before = null;
         if (_frames.Count > 0)
             return [];
 
         var changes = TomChangeEvents.Build(_entries, Ids);
         _entries.Clear();
+        before = frame.Checkpoint;
         return changes;
+    }
+
+    /// <summary>A checkpoint of the model as it is now, outside any transaction: the redo step
+    /// an undo keeps.</summary>
+    public TomCheckpoint Capture()
+    {
+        RequireNoTransaction();
+        return TakeCheckpoint();
+    }
+
+    /// <summary>Puts <paramref name="checkpoint"/> back outside any transaction: an undo or redo.
+    /// The checkpoint stays unchanged, so it can be restored again.</summary>
+    public void RestoreTo(TomCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        RequireNoTransaction();
+        Restore(checkpoint);
     }
 
     /// <summary>Rolls back the innermost transaction: restores the model and IDs to where they
@@ -141,26 +166,41 @@ internal sealed class TomChangeJournal
             throw new InvalidOperationException("TOM writes and commits need an open journal transaction.");
     }
 
-    private Checkpoint TakeCheckpoint()
+    private void RequireNoTransaction()
     {
-        var copy = Database.Clone();
-        var ids = new Dictionary<MetadataObject, ObjectId>(ReferenceEqualityComparer.Instance);
-        foreach (var (live, copied) in TomObjectIdMap.Pair(TomObjectTree.Walk(Database.Model), TomObjectTree.Walk(copy.Model)))
-        {
-            if (Ids.TryGet(live, out var id))
-                ids[copied] = id;
-        }
-
-        return new Checkpoint(copy, ids);
+        if (_frames.Count > 0)
+            throw new InvalidOperationException("Commit or roll back the open journal transaction first.");
     }
 
-    private void Restore(Checkpoint checkpoint)
+    private TomCheckpoint TakeCheckpoint()
+    {
+        var copy = Copy(Database);
+        var ids = new Dictionary<MetadataObject, ObjectId>(ReferenceEqualityComparer.Instance);
+        // Give every object its ID now: one that first gets an ID after this point would
+        // otherwise come back from a restore without it and be given a new one.
+        foreach (var (live, copied) in TomObjectIdMap.Pair(TomObjectTree.Walk(Database.Model), TomObjectTree.Walk(copy.Model)))
+            ids[copied] = Ids.GetOrAdd(live);
+
+        return new TomCheckpoint(copy, ids);
+    }
+
+    /// <summary><c>Database.Clone()</c>, plus what it leaves out: the compatibility mode, which
+    /// TMDL writes as <c>compatibilityMode</c> (TOM 19.117).</summary>
+    private static Database Copy(Database database)
+    {
+        var copy = database.Clone();
+        if (copy.CompatibilityMode != database.CompatibilityMode)
+            copy.CompatibilityMode = database.CompatibilityMode;
+        return copy;
+    }
+
+    private void Restore(TomCheckpoint checkpoint)
     {
         var ids = new Dictionary<MetadataObject, ObjectId>(ReferenceEqualityComparer.Instance);
         if (_restore == TomCheckpointRestore.Swap)
         {
             // Restore a copy, not the checkpoint itself: an outer transaction may share it.
-            var restored = checkpoint.Database.Clone();
+            var restored = Copy(checkpoint.Database);
             foreach (var (saved, live) in TomObjectIdMap.Pair(TomObjectTree.Walk(checkpoint.Database.Model), TomObjectTree.Walk(restored.Model)))
             {
                 if (checkpoint.Ids.TryGetValue(saved, out var id))
@@ -218,11 +258,13 @@ internal sealed class TomChangeJournal
     {
         public int EntryStart { get; } = entryStart;
 
-        public Checkpoint? Checkpoint { get; set; }
+        public TomCheckpoint? Checkpoint { get; set; }
     }
-
-    private sealed record Checkpoint(Database Database, Dictionary<MetadataObject, ObjectId> Ids);
 }
+
+/// <summary>A copy of the model and the ID of each of its objects (ADR 0003 §1). Never
+/// mutated: a restore works on a copy of it.</summary>
+internal sealed record TomCheckpoint(Database Database, Dictionary<MetadataObject, ObjectId> Ids);
 
 internal enum TomJournalOperation
 {

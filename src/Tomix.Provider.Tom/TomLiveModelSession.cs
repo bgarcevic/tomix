@@ -8,22 +8,37 @@ namespace Tomix.Provider.Tom;
 /// A TOM model held open for many requests (ADR 0001), for TMDL, <c>.bim</c> and XMLA sources.
 /// All access to the <see cref="Database"/> goes through a FIFO <see cref="LeaseGate"/>; a lease
 /// is a <see cref="TomChangeJournal"/> transaction and the only way to reach the model
-/// (ADR 0002 §1). Change events come from the journal; rollback restores its checkpoints
-/// (ADR 0003).
+/// (ADR 0002 §1). Change events come from the journal; rollback, undo and redo restore its
+/// checkpoints (ADR 0003).
 /// </summary>
 /// <remarks>
-/// Undo, redo and explicit transactions arrive with #346 and throw
-/// <see cref="NotSupportedException"/> until then. Detecting a source changed on disk
+/// Each committed transaction that changed something is one undo step: the checkpoint taken
+/// before it, kept with the changes it made. Detecting a source changed on disk
 /// (<see cref="SessionState.Stale"/>) is not implemented yet.
 /// </remarks>
 public sealed class TomLiveModelSession : ILiveModelSession
 {
+    /// <summary>Undo steps kept by default. Each holds a full copy of the model (ADR 0003 §3),
+    /// so memory grows with model size times this number.</summary>
+    public const int DefaultUndoLimit = 50;
+
+    /// <summary>How long an explicit transaction may sit with no lease in it before it is
+    /// rolled back, so a client that went away cannot hold the model forever.</summary>
+    public static readonly TimeSpan DefaultTransactionIdleTimeout = TimeSpan.FromMinutes(15);
+
     private readonly TomModelSource _source;
     private readonly LeaseGate _gate = new();
     private readonly AsyncLocal<LeaseFlow?> _flow = new();
     private readonly object _sync = new();
+    private readonly LinkedList<UndoStep> _undo = new();
+    private readonly Stack<UndoStep> _redo = new();
     private long _version;
-    private long? _savedVersion = 0;
+    // Identifies the model's content: a new token per committed change, the step's own token on
+    // undo and redo. The session is clean while the saved token is the current one.
+    private object _content = new();
+    private object? _savedContent;
+    private Lease? _explicit;
+    private Timer? _idleTimer;
     private bool _saving;
     private bool _closed;
     private int _closing;
@@ -34,6 +49,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
     internal TomLiveModelSession(TomModelSource source)
     {
         _source = source;
+        _savedContent = _content;
         Journal = new TomChangeJournal(source.Load(), source.Restore);
     }
 
@@ -46,6 +62,13 @@ public sealed class TomLiveModelSession : ILiveModelSession
 
     internal TomModelSource Source => _source;
 
+    /// <summary>How many undo steps to keep; the oldest is dropped past it.</summary>
+    internal int UndoLimit { get; init; } = DefaultUndoLimit;
+
+    /// <summary>Idle time after which an explicit transaction is rolled back;
+    /// <see cref="Timeout.InfiniteTimeSpan"/> never rolls it back.</summary>
+    internal TimeSpan TransactionIdleTimeout { get; init; } = DefaultTransactionIdleTimeout;
+
     public ModelReference Reference => _source.Reference;
 
     public string SourcePath => _source.SourcePath;
@@ -57,7 +80,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
 
     public bool IsDirty
     {
-        get { lock (_sync) return _savedVersion != _version; }
+        get { lock (_sync) return !ReferenceEquals(_savedContent, _content); }
     }
 
     public long Version
@@ -65,9 +88,15 @@ public sealed class TomLiveModelSession : ILiveModelSession
         get { lock (_sync) return _version; }
     }
 
-    public bool CanUndo => false;
+    public bool CanUndo
+    {
+        get { lock (_sync) return _undo.Count > 0; }
+    }
 
-    public bool CanRedo => false;
+    public bool CanRedo
+    {
+        get { lock (_sync) return _redo.Count > 0; }
+    }
 
     public event EventHandler<ModelChangeBatch>? Changed;
 
@@ -90,17 +119,34 @@ public sealed class TomLiveModelSession : ILiveModelSession
 
         var flow = new LeaseFlow();
         _flow.Value = flow;
-        return AcquireAsync(flow, options, cancellationToken);
+        return OpenTransactionOf(options.Client) is { } open
+            ? JoinTransactionAsync(flow, open, options, cancellationToken)
+            : AcquireAsync(flow, options, isExplicit: false, cancellationToken);
     }
 
-    public Task<ILiveSessionLease> BeginTransactionAsync(LiveLeaseOptions options, CancellationToken cancellationToken)
-        => throw new NotSupportedException("Explicit transactions are not available yet (#346).");
+    /// <remarks>The transaction is not tied to the caller's asynchronous flow: the client's
+    /// later leases join it by <see cref="LiveLeaseOptions.Client"/>, one at a time, each as a
+    /// savepoint. It is rolled back after <see cref="TransactionIdleTimeout"/> with no lease in it.</remarks>
+    /// <exception cref="InvalidOperationException">The caller holds a lease, or the client
+    /// already has an open transaction.</exception>
+    public async Task<ILiveSessionLease> BeginTransactionAsync(LiveLeaseOptions options, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ThrowIfClosed();
+        if (_flow.Value?.Current is not null || OpenTransactionOf(options.Client) is not null)
+            throw new InvalidOperationException("A transaction is already open; transactions do not nest.");
 
+        return await AcquireAsync(new LeaseFlow(), options, isExplicit: true, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <exception cref="InvalidOperationException">The caller holds a lease, or the client has
+    /// an open transaction: commit or roll it back first.</exception>
     public Task<ModelChangeBatch?> UndoAsync(string? client, CancellationToken cancellationToken)
-        => throw new NotSupportedException("Undo is not available yet (#346).");
+        => StepAsync(client, ChangeOriginKind.Undo, cancellationToken);
 
+    /// <inheritdoc cref="UndoAsync"/>
     public Task<ModelChangeBatch?> RedoAsync(string? client, CancellationToken cancellationToken)
-        => throw new NotSupportedException("Redo is not available yet (#346).");
+        => StepAsync(client, ChangeOriginKind.Redo, cancellationToken);
 
     public async Task<LiveModelSnapshot> GetLiveSnapshotAsync(CancellationToken cancellationToken)
     {
@@ -108,12 +154,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
         if (cached is not null && cached.Version == Version)
             return cached;
 
-        return await ReadAsync(() =>
-        {
-            if (_snapshot is null || _snapshot.Version != _version)
-                Volatile.Write(ref _snapshot, new LiveModelSnapshot(_version, Snapshot()));
-            return _snapshot!;
-        }, cancellationToken).ConfigureAwait(false);
+        return await ReadAsync(CacheSnapshot, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
@@ -122,8 +163,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
     public Task<ModelSummary> GetSummaryAsync(CancellationToken cancellationToken)
         => ReadAsync(() => _source.Summarize(Journal.Database), cancellationToken);
 
-    /// <summary>Closes the session once the current lease ends. Leases still waiting fail with
-    /// <see cref="ObjectDisposedException"/>.</summary>
+    /// <summary>Closes the session once the current lease ends, rolling back an open explicit
+    /// transaction. Leases still waiting fail with <see cref="ObjectDisposedException"/>.</summary>
     public async ValueTask DisposeAsync()
     {
         if (_flow.Value?.Current is not null)
@@ -131,11 +172,22 @@ public sealed class TomLiveModelSession : ILiveModelSession
         if (Interlocked.Exchange(ref _closing, 1) == 1)
             return;
 
+        Lease? open;
+        lock (_sync)
+            open = _explicit;
+        if (open is not null)
+            await open.DisposeAsync().ConfigureAwait(false);
+
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             lock (_sync)
+            {
                 _closed = true;
+                _undo.Clear();
+                _redo.Clear();
+            }
+
             UpdateState();
             await _source.DisposeAsync().ConfigureAwait(false);
         }
@@ -171,15 +223,33 @@ public sealed class TomLiveModelSession : ILiveModelSession
         }
     }
 
-    private async Task<ILiveSessionLease> AcquireAsync(LeaseFlow flow, LiveLeaseOptions options, CancellationToken cancellationToken)
+    /// <summary>The published snapshot of the current version, built if needed. Callers hold the gate.</summary>
+    private LiveModelSnapshot CacheSnapshot()
+    {
+        if (_snapshot is null || _snapshot.Version != _version)
+            Volatile.Write(ref _snapshot, new LiveModelSnapshot(_version, Snapshot()));
+        return _snapshot!;
+    }
+
+    private async Task<ILiveSessionLease> AcquireAsync(LeaseFlow flow, LiveLeaseOptions options, bool isExplicit, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         Lease lease;
         try
         {
             ThrowIfClosed();
+            if (isExplicit)
+            {
+                if (OpenTransactionOf(options.Client) is not null)
+                    throw new InvalidOperationException("A transaction is already open; transactions do not nest.");
+
+                // Other clients read the last committed version while the transaction is open;
+                // cache it now, because building it later would read uncommitted changes.
+                CacheSnapshot();
+            }
+
             Journal.Begin();
-            lease = new Lease(this, flow, parent: null, options, $"t{++_transactions}", Version);
+            lease = new Lease(this, flow, parent: null, options, $"t{++_transactions}", Version, isExplicit);
         }
         catch
         {
@@ -188,6 +258,13 @@ public sealed class TomLiveModelSession : ILiveModelSession
         }
 
         flow.Current = lease;
+        if (isExplicit)
+        {
+            lock (_sync)
+                _explicit = lease;
+            ArmIdleTimer(lease);
+        }
+
         return lease;
     }
 
@@ -199,7 +276,31 @@ public sealed class TomLiveModelSession : ILiveModelSession
         return lease;
     }
 
-    private ModelChangeBatch? Commit(Lease lease)
+    /// <summary>The open explicit transaction, if <paramref name="client"/> owns it.</summary>
+    private Lease? OpenTransactionOf(string? client)
+    {
+        lock (_sync)
+            return _explicit is { } open && string.Equals(open.Options.Client, client, StringComparison.Ordinal) ? open : null;
+    }
+
+    /// <summary>A lease of the client that owns <paramref name="open"/>: waits for the client's
+    /// previous lease in it to end, then runs as a savepoint inside the transaction.</summary>
+    private async Task<ILiveSessionLease> JoinTransactionAsync(LeaseFlow flow, Lease open, LiveLeaseOptions options, CancellationToken cancellationToken)
+    {
+        if (!await open.TakeTurnAsync(cancellationToken).ConfigureAwait(false))
+        {
+            // The transaction ended while this lease waited: lease on its own.
+            return await AcquireAsync(flow, options, isExplicit: false, cancellationToken).ConfigureAwait(false);
+        }
+
+        DisarmIdleTimer();
+        Journal.Begin();
+        var lease = new Lease(this, flow, open, options, open.Transaction, Version);
+        flow.Current = lease;
+        return lease;
+    }
+
+    private async Task<ModelChangeBatch?> CommitAsync(Lease lease, CancellationToken cancellationToken)
     {
         if (!ReferenceEquals(lease.Flow.Current, lease))
             throw new InvalidOperationException("A lease opened inside this one is still open; end it first.");
@@ -207,14 +308,18 @@ public sealed class TomLiveModelSession : ILiveModelSession
         if (lease.IsJoined)
         {
             Journal.Commit();
-            lease.End();
+            EndJoined(lease);
             return null;
         }
+
+        // An explicit transaction ends only between the leases that join it.
+        if (lease.IsExplicit && !await lease.TakeTurnAsync(cancellationToken).ConfigureAwait(false))
+            throw new ObjectDisposedException(nameof(Lease), "The transaction has already ended.");
 
         try
         {
             var entries = Journal.Entries.Count;
-            var changes = Journal.Commit();
+            var changes = Journal.Commit(out var before);
             lease.End();
 
             ModelChangeBatch? batch = null;
@@ -225,10 +330,16 @@ public sealed class TomLiveModelSession : ILiveModelSession
                     _version++;
                     batch = new ModelChangeBatch(_version, lease.Transaction,
                         new ChangeOrigin(lease.Options.Client, ChangeOriginKind.Apply), changes);
+                    var previous = _content;
+                    _content = new object();
+                    _undo.AddLast(new UndoStep(before!, previous, _content, changes));
+                    while (_undo.Count > UndoLimit)
+                        _undo.RemoveFirst();
+                    _redo.Clear();
                 }
 
                 if (lease.EntriesAtSave is { } atSave)
-                    _savedVersion = atSave == entries ? _version : null;
+                    _savedContent = atSave == entries ? _content : null;
             }
 
             if (batch is not null)
@@ -238,8 +349,15 @@ public sealed class TomLiveModelSession : ILiveModelSession
         }
         finally
         {
-            _gate.Release();
+            ReleaseRoot(lease);
         }
+    }
+
+    private async Task RollbackAsync(Lease lease, CancellationToken cancellationToken)
+    {
+        if (lease.IsExplicit && !await lease.TakeTurnAsync(cancellationToken).ConfigureAwait(false))
+            throw new ObjectDisposedException(nameof(Lease), "The transaction has already ended.");
+        Rollback(lease);
     }
 
     private void Rollback(Lease lease)
@@ -260,7 +378,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
             }
             finally
             {
-                lease.End();
+                EndJoined(lease);
             }
 
             return;
@@ -274,7 +392,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
                 // A save inside a rolled-back transaction wrote state the model no longer has,
                 // unless nothing had been written before it.
                 if (lease.EntriesAtSave is { } atSave)
-                    _savedVersion = atSave == 0 ? _version : null;
+                    _savedContent = atSave == 0 ? _content : null;
             }
 
             UpdateState();
@@ -282,7 +400,124 @@ public sealed class TomLiveModelSession : ILiveModelSession
         finally
         {
             lease.End();
+            ReleaseRoot(lease);
+        }
+    }
+
+    /// <summary>Ends a savepoint lease. One that joined an explicit transaction from its own
+    /// flow hands the transaction to the client's next lease.</summary>
+    private void EndJoined(Lease lease)
+    {
+        lease.End();
+        if (lease.HoldsTurn)
+        {
+            ArmIdleTimer(lease.Parent!);
+            lease.Parent!.Turns!.Release();
+        }
+    }
+
+    private void ReleaseRoot(Lease lease)
+    {
+        if (lease.IsExplicit)
+        {
+            DisarmIdleTimer();
+            lock (_sync)
+            {
+                if (ReferenceEquals(_explicit, lease))
+                    _explicit = null;
+            }
+
+            // Leases queued for the transaction find it ended and lease on their own.
+            lease.Turns!.Release();
+        }
+
+        _gate.Release();
+    }
+
+    private async Task<ModelChangeBatch?> StepAsync(string? client, ChangeOriginKind kind, CancellationToken cancellationToken)
+    {
+        ThrowIfClosed();
+        var name = kind == ChangeOriginKind.Undo ? "Undo" : "Redo";
+        if (_flow.Value?.Current is not null)
+            throw new InvalidOperationException($"{name} is not available while holding a lease; end the lease first.");
+        if (OpenTransactionOf(client) is not null)
+            throw new InvalidOperationException($"{name} is not available inside a transaction; commit or roll it back first.");
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfClosed();
+            UndoStep? step;
+            lock (_sync)
+                step = kind == ChangeOriginKind.Undo ? _undo.Last?.Value : _redo.TryPeek(out var next) ? next : null;
+            if (step is null)
+                return null;
+
+            ModelChangeBatch batch;
+            if (kind == ChangeOriginKind.Undo)
+            {
+                // The model is still in the step's after state: keep it for a redo.
+                step.After ??= Journal.Capture();
+                Journal.RestoreTo(step.Before);
+                lock (_sync)
+                {
+                    _undo.RemoveLast();
+                    _redo.Push(step);
+                    _content = step.BeforeContent;
+                    batch = new ModelChangeBatch(++_version, $"t{++_transactions}", new ChangeOrigin(client, kind), Invert(step.Changes));
+                }
+            }
+            else
+            {
+                Journal.RestoreTo(step.After!);
+                lock (_sync)
+                {
+                    _redo.Pop();
+                    _undo.AddLast(step);
+                    _content = step.AfterContent;
+                    batch = new ModelChangeBatch(++_version, $"t{++_transactions}", new ChangeOrigin(client, kind), step.Changes);
+                }
+            }
+
+            Changed?.Invoke(this, batch);
+            UpdateState();
+            return batch;
+        }
+        finally
+        {
             _gate.Release();
+        }
+    }
+
+    /// <summary>The changes that take the model back across <paramref name="changes"/>.</summary>
+    internal static IReadOnlyList<ModelChange> Invert(IReadOnlyList<ModelChange> changes)
+        => changes.Reverse().Select(change => change.Change switch
+        {
+            ModelChangeKind.Added => change with { Change = ModelChangeKind.Removed },
+            ModelChangeKind.Removed => change with { Change = ModelChangeKind.Added },
+            ModelChangeKind.Renamed or ModelChangeKind.Moved when change.OldPath is { } old
+                => change with { Path = old, OldPath = change.Path },
+            _ => change
+        }).ToList();
+
+    private void ArmIdleTimer(Lease open)
+    {
+        if (TransactionIdleTimeout == Timeout.InfiniteTimeSpan)
+            return;
+
+        lock (_sync)
+        {
+            _idleTimer?.Dispose();
+            _idleTimer = new Timer(_ => _ = open.DisposeAsync().AsTask(), null, TransactionIdleTimeout, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void DisarmIdleTimer()
+    {
+        lock (_sync)
+        {
+            _idleTimer?.Dispose();
+            _idleTimer = null;
         }
     }
 
@@ -311,7 +546,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
         {
             var next = _closed ? SessionState.Closed
                 : _saving ? SessionState.Saving
-                : _savedVersion != _version ? SessionState.Dirty
+                : !ReferenceEquals(_savedContent, _content) ? SessionState.Dirty
                 : SessionState.Clean;
             if (next != _state)
             {
@@ -342,6 +577,21 @@ public sealed class TomLiveModelSession : ILiveModelSession
         }
     }
 
+    /// <summary>One undo step: the model before and after a committed transaction, and its changes.</summary>
+    private sealed class UndoStep(TomCheckpoint before, object beforeContent, object afterContent, IReadOnlyList<ModelChange> changes)
+    {
+        public TomCheckpoint Before { get; } = before;
+
+        /// <summary>Taken by the first undo, while the model is still in this state.</summary>
+        public TomCheckpoint? After { get; set; }
+
+        public object BeforeContent { get; } = beforeContent;
+
+        public object AfterContent { get; } = afterContent;
+
+        public IReadOnlyList<ModelChange> Changes { get; } = changes;
+    }
+
     /// <summary>The leases of one asynchronous flow: the innermost open one, if any.</summary>
     internal sealed class LeaseFlow
     {
@@ -353,7 +603,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
         private readonly TomLiveModelSession _session;
         private int _ended;
 
-        public Lease(TomLiveModelSession session, LeaseFlow flow, Lease? parent, LiveLeaseOptions options, string transaction, long baseVersion)
+        public Lease(TomLiveModelSession session, LeaseFlow flow, Lease? parent, LiveLeaseOptions options, string transaction, long baseVersion,
+            bool isExplicit = false)
         {
             _session = session;
             Flow = flow;
@@ -361,6 +612,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
             Options = options;
             Transaction = transaction;
             BaseVersion = baseVersion;
+            IsExplicit = isExplicit;
+            Turns = isExplicit ? new LeaseGate() : null;
             Session = session.Source is TomServerModelSource server
                 ? new TomServerLeaseView(session, this, server)
                 : new TomLeaseView(session, this);
@@ -387,24 +640,51 @@ public sealed class TomLiveModelSession : ILiveModelSession
 
         public bool IsJoined => Parent is not null;
 
+        /// <summary>An explicit transaction (<see cref="BeginTransactionAsync"/>).</summary>
+        public bool IsExplicit { get; }
+
+        /// <summary>For an explicit transaction: one turn at a time for the leases that join it,
+        /// and for ending it.</summary>
+        public LeaseGate? Turns { get; }
+
+        /// <summary>True for a lease that joined an explicit transaction from its own flow; it
+        /// holds the transaction's turn until it ends.</summary>
+        public bool HoldsTurn => Parent is { IsExplicit: true } && !ReferenceEquals(Parent.Flow, Flow);
+
         public Task<ModelChangeBatch?> CommitAsync(CancellationToken cancellationToken)
         {
             ThrowIfEnded();
-            return Task.FromResult(_session.Commit(this));
+            return _session.CommitAsync(this, cancellationToken);
         }
 
         public Task RollbackAsync(CancellationToken cancellationToken)
         {
             ThrowIfEnded();
-            _session.Rollback(this);
-            return Task.CompletedTask;
+            return _session.RollbackAsync(this, cancellationToken);
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
+            if (!IsActive)
+                return;
+
+            // An explicit transaction waits for the lease running inside it, which may end it.
+            if (IsExplicit && !await TakeTurnAsync(CancellationToken.None).ConfigureAwait(false))
+                return;
+
+            _session.Rollback(this);
+        }
+
+        /// <summary>For an explicit transaction: waits for its turn. False, with the turn passed
+        /// on, when the transaction ended meanwhile.</summary>
+        public async Task<bool> TakeTurnAsync(CancellationToken cancellationToken)
+        {
+            await Turns!.WaitAsync(cancellationToken).ConfigureAwait(false);
             if (IsActive)
-                _session.Rollback(this);
-            return ValueTask.CompletedTask;
+                return true;
+
+            Turns.Release();
+            return false;
         }
 
         public void ThrowIfEnded() => ObjectDisposedException.ThrowIf(!IsActive, this);
@@ -412,8 +692,9 @@ public sealed class TomLiveModelSession : ILiveModelSession
         public void End()
         {
             Interlocked.Exchange(ref _ended, 1);
+            // A lease that joined an explicit transaction leaves its own flow with no lease.
             if (ReferenceEquals(Flow.Current, this))
-                Flow.Current = Parent;
+                Flow.Current = Parent is not null && ReferenceEquals(Parent.Flow, Flow) ? Parent : null;
         }
     }
 }

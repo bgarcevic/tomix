@@ -6,15 +6,15 @@ namespace Tomix.Provider.Tom.Tests;
 /// <summary>
 /// Runs every mutation kind on <see cref="JournalFixture.Rich"/> through both oracles of
 /// <see cref="JournalOracle"/>: the journal's changes must agree with the snapshot diff, and
-/// rolling the mutation back must restore the model, by swap and by <c>CopyTo</c>. A new
-/// mutation path belongs in <see cref="Cases"/>.
+/// rolling the mutation back, undoing and redoing it must restore the model, by swap and by
+/// <c>CopyTo</c>. A new mutation path belongs in <see cref="Cases"/>.
 /// </summary>
 public sealed class TomChangeJournalOracleTests
 {
     private const string PolicySource =
         "let Source = Sql.Database(\"srv\", \"db\"), Filtered = Table.SelectRows(Source, each [Date] >= RangeStart and [Date] < RangeEnd) in Filtered";
 
-    private static readonly Dictionary<string, Action<TomModelMutator>> Mutations = new()
+    internal static readonly Dictionary<string, Action<TomModelMutator>> Mutations = new()
     {
         // set: one per object kind, plus renames that move descendants and relabel references
         ["set measure expression"] = m => m.SetProperty(Set("Sales/Revenue", "expression", "SUM(Sales[Amount]) * 2")),
@@ -149,4 +149,31 @@ public sealed class TomChangeJournalOracleTests
     [MemberData(nameof(Cases))]
     public void Rollback_ByCopyTo_RestoresTheModelContent(string mutation)
         => JournalOracle.AssertRollbackRestores(JournalFixture.Rich(), Mutations[mutation], TomCheckpointRestore.CopyTo);
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void UndoAndRedo_BySwap_RestoreTheModelByteForByte(string mutation)
+        => JournalOracle.AssertUndoRedoRestores(JournalFixture.Rich(), Mutations[mutation], TomCheckpointRestore.Swap);
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void UndoAndRedo_ByCopyTo_RestoreTheModelContent(string mutation)
+        => JournalOracle.AssertUndoRedoRestores(JournalFixture.Rich(), Mutations[mutation], TomCheckpointRestore.CopyTo);
+
+    /// <summary><c>Database.Clone()</c> drops the database's compatibility mode, which the rich
+    /// fixture does not set; a model loaded from TMDL does.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RestoringAModelLoadedFromTmdl_KeepsItsDatabaseProperties(bool swap)
+    {
+        var restore = swap ? TomCheckpointRestore.Swap : TomCheckpointRestore.CopyTo;
+        static Microsoft.AnalysisServices.Tabular.Database Load()
+            => Microsoft.AnalysisServices.Tabular.TmdlSerializer.DeserializeDatabaseFromFolder(
+                Path.Combine(Tomix.Tests.Support.RepoPaths.Samples, "basic-tmdl"));
+        Action<TomModelMutator> edit = m => m.SetProperty(Set("Sales/Total Sales", "expression", "1"));
+
+        JournalOracle.AssertRollbackRestores(Load(), edit, restore);
+        JournalOracle.AssertUndoRedoRestores(Load(), edit, restore);
+    }
 }
