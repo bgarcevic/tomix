@@ -126,6 +126,9 @@ public sealed class UiHost : IAsyncDisposable
 
         switch (request.Path.Value)
         {
+            case "/" when HttpMethods.IsGet(request.Method):
+                await WritePageAsync(response, port, context.RequestAborted);
+                return;
             case "/status" when HttpMethods.IsGet(request.Method):
                 response.ContentType = "application/json; charset=utf-8";
                 await response.WriteAsync(options.Status(), context.RequestAborted);
@@ -142,6 +145,30 @@ public sealed class UiHost : IAsyncDisposable
                 return;
         }
     }
+
+    /// <summary>
+    /// The page: a small companion view until the web app (#361) replaces it. Its script and style
+    /// run under a per-response nonce, and no referrer leaves it, since its URL carries the token.
+    /// </summary>
+    private static async Task WritePageAsync(HttpResponse response, int port, CancellationToken cancellationToken)
+    {
+        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+        response.ContentType = "text/html; charset=utf-8";
+        response.Headers.ContentSecurityPolicy =
+            $"default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
+            + $"connect-src 'self' ws://127.0.0.1:{port} ws://localhost:{port}; base-uri 'none'; form-action 'none'";
+        response.Headers["Referrer-Policy"] = "no-referrer";
+        response.Headers.XContentTypeOptions = "nosniff";
+        await response.WriteAsync(Page.Value.Replace("{{nonce}}", nonce, StringComparison.Ordinal), cancellationToken);
+    }
+
+    private static readonly Lazy<string> Page = new(() =>
+    {
+        using var stream = typeof(UiHost).Assembly.GetManifestResourceStream("Tomix.Ui.Page.index.html")
+            ?? throw new InvalidOperationException("The page resource is missing from Tomix.Ui.");
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return reader.ReadToEnd();
+    });
 
     /// <summary>Only <c>127.0.0.1</c> or <c>localhost</c> on this port: refuses DNS rebinding.</summary>
     private static bool IsLocalHost(HostString host, int port)

@@ -19,7 +19,7 @@ Open-source CLI for inspecting, validating, querying, testing, and deploying tab
 - `/src/Tomix.Platform` - Dependency-free filesystem and operating-system primitives shared by outer projects
 - `/src/Tomix.Provider.*` - Model providers for TOM, TMDL, and VPAX
 - `/src/Tomix.Auth` - Authentication and credential caching
-- `/src/Tomix.Ui` - Localhost web endpoint (ASP.NET Core/Kestrel) of a shared live session: `/ws` and `/status`
+- `/src/Tomix.Ui` - Localhost web endpoint (ASP.NET Core/Kestrel) of a shared live session (`tx ui`): the page, `/ws` and `/status`
 - `/tests` - Unit, handler, CLI, golden, provider, and integration tests
 - `/engines/powerquery` - npm project that builds the offline Power Query (M) engine bundle embedded in `Tomix.App` (dev-only; users need no Node)
 - `/samples` - Sample models used by tests and documentation

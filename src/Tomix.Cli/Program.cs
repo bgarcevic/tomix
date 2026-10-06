@@ -119,13 +119,29 @@ internal static class Program
     {
         try
         {
-            return parseResult.Invoke(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+            return parseResult.Invoke(new InvocationConfiguration
+            {
+                EnableDefaultExceptionHandler = false,
+                ProcessTerminationTimeout = TerminationTimeout(parseResult)
+            });
         }
         catch (Exception ex)
         {
             return ReportFailure(ex, parseResult);
         }
     }
+
+    /// <summary>Commands that hold a session and handle Ctrl+C themselves.</summary>
+    private static readonly HashSet<string> HandleCtrlC = new(StringComparer.Ordinal) { "interactive", "serve", "ui" };
+
+    /// <summary>
+    /// How long the library waits after Ctrl+C before ending the process with 130: two seconds, or
+    /// never for a command that handles Ctrl+C itself. Every Ctrl+C handler in a process runs, so
+    /// with the library's on, a Ctrl+C that <c>tx interactive</c> meant for its running command
+    /// would also cancel the session and end it two seconds later, unsaved changes and all.
+    /// </summary>
+    internal static TimeSpan? TerminationTimeout(ParseResult parseResult)
+        => HandleCtrlC.Contains(parseResult.CommandResult.Command.Name) ? null : TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// Maps an exception that escaped a command to its diagnostic and exit code: shared by the
@@ -251,6 +267,13 @@ internal static class Program
             new SummaryCommand(providers, services.State),
             new StageCommand(providers, services.State, services.Staging, services.ConfigStore.ValidateOnSaveEnabled),
             new TestCommand(providers, loadCurrentSession),
+            new UiCommand(
+                providers,
+                services.State,
+                services.Staging,
+                version,
+                (session, sessionCommands) => BuildSessionRootCommand(
+                    session, sessionCommands, providers, formatter, services, httpClient, workspaceCatalog, cachedUsername)),
             new UpdateCommand(version, releaseSource ?? UnavailableReleaseSource.Instance, services.UpdateCheck),
             new ValidateCommand(providers, services.State),
             new VertipaqCommand(providers, analyzer, services.State, mutations)

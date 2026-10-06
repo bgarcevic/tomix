@@ -121,7 +121,8 @@ Discover: `summary` (where a model lives and what it contains), `ls`, `get`,
 Modify: `add`, `set`, `mv`, `rm`, `replace`, `format` (DAX and M, via the
 formatter APIs), `interactive` (alias `shell`: run commands against a model
 held in memory, with undo, redo and transactions, then `save`), `serve` (the
-same session for editors and agents, over JSON-RPC on stdin and stdout).
+same session for editors and agents, over JSON-RPC on stdin and stdout), `ui`
+(share the session with a browser page and agents on localhost).
 Refresh policies use `get`/`set`/`rm` with `<table>/RefreshPolicy`;
 `refresh --policy-only` applies a saved policy without loading data.
 Connect: `connect` (interactive workspace/model pickers with `--remote`,

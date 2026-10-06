@@ -515,6 +515,14 @@ Run DAX regression tests against a live model
   opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --trx <file>  Write results to a .trx test-run file at this path
 
+# tx ui
+Share a model session with a browser and agents
+  arg [model]  Model to open: a TMDL folder or .bim file (default: the active connection's)
+  opt --port <port>  Port on 127.0.0.1 (default: a free one)
+  opt --open  Open the page in the default browser
+  opt --grace <seconds>  Seconds to keep running after the last client leaves (default: 30)
+  opt --log <file>  Append the session's request log to this file
+
 # tx update
 Update tx to the latest release
   opt --check  Preview only: show the latest version and release notes without changing anything

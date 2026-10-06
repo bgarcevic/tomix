@@ -6,10 +6,12 @@ Core (Kestrel), as decided in #356.
 ## Responsibilities
 
 - Listen on `127.0.0.1` only: `/ws` for protocol clients over a WebSocket, `GET /status` for
-  tools that poll.
+  tools that poll, `GET /` for the page.
 - Refuse every request without the session token, with a `Host` other than this server, or with
   an `Origin` other than its own (`TOMIX_UI_*` answers).
-- Later: serve the built web app (`apps/web`, #361).
+- Serve the page at `/` (`Page/index.html`, an embedded resource): a small companion view until
+  the built web app (`apps/web`, #361) replaces it. It runs under a per-response CSP nonce, sends
+  no referrer (its URL carries the token) and is a plain protocol client of `/ws`.
 
 ## Cross-folder dependencies
 
@@ -26,6 +28,8 @@ Core (Kestrel), as decided in #356.
 - Never write to stdout: logging providers are cleared, and the host does not handle Ctrl+C; the
   command that starts it does.
 - Keep security checks in `UiHost.HandleAsync`, before any routing.
+- The page loads nothing from other origins and builds its DOM with `textContent`, never from
+  HTML strings: model names and paths come from the session.
 
 ## Test
 

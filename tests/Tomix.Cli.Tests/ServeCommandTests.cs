@@ -340,6 +340,55 @@ public sealed class ServeCommandTests
         Assert.Contains("SUM", (string?)run.Result(3)["data"]!["formatted"]);
     }
 
+    [Fact]
+    public async Task Stopped_WhileItsInputStaysOpen_ClosesTheSession_AndExits130()
+    {
+        using var model = SampleModel.CopyToTemp();
+        using var logDir = new TempDir();
+        var logPath = Path.Combine(logDir.Path, "serve.log");
+        var root = Program.BuildRootCommand(Providers, new CompositeExpressionFormatterClient([new OfflineDaxFormatterClient()]), TestRoot.Version, TestServices.Create());
+        // Like a terminal's stdin, the input never ends: a pipe the test writes to and never closes.
+        var input = new System.IO.Pipelines.Pipe();
+        using var output = new MemoryStream();
+        using var stop = new CancellationTokenSource();
+        ServeCommand.TestStreams.Value = (input.Reader.AsStream(), output);
+        try
+        {
+            var serving = root.Parse(["serve", model.Path, "--log", logPath])
+                .InvokeAsync(new System.CommandLine.InvocationConfiguration { EnableDefaultExceptionHandler = false, ProcessTerminationTimeout = null }, stop.Token);
+            await input.Writer.WriteAsync(Encoding.UTF8.GetBytes(
+                Initialize() + Request(2, "object.set", new JsonObject { ["path"] = "Sales/Amount", ["set"] = new JsonObject { ["description"] = "Net" } })));
+            for (var i = 0; i < 200 && !ReadLog(logPath).Contains("object.set #2 ok", StringComparison.Ordinal); i++)
+                await Task.Delay(50);
+
+            stop.Cancel();
+            var exitCode = await serving.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.Equal(130, exitCode);
+            var log = ReadLog(logPath);
+            Assert.Contains("[tx serve] interrupted (Ctrl+C)", log);
+            Assert.Contains("unsaved changes to", log);
+        }
+        finally
+        {
+            ServeCommand.TestStreams.Value = null;
+        }
+    }
+
+    private static string ReadLog(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (FileNotFoundException)
+        {
+            return "";
+        }
+    }
+
     internal static string Initialize(int id = 1)
         => Request(id, "initialize", new JsonObject { ["protocolVersion"] = "0", ["clientInfo"] = new JsonObject { ["name"] = "test" } });
 

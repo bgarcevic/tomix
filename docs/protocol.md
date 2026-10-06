@@ -8,7 +8,7 @@ change events as `tx interactive`.
 This page is the v0 specification. `tx serve` implements it on stdin and
 stdout ([`tx serve`](commands/modify.md#serve-serve-a-session-to-other-programs)).
 A localhost WebSocket carries the same messages to several clients of one
-session; `tx ui` opens it (#369). The design behind it is
+session; [`tx ui`](commands/modify.md#ui-share-a-session-with-the-browser-and-agents) opens it. The design behind it is
 [ADR 0001](design/adr-0001-live-model-session.md).
 
 `tx serve` does not serve `query.run`, `$/progress` or `diagnostics.updated`
@@ -91,8 +91,8 @@ removed within a protocol version.
 
 ### Discovery
 
-A process that shares a session writes one file per open model to
-`~/.tomix/live/` (only the current user can read it):
+`tx ui` writes one file per open model to `~/.tomix/live/` (only the current
+user can read it):
 
 ```json
 {
@@ -108,6 +108,16 @@ A process that shares a session writes one file per open model to
 The file is removed when the process ends. A file whose `pid` is no longer
 running is stale: ignore it (tx deletes such files when it finds them). No
 file, or a refused connection, means no session is open.
+
+`tx serve <model>` reads this file: when `tx ui` holds the model, it joins that
+session over the WebSocket instead of opening a second one.
+
+### The page
+
+`GET http://127.0.0.1:<port>/?token=<token>` serves the session's browser page,
+the URL `tx ui` prints. Its script and style run under a per-response
+`Content-Security-Policy` nonce, it sends no referrer, and it connects to `/ws`
+like any other client (`clientInfo.name` `tomix-ui`).
 
 ## Lifecycle
 

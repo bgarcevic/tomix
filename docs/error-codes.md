@@ -139,7 +139,7 @@ Raised when a command runs against an open live session (`tx shell` and the othe
 
 ## Local Endpoint Codes (`TOMIX_UI_*`)
 
-Answered by the localhost endpoint of a shared session ([session protocol](protocol.md#websocket)) as an HTTP status with a JSON body `{"code": "...", "error": "..."}`. They have no exit code.
+Answered by the localhost endpoint of a shared session ([session protocol](protocol.md#websocket)) as an HTTP status with a JSON body `{"code": "...", "error": "..."}`. They have no exit code, except the last two, which `tx ui` and `tx serve` report themselves.
 
 | Code | Exit | Trigger |
 |------|------|---------|
@@ -147,6 +147,8 @@ Answered by the localhost endpoint of a shared session ([session protocol](proto
 | `TOMIX_UI_FORBIDDEN` | — | HTTP 403: the `Host` header names another server, or `Origin` is another web origin. Only the session's own page and non-browser tools on this machine may connect. |
 | `TOMIX_UI_NOT_WEBSOCKET` | — | HTTP 400: a plain HTTP request to `/ws`, which takes WebSocket upgrades only. |
 | `TOMIX_UI_NOT_FOUND` | — | HTTP 404: nothing is served at that path. |
+| `TOMIX_UI_PORT_IN_USE` | 2 | `tx ui --port` names a port another program listens on. Pick another, or leave `--port` out to use a free one. |
+| `TOMIX_UI_UNREACHABLE` | 2 | `tx serve <model>` found the model open in `tx ui` but could not connect to it. Stop that `tx ui`, or wait for it to start, and try again. |
 
 ## Save Codes (`TOMIX_SAVE_*`)
 

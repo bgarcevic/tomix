@@ -197,6 +197,73 @@ public sealed class SharedSessionTests
         Assert.Contains("401", refused.Message);
     }
 
+    [Fact]
+    public async Task ThePage_IsServed_WithItsScriptUnderAFreshNonce_AndNoReferrer()
+    {
+        await using var shared = await Shared.StartAsync();
+
+        using var response = await shared.Http.GetAsync($"/?token={shared.Token}");
+        using var again = await shared.Http.GetAsync($"/?token={shared.Token}");
+        using var refused = await shared.Http.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        var policy = response.Headers.GetValues("Content-Security-Policy").Single();
+        var nonce = System.Text.RegularExpressions.Regex.Match(policy, "script-src 'nonce-([^']+)'").Groups[1].Value;
+        Assert.NotEmpty(nonce);
+        Assert.Contains($"<script nonce=\"{nonce}\">", await response.Content.ReadAsStringAsync());
+        Assert.DoesNotContain(nonce, again.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.Equal("no-referrer", response.Headers.GetValues("Referrer-Policy").Single());
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task TheServeRelay_MakesAStdioClient_OneMoreClientOfTheSharedSession()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+
+        var relay = await shared.RelayAsync(
+            ServeCommandTests.Initialize(),
+            ServeCommandTests.Request(2, "object.add", new JsonObject { ["path"] = "Sales/Relayed", ["type"] = "Measure", ["expression"] = "1" }),
+            ServeCommandTests.Request(3, "shutdown"),
+            ServeCommandTests.Exit());
+
+        Assert.Equal(0, relay.ExitCode);
+        Assert.Equal("test-1", (string?)relay.Result(1)["clientId"]);
+        Assert.Equal("Sales/Relayed", (string?)relay.Result(2)["data"]!["added"]);
+        Assert.Single(relay.Notifications("model.changed"));
+        var changed = await web.NotificationAsync("model.changed");
+        Assert.Equal("test-1", (string?)changed["origin"]!["client"]);
+    }
+
+    [Fact]
+    public async Task TheServeRelay_ExitsWithOne_OnExitWithoutShutdown()
+    {
+        await using var shared = await Shared.StartAsync();
+
+        var relay = await shared.RelayAsync(ServeCommandTests.Initialize(), ServeCommandTests.Exit());
+
+        Assert.Equal(1, relay.ExitCode);
+    }
+
+    [Fact]
+    public async Task WhenTheRelaysInputEnds_ItsAnswersStillArrive_AndTheSessionStaysOpen()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+
+        var relay = await shared.RelayAsync(
+            ServeCommandTests.Initialize(),
+            ServeCommandTests.Request(2, "object.add", new JsonObject { ["path"] = "Sales/Kept", ["type"] = "Measure", ["expression"] = "1" }));
+
+        Assert.Equal(0, relay.ExitCode);
+        Assert.Equal("Sales/Kept", (string?)relay.Result(2)["data"]!["added"]);
+        var status = await shared.StatusAsync();
+        Assert.Equal("dirty", (string?)status["state"]);
+        Assert.Equal(["web-1"], status["clients"]!.AsArray().Select(id => (string?)id));
+    }
+
     /// <summary>A session on a copy of the sample model, shared through an in-memory test server.</summary>
     private sealed class Shared : IAsyncDisposable
     {
@@ -255,6 +322,20 @@ public sealed class SharedSessionTests
             });
             client.ClientId = (string?)initialized["result"]!["clientId"];
             return client;
+        }
+
+        /// <summary>Runs <c>tx serve</c>'s relay into the session, with <paramref name="frames"/> as its stdin.</summary>
+        public async Task<ServeRun> RelayAsync(params string[] frames)
+        {
+            var socket = await Server.CreateWebSocketClient().ConnectAsync(new Uri($"ws://localhost/ws?token={Token}"), CancellationToken.None);
+            using (socket)
+            {
+                using var input = new MemoryStream(Encoding.UTF8.GetBytes(string.Concat(frames)));
+                using var output = new MemoryStream();
+                var exitCode = await ServeRelay.RunAsync(new StreamChannel(input, output), new WebSocketChannel(socket), CancellationToken.None)
+                    .WaitAsync(TimeSpan.FromSeconds(30));
+                return new ServeRun(exitCode, "", "", ServeRun.ReadFrames(output.ToArray()));
+            }
         }
 
         public async Task<JsonObject> StatusAsync()
