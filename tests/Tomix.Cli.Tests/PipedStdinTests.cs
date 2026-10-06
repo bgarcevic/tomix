@@ -59,7 +59,7 @@ public sealed class PipedStdinTests
     [Fact]
     public void Query_NoQueryGiven_ReadsPipedInput()
     {
-        InputValueResolver.TestStdin.Value = new StringReader("EVALUATE ROW(\"a\", 1)\n");
+        InputValueResolver.Stdin.Value = new StringReader("EVALUATE ROW(\"a\", 1)\n");
         try
         {
             var (query, error) = QueryCommand.ResolveQueryInput(positional: null, query: null, file: null);
@@ -69,7 +69,7 @@ public sealed class PipedStdinTests
         }
         finally
         {
-            InputValueResolver.TestStdin.Value = null;
+            InputValueResolver.Stdin.Value = null;
         }
     }
 
@@ -89,14 +89,14 @@ public sealed class PipedStdinTests
             new AddCommand([], services.State, services.Mutations).Build());
 
         // Set on this async flow only, so a test running in parallel keeps the real stdin.
-        InputValueResolver.TestStdin.Value = stdin;
+        InputValueResolver.Stdin.Value = stdin;
         try
         {
             return ConsoleCapture.Invoke(root.Parse(args), captureAnsiConsole: true);
         }
         finally
         {
-            InputValueResolver.TestStdin.Value = null;
+            InputValueResolver.Stdin.Value = null;
         }
     }
 

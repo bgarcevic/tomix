@@ -37,11 +37,15 @@ internal static class ConsoleRouting
         });
     }
 
-    /// <summary>Runs <paramref name="run"/> with the console written to <paramref name="stdout"/> and <paramref name="stderr"/>.</summary>
-    public static async Task<T> CaptureAsync<T>(TextWriter stdout, TextWriter stderr, Func<Task<T>> run)
+    /// <summary>
+    /// Runs <paramref name="run"/> with the console written to <paramref name="stdout"/> and
+    /// <paramref name="stderr"/>: without color and 80 columns wide, or as <paramref name="terminal"/>
+    /// says, for output a caller prints on its own terminal.
+    /// </summary>
+    public static async Task<T> CaptureAsync<T>(TextWriter stdout, TextWriter stderr, Func<Task<T>> run, CapturedTerminal? terminal = null)
     {
         var previous = Current.Value;
-        Current.Value = new Target(stdout, stderr);
+        Current.Value = new Target(stdout, stderr, terminal);
         try
         {
             return await run();
@@ -52,18 +56,34 @@ internal static class ConsoleRouting
         }
     }
 
-    private sealed class Target(TextWriter output, TextWriter error)
+    private sealed class Target(TextWriter output, TextWriter error, CapturedTerminal? terminal = null)
     {
         public TextWriter Out { get; } = TextWriter.Synchronized(output);
         public TextWriter Error { get; } = TextWriter.Synchronized(error);
 
-        public IAnsiConsole Ansi { get; } = AnsiConsole.Create(new AnsiConsoleSettings
+        public IAnsiConsole Ansi { get; } = Create(output, terminal);
+
+        private static IAnsiConsole Create(TextWriter output, CapturedTerminal? terminal)
         {
-            Out = new AnsiConsoleOutput(output),
-            Ansi = AnsiSupport.No,
-            ColorSystem = ColorSystemSupport.NoColors,
-            Interactive = InteractionSupport.No
-        });
+            var colors = terminal?.Colors ?? ColorSystem.NoColors;
+            var console = AnsiConsole.Create(new AnsiConsoleSettings
+            {
+                Out = new AnsiConsoleOutput(output),
+                Ansi = colors == ColorSystem.NoColors ? AnsiSupport.No : AnsiSupport.Yes,
+                ColorSystem = colors switch
+                {
+                    ColorSystem.TrueColor => ColorSystemSupport.TrueColor,
+                    ColorSystem.EightBit => ColorSystemSupport.EightBit,
+                    ColorSystem.Standard => ColorSystemSupport.Standard,
+                    ColorSystem.Legacy => ColorSystemSupport.Legacy,
+                    _ => ColorSystemSupport.NoColors
+                },
+                Interactive = InteractionSupport.No
+            });
+            if (terminal?.Width is { } width)
+                console.Profile.Width = width;
+            return console;
+        }
     }
 
     private sealed class RoutedWriter(Func<Target, TextWriter> select, Target fallback) : TextWriter
@@ -111,3 +131,6 @@ internal static class ConsoleRouting
         public void Dispose() => Interlocked.Exchange(ref _restore, null)?.Invoke();
     }
 }
+
+/// <summary>The caller's terminal a captured command renders for: its colors and, when known, its width.</summary>
+internal sealed record CapturedTerminal(ColorSystem Colors, int? Width);

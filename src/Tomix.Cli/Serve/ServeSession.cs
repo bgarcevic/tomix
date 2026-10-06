@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Tomix.App.Models;
 using Tomix.App.Session;
+using Tomix.Cli.Commands;
 using Tomix.Cli.Interactive;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
@@ -37,7 +38,7 @@ internal sealed class ServeSession : IProtocolMethods
         "session.open", "session.close", "session.status", "session.save", "session.snapshot", "session.history",
         "session.undo", "session.redo", "transaction.begin", "transaction.commit", "transaction.rollback",
         "model.summary", "model.tree", "object.get", "object.find", "deps.get", "object.add", "object.set",
-        "object.remove", "object.move", "model.replace", "bpa.run", "bpa.fix", "dax.format", "dax.check"
+        "object.remove", "object.move", "model.replace", "bpa.run", "bpa.fix", "dax.format", "dax.check", "command.run"
     ];
 
     public IReadOnlyList<string> Notifications { get; } =
@@ -74,6 +75,8 @@ internal sealed class ServeSession : IProtocolMethods
             return Envelope(await SnapshotAsync(scope, cancellationToken), scope);
         if (method == "model.tree")
             return Envelope(await TreeAsync(scope, parameters, cancellationToken), scope);
+        if (method == "command.run")
+            return Envelope(await RunCommandAsync(parameters, cancellationToken), scope);
 
         if (method == "deps.get")
             Direction(parameters);
@@ -274,6 +277,83 @@ internal sealed class ServeSession : IProtocolMethods
             ProtocolErrors.InternalError,
             $"{method} produced no result (exit code {exitCode}).",
             new JsonObject { ["code"] = "TOMIX_UNEXPECTED", ["output"] = stdout + stderr.ToString() });
+    }
+
+    /// <summary>
+    /// <c>command.run</c>: a one-shot command a caller routed to this session (#400), run as it would
+    /// run in <c>tx interactive</c>, with its output and exit code as the result. Only the commands
+    /// <see cref="LiveCommandRoute.Commands"/> lists run, so a caller cannot reopen the session.
+    /// </summary>
+    private async Task<JsonObject> RunCommandAsync(JsonObject parameters, CancellationToken cancellationToken)
+    {
+        Only(parameters, "command.run", "args", "stdin", "colorSystem", "width");
+        if (parameters["args"] is not JsonArray items || items.Count == 0)
+            throw ProtocolException.InvalidParams("command.run needs 'args': the command line, for example [\"set\", \"Sales/Margin\", \"--set\", \"FormatString=0%\"].");
+        var args = items.Select(item => item is JsonValue value && value.GetValueKind() == JsonValueKind.String
+            ? value.GetValue<string>()
+            : throw ProtocolException.InvalidParams("'args' must be an array of strings.")).ToArray();
+        var stdin = Text(parameters, "stdin");
+        var colors = Text(parameters, "colorSystem") is { } name
+            ? Enum.TryParse<Spectre.Console.ColorSystem>(name, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+                ? parsed
+                : throw ProtocolException.InvalidParams($"'colorSystem' must be NoColors, Legacy, Standard, EightBit or TrueColor, not '{name}'.")
+            : Spectre.Console.ColorSystem.NoColors;
+        int? width = parameters["width"] switch
+        {
+            null => null,
+            JsonValue value when value.TryGetValue<int>(out var columns) && columns > 0 => columns,
+            _ => throw ProtocolException.InvalidParams("'width' must be a positive whole number.")
+        };
+
+        // Nothing in the session can ask the person anything: a command that would prompt fails instead.
+        var parseResult = _root!.Parse(["--non-interactive", .. args], new ParserConfiguration { ResponseFileTokenReplacer = null });
+        var command = LiveCommandRoute.CommandPath(parseResult.CommandResult);
+        if (!LiveCommandRoute.Commands.Contains(command))
+            throw ProtocolException.InvalidParams(
+                $"'{(command.Length == 0 ? string.Join(' ', args) : command)}' cannot run through command.run; it runs {string.Join(", ", LiveCommandRoute.Commands)}.");
+        if (parseResult.Errors.Count > 0)
+            throw ProtocolException.InvalidParams(string.Join(" ", parseResult.Errors.Select(error => error.Message)));
+
+        var session = _scope!.Session;
+        var wasDirty = session.IsDirty;
+        _scope.Source.Options = new LiveLeaseOptions(_client, command);
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var exitCode = await ConsoleRouting.CaptureAsync(stdout, stderr, async () =>
+        {
+            InputValueResolver.Stdin.Value = stdin is null ? null : new StringReader(stdin);
+            try
+            {
+                return await parseResult.InvokeAsync(
+                    new InvocationConfiguration { EnableDefaultExceptionHandler = false, ProcessTerminationTimeout = null },
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                return Program.ReportFailure(ex, parseResult);
+            }
+        }, new CapturedTerminal(colors, width));
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // 'save', or an edit with --save, wrote the session back to its source.
+        if (wasDirty && !session.IsDirty)
+            _host.Broadcast("session.saved", new JsonObject
+            {
+                ["version"] = session.Version,
+                ["savedTo"] = session.Reference.Value,
+                ["persistence"] = "file"
+            });
+
+        return new JsonObject
+        {
+            ["exitCode"] = exitCode,
+            ["stdout"] = stdout.ToString(),
+            ["stderr"] = stderr.ToString()
+        };
     }
 
     private static JsonNode? Json(string text)

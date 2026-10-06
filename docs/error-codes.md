@@ -148,7 +148,7 @@ Answered by the localhost endpoint of a shared session ([session protocol](proto
 | `TOMIX_UI_NOT_WEBSOCKET` | — | HTTP 400: a plain HTTP request to `/ws`, which takes WebSocket upgrades only. |
 | `TOMIX_UI_NOT_FOUND` | — | HTTP 404: nothing is served at that path. |
 | `TOMIX_UI_PORT_IN_USE` | 2 | `tx ui --port` names a port another program listens on. Pick another, or leave `--port` out to use a free one. |
-| `TOMIX_UI_UNREACHABLE` | 2 | `tx serve <model>` found the model open in `tx ui` but could not connect to it. Stop that `tx ui`, or wait for it to start, and try again. |
+| `TOMIX_UI_UNREACHABLE` | 2 | `tx serve <model>`, or a command run on a model `tx ui` holds, found the model open in `tx ui` but could not connect to it. Stop that `tx ui`, or wait for it to start, and try again. |
 
 ## Save Codes (`TOMIX_SAVE_*`)
 

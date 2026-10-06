@@ -98,7 +98,7 @@ internal sealed class InteractiveCommand : ICommandModule
             }
 
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
-            var testInput = InputValueResolver.TestStdin.Value;
+            var testInput = InputValueResolver.Stdin.Value;
             var terminal = testInput is null && !Console.IsInputRedirected;
             var canPrompt = terminal && InteractionGate.CanPrompt(parseResult, format);
             var oneShot = parseResult.RootCommandResult.Command.Subcommands

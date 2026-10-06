@@ -638,6 +638,22 @@ tx ui ./model --port 7411 --grace 300
 tx ui ./model --output-format json            # {"data": {"url", "port", "model", "processId", "joined"}}
 ```
 
+While `tx ui` holds a model, the one-shot commands that work on it (`add`,
+`bpa run`, `deps`, `find`, `format`, `get`, `ls`, `mv`, `replace`, `rm`,
+`save`, `set`, `summary` and `validate`) run in its session instead of on the
+files, so `tx set` from an agent or another terminal shows up in the page and
+can be undone there. They see the session's unsaved edits; their own edits stay
+unsaved until `tx save` (or `--save`), as in `tx interactive`. A command that
+would prompt fails and names the flag to pass instead, and `--stage` is refused,
+since the session already holds the edits. `--recent` and the other commands
+still work on the files.
+
+```sh
+tx ui ./model &
+tx set Sales/Revenue ./model -p FormatString='#,0'   # one undo step in the session
+tx save ./model                                      # writes the session
+```
+
 The page is a small companion view for now: the model, its unsaved state, who
 else is connected, an activity feed of every client's changes, and Undo, Redo
 and Save. The full tomix UI replaces it. In the Claude desktop app, open the

@@ -384,7 +384,7 @@ public sealed partial class InteractiveCommandTests
         string command, string modelPath, string script, AppServices services, params string[] flags)
     {
         var root = Root(services);
-        InputValueResolver.TestStdin.Value = new StringReader(script);
+        InputValueResolver.Stdin.Value = new StringReader(script);
         try
         {
             string[] args = modelPath.Length == 0 ? [command, .. flags] : [command, modelPath, .. flags];
@@ -393,7 +393,7 @@ public sealed partial class InteractiveCommandTests
         }
         finally
         {
-            InputValueResolver.TestStdin.Value = null;
+            InputValueResolver.Stdin.Value = null;
         }
     }
 

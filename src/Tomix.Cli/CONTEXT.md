@@ -48,7 +48,10 @@ CLI entry point for `tx`.
   (async-local), so clients' requests run side by side and stdout carries only frames.
   `WebEndpoint` puts a host on `Tomix.Ui`; `LiveRegistry` writes `~/.tomix/live/*.json` so other
   processes find it. `ServeRelay` lets `tx serve` join a session `tx ui` holds instead of
-  opening a second one. `UiLifetime` decides when `tx ui` stops: never with changes unsaved.
+  opening a second one. `LiveCommandRoute` runs a one-shot command on a model `tx ui`
+  holds in that session (`command.run`, #400): `Program.Run` asks it before invoking, and it
+  makes the command's paths absolute and sends its stdin, colors and width along.
+  `UiLifetime` decides when `tx ui` stops: never with changes unsaved.
   `tx interactive`, `tx serve` and `tx ui` handle Ctrl+C themselves (the last two through
   `ConsoleSignals`), so `Program.TerminationTimeout` turns off the library's handling for them:
   every Ctrl+C handler in a process runs, and the library's would end the process two seconds

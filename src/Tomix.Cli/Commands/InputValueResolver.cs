@@ -14,10 +14,11 @@ namespace Tomix.Cli.Commands;
 internal static class InputValueResolver
 {
     /// <summary>
-    /// Stands in for stdin in tests, per async flow, so a test cannot leak its input into another
-    /// running in parallel. A set value also counts as redirected input.
+    /// Stands in for stdin per async flow: a test's input, which cannot leak into another test
+    /// running in parallel, or the caller's stdin for a command run in a live session
+    /// (<c>command.run</c>). A set value also counts as redirected input.
     /// </summary>
-    internal static readonly AsyncLocal<TextReader?> TestStdin = new();
+    internal static readonly AsyncLocal<TextReader?> Stdin = new();
 
     /// <summary>
     /// Reads from stdin when <paramref name="value"/> is <c>-</c>, or, with
@@ -35,11 +36,11 @@ internal static class InputValueResolver
     public static string? Resolve(string? value, string? file, bool readPipedInput = false)
         => !string.IsNullOrWhiteSpace(file) ? File.ReadAllText(file) : Resolve(value, readPipedInput);
 
-    private static bool IsInputRedirected => TestStdin.Value is not null || Console.IsInputRedirected;
+    private static bool IsInputRedirected => Stdin.Value is not null || Console.IsInputRedirected;
 
     // echo/heredoc pipes always end with a newline the user did not intend as part of the
     // value; keep interior newlines (multiline DAX/M) but drop the trailing ones. Windows
     // PowerShell 5.1 prefixes piped text with a BOM, which would otherwise land in the value.
     private static string ReadStdin()
-        => (TestStdin.Value ?? Console.In).ReadToEnd().TrimStart('﻿').TrimEnd('\r', '\n');
+        => (Stdin.Value ?? Console.In).ReadToEnd().TrimStart('﻿').TrimEnd('\r', '\n');
 }

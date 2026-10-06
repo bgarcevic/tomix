@@ -101,6 +101,9 @@ internal sealed class UiCommand : ICommandModule
             var explicitModel = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
             if (!opener.TryResolve(parseResult, explicitModel, out var reference, out _, out var resolveExit))
                 return resolveExit;
+            // Registered by its full path: a process in another folder must find the same model.
+            if (reference.IsLocalPath)
+                reference = new ModelReference(Path.GetFullPath(reference.Value));
             var json = OutputFormats.IsJson(GlobalOptions.OutputFormatValue(parseResult));
             var open = parseResult.GetValue(openOption);
 

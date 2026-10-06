@@ -46,9 +46,9 @@ internal sealed class WebSocketChannel : IMessageChannel
                     : new ProtocolFrame(null, "Binary messages are not part of the protocol; send each message as text.");
             }
         }
-        catch (WebSocketException)
+        catch (Exception ex) when (ex is WebSocketException or IOException)
         {
-            // The client went away without closing.
+            // The other side went away without closing.
             return null;
         }
     }
@@ -65,8 +65,9 @@ internal sealed class WebSocketChannel : IMessageChannel
             {
                 await _socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
             }
-            catch (WebSocketException)
+            catch (Exception ex) when (ex is WebSocketException or IOException)
             {
+                // The other side has already gone.
             }
         }
     }

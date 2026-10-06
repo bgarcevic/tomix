@@ -14,6 +14,7 @@ using Tomix.Auth;
 using Tomix.Cli.Commands;
 using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
+using Tomix.Cli.Serve;
 using Tomix.Core.Configuration;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
@@ -105,7 +106,10 @@ internal static class Program
             return 2;
         }
 
-        var exitCode = Invoke(parseResult);
+        // A model a tx ui holds is edited in its session, not on disk under it (#400).
+        var exitCode = configLoadError is null && new LiveCommandRoute(LiveRegistry.Default, services.State) is var route && route.Plan(parseResult) is { } routed
+            ? RunRouted(route, routed, parseResult)
+            : Invoke(parseResult);
         if (configLoadError is null)
             UpdateNotice.Run(parseResult, version, config, services.UpdateCheck, releaseSource);
         return exitCode;
@@ -129,6 +133,16 @@ internal static class Program
         {
             return ReportFailure(ex, parseResult);
         }
+    }
+
+    /// <summary>Runs a command in the live session that holds its model, saying so unless asked to be quiet.</summary>
+    internal static int RunRouted(LiveCommandRoute route, LiveCommandRoute.Routed routed, ParseResult parseResult)
+    {
+        if (!parseResult.GetValue(GlobalOptions.Quiet) && !OutputFormats.IsJson(GlobalOptions.OutputFormatValue(parseResult)))
+            StdErr.MarkupLine(Styling.Guidance(
+                $"{routed.Session.Model} is open in tx ui (process {routed.Session.ProcessId}): this runs in its session"
+                + (LiveCommandRoute.Edits(routed.Command) ? ", where edits stay unsaved until 'tx save'." : ".")));
+        return route.RunAsync(routed, parseResult, Console.Out, Console.Error, CancellationToken.None).GetAwaiter().GetResult();
     }
 
     /// <summary>Commands that hold a session and handle Ctrl+C themselves.</summary>

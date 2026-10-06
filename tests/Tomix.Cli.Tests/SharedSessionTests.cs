@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Tomix.App.Format;
+using Tomix.Cli.Commands;
 using Tomix.Cli.Interactive;
 using Tomix.Cli.Serve;
 using Tomix.Core.Models;
@@ -264,6 +265,148 @@ public sealed class SharedSessionTests
         Assert.Equal(["web-1"], status["clients"]!.AsArray().Select(id => (string?)id));
     }
 
+    [Fact]
+    public async Task ACommandOnTheLiveModel_RunsInTheSession_AsAnUndoStep_AndLeavesTheFilesAlone()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+        var onDisk = SnapshotFiles(shared.ModelPath);
+
+        var run = await shared.RouteAsync("add", "Sales/Routed", "--type", "Measure", "--expression", "1");
+
+        Assert.True(run.ExitCode == 0, run.Stderr);
+        Assert.Contains("Sales/Routed", run.Stdout);
+        var changed = await web.NotificationAsync("model.changed");
+        Assert.Equal("tx add-1", (string?)changed["origin"]!["client"]);
+        var status = await shared.StatusAsync();
+        Assert.Equal("dirty", (string?)status["state"]);
+        Assert.Equal(1, (int?)status["undoSteps"]);
+        Assert.Equal(["web-1"], status["clients"]!.AsArray().Select(id => (string?)id));
+        Assert.Equal(onDisk, SnapshotFiles(shared.ModelPath));
+    }
+
+    [Fact]
+    public async Task ACommandOnTheLiveModel_SeesTheSessionsUnsavedEdits()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var agent = await shared.ConnectAsync("agent");
+        await agent.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/Unsaved", ["type"] = "Measure", ["expression"] = "1" });
+
+        var run = await shared.RouteAsync("get", "Sales/Unsaved", "--output-format", "json");
+
+        Assert.True(run.ExitCode == 0, run.Stderr);
+        Assert.Contains("\"Sales/Unsaved\"", run.Stdout);
+    }
+
+    [Fact]
+    public async Task ARoutedCommand_KeepsItsExitCodeAndError()
+    {
+        await using var shared = await Shared.StartAsync();
+
+        var run = await shared.RouteAsync("get", "Sales/Missing", "--error-format", "json");
+
+        Assert.Equal(1, run.ExitCode);
+        Assert.Equal("TOMIX_OBJECT_NOT_FOUND", (string?)JsonNode.Parse(run.Stderr)!["code"]);
+    }
+
+    [Fact]
+    public async Task ARoutedSave_WritesTheSession_AndTellsTheOtherClients()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+        await shared.RouteAsync("add", "Sales/SavedByRoute", "--type", "Measure", "--expression", "1");
+
+        var run = await shared.RouteAsync("save");
+
+        Assert.True(run.ExitCode == 0, run.Stderr);
+        Assert.Equal(Path.GetFullPath(shared.ModelPath), (string?)(await web.NotificationAsync("session.saved"))["savedTo"]);
+        Assert.Equal("clean", (string?)(await shared.StatusAsync())["state"]);
+        Assert.Contains(
+            Directory.EnumerateFiles(shared.ModelPath, "*.tmdl", SearchOption.AllDirectories),
+            file => File.ReadAllText(file).Contains("SavedByRoute", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ADashValue_SendsTheCommandsStdin()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var agent = await shared.ConnectAsync("agent");
+        InputValueResolver.Stdin.Value = new StringReader("6 * 7\n");
+
+        var run = await shared.RouteAsync("add", "Sales/Piped", "--type", "Measure", "--expression", "-");
+
+        Assert.True(run.ExitCode == 0, run.Stderr);
+        Assert.Equal("6 * 7", run.Routed!.Stdin);
+        var get = await agent.RequestAsync("object.get", new JsonObject { ["path"] = "Sales/Piped" });
+        Assert.Contains("6 * 7", get["result"]!["data"]!.ToJsonString());
+    }
+
+    [Fact]
+    public async Task ARoutedCommand_NamesTheModelByItsFullPath()
+    {
+        await using var shared = await Shared.StartAsync();
+        var full = Path.GetFullPath(shared.ModelPath);
+        var relative = Path.GetRelativePath(Environment.CurrentDirectory, full);
+
+        var named = shared.Plan("summary", relative)!;
+        var unnamed = shared.Plan("summary")!;
+
+        Assert.Equal(["summary", full], named.Args);
+        Assert.Equal(["--model", full, "summary"], unnamed.Args);
+    }
+
+    [Theory]
+    [InlineData("diff")]
+    [InlineData("bpa", "rules", "list")]
+    [InlineData("summary", "--recent", "1")]
+    public void CommandsTheSessionDoesNotRun_RunOnTheirOwn(params string[] args)
+    {
+        using var model = SampleModel.CopyToTemp();
+        using var live = new TempDir();
+        var services = TestServices.Create();
+        var registry = new LiveRegistry(live.Path, _ => true);
+        using var _ = registry.Register(new LiveEntry(Path.GetFullPath(model.Path), Environment.ProcessId, 80, "token", DateTimeOffset.UtcNow));
+
+        var routed = new LiveCommandRoute(registry, services.State).Plan(FullRoot(services).Parse([.. args, model.Path]));
+
+        Assert.Null(routed);
+    }
+
+    [Fact]
+    public void AModelNoSessionHolds_RunsOnItsOwn()
+    {
+        using var model = SampleModel.CopyToTemp();
+        using var live = new TempDir();
+        var services = TestServices.Create();
+
+        var routed = new LiveCommandRoute(new LiveRegistry(live.Path, _ => true), services.State)
+            .Plan(FullRoot(services).Parse(["set", "Sales/A", model.Path, "--set", "Description=x"]));
+
+        Assert.Null(routed);
+    }
+
+    [Theory]
+    [InlineData("connect")]
+    [InlineData("undo")]
+    public async Task CommandRun_RunsOnlyTheRoutedCommands(string command)
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var agent = await shared.ConnectAsync("agent");
+
+        var answer = await agent.RequestAsync("command.run", new JsonObject { ["args"] = new JsonArray(command, shared.ModelPath) });
+
+        Assert.Equal(-32602, (int?)answer["error"]!["code"]);
+        Assert.Contains("cannot run through command.run", (string?)answer["error"]!["message"]);
+    }
+
+    private static Dictionary<string, string> SnapshotFiles(string folder)
+        => Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToDictionary(file => file, File.ReadAllText);
+
+    private static System.CommandLine.RootCommand FullRoot(Tomix.App.AppServices services)
+        => Program.BuildRootCommand(Providers, new CompositeExpressionFormatterClient([]), TestRoot.Version, services);
+
+    private sealed record RouteRun(int ExitCode, string Stdout, string Stderr, LiveCommandRoute.Routed? Routed);
+
     /// <summary>A session on a copy of the sample model, shared through an in-memory test server.</summary>
     private sealed class Shared : IAsyncDisposable
     {
@@ -271,9 +414,19 @@ public sealed class SharedSessionTests
         private readonly IDisposable _routing;
         private readonly SessionHost _host;
         private readonly UiHost _endpoint;
+        private readonly Tomix.App.AppServices _services;
+        private readonly TempDir _live = new();
+        private readonly LiveRegistry _registry;
+        private readonly IDisposable _registration;
 
-        private Shared(TempDir model, IDisposable routing, SessionHost host, UiHost endpoint, string token)
+        private Shared(TempDir model, IDisposable routing, SessionHost host, UiHost endpoint, string token, Tomix.App.AppServices services)
         {
+            // As after 'tx connect': a command that names no model addresses this one.
+            _services = services;
+            _services.State.SaveCurrentSession(new Tomix.App.State.CliConnectionState(
+                Server: null, Database: null, Model: model.Path, Auth: null, Local: true, Profile: null));
+            _registry = new LiveRegistry(_live.Path, _ => true);
+            _registration = _registry.Register(new LiveEntry(Path.GetFullPath(model.Path), Environment.ProcessId, 80, token, DateTimeOffset.UtcNow));
             _model = model;
             _routing = routing;
             _host = host;
@@ -308,7 +461,7 @@ public sealed class SharedSessionTests
                 session);
             var token = UiHost.NewToken();
             var endpoint = await WebEndpoint.StartAsync(host, "test", port: 80, token, CancellationToken.None, web => web.UseTestServer());
-            return new Shared(model, routing, host, endpoint, token);
+            return new Shared(model, routing, host, endpoint, token, services);
         }
 
         public async Task<Client> ConnectAsync(string name)
@@ -338,6 +491,25 @@ public sealed class SharedSessionTests
             }
         }
 
+        /// <summary>What <c>tx</c> would send the session for <paramref name="args"/>.</summary>
+        public LiveCommandRoute.Routed? Plan(params string[] args)
+            => Route().Plan(FullRoot(_services).Parse(args));
+
+        /// <summary>Runs <paramref name="args"/> as <c>tx</c> would while this session holds the model.</summary>
+        public async Task<RouteRun> RouteAsync(params string[] args)
+        {
+            var parseResult = FullRoot(_services).Parse(args);
+            var routed = Route().Plan(parseResult);
+            Assert.NotNull(routed);
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var exitCode = await Route().RunAsync(routed, parseResult, stdout, stderr, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30));
+            return new RouteRun(exitCode, stdout.ToString(), stderr.ToString(), routed);
+        }
+
+        private LiveCommandRoute Route()
+            => new(_registry, _services.State, (_, cancellationToken) => Server.CreateWebSocketClient().ConnectAsync(new Uri($"ws://localhost/ws?token={Token}"), cancellationToken));
+
         public async Task<JsonObject> StatusAsync()
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "/status");
@@ -353,6 +525,8 @@ public sealed class SharedSessionTests
             await _endpoint.DisposeAsync();
             await _host.CloseAsync();
             _routing.Dispose();
+            _registration.Dispose();
+            _live.Dispose();
             _model.Dispose();
         }
     }

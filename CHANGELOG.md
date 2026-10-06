@@ -10,6 +10,27 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx interactive` (alias `tx shell`) opens a model once and keeps it in memory: commands such
+  as `get`, `set`, `add`, `rm` and `bpa run` work on the open model, `undo` and `redo` step
+  through every change, `begin` … `commit` groups edits into one undo step, `history` lists
+  them, and `save` writes the model. It asks before discarding unsaved changes (#347).
+- `tx serve` holds a live session for editors and agents and speaks the tomix session protocol
+  (JSON-RPC over stdio, specified in `docs/protocol.md`): open, read, edit, undo, transactions,
+  save, and change events for every client (#348, #349).
+- `tx ui [model]` shares a live session on `127.0.0.1` with a browser page and agents at the
+  same time: the page shows who is connected and every client's changes as they happen, with
+  Undo, Redo and Save. `--open` opens the page; `--port`, `--grace` and `--log` tune it. Every
+  request needs the session's token. `tx serve` on a model `tx ui` holds joins that session
+  instead of opening a second one (#369).
+- While `tx ui` holds a model, `add`, `bpa run`, `deps`, `find`, `format`, `get`, `ls`, `mv`,
+  `replace`, `rm`, `save`, `set`, `summary` and `validate` on it run in its session instead of
+  on the files: edits become undo steps there and show up on the page, reads see unsaved
+  edits, and edits stay unsaved until `tx save` (#400).
+- New error codes `TOMIX_SESSION_IN_USE`, `TOMIX_UI_UNAUTHORIZED`, `TOMIX_UI_FORBIDDEN`,
+  `TOMIX_UI_PORT_IN_USE` and `TOMIX_UI_UNREACHABLE` (#369).
+
 ## [0.8.0] - 2026-10-01
 
 ### Added

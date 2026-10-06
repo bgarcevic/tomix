@@ -273,6 +273,7 @@ Clients should branch on `data.code`, not on `message`.
 | `dax.format` | request | Format an expression, or an object's. |
 | `dax.check` | request | Check the model's DAX and references. |
 | `query.run` | request | Run a DAX or DMV query (server-backed models). |
+| `command.run` | request | Run a `tx` command in the session, as `tx` does for a model a `tx ui` holds. |
 | `$/cancelRequest` | notification | Cancel a request. |
 | `$/progress` | notification | Progress of a long request. |
 | `model.changed` | notification | A transaction was committed. |
@@ -1115,6 +1116,55 @@ returned (`truncated` says whether it did). Cancel it with `$/cancelRequest`.
     },
     "diagnostics": [],
     "version": 12
+  }
+}
+```
+
+#### `command.run`
+
+How a one-shot `tx` command runs on a model that a `tx ui` holds: rather than
+open the files, which the session would later overwrite, `tx` connects as a
+client named after the command (`tx set`), sends its command line here and
+prints the output (#400). The command runs as in `tx interactive`: an edit is
+one undo step and stays unsaved until a save, and `save` writes the session.
+
+`args` is the command line after `tx`, with local paths absolute, since the
+session runs in its own folder. Only `add`, `bpa run`, `deps`, `find`,
+`format`, `get`, `ls`, `mv`, `replace`, `rm`, `save`, `set`, `summary` and
+`validate` run; anything else is invalid params. Nothing can prompt, so a
+command that would ask fails instead, as with `--non-interactive`. `stdin` is
+what the command reads for a `-` value. `colorSystem` (`NoColors`, `Legacy`,
+`Standard`, `EightBit` or `TrueColor`; default `NoColors`) and `width` shape
+the text output for the caller's terminal.
+
+The result carries the command's exit code and what it wrote to stdout and
+stderr, whatever the exit code; a command that fails is not a JSON-RPC error.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "method": "command.run",
+  "params": {
+    "args": ["set", "Sales/Revenue", "--set", "FormatString=#,0", "--model", "/models/sales"],
+    "colorSystem": "TrueColor",
+    "width": 120
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "data": {
+      "exitCode": 0,
+      "stdout": "Set: Sales/Revenue.FormatString\n",
+      "stderr": ""
+    },
+    "diagnostics": [],
+    "version": 13
   }
 }
 ```

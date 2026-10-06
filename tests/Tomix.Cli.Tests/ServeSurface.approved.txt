@@ -24,6 +24,7 @@ bpa.run
 bpa.fix
 dax.format
 dax.check
+command.run
 # notifications
 model.changed
 session.state
