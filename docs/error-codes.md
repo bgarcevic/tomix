@@ -178,7 +178,8 @@ Answered by the localhost endpoint of a shared session ([session protocol](proto
 
 | Code | Exit | Trigger |
 |------|------|---------|
-| `TOMIX_REFRESH_NO_REMOTE_TARGET` | 2 | `refresh` could not resolve a remote endpoint (default connection is local and no remote workspace-mode secondary is set). |
+| `TOMIX_REFRESH_NO_REMOTE_TARGET` | 2 | `refresh` could not resolve a remote endpoint: the model is files, no remote workspace-mode secondary is set, and no running Power BI Desktop has the files open. |
+| `TOMIX_REFRESH_IN_DESKTOP` | 0 | Info: the model was a PBIP's files, so `refresh` ran in the Power BI Desktop that has the PBIP open. Save in Desktop to keep the data. |
 | `TOMIX_REFRESH_UNSUPPORTED` | 2 | The provider session does not implement `IModelRefreshSession` (e.g. a local TMDL/BIM model). |
 | `TOMIX_REFRESH_BAD_TYPE` | 2 | `--type` was not one of `full`, `dataonly`, `automatic`, `calculate`, `clearvalues`, `defragment`, `add`. |
 | `TOMIX_REFRESH_TABLE_PARTITION_CONFLICT` | 2 | `--table` and `--partition` were passed together; choose one. |

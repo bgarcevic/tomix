@@ -1,15 +1,18 @@
+using Tomix.App.Connect;
 using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
 namespace Tomix.App.Refresh;
 
 /// <summary>
-/// Resolves the refresh target (primary if remote, else the remote workspace-mode secondary),
-/// opens a refresh-capable session, and runs the refresh. Mirrors <see cref="Deploy.DeployModelHandler"/>.
+/// Resolves the refresh target (primary if remote, else the remote workspace-mode secondary, else
+/// the Power BI Desktop instance that has the local model's PBIP open), opens a refresh-capable
+/// session, and runs the refresh. Mirrors <see cref="Deploy.DeployModelHandler"/>.
 /// All console/Spectre concerns stay in the CLI: progress and trace writers are injected.
 /// </summary>
 public sealed class RefreshModelHandler
@@ -19,11 +22,20 @@ public sealed class RefreshModelHandler
 
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly Func<CliConnectionState?> _resolveSession;
+    private readonly Func<string, PowerBiDesktopInstance?> _findDesktop;
 
-    public RefreshModelHandler(IEnumerable<IModelProvider> providers, Func<CliConnectionState?> resolveSession)
+    /// <param name="findDesktop">
+    /// The running Power BI Desktop instance with a local model's files open; defaults to
+    /// <see cref="PowerBiDesktopProjects.FindOpening(string)"/>.
+    /// </param>
+    public RefreshModelHandler(
+        IEnumerable<IModelProvider> providers,
+        Func<CliConnectionState?> resolveSession,
+        Func<string, PowerBiDesktopInstance?>? findDesktop = null)
     {
         _providers = providers.ToList();
         _resolveSession = resolveSession;
+        _findDesktop = findDesktop ?? PowerBiDesktopProjects.FindOpening;
     }
 
     /// <summary>Previews (<see cref="RefreshModelRequest.Preview"/>) or runs one refresh.</summary>
@@ -69,13 +81,27 @@ public sealed class RefreshModelHandler
                 exitCode: 2,
                 hint: "Example: --partition Sales.Internet"));
 
-        var target = ResolveTarget(request);
+        var resolver = new ActiveModelResolver(_resolveSession);
+        var target = ResolveTarget(request, resolver);
+        IReadOnlyList<TomixDiagnostic> notices = [];
+        if (target is null)
+        {
+            // Files cannot be refreshed, but the engine of a Power BI Desktop that has them open
+            // can: refresh there, as Tabular Editor does when Desktop launches it.
+            var local = resolver.ResolveReference(request.Model, request.Database, request.Server);
+            if (local.IsLocalPath && _findDesktop(local.Value) is { } desktop)
+            {
+                target = ModelReference.Remote(desktop.Endpoint);
+                notices = [DesktopNotice(local.Value, desktop)];
+            }
+        }
+
         if (target is null)
             return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
                 "TOMIX_REFRESH_NO_REMOTE_TARGET",
-                "No remote connection to refresh. The default connection is local and no remote workspace-mode secondary is set.",
+                "No deployed model to refresh: files cannot be refreshed, no workspace-mode secondary is set, and no running Power BI Desktop has these files open.",
                 exitCode: 2,
-                hint: "Use 'tx connect -s <workspace> -d <model>' or pass -s/-d explicitly, or set up workspace mode with 'tx connect --workspace <endpoint>'."));
+                hint: "Open the PBIP in Power BI Desktop, use 'tx connect -s <workspace> -d <model>' or pass -s/-d explicitly, or set up workspace mode with 'tx connect --workspace <endpoint>'."));
 
         if (!target.IsRemote)
             return RefreshOperation.Failed(TomixResult<RefreshModelResult>.Fail(
@@ -116,8 +142,15 @@ public sealed class RefreshModelHandler
                     hint: "Refresh is only supported on deployed models connected via XMLA (-s <workspace> -d <model>)."));
         }
 
-        return new RefreshOperation(session, target, request);
+        return new RefreshOperation(session, target, request, notices);
     }
+
+    private static TomixDiagnostic DesktopNotice(string path, PowerBiDesktopInstance desktop)
+        => new(
+            "TOMIX_REFRESH_IN_DESKTOP",
+            DiagnosticSeverity.Info,
+            $"'{path}' is open in Power BI Desktop{(desktop.ReportName is { } name ? $" ('{name}')" : "")}, so the model there ({desktop.Endpoint}) was refreshed.",
+            Hint: "Save in Power BI Desktop to keep the refreshed data.");
 
     /// <summary>Maps a failure while connecting, previewing, or refreshing to its diagnostic.</summary>
     internal static TomixResult<RefreshModelResult> MapFailure(Exception ex, ModelReference target, bool policyOnly)
@@ -215,9 +248,6 @@ public sealed class RefreshModelHandler
 
         return secondary;
     }
-
-    private ModelReference? ResolveTarget(RefreshModelRequest request)
-        => ResolveTarget(request, new ActiveModelResolver(_resolveSession));
 
     private static TomixResult<RefreshModelResult> AuthFail(AuthenticationRequiredException ex)
         => TomixResult<RefreshModelResult>.Fail(

@@ -15,7 +15,11 @@ namespace Tomix.App.Connect;
 /// over XMLA a Desktop database is named by a GUID and its model is always literally "Model".
 /// Null when the parent has no window (starting up, or already gone).
 /// </param>
-internal sealed record DesktopProcess(string DataDirectory, string? ReportName);
+/// <param name="OpenedFile">
+/// The file the hosting Desktop was started with (a <c>.pbip</c>, <c>.pbix</c> or similar), from its
+/// command line. Null when Desktop was started empty and the file opened from its File menu.
+/// </param>
+internal sealed record DesktopProcess(string DataDirectory, string? ReportName, string? OpenedFile = null);
 
 /// <summary>
 /// Enumerates running Power BI Desktop engines so discovered endpoints can be labelled with a
@@ -44,7 +48,8 @@ internal static class PowerBiDesktopProcesses
                 if (DataDirectoryFrom(process["CommandLine"] as string) is not { } dataDirectory)
                     continue;
 
-                processes.Add(new DesktopProcess(dataDirectory, WindowTitle(process["ParentProcessId"])));
+                var parent = process["ParentProcessId"];
+                processes.Add(new DesktopProcess(dataDirectory, WindowTitle(parent), OpenedFileFrom(CommandLineOf(parent))));
             }
 
             return processes;
@@ -92,6 +97,58 @@ internal static class PowerBiDesktopProcesses
         }
 
         return path.IsEmpty ? null : path.ToString();
+    }
+
+    /// <summary>
+    /// The first argument after the executable that names a Power BI file, from a Desktop command
+    /// line such as <c>"...\pbidesktop.exe" "C:\repo\Sales.pbip"</c>.
+    /// </summary>
+    internal static string? OpenedFileFrom(string? commandLine)
+        => string.IsNullOrWhiteSpace(commandLine)
+            ? null
+            : Arguments(commandLine).Skip(1).FirstOrDefault(argument => OpenableExtensions.Contains(Path.GetExtension(argument)));
+
+    private static readonly HashSet<string> OpenableExtensions =
+        new([".pbip", ".pbix", ".pbit", ".pbism"], StringComparer.OrdinalIgnoreCase);
+
+    // Splits on spaces outside double quotes, dropping the quotes. Paths cannot contain quotes, so
+    // the Windows escaping rules for embedded quotes are not needed.
+    private static IEnumerable<string> Arguments(string commandLine)
+    {
+        var current = new System.Text.StringBuilder();
+        var quoted = false;
+        foreach (var c in commandLine)
+        {
+            if (c == '"')
+                quoted = !quoted;
+            else if (c == ' ' && !quoted)
+            {
+                if (current.Length > 0)
+                    yield return current.ToString();
+                current.Clear();
+            }
+            else
+                current.Append(c);
+        }
+
+        if (current.Length > 0)
+            yield return current.ToString();
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static string? CommandLineOf(object? processId)
+    {
+        if (processId is not uint pid)
+            return null;
+
+        using var searcher = new ManagementObjectSearcher($"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {pid}");
+        foreach (var row in searcher.Get())
+        {
+            using var process = (ManagementObject)row;
+            return process["CommandLine"] as string;
+        }
+
+        return null;
     }
 
     [SupportedOSPlatform("windows")]

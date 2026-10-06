@@ -215,6 +215,35 @@ public sealed class PowerBiDesktopDiscoveryTests : IDisposable
     public void DataDirectoryFrom_ReturnsNullWhenNoPathIsPresent(string? commandLine)
         => Assert.Null(PowerBiDesktopProcesses.DataDirectoryFrom(commandLine));
 
+    [Theory]
+    // The literal command line of a live Store-install Desktop opening a PBIP.
+    [InlineData(@"""C:\Program Files\WindowsApps\Microsoft.MicrosoftPowerBIDesktop_2.158.1177.0_x64__8wekyb3d8bbwe\bin\pbidesktop.exe"" ""C:\repos\tomix-cli\samples\Revenue Opportunities.pbip""",
+        @"C:\repos\tomix-cli\samples\Revenue Opportunities.pbip")]
+    [InlineData(@"pbidesktop.exe C:\models\Sales.pbix", @"C:\models\Sales.pbix")]
+    [InlineData(@"pbidesktop.exe -flag ""C:\models\Sales.SemanticModel\definition.pbism""", @"C:\models\Sales.SemanticModel\definition.pbism")]
+    public void OpenedFileFrom_TheFileDesktopWasStartedWith(string commandLine, string expected)
+        => Assert.Equal(expected, PowerBiDesktopProcesses.OpenedFileFrom(commandLine));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(@"""C:\Program Files\Power BI\pbidesktop.exe""")]  // started empty
+    [InlineData(@"C:\tools\Sales.pbip.exe -x")]                      // the executable itself is skipped
+    [InlineData(@"pbidesktop.exe C:\notes\readme.txt")]
+    public void OpenedFileFrom_NullWhenNoPowerBiFileIsNamed(string? commandLine)
+        => Assert.Null(PowerBiDesktopProcesses.OpenedFileFrom(commandLine));
+
+    [Fact]
+    public void DiscoverInstances_CarriesTheFileDesktopOpened()
+    {
+        var root = WriteWorkspace("store", "abc", Utf16LeNoBom("61696"));
+        var dataDirectory = Path.Combine(root, "AnalysisServicesWorkspace_abc", "Data");
+
+        Assert.Equal(
+            @"C:\repo\Sales.pbip",
+            Assert.Single(DiscoverInstances([root], () => [new DesktopProcess(dataDirectory, "Sales", @"C:\repo\Sales.pbip")])).OpenedFile);
+    }
+
     // --- WorkspaceRoots ---------------------------------------------------------------------
 
     [Theory]

@@ -1,3 +1,4 @@
+using Tomix.App.Connect;
 using Tomix.App.Refresh;
 using Tomix.App.State;
 using Tomix.Core.Models;
@@ -273,7 +274,7 @@ public sealed class RefreshModelHandlerTests
     public async Task PolicyOnly_LocalModelWithoutMirrorFails()
     {
         var session = new StubRefreshSession();
-        var result = await new RefreshModelHandler([new StubRefreshProvider(session)], LocalSession)
+        var result = await new RefreshModelHandler([new StubRefreshProvider(session)], LocalSession, findDesktop: _ => null)
             .HandleAsync(Request(refreshType: "automatic", tables: ["Sales"]) with { PolicyOnly = true },
                 null, null, CancellationToken.None);
         Assert.False(result.Success);
@@ -307,6 +308,56 @@ public sealed class RefreshModelHandlerTests
                 null, null, CancellationToken.None);
         Assert.True(result.Success);
         Assert.NotNull(session.Applied);
+    }
+
+    [Fact]
+    public async Task LocalModel_OpenInDesktop_RefreshesDesktopAndSaysSo()
+    {
+        var session = new StubRefreshSession();
+        var provider = new StubRefreshProvider(session);
+        string? asked = null;
+        var result = await new RefreshModelHandler([provider], () => null, findDesktop: path =>
+            {
+                asked = path;
+                return new PowerBiDesktopInstance("localhost:52067", "Sales", "port.txt", @"C:\repo\Sales.pbip");
+            })
+            .HandleAsync(Request(model: "Sales.SemanticModel"), null, null, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(session.RefreshCalled);
+        Assert.Equal("Sales.SemanticModel", asked);
+        Assert.Equal("localhost:52067", provider.Opened?.Value);
+        var notice = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_REFRESH_IN_DESKTOP", notice.Code);
+        Assert.Equal(Tomix.Core.Diagnostics.DiagnosticSeverity.Info, notice.Severity);
+        Assert.Contains("localhost:52067", notice.Message);
+    }
+
+    [Fact]
+    public async Task LocalModel_NotOpenInDesktop_Fails()
+    {
+        var session = new StubRefreshSession();
+        var result = await new RefreshModelHandler([new StubRefreshProvider(session)], () => null, findDesktop: _ => null)
+            .HandleAsync(Request(model: "Sales.SemanticModel"), null, null, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_REFRESH_NO_REMOTE_TARGET", result.Diagnostics[0].Code);
+        Assert.False(session.RefreshCalled);
+    }
+
+    [Fact]
+    public async Task LocalModel_WithRemoteMirror_RefreshesTheMirrorNotDesktop()
+    {
+        var session = new StubRefreshSession();
+        var provider = new StubRefreshProvider(session);
+        var connection = LocalSession() with { Workspace = "powerbi://api.powerbi.com/v1.0/myorg/ws", Database = "Model" };
+        var result = await new RefreshModelHandler([provider], () => connection,
+                findDesktop: _ => throw new InvalidOperationException("Desktop is only asked when there is no remote target."))
+            .HandleAsync(Request(), null, null, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal("powerbi://api.powerbi.com/v1.0/myorg/ws", provider.Opened?.Value);
     }
 
     private static RefreshModelRequest Request(
@@ -354,10 +405,12 @@ public sealed class RefreshModelHandlerTests
         private readonly StubRefreshSession _session;
         public StubRefreshProvider(StubRefreshSession session) => _session = session;
         public int OpenCount { get; private set; }
+        public ModelReference? Opened { get; private set; }
         public bool CanOpen(ModelReference reference) => reference.IsRemote;
-        public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken ct)
         {
             OpenCount++;
+            Opened = reference;
             return Task.FromResult<IModelSession>(_session);
         }
     }

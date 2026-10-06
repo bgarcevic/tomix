@@ -13,7 +13,8 @@ namespace Tomix.App.Connect;
 /// The <c>msmdsrv.port.txt</c> this instance was found through. Persisted alongside a cached
 /// <paramref name="ReportName"/> so the name can later be revalidated without a WMI query.
 /// </param>
-public sealed record PowerBiDesktopInstance(string Endpoint, string? ReportName, string PortFile);
+/// <param name="OpenedFile">The file Desktop was started with, when its command line names one.</param>
+public sealed record PowerBiDesktopInstance(string Endpoint, string? ReportName, string PortFile, string? OpenedFile = null);
 
 /// <summary>
 /// Discovers running Power BI Desktop instances by probing the known AnalysisServices workspace
@@ -61,9 +62,9 @@ public static class PowerBiDesktopDiscovery
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Keyed by the engine's data directory, which is also the folder holding the port file.
-        var reportNames = describeProcesses()
+        var processes = describeProcesses()
             .GroupBy(p => NormalizeDirectory(p.DataDirectory), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().ReportName, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         var distinctRoots = roots
             .Where(root => !string.IsNullOrWhiteSpace(root))
@@ -82,11 +83,12 @@ public static class PowerBiDesktopDiscovery
                 if (!seen.Add(endpoint))
                     continue;
 
-                var directory = NormalizeDirectory(Path.GetDirectoryName(portFile));
+                var process = processes.GetValueOrDefault(NormalizeDirectory(Path.GetDirectoryName(portFile)));
                 instances.Add(new PowerBiDesktopInstance(
                     endpoint,
-                    reportNames.GetValueOrDefault(directory),
-                    portFile));
+                    process?.ReportName,
+                    portFile,
+                    process?.OpenedFile));
             }
         }
 

@@ -18,6 +18,10 @@ and the API surface that major versions protect.
   that change. `reload` (protocol: `session.reload`) takes the files' version, and
   `save --force` (`session.save` with `force`) keeps the session's. The `tx ui` page offers
   both (#351).
+- `tx refresh` on a PBIP's files (the `.pbip`, its `.SemanticModel` folder, or anything in it)
+  now refreshes the model in the Power BI Desktop that has that PBIP open, as Tabular Editor
+  does, instead of failing with `TOMIX_REFRESH_NO_REMOTE_TARGET`. It says so with
+  `TOMIX_REFRESH_IN_DESKTOP`.
 
 ## [0.9.0] - 2026-10-06
 

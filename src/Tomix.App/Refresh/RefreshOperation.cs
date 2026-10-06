@@ -1,3 +1,4 @@
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -14,13 +15,16 @@ public sealed class RefreshOperation : IAsyncDisposable
     private readonly IModelSession? _session;
     private readonly ModelReference? _target;
     private readonly RefreshModelRequest? _request;
+    private readonly IReadOnlyList<TomixDiagnostic> _notices = [];
     private RefreshPolicyInfo? _policy;
 
-    internal RefreshOperation(IModelSession session, ModelReference target, RefreshModelRequest request)
+    /// <param name="notices">Diagnostics every successful result carries, such as which target was chosen.</param>
+    internal RefreshOperation(IModelSession session, ModelReference target, RefreshModelRequest request, IReadOnlyList<TomixDiagnostic>? notices = null)
     {
         _session = session;
         _target = target;
         _request = request;
+        _notices = notices ?? [];
     }
 
     private RefreshOperation(TomixResult<RefreshModelResult> failure) => _failure = failure;
@@ -49,13 +53,13 @@ public sealed class RefreshOperation : IAsyncDisposable
             if (request.PolicyOnly)
             {
                 var policy = GetPolicy();
-                return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(target.Value, target.Database,
+                return Ok(new RefreshModelResult(target.Value, target.Database,
                     "policyOnly", 0, [], null, null,
                     PolicyPreview: new PolicyOnlyPreview(policy.Table, EffectiveDate, request.MaxParallelism)));
             }
 
             var script = ((IModelRefreshSession)_session!).GenerateRefreshScript(SessionRequest);
-            return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(
+            return Ok(new RefreshModelResult(
                 target.Value, target.Database, RefreshModelHandler.NormalizeType(request.RefreshType), 0,
                 Array.Empty<RefreshTableResult>(), null, script));
         }
@@ -84,13 +88,13 @@ public sealed class RefreshOperation : IAsyncDisposable
                 var applied = await ((IRefreshPolicyApplySession)_session!).ApplyRefreshPolicyAsync(
                     new RefreshPolicyApplyRequest(policy.Table, EffectiveDate, Refresh: false, request.MaxParallelism),
                     cancellationToken).ConfigureAwait(false);
-                return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(applied.Server, applied.Database,
+                return Ok(new RefreshModelResult(applied.Server, applied.Database,
                     "policyOnly", applied.DurationMs, [], null, null, PolicyApplication: applied));
             }
 
             var result = await ((IModelRefreshSession)_session!)
                 .RefreshAsync(SessionRequest, progress, traceWriter, cancellationToken).ConfigureAwait(false);
-            return TomixResult<RefreshModelResult>.Ok(new RefreshModelResult(
+            return Ok(new RefreshModelResult(
                 result.Server, result.Database, result.RefreshType, result.DurationMs, result.Tables, result.Totals, Script: null,
                 Phases: result.Phases));
         }
@@ -99,6 +103,9 @@ public sealed class RefreshOperation : IAsyncDisposable
             return RefreshModelHandler.MapFailure(ex, target, request.PolicyOnly);
         }
     }
+
+    private TomixResult<RefreshModelResult> Ok(RefreshModelResult result)
+        => TomixResult<RefreshModelResult>.Ok(result, diagnostics: _notices);
 
     private DateOnly EffectiveDate => _request!.EffectiveDate ?? DateOnly.FromDateTime(DateTime.Today);
 
