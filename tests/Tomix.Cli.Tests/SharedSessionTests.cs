@@ -399,6 +399,92 @@ public sealed class SharedSessionTests
         Assert.Contains("cannot run through command.run", (string?)answer["error"]!["message"]);
     }
 
+    [Fact]
+    public async Task FilesChangedOnDisk_TurnTheSessionStale_ForEveryClient_AndASaveIsRefused()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+        await using var agent = await shared.ConnectAsync("agent");
+        await agent.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/Mine", ["type"] = "Measure", ["expression"] = "1" });
+        var theirs = EditSalesOnDisk(shared);
+
+        var states = await web.NotificationsAsync("session.state", 2);
+        var save = await agent.RequestAsync("session.save");
+
+        Assert.Equal("stale", (string?)states[^1]["state"]);
+        Assert.Equal("TOMIX_SESSION_STALE", (string?)save["error"]!["data"]!["code"]);
+        Assert.Equal(theirs, File.ReadAllText(SalesFile(shared)));
+    }
+
+    [Fact]
+    public async Task ASaveWithForce_KeepsTheSessionsVersion_OverTheFiles()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var agent = await shared.ConnectAsync("agent");
+        await agent.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/Mine", ["type"] = "Measure", ["expression"] = "1" });
+        EditSalesOnDisk(shared);
+
+        var save = await agent.RequestAsync("session.save", new JsonObject { ["force"] = true });
+
+        Assert.NotNull(save["result"]);
+        var sales = File.ReadAllText(SalesFile(shared));
+        Assert.Contains("measure Mine = 1", sales);
+        Assert.DoesNotContain("Theirs", sales);
+        Assert.Equal("clean", (string?)(await shared.StatusAsync())["state"]);
+    }
+
+    [Fact]
+    public async Task Reload_TakesTheFiles_AfterTheClientAgreesToDiscardItsChanges()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+        await using var agent = await shared.ConnectAsync("agent");
+        await agent.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/Mine", ["type"] = "Measure", ["expression"] = "1" });
+        EditSalesOnDisk(shared);
+
+        var refused = await web.RequestAsync("session.reload");
+        var reloaded = await web.RequestAsync("session.reload", new JsonObject { ["discard"] = true });
+
+        Assert.Equal("TOMIX_SESSION_DIRTY", (string?)refused["error"]!["data"]!["code"]);
+        Assert.NotNull(reloaded["result"]);
+        var changed = (await agent.NotificationsAsync("model.changed", 2))[^1];
+        Assert.Equal("reload", (string?)changed["origin"]!["kind"]);
+        Assert.Contains(changed["changes"]!.AsArray(), change => (string?)change!["path"] == "Sales/Theirs" && (string?)change["change"] == "added");
+        Assert.Contains(changed["changes"]!.AsArray(), change => (string?)change!["path"] == "Sales/Mine" && (string?)change["change"] == "removed");
+        var status = await shared.StatusAsync();
+        Assert.Equal("clean", (string?)status["state"]);
+        Assert.Equal(0, (int?)status["undoSteps"]);
+    }
+
+    [Fact]
+    public async Task ARoutedSaveWithForce_OverwritesTheFiles()
+    {
+        await using var shared = await Shared.StartAsync();
+        await shared.RouteAsync("add", "Sales/Mine", "--type", "Measure", "--expression", "1");
+        EditSalesOnDisk(shared);
+
+        var refused = await shared.RouteAsync("save", "--error-format", "json");
+        var forced = await shared.RouteAsync("save", "--force");
+
+        Assert.Equal(1, refused.ExitCode);
+        Assert.Equal("TOMIX_SESSION_STALE", (string?)JsonNode.Parse(refused.Stderr)!["code"]);
+        Assert.True(forced.ExitCode == 0, forced.Stderr);
+        Assert.Contains("measure Mine = 1", File.ReadAllText(SalesFile(shared)));
+    }
+
+    private static string SalesFile(Shared shared) => Path.Combine(shared.ModelPath, "tables", "Sales.tmdl");
+
+    /// <summary>Adds a measure to the Sales file, as another editor would; returns the file's new text.</summary>
+    private static string EditSalesOnDisk(Shared shared)
+    {
+        var text = File.ReadAllText(SalesFile(shared)).Replace(
+            "\tmeasure 'Total Sales' = SUM ( Sales[Amount] )",
+            "\tmeasure 'Total Sales' = SUM ( Sales[Amount] )\n\n\tmeasure Theirs = 2");
+        Assert.Contains("Theirs", text);
+        File.WriteAllText(SalesFile(shared), text);
+        return text;
+    }
+
     private static Dictionary<string, string> SnapshotFiles(string folder)
         => Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToDictionary(file => file, File.ReadAllText);
 

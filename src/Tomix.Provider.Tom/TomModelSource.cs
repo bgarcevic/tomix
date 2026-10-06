@@ -45,6 +45,19 @@ internal abstract class TomModelSource : IAsyncDisposable
 
     public abstract ValueTask DisposeAsync();
 
+    /// <summary>Whether <see cref="Load"/> reads the source again, so a session can reload it.</summary>
+    public virtual bool CanReload => false;
+
+    /// <summary>
+    /// What the source holds now, for telling whether it changed outside the session (#351): equal
+    /// fingerprints mean equal content. <c>null</c> when the source cannot tell.
+    /// </summary>
+    public virtual string? Fingerprint() => null;
+
+    /// <summary>Calls <paramref name="changed"/> when something may have changed the source; the
+    /// caller compares <see cref="Fingerprint"/>s to know. <c>null</c> when the source cannot be watched.</summary>
+    public virtual IDisposable? Watch(Action changed) => null;
+
     /// <summary>A TMDL folder, <c>.bim</c> or TMSL file, saved in place in
     /// <paramref name="sourceFormat"/>.</summary>
     public static TomModelSource File(ModelReference reference, string path, string sourceFormat, Func<string, Database> load, IAccessTokenProvider? tokenProvider)
@@ -60,6 +73,12 @@ internal abstract class TomModelSource : IAsyncDisposable
         public override Database Load() => load(path);
 
         public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public override bool CanReload => true;
+
+        public override string? Fingerprint() => SourceFingerprint.Of(path);
+
+        public override IDisposable? Watch(Action changed) => SourceFingerprint.Watch(path, changed);
 
         public override bool IsInPlace(string? outputPath)
             => string.IsNullOrWhiteSpace(outputPath) || SamePath(outputPath, path);

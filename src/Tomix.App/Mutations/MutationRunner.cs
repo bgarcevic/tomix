@@ -119,6 +119,10 @@ public static class MutationRunner
         {
             return SaveValidation.Blocked<TResult>(ex.Delta);
         }
+        catch (ModelSourceChangedException ex)
+        {
+            return Session.SourceChangedFailure.Result<TResult>(ex);
+        }
         catch (Format.ExpressionFormatFailedException ex)
         {
             return Format.FormatFailure.Result<TResult>(ex.Message, ex.SyntaxErrors, ex.ObjectPath);

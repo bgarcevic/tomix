@@ -76,6 +76,10 @@ public sealed class SaveModelHandler
 
         try
         {
+            // Keep the session's model over changes made to the files outside it (#351).
+            if (request.Force && _sessions.IsLive && inPlace && session is IExternalChangeSession external)
+                external.KeepChanges();
+
             var export = _sessions.IsLive && inPlace && session is IModelMutationSession live
                 ? await live.SaveAsync(null, serialization, overwrite: true, cancellationToken)
                 : await exporter.ExportAsync(
@@ -95,6 +99,10 @@ public sealed class SaveModelHandler
             return TomixResult<SaveModelResult>.Ok(
                 new SaveModelResult(export.Format) { Outcome = outcome },
                 outcome.SyncFailed ? 1 : 0);
+        }
+        catch (ModelSourceChangedException ex)
+        {
+            return Session.SourceChangedFailure.Result<SaveModelResult>(ex);
         }
         catch (NotSupportedException ex)
         {

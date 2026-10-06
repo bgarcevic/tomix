@@ -65,6 +65,8 @@ internal sealed class SaveCommand : ICommandModule
         {
             Description = "Skip workspace sync when workspace mode is active"
         };
+        var forceOption = LifecycleOptions.Force(
+            "In a live session (tx interactive, tx ui), overwrite changes made to the model's files outside it");
 
         var command = new Command("save", "Write a model to disk in a chosen format")
         {
@@ -75,7 +77,8 @@ internal sealed class SaveCommand : ICommandModule
             fixBpaOption,
             bpaRulesOption,
             supportingFilesOption,
-            noSyncOption
+            noSyncOption,
+            forceOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -128,7 +131,8 @@ internal sealed class SaveCommand : ICommandModule
                         supportingFiles,
                         fixBpa,
                         bpaRules,
-                        syncTarget),
+                        syncTarget,
+                        parseResult.GetValue(forceOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 

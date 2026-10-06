@@ -102,6 +102,30 @@ internal sealed class TomChangeJournal
         Restore(checkpoint);
     }
 
+    /// <summary>
+    /// Replaces the model with <paramref name="database"/>, read again from the source, outside
+    /// any transaction. An object whose kind and path the old model had keeps its ID; the rest get
+    /// new ones.
+    /// </summary>
+    public void Reload(Database database)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        RequireNoTransaction();
+        var byPath = new Dictionary<(ModelObjectKind, string), ObjectId>();
+        foreach (var old in TomObjectTree.Walk(Database.Model))
+            byPath.TryAdd((TomObjectTree.KindOf(old)!.Value, TomObjectTree.PathOf(old)), Ids.GetOrAdd(old));
+
+        var ids = new Dictionary<MetadataObject, ObjectId>(ReferenceEqualityComparer.Instance);
+        foreach (var loaded in TomObjectTree.Walk(database.Model))
+        {
+            if (byPath.TryGetValue((TomObjectTree.KindOf(loaded)!.Value, TomObjectTree.PathOf(loaded)), out var id))
+                ids[loaded] = id;
+        }
+
+        Database = database;
+        Ids.Reset(ids);
+    }
+
     /// <summary>Rolls back the innermost transaction: restores the model and IDs to where they
     /// were when it began and drops its entries.</summary>
     public void Rollback()

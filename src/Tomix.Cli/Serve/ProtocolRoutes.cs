@@ -32,6 +32,7 @@ internal static class ProtocolRoutes
         ["session.history"] = new(["history"], []),
         ["session.undo"] = new(["undo"], []),
         ["session.redo"] = new(["redo"], []),
+        ["session.reload"] = new(["reload"], []),
         ["transaction.begin"] = new(["begin"], ["label"]),
         ["transaction.commit"] = new(["commit"], []),
         ["transaction.rollback"] = new(["rollback"], []),

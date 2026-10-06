@@ -26,6 +26,8 @@ button:disabled{opacity:.45;cursor:default}
 main{padding:12px 16px 32px;max-width:900px}
 .bar{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin-bottom:12px}
 .txn{border:1px solid var(--agent);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}
+.stale{border:1px solid var(--warn);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.stale span{flex:1 1 240px}
 .error{border:1px solid var(--bad);color:var(--bad);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}
 h2{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
 ol{list-style:none;margin:0;padding:0}
@@ -54,6 +56,11 @@ footer{font-size:12px;color:var(--muted);margin-top:24px}
 <main>
   <div class="bar"><span id="clients"></span><span id="steps"></span></div>
   <div class="txn" id="txn" hidden></div>
+  <div class="stale" id="stale" role="alert" hidden>
+    <span>The model's files changed outside this session, for example by a git checkout or another editor. Saving would overwrite those changes.</span>
+    <button id="reload">Reload from disk</button>
+    <button id="keep">Keep this version</button>
+  </div>
   <div class="error" id="error" role="alert" hidden></div>
   <h2>Activity</h2>
   <ol id="feed" aria-live="polite"><li class="empty" id="nothing">No changes yet. Edits from any client appear here.</li></ol>
@@ -94,8 +101,11 @@ async function refresh() {
   $("model").textContent = leaf(status.model);
   $("model").title = status.model || "";
   const state = $("state");
-  state.textContent = status.dirty ? "● unsaved changes" : status.state === "closed" ? "" : "saved";
-  state.className = "state" + (status.dirty ? " dirty" : "");
+  const stale = status.state === "stale";
+  state.textContent = stale ? "● files changed on disk" : status.dirty ? "● unsaved changes" : status.state === "closed" ? "" : "saved";
+  state.className = "state" + (stale || status.dirty ? " dirty" : "");
+  $("stale").hidden = !stale;
+  $("reload").dataset.dirty = status.dirty ? "1" : "";
   const others = status.clients.filter(id => id !== me);
   $("clients").textContent = others.length ? "Also here: " + others.join(", ") : "No other clients";
   $("steps").textContent = status.undoSteps + " undo · " + status.redoSteps + " redo";
@@ -198,6 +208,19 @@ for (const [id, method] of [["undo", "session.undo"], ["redo", "session.redo"], 
     refresh();
   });
 }
+
+// Reload discards unsaved changes, so it asks first; keeping this version saves over the files.
+$("reload").addEventListener("click", async () => {
+  const dirty = !!$("reload").dataset.dirty;
+  if (dirty && !confirm("Reload the model from disk? This discards the session's unsaved changes and its undo history.")) return;
+  try { showError(""); await request("session.reload", { discard: dirty }); } catch (error) { showError(error.message); }
+  refresh();
+});
+$("keep").addEventListener("click", async () => {
+  if (!confirm("Save this session's version over the files, discarding the changes made outside it?")) return;
+  try { showError(""); await request("session.save", { force: true }); } catch (error) { showError(error.message); }
+  refresh();
+});
 
 connect();
 // Clients joining and leaving send no event: the status, which is cheap to read, is polled.

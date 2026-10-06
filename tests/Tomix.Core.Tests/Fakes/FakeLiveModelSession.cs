@@ -74,6 +74,13 @@ internal sealed class FakeLiveModelSession : ILiveModelSession
     public Task<ModelChangeBatch?> RedoAsync(string? client, CancellationToken cancellationToken)
         => throw new NotSupportedException();
 
+    public bool CanReload => false;
+
+    public Task<bool> CheckSourceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+
+    public Task<ModelChangeBatch> ReloadAsync(string? client, CancellationToken cancellationToken)
+        => throw new NotSupportedException();
+
     public ValueTask DisposeAsync()
     {
         _gate.Dispose();

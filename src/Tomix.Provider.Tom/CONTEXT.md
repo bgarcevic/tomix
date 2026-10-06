@@ -35,6 +35,16 @@ constructor uses `TomWriter.Untracked`, so one-shot sessions record nothing; a l
 its journal's writer through the internal constructor. `BannedSymbols.txt` rejects direct TOM
 collection `Add`/`Remove` at build time.
 
+**A live session on files watches them** (#351). `TomModelSource` gives each source a
+`Fingerprint` (for files, `SourceFingerprint`: a hash of the `.bim`, or of a folder's `.tmdl` files by
+relative path and content) and a `Watch`. `TomLiveModelSession` keeps the fingerprint it last
+opened, reloaded or saved; a watcher event checks it after `SourceSettleDelay`, and an in-place
+save checks it first and throws `ModelSourceChangedException` rather than overwrite. Checks and
+saves share `_sourceLock`, so a check never reads files a save is writing. `KeepChanges` takes the
+files as they are as the new baseline (`save --force`); `ReloadAsync` loads them again through
+`TomChangeJournal.Reload`, which keeps the ID of every object whose kind and path survive.
+Server sources have no fingerprint yet, so they never turn stale.
+
 ## Cross-folder dependencies
 
 - Depends on `/src/Tomix.Core`.

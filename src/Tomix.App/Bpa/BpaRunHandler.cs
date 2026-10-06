@@ -207,6 +207,10 @@ public sealed class BpaRunHandler
                     {
                         return SaveValidation.Blocked<BpaRunResult>(ex.Delta);
                     }
+                    catch (ModelSourceChangedException ex)
+                    {
+                        return Session.SourceChangedFailure.Result<BpaRunResult>(ex);
+                    }
 
                     runResult = runResult with { FixOutcome = outcome with { Target = MutationTarget.Merge(MutationTarget.For(request.Model, connection), outcome.Target) } };
                     if (context.Force && outcome.Validation is { NewErrorCount: > 0 } delta)

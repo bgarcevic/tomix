@@ -36,7 +36,7 @@ internal sealed class ServeSession : IProtocolMethods
     public IReadOnlyList<string> Methods { get; } =
     [
         "session.open", "session.close", "session.status", "session.save", "session.snapshot", "session.history",
-        "session.undo", "session.redo", "transaction.begin", "transaction.commit", "transaction.rollback",
+        "session.undo", "session.redo", "session.reload", "transaction.begin", "transaction.commit", "transaction.rollback",
         "model.summary", "model.tree", "object.get", "object.find", "deps.get", "object.add", "object.set",
         "object.remove", "object.move", "model.replace", "bpa.run", "bpa.fix", "dax.format", "dax.check", "command.run"
     ];

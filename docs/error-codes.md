@@ -124,16 +124,17 @@ Raised when a command runs against an open live session (`tx shell` and the othe
 |------|------|---------|
 | `TOMIX_SESSION_STAGE_UNSUPPORTED` | 2 | `--stage` or `--revert` on a live session. Its edits already stay in the session until it saves. |
 | `TOMIX_SESSION_MODEL_MISMATCH` | 2 | The command names a different model from the one the live session holds. |
-| `TOMIX_SESSION_DIRTY` | 1 | `tx interactive` reached `exit` or the end of its input with unsaved changes or an open transaction, and could not ask. Run `save`, or pass `--discard-on-exit` or `--yes`. From `tx serve`: `session.open` or `session.close` would discard unsaved changes; save first or pass `"discard": true`. |
+| `TOMIX_SESSION_DIRTY` | 1 | `tx interactive` reached `exit` or the end of its input with unsaved changes or an open transaction, and could not ask. Run `save`, or pass `--discard-on-exit` or `--yes`. `reload` would discard unsaved changes; pass `--discard`. From `tx serve`: `session.open`, `session.close` or `session.reload` would discard unsaved changes; save first or pass `"discard": true`. |
 | `TOMIX_SESSION_NO_MODEL` | 2 | `tx interactive` has no model open for the command. Run `connect <path>` first. From `tx serve`: send `session.open` first. |
 | `TOMIX_SESSION_COMMAND_UNAVAILABLE` | 2 | The command does not run inside an interactive session. Run it outside. |
-| `TOMIX_SESSION_SOURCE_UNSUPPORTED` | 2 | `tx interactive` cannot open this model yet; it opens TMDL folders and `.bim` files. |
+| `TOMIX_SESSION_SOURCE_UNSUPPORTED` | 2 | `tx interactive` cannot open this model yet; it opens TMDL folders and `.bim` files. Also `reload` on a session that cannot read its source again (a server-backed model). |
 | `TOMIX_SESSION_NOTHING_TO_UNDO` | 1 | `undo` with no change to revert. |
 | `TOMIX_SESSION_NOTHING_TO_REDO` | 1 | `redo` with no undone change to reapply. |
 | `TOMIX_SESSION_IN_TRANSACTION` | 2 | `undo` or `redo` while a transaction is open. Run `commit` or `rollback` first. |
 | `TOMIX_SESSION_TRANSACTION_OPEN` | 2 | `begin` while a transaction is open; transactions do not nest. |
 | `TOMIX_SESSION_NO_TRANSACTION` | 2 | `commit` or `rollback` with no open transaction. |
 | `TOMIX_SESSION_TRANSACTION_ENDED` | 1 | The transaction was rolled back because it sat idle for 15 minutes. |
+| `TOMIX_SESSION_STALE` | 1 | A live session would save over changes made to the model's files outside it (a `git checkout`, another editor) since it opened, reloaded or last saved. Nothing was written. Run `reload` to take the files' version (unsaved changes are lost), or `save --force` to overwrite them with the session's. From `tx serve`: `session.reload`, or `session.save` with `"force": true`. |
 | `TOMIX_SESSION_IN_USE` | 1 | A session client sent `session.open` or `session.close` while other clients are connected to the same session. Disconnect them first, or start another session for the other model. |
 | `TOMIX_PROTOCOL_VERSION` | 2 | A `tx serve` client asked for a session protocol version the server does not speak. `data.supported` lists the versions it does ([session protocol](protocol.md)). |
 

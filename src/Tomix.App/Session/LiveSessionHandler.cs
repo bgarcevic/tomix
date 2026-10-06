@@ -94,6 +94,47 @@ public sealed class LiveSessionHandler
         }
     }
 
+    /// <summary>
+    /// Reads the model's files again (#351), for a session whose source changed outside it. Fails
+    /// with <c>TOMIX_SESSION_DIRTY</c> when that would discard unsaved changes, unless
+    /// <paramref name="discard"/> says to.
+    /// </summary>
+    public async Task<TomixResult<SessionStepResult>> ReloadAsync(bool discard, CancellationToken cancellationToken)
+    {
+        if (_transaction is not null)
+            return TomixResult<SessionStepResult>.Fail(
+                "TOMIX_SESSION_IN_TRANSACTION",
+                $"Cannot reload inside transaction {_transaction.Transaction}.",
+                exitCode: 2,
+                "Run 'commit' or 'rollback' first.");
+        if (!_session.CanReload)
+            return TomixResult<SessionStepResult>.Fail(
+                "TOMIX_SESSION_SOURCE_UNSUPPORTED",
+                $"A session on {_session.Reference.Value} cannot reload it; reload works for TMDL folders and .bim files.",
+                exitCode: 2,
+                "Close the session and open the model again.");
+        if (_session.IsDirty && !discard)
+            return TomixResult<SessionStepResult>.Fail(
+                "TOMIX_SESSION_DIRTY",
+                "Reloading would discard the session's unsaved changes and its undo history.",
+                exitCode: 1,
+                "Pass --discard to reload anyway, or 'save --force' to keep the session's version instead.");
+
+        try
+        {
+            var batch = await _session.ReloadAsync(_client, cancellationToken);
+            return Step("reload", batch.Transaction, null, batch.Changes);
+        }
+        catch (ModelLoadException ex)
+        {
+            return TomixResult<SessionStepResult>.Fail(
+                "TOMIX_MODEL_LOAD_FAILED",
+                ex.Message,
+                exitCode: 2,
+                "Fix the files and run 'reload' again; the session keeps its model meanwhile.");
+        }
+    }
+
     /// <summary>Rolls back the open transaction, if any, before the host closes the session.</summary>
     public async Task<bool> RollbackOpenTransactionAsync(CancellationToken cancellationToken)
     {

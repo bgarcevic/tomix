@@ -49,6 +49,7 @@ internal sealed class InteractiveLoop : IAsyncDisposable
     private LiveSessionHandler? _handler;
     private RootCommand _root;
     private CancellationTokenSource? _running;
+    private bool _staleNoticed;
     private bool _exitRequested;
 
     /// <param name="buildRoot">Builds the command tree around the loop's own commands: with a
@@ -100,6 +101,7 @@ internal sealed class InteractiveLoop : IAsyncDisposable
             var lineNumber = 0;
             while (true)
             {
+                NoticeStale();
                 var line = reader.ReadLine(Prompt());
                 lineNumber++;
                 if (line is null)
@@ -364,6 +366,16 @@ internal sealed class InteractiveLoop : IAsyncDisposable
 
     private void Error(string code, string message, string hint)
         => ErrorOutput.Write([new TomixDiagnostic(code, DiagnosticSeverity.Error, message, hint)], _options.ErrorFormat);
+
+    /// <summary>Says once, before the prompt, that the model's files changed outside the session (#351).</summary>
+    private void NoticeStale()
+    {
+        var stale = _scope?.Session.State == SessionState.Stale;
+        if (stale && !_staleNoticed)
+            StdErr.MarkupLine(Styling.Warning(
+                "The model's files changed outside this session. Run 'reload' to take them (unsaved changes are lost), or 'save --force' to keep this session's version."));
+        _staleNoticed = stale;
+    }
 
     /// <summary><c>tx [model*] (transaction)&gt;</c>, or <c>tx&gt;</c> with no model open.</summary>
     private string Prompt()

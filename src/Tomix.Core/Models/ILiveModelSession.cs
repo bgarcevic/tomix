@@ -83,6 +83,29 @@ public interface ILiveModelSession : IModelSession
     /// <summary>Reapplies the last undone transaction as one step.</summary>
     /// <returns>The batch describing the reapplication, or <c>null</c> when there is nothing to redo.</returns>
     Task<ModelChangeBatch?> RedoAsync(string? client, CancellationToken cancellationToken);
+
+    /// <summary>True when the session can tell that its source changed outside it, and reload it.
+    /// File sources can; server sources cannot yet.</summary>
+    bool CanReload { get; }
+
+    /// <summary>
+    /// Compares the source with the state the session last opened, reloaded or saved, and marks
+    /// the session <see cref="SessionState.Stale"/> when it changed (or clears that when it is
+    /// back as it was). Sessions also check on their own when they see the source change, and
+    /// before every save.
+    /// </summary>
+    /// <returns>True when the source changed outside the session.</returns>
+    Task<bool> CheckSourceAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the source again, discarding unsaved changes and the undo history. Objects that keep
+    /// their path keep their ID. Publishes one batch with <see cref="ChangeOriginKind.Reload"/>
+    /// naming what differs; modified objects carry no property names.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The session cannot reload (<see cref="CanReload"/>).</exception>
+    /// <exception cref="InvalidOperationException">The caller holds a lease, or the client has
+    /// an open transaction.</exception>
+    Task<ModelChangeBatch> ReloadAsync(string? client, CancellationToken cancellationToken);
 }
 
 /// <summary>One committed transaction in <see cref="ILiveModelSession.History"/>.</summary>

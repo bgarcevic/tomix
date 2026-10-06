@@ -17,7 +17,7 @@ internal static class SessionCommands
 {
     /// <summary>The names <see cref="Build"/> registers, so a session with no model can explain them.</summary>
     public static readonly IReadOnlySet<string> Names =
-        new HashSet<string>(["undo", "redo", "begin", "commit", "rollback", "status", "history"], StringComparer.Ordinal);
+        new HashSet<string>(["undo", "redo", "begin", "commit", "rollback", "status", "history", "reload"], StringComparer.Ordinal);
 
     public static IEnumerable<Command> Build(LiveSessionHandler handler)
     {
@@ -44,6 +44,15 @@ internal static class SessionCommands
         var history = new Command("history", "List the changes undo can revert and redo can reapply");
         history.SetAction(parseResult => Render(parseResult, "history", handler.History(), RenderHistory));
         yield return history;
+
+        var discardOption = new Option<bool>("--discard")
+        {
+            Description = "Reload even though it discards unsaved changes"
+        };
+        var reload = new Command("reload", "Read the model's files again, after they changed outside the session; clears undo history") { discardOption };
+        reload.SetAction((parseResult, cancellationToken) =>
+            RenderStepAsync(parseResult, handler.ReloadAsync(parseResult.GetValue(discardOption), cancellationToken)));
+        yield return reload;
     }
 
     private static Command Step(string name, string description, Func<CancellationToken, Task<TomixResult<SessionStepResult>>> run)
@@ -74,6 +83,7 @@ internal static class SessionCommands
             "redo" => $"Redone: {subject} ({Changes(result.Changes)})",
             "begin" => $"Transaction {subject} open. Commands now group into one undo step until 'commit' or 'rollback'.",
             "commit" => $"Committed: {subject} ({Changes(result.Changes)})",
+            "reload" => $"Reloaded from disk ({Changes(result.Changes)}); undo history cleared.",
             _ => $"Rolled back: {subject}"
         };
         AnsiConsole.MarkupLine(Styling.Success(line));
@@ -83,6 +93,8 @@ internal static class SessionCommands
     {
         AnsiConsole.MarkupLine(Styling.KeyValue("Model:", status.Source));
         AnsiConsole.MarkupLine(Styling.KeyValue("Unsaved changes:", status.Dirty ? "yes" : "no"));
+        if (status.State == SessionState.Stale)
+            AnsiConsole.MarkupLine(Styling.KeyValue("Files:", "changed outside the session; run 'reload' or 'save --force'"));
         AnsiConsole.MarkupLine(Styling.KeyValue("Undo steps:", Styling.Number(status.UndoSteps)));
         AnsiConsole.MarkupLine(Styling.KeyValue("Redo steps:", Styling.Number(status.RedoSteps)));
         AnsiConsole.MarkupLine(Styling.KeyValue("Transaction:", status.Transaction is { } open

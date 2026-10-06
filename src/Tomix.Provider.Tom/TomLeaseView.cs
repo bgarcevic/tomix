@@ -10,7 +10,7 @@ namespace Tomix.Provider.Tom;
 /// <see cref="Database"/> from the journal on every call, since a rollback can replace it.
 /// </summary>
 internal class TomLeaseView : IModelSession, IModelExportSession, IModelMutationSession,
-    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession
+    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IExternalChangeSession
 {
     private readonly TomLiveModelSession _session;
     private readonly TomLiveModelSession.Lease _lease;
@@ -84,6 +84,14 @@ internal class TomLeaseView : IModelSession, IModelExportSession, IModelMutation
     {
         _lease.ThrowIfEnded();
         return _session.SaveAsync(_lease, outputPath, serialization, overwrite, cancellationToken);
+    }
+
+    public bool SourceChanged => _session.SourceChanged;
+
+    public void KeepChanges()
+    {
+        _lease.ThrowIfEnded();
+        _session.KeepChanges();
     }
 
     public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken cancellationToken)

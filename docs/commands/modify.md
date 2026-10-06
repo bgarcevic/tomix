@@ -521,10 +521,22 @@ Inside a session these commands also work:
 | `rollback` | Discard the open transaction's changes. |
 | `status` | The model, unsaved changes, undo and redo steps, and the open transaction. |
 | `history` | The changes undo can revert and redo can reapply, labelled with the command that made them. |
+| `reload [--discard]` | Read the model's files again after they changed outside the session. Clears undo history; with unsaved changes it needs `--discard`. |
 | `exit`, `quit` | Leave the session. |
 | `help` | List the commands that work in the session. |
 
 The session keeps the last 50 undo steps. A command that fails changes nothing.
+
+**Files changed outside the session.** The session watches the model's files.
+When something else changes them (a `git checkout`, a pull, another editor),
+the session says so before the next prompt, and `save` fails with
+`TOMIX_SESSION_STALE` instead of overwriting that change. Then either:
+
+- `reload` takes the files' version. It discards unsaved changes (pass
+  `--discard` when there are some) and the undo history.
+- `save --force` keeps the session's version and writes it over the files.
+
+`status` shows when the files changed.
 
 Leaving with unsaved changes (or an open transaction) asks first at a
 terminal. Anywhere else it fails with `TOMIX_SESSION_DIRTY` and exit code 1
@@ -653,6 +665,11 @@ tx ui ./model &
 tx set Sales/Revenue ./model -p FormatString='#,0'   # one undo step in the session
 tx save ./model                                      # writes the session
 ```
+
+When the model's files change outside the session, the page says so and
+offers to reload them or keep the session's version, and `tx save` from any
+client fails with `TOMIX_SESSION_STALE` until one of the two is chosen
+(`tx save --force` keeps the session's version), as in `tx interactive`.
 
 The page is a small companion view for now: the model, its unsaved state, who
 else is connected, an activity feed of every client's changes, and Undo, Redo

@@ -255,6 +255,7 @@ tx save [model] [options]
 | `--supporting-files` | Write a `{modelName}.SemanticModel/` folder (with `.platform` and `definition.pbism`) around the output. |
 | `--fix-bpa` / `--bpa-rules <file>` | Apply BPA rule fixes before saving, optionally with specific rule files. |
 | `--overwrite` | Replace an existing output file or directory. |
+| `-f, --force` | In a live session (`tx interactive`, `tx ui`), write over changes made to the model's files outside it, instead of failing with `TOMIX_SESSION_STALE`. |
 
 ```sh
 tx save -s MyWorkspace -d Sales -o ./sales.tmdl          # download a deployed model

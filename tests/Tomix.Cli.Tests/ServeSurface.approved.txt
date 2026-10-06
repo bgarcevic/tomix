@@ -7,6 +7,7 @@ session.snapshot
 session.history
 session.undo
 session.redo
+session.reload
 transaction.begin
 transaction.commit
 transaction.rollback

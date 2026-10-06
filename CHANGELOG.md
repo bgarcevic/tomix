@@ -10,6 +10,15 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- A live session (`tx interactive`, `tx serve`, `tx ui`) on a TMDL folder or `.bim` file now
+  notices when the files change outside it, for example by a `git checkout` or another editor.
+  The session turns `stale`, and saving fails with `TOMIX_SESSION_STALE` instead of overwriting
+  that change. `reload` (protocol: `session.reload`) takes the files' version, and
+  `save --force` (`session.save` with `force`) keeps the session's. The `tx ui` page offers
+  both (#351).
+
 ## [0.9.0] - 2026-10-06
 
 The live session (`tx interactive`, `tx serve`, `tx ui`) is a preview: its protocol and options

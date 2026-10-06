@@ -255,6 +255,7 @@ Clients should branch on `data.code`, not on `message`.
 | `session.history` | request | The steps undo and redo walk through. |
 | `session.undo` | request | Revert the last step. |
 | `session.redo` | request | Reapply the last undone step. |
+| `session.reload` | request | Read the model's files again after they changed outside the session. |
 | `transaction.begin` | request | Group the following requests into one undo step. |
 | `transaction.commit` | request | Keep the group as one step. |
 | `transaction.rollback` | request | Discard the group. |
@@ -283,8 +284,8 @@ Clients should branch on `data.code`, not on `message`.
 | `transaction.closed` | notification | That transaction was committed or rolled back. |
 | `diagnostics.updated` | notification | Dependency, DAX and BPA results were recomputed. |
 
-Reserved for later versions: `session.reload` and `session.merge` (#351,
-#374), and `changeSet.*` for proposed edits that a person approves (#370).
+Reserved for later versions: `session.merge` (#374), and `changeSet.*` for
+proposed edits that a person approves (#370).
 
 ### Lifecycle methods
 
@@ -438,6 +439,12 @@ makes the current version the save point; with it, it writes a copy and the
 session keeps saving to its source. `serialization` and `fixBpa` work as in
 `tx save`.
 
+When the model's files changed outside the session since it opened, reloaded
+or last saved (the session is `stale`), a save to the source fails with
+`TOMIX_SESSION_STALE` and writes nothing. Pass `"force": true` to keep the
+session's version and overwrite the files, or call `session.reload` to take
+theirs.
+
 ```json
 { "jsonrpc": "2.0", "id": 5, "method": "session.save", "params": {} }
 ```
@@ -575,6 +582,43 @@ when there is none.
     },
     "diagnostics": [],
     "version": 6
+  }
+}
+```
+
+#### `session.reload`
+
+Reads the model's files again, after they changed outside the session (a
+`git checkout`, another editor). It discards unsaved changes and clears undo
+history, so on a dirty session it fails with `TOMIX_SESSION_DIRTY` unless
+`discard` is `true`. Objects that keep their path keep their `id`. Every client
+gets one `model.changed` with `origin.kind` `reload`, naming what differs from
+the model before; modified objects carry no `properties`. Fails with
+`TOMIX_MODEL_LOAD_FAILED`, leaving the session as it was, when the files no
+longer load, and with `TOMIX_SESSION_SOURCE_UNSUPPORTED` on a server-backed
+session.
+
+```json
+{ "jsonrpc": "2.0", "id": 32, "method": "session.reload", "params": { "discard": true } }
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "result": {
+    "data": {
+      "action": "reload",
+      "transaction": "t9",
+      "label": null,
+      "changes": [
+        { "id": "oh", "objectKind": "Measure", "change": "modified", "path": "Sales/Total Sales" }
+      ],
+      "version": 7,
+      "dirty": false
+    },
+    "diagnostics": [],
+    "version": 7
   }
 }
 ```
@@ -1223,6 +1267,12 @@ One per committed transaction, whether it touched one object or four hundred.
 
 `state` is `clean`, `dirty`, `saving`, `stale` or `closed`. A client shows
 unsaved changes from it, and offers reload when the session is `stale`.
+
+A session on a TMDL folder or `.bim` file watches its files. When their
+content differs from what the session last opened, reloaded or saved, it turns
+`stale` (it may also have unsaved changes; `session.status` reports `dirty`
+separately), and back again if the files return to that content. `stale` ends
+with `session.reload` or a `session.save` with `force`.
 
 ```json
 {
