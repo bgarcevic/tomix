@@ -41,14 +41,16 @@ Application use cases and command handlers.
   (`ModelSessionRunner`, `MutationRunner`, and `bpa run`, which drives the lifecycle itself) take
   their session from an `IModelSessionSource`: `OneShotSessionSource` opens and disposes;
   `LiveSessionSource` leases the open session and never disposes it, and serves only the model the
-  session holds (`TOMIX_SESSION_MODEL_MISMATCH`). Under a live source, mutations run in
+  session holds (`TOMIX_SESSION_MODEL_MISMATCH`). With `LiveSessionSource.Snapshot` set, its
+  leases read that published snapshot instead: no transaction, no wait, no writes.
+  `DependencyGraph.FromSnapshot` builds one graph per snapshot, so those readers share it. Under a live source, mutations run in
   `MutationMode.Live`, which applies in a transaction without persisting (status `applied`);
   `--save` applies and saves in the same transaction; `--stage`/`--revert` fail with
   `TOMIX_SESSION_STAGE_UNSUPPORTED`. `SaveModelHandler` takes a source too: an in-place save in a
   live session goes through the session's own save, so it records the save point.
   `Session/LiveSessionHandler` holds one client's session commands (status, history, undo/redo,
-  and its explicit transaction); a host keeps one per attached client. Planned: `SessionHost` owns the session registry, client
-  attach/detach and the approval policy. Front ends (`shell`, `serve`, `mcp`, `ui`) call handlers with the same
+  and its explicit transaction); a host keeps one per attached client. Planned: `SessionHost` owns the session registry and client
+  attach/detach. Front ends (`shell`, `serve`, `mcp`, `ui`) call handlers with the same
   `*Request` records; they never get their own copy of command logic.
 - Formatting behavior:
   - DAX formatting is offline: the vendored SQLBI engine behind `Tomix.Core.Dax.DaxFormatter`,

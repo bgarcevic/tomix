@@ -11,8 +11,7 @@ A localhost WebSocket carries the same messages to several clients of one
 session; [`tx ui`](commands/modify.md#ui-share-a-session-with-the-browser-and-agents) opens it. The design behind it is
 [ADR 0001](design/adr-0001-live-model-session.md).
 
-`tx serve` does not serve `query.run`, `$/progress` or `diagnostics.updated`
-yet. `initialize` lists what it does serve, so a client can check
+`tx serve` does not serve `query.run` or `$/progress` yet. `initialize` lists what it does serve, so a client can check
 `capabilities` rather than this page.
 
 ## Transport
@@ -291,8 +290,7 @@ Clients should branch on `data.code`, not on `message`.
 | `transaction.closed` | notification | That transaction was committed or rolled back. |
 | `diagnostics.updated` | notification | Dependency, DAX and BPA results were recomputed. |
 
-Reserved for later versions: `session.merge` (#374), and `changeSet.*` for
-proposed edits that a person approves (#370).
+Reserved for later versions: `session.merge` (#374).
 
 ### Lifecycle methods
 
@@ -302,6 +300,11 @@ proposed edits that a person approves (#370).
 returns the ID it will use for this client: the name, numbered per name in the
 session (`tomix-ui-1`, `tomix-ui-2`).
 
+`capabilities.diagnostics` asks the host to keep dependencies and DAX
+diagnostics up to date after every change and to send this client
+`diagnostics.updated`: `true`, or `{ "bpa": true }` to include BPA findings.
+Leave it out, or send `false`, for neither.
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -309,7 +312,8 @@ session (`tomix-ui-1`, `tomix-ui-2`).
   "method": "initialize",
   "params": {
     "protocolVersion": "0",
-    "clientInfo": { "name": "tomix-ui", "version": "0.1.0" }
+    "clientInfo": { "name": "tomix-ui", "version": "0.1.0" },
+    "capabilities": { "diagnostics": { "bpa": true } }
   }
 }
 ```
@@ -835,6 +839,11 @@ The `tx find` payload.
 The `tx deps` payload. `direction` is `upstream`, `downstream` or `both` (the
 default); `unused` lists objects nothing depends on instead.
 
+`deps.get`, `dax.check` and `bpa.run` read the last committed version, so they
+do not wait for another client's transaction; inside the client's own
+transaction they read its uncommitted changes. `version` is the version they
+read.
+
 ```json
 { "jsonrpc": "2.0", "id": 19, "method": "deps.get", "params": { "path": "Sales/Total Sales" } }
 ```
@@ -1114,8 +1123,9 @@ session; with neither, every expression in the model. `lang` is `dax`
 #### `dax.check`
 
 The `tx validate` payload: DAX syntax and broken references across the model.
-The host also runs it after every change and announces new results with
-`diagnostics.updated`.
+For a client that asked for `capabilities.diagnostics`, the host also runs it
+after every change and announces new results with `diagnostics.updated`;
+`dax.check` without parameters then answers with those results.
 
 ```json
 { "jsonrpc": "2.0", "id": 28, "method": "dax.check" }
@@ -1336,8 +1346,13 @@ its `model.changed`.
 
 #### `diagnostics.updated`
 
-The host recomputed dependencies, DAX diagnostics and BPA for `version`, 250 ms
-after the last change. Fetch them with `dax.check`, `bpa.run` or `deps.get`.
+The host recomputed dependencies, DAX diagnostics and, when asked, BPA findings
+for `version`, 250 ms after the last change. A burst of changes causes one
+recompute. Only clients that sent `capabilities.diagnostics` in `initialize`
+get it. Fetch the results with `dax.check`, `bpa.run` or `deps.get`: without
+parameters, `dax.check` and `bpa.run` answer with the recomputed results for the
+current version instead of running again. BPA results follow the rule files as
+they were at that recompute; pass any parameter to `bpa.run` to run it again.
 
 ```json
 { "jsonrpc": "2.0", "method": "diagnostics.updated", "params": { "version": 43 } }

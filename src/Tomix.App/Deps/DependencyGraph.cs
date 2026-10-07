@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.Core.Models;
@@ -13,6 +14,8 @@ namespace Tomix.App.Deps;
 /// </summary>
 internal sealed class DependencyGraph
 {
+    private static readonly ConditionalWeakTable<ModelSnapshot, DependencyGraph> Built = new();
+
     private readonly IReadOnlyList<ModelObject> _objects;
     private readonly Dictionary<string, ModelObject> _byPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ModelObject> _measureByName = new(StringComparer.OrdinalIgnoreCase);
@@ -31,8 +34,12 @@ internal sealed class DependencyGraph
         BuildEdges();
     }
 
+    /// <summary>
+    /// The graph of <paramref name="snapshot"/>, built once per snapshot: a live session publishes
+    /// one snapshot per version, so its readers share one graph until the next change.
+    /// </summary>
     public static DependencyGraph FromSnapshot(ModelSnapshot snapshot)
-        => new(ModelObjectProjection.Flatten(snapshot));
+        => Built.GetValue(snapshot, static built => new(ModelObjectProjection.Flatten(built)));
 
     /// <summary>Single-level objects that <paramref name="target"/> depends on.</summary>
     public IReadOnlyList<DependencyObject> DirectUpstream(ModelObject target)

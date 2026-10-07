@@ -41,7 +41,9 @@ CLI entry point for `tx`.
   localhost endpoint of `tx ui`. `ProtocolServer` owns the lifecycle, validation, cancellation and error
   answers over an `IMessageChannel` (`StreamChannel` frames on stdio, `WebSocketChannel`).
   `SessionHost` owns the one live session of the process, hands out client IDs, broadcasts every
-  event and keeps the `/status` JSON; each connection is a `ServeSession`, which answers the
+  event and keeps the `/status` JSON; its `DerivedState` recomputes `dax.check`, the dependency
+  graph and (when asked) `bpa.run` from the published snapshot after changes, for the clients
+  that sent `capabilities.diagnostics`; each connection is a `ServeSession`, which answers the
   methods, most by running the session command tree (the one `tx interactive` uses) with JSON
   output captured, so `data` is the command's own JSON. `ProtocolRoutes` maps parameters to
   command-line arguments. `ConsoleRouting` gives each running command its own captured console

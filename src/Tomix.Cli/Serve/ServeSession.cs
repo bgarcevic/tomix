@@ -42,10 +42,21 @@ internal sealed class ServeSession : IProtocolMethods
     ];
 
     public IReadOnlyList<string> Notifications { get; } =
-        ["model.changed", "session.state", "session.saved", "transaction.opened", "transaction.closed"];
+        ["model.changed", "session.state", "session.saved", "transaction.opened", "transaction.closed", "diagnostics.updated"];
 
-    public string Attach(string clientName, Action<string, JsonNode?> notify)
+    /// <summary>What this client asked to be kept up to date on (<c>capabilities.diagnostics</c>).</summary>
+    internal DiagnosticsInterest Interest { get; private set; }
+
+    public string Attach(string clientName, JsonObject? capabilities, Action<string, JsonNode?> notify)
     {
+        Interest = capabilities?["diagnostics"] switch
+        {
+            null => DiagnosticsInterest.None,
+            JsonValue value when value.GetValueKind() is JsonValueKind.True => DiagnosticsInterest.Model,
+            JsonValue value when value.GetValueKind() is JsonValueKind.False => DiagnosticsInterest.None,
+            JsonObject options => Flag(options, "bpa") ? DiagnosticsInterest.WithBpa : DiagnosticsInterest.Model,
+            _ => throw ProtocolException.InvalidParams("'capabilities.diagnostics' must be true, false or an object such as { \"bpa\": true }.")
+        };
         _notify = notify;
         _client = _host.Reserve(clientName);
         _joined = true;
@@ -81,7 +92,33 @@ internal sealed class ServeSession : IProtocolMethods
         if (method == "deps.get")
             Direction(parameters);
         var route = ProtocolRoutes.All[method];
-        var result = await RunAsync(method, ProtocolRoutes.Arguments(method, route, parameters, _root!), cancellationToken);
+        var arguments = ProtocolRoutes.Arguments(method, route, parameters, _root!);
+        JsonObject result;
+        if (method is "deps.get" or "dax.check" or "bpa.run" && !_handler!.InTransaction)
+        {
+            if (parameters.All(pair => pair.Key == "progressToken") && _host.Diagnostics.Answer(method, scope.Session) is { } recomputed)
+                return recomputed;
+
+            // Analysis reads the published snapshot: it waits for no other client's lease, and it
+            // reuses what the host built for that version (ADR 0001 §3).
+            var snapshot = await scope.Session.GetLiveSnapshotAsync(cancellationToken);
+            scope.Source.Snapshot = snapshot;
+            try
+            {
+                result = await RunAsync(method, arguments, cancellationToken);
+            }
+            finally
+            {
+                scope.Source.Snapshot = null;
+            }
+
+            result["version"] = snapshot.Version;
+        }
+        else
+        {
+            result = await RunAsync(method, arguments, cancellationToken);
+        }
+
         if (method == "object.get")
             await AddIdsAsync(scope, result["data"], cancellationToken);
         Announce(method, parameters, result);
@@ -232,8 +269,19 @@ internal sealed class ServeSession : IProtocolMethods
     {
         var scope = _scope!;
         scope.Source.Options = new LiveLeaseOptions(_client, method);
+        var envelope = await RunJsonAsync(_root!, method, arguments, _host.Log, cancellationToken);
+        envelope["version"] = scope.Session.Version;
+        return envelope;
+    }
+
+    /// <summary>
+    /// Runs one command of <paramref name="root"/> with JSON output and returns its envelope; the
+    /// host's diagnostics recompute runs its commands this way too.
+    /// </summary>
+    internal static async Task<JsonObject> RunJsonAsync(RootCommand root, string method, IReadOnlyList<string> arguments, TextWriter log, CancellationToken cancellationToken)
+    {
         string[] args = [.. arguments.TakeWhile(arg => arg != "--"), "--output-format", "json", "--error-format", "json", "--quiet", "--non-interactive", .. arguments.SkipWhile(arg => arg != "--")];
-        var parseResult = _root!.Parse(args, new ParserConfiguration { ResponseFileTokenReplacer = null });
+        var parseResult = root.Parse(args, new ParserConfiguration { ResponseFileTokenReplacer = null });
         if (parseResult.Errors.Count > 0)
             throw ProtocolException.InvalidParams(string.Join(" ", parseResult.Errors.Select(error => error.Message)));
 
@@ -259,12 +307,9 @@ internal sealed class ServeSession : IProtocolMethods
         cancellationToken.ThrowIfCancellationRequested();
 
         if (stderr.ToString() is { Length: > 0 } commentary && Json(commentary) is not JsonObject)
-            _host.Log.Write(commentary);
+            log.Write(commentary);
         if (Json(stdout.ToString()) is JsonObject { } envelope && envelope.ContainsKey("data"))
-        {
-            envelope["version"] = scope.Session.Version;
             return envelope;
-        }
 
         if (Json(stderr.ToString()) is JsonObject error)
             throw ProtocolException.Tomix(

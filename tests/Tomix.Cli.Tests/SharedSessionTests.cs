@@ -162,6 +162,191 @@ public sealed class SharedSessionTests
         }
     }
 
+    [Fact]
+    public async Task Diagnostics_FollowEdits_ForTheClientsThatAskForThem()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web", new JsonObject { ["diagnostics"] = true });
+        await using var agent = await shared.ConnectAsync("agent");
+        await web.NotificationAsync("diagnostics.updated");
+
+        await agent.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/Broken", ["type"] = "Measure", ["expression"] = "SUM(" });
+        var version = (long)(await web.NotificationAsync("model.changed"))["version"]!;
+        var broken = await DiagnosticsAtAsync(web, version);
+        var check = await web.RequestAsync("dax.check");
+        await agent.RequestAsync("object.set", new JsonObject { ["path"] = "Sales/Broken", ["set"] = new JsonObject { ["expression"] = "1" } });
+        var fixedAt = (long)(await web.NotificationsAsync("model.changed", count: 2))[1]["version"]!;
+        await DiagnosticsAtAsync(web, fixedAt);
+        var fixedCheck = await web.RequestAsync("dax.check");
+
+        Assert.Equal(version, (long)broken["version"]!);
+        Assert.Equal(version, (long)check["result"]!["version"]!);
+        Assert.Equal(false, (bool?)check["result"]!["data"]!["valid"]);
+        Assert.Contains("Broken", check["result"]!["data"]!["errors"]!.ToJsonString());
+        Assert.Equal(true, (bool?)fixedCheck["result"]!["data"]!["valid"]);
+        Assert.False(agent.Received("diagnostics.updated"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Diagnostics_AnswerDaxCheckAndBpaRun_FromTheRecompute_AndRunBpaOnlyWhenAsked(bool bpa)
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web", new JsonObject { ["diagnostics"] = new JsonObject { ["bpa"] = bpa } });
+        await web.NotificationAsync("diagnostics.updated");
+        var session = shared.Host.Session!;
+
+        var daxCheck = shared.Host.Diagnostics.Answer("dax.check", session);
+        var bpaRun = shared.Host.Diagnostics.Answer("bpa.run", session);
+        var answered = await web.RequestAsync("dax.check");
+        var fresh = await web.RequestAsync("dax.check", new JsonObject { ["noWarnings"] = true });
+
+        Assert.NotNull(daxCheck);
+        Assert.Equal(bpa, bpaRun is not null);
+        Assert.Equal(daxCheck.ToJsonString(), answered["result"]!.ToJsonString());
+        Assert.Empty(fresh["result"]!["data"]!["warnings"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task Diagnostics_WaitForEditsToSettle_ThenRecomputeOnce()
+    {
+        var time = new ManualTime();
+        await using var shared = await Shared.StartAsync(time);
+        await using var web = await shared.ConnectAsync("web", new JsonObject { ["diagnostics"] = true });
+        time.Advance(DerivedState.DefaultDelay);
+        await web.NotificationAsync("diagnostics.updated");
+        var before = shared.Host.Diagnostics.Recomputes;
+
+        await web.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/A", ["type"] = "Measure", ["expression"] = "1" });
+        time.Advance(TimeSpan.FromMilliseconds(200));
+        await web.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/B", ["type"] = "Measure", ["expression"] = "2" });
+        time.Advance(TimeSpan.FromMilliseconds(200));
+        var whileEditing = shared.Host.Diagnostics.Recomputes;
+        time.Advance(TimeSpan.FromMilliseconds(50));
+        var updated = (await web.NotificationsAsync("diagnostics.updated", count: 2))[1];
+
+        Assert.Equal(before, whileEditing);
+        Assert.Equal(before + 1, shared.Host.Diagnostics.Recomputes);
+        Assert.Equal(shared.Host.Session!.Version, (long)updated["version"]!);
+    }
+
+    [Fact]
+    public async Task Analysis_ReadsTheLastCommittedVersion_WithoutWaitingForAnotherClientsTransaction()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+        await using var agent = await shared.ConnectAsync("agent");
+        var committed = shared.Host.Session!.Version;
+
+        await web.RequestAsync("transaction.begin");
+        JsonObject check, deps, own;
+        try
+        {
+            await web.RequestAsync("object.add", new JsonObject { ["path"] = "Sales/Broken", ["type"] = "Measure", ["expression"] = "SUM(" });
+            check = await agent.RequestAsync("dax.check").WaitAsync(TimeSpan.FromSeconds(10));
+            deps = await agent.RequestAsync("deps.get", new JsonObject { ["path"] = "Sales/Broken" }).WaitAsync(TimeSpan.FromSeconds(10));
+            own = await web.RequestAsync("dax.check");
+        }
+        finally
+        {
+            // Lets a read that waited for the transaction finish, so a failure does not hang.
+            await web.RequestAsync("transaction.rollback");
+        }
+
+        Assert.Equal(committed, (long)check["result"]!["version"]!);
+        Assert.Equal(true, (bool?)check["result"]!["data"]!["valid"]);
+        Assert.Equal("TOMIX_OBJECT_NOT_FOUND", (string?)deps["error"]!["data"]!["code"]);
+        Assert.Equal(false, (bool?)own["result"]!["data"]!["valid"]);
+    }
+
+    [Theory]
+    [InlineData("\"yes\"")]
+    [InlineData("1")]
+    public async Task Initialize_RefusesDiagnosticsThatAreNotTrueFalseOrAnObject(string value)
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web", new JsonObject { ["diagnostics"] = JsonNode.Parse(value) });
+
+        Assert.Equal(-32602, (int?)web.Initialized!["error"]!["code"]);
+        Assert.Contains("capabilities.diagnostics", (string?)web.Initialized!["error"]!["message"]);
+    }
+
+    /// <summary>The <c>diagnostics.updated</c> for <paramref name="version"/>, skipping earlier ones.</summary>
+    private static async Task<JsonObject> DiagnosticsAtAsync(Client client, long version)
+    {
+        for (var count = 1; ; count++)
+        {
+            var updates = await client.NotificationsAsync("diagnostics.updated", count);
+            if ((long)updates[^1]["version"]! >= version)
+                return updates[^1];
+        }
+    }
+
+    /// <summary>A clock the test moves by hand; a timer fires when the clock passes its due time.</summary>
+    private sealed class ManualTime : TimeProvider
+    {
+        private readonly Lock _sync = new();
+        private readonly List<ManualTimer> _timers = [];
+        private DateTimeOffset _now = DateTimeOffset.UtcNow;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            lock (_sync)
+                return _now;
+        }
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new ManualTimer(this, callback, state);
+            lock (_sync)
+                _timers.Add(timer);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+
+        public void Advance(TimeSpan by)
+        {
+            List<ManualTimer> due;
+            lock (_sync)
+            {
+                _now += by;
+                due = [.. _timers.Where(timer => timer.Due is { } at && at <= _now)];
+                foreach (var timer in due)
+                    timer.Due = null;
+            }
+
+            foreach (var timer in due)
+                timer.Fire();
+        }
+
+        private sealed class ManualTimer(ManualTime time, TimerCallback callback, object? state) : ITimer
+        {
+            public DateTimeOffset? Due { get; set; }
+
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                lock (time._sync)
+                    Due = dueTime == Timeout.InfiniteTimeSpan ? null : time._now + dueTime;
+                return true;
+            }
+
+            public void Fire() => callback(state);
+
+            public void Dispose()
+            {
+                lock (time._sync)
+                    time._timers.Remove(this);
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
+
     /// <summary>A real session whose <see cref="ILiveModelSession.SourceUnavailable"/> the test sets.</summary>
     private sealed class UnreachableSession(ILiveModelSession inner) : ILiveModelSession
     {
@@ -596,7 +781,10 @@ public sealed class SharedSessionTests
 
         public string ModelPath => _model.Path;
 
-        public static async Task<Shared> StartAsync()
+        public SessionHost Host => _host;
+
+        /// <param name="time">The clock of the diagnostics delay; the real one when <c>null</c>.</param>
+        public static async Task<Shared> StartAsync(TimeProvider? time = null)
         {
             var model = SampleModel.CopyToTemp();
             var log = TextWriter.Synchronized(new StringWriter());
@@ -610,22 +798,27 @@ public sealed class SharedSessionTests
                 (scope, commands) => Program.BuildSessionRootCommand(scope, commands, Providers, formatter, services, httpClient: null),
                 opener,
                 log,
-                session);
+                session,
+                time);
             var token = UiHost.NewToken();
             var endpoint = await WebEndpoint.StartAsync(host, "test", port: 80, token, CancellationToken.None, web => web.UseTestServer());
             return new Shared(model, routing, host, endpoint, token, services);
         }
 
-        public async Task<Client> ConnectAsync(string name)
+        public async Task<Client> ConnectAsync(string name, JsonObject? capabilities = null)
         {
             var socket = await Server.CreateWebSocketClient().ConnectAsync(new Uri($"ws://localhost/ws?token={Token}"), CancellationToken.None);
             var client = new Client(socket);
-            var initialized = await client.RequestAsync("initialize", new JsonObject
+            var parameters = new JsonObject
             {
                 ["protocolVersion"] = "0",
                 ["clientInfo"] = new JsonObject { ["name"] = name }
-            });
-            client.ClientId = (string?)initialized["result"]!["clientId"];
+            };
+            if (capabilities is not null)
+                parameters["capabilities"] = capabilities;
+            var initialized = await client.RequestAsync("initialize", parameters);
+            client.ClientId = (string?)initialized["result"]?["clientId"];
+            client.Initialized = initialized;
             return client;
         }
 
@@ -691,6 +884,11 @@ public sealed class SharedSessionTests
         private int _nextId;
 
         public string? ClientId { get; set; }
+
+        public JsonObject? Initialized { get; set; }
+
+        /// <summary>Whether a <paramref name="method"/> notification has arrived so far.</summary>
+        public bool Received(string method) => Matching(method).Count > 0;
 
         public async Task<JsonObject> RequestAsync(string method, JsonObject? parameters = null)
             => await AnswerAsync(await SendAsync(method, parameters));

@@ -162,6 +162,31 @@ public sealed class LiveSessionSourceTests
     }
 
     [Fact]
+    public async Task A_snapshot_source_reads_the_published_snapshot_and_cannot_write()
+    {
+        await using var live = await Live.OpenAsync();
+        var published = await live.Session.GetLiveSnapshotAsync(None);
+        live.Source.Snapshot = published;
+
+        await using (var lease = await live.Source.LeaseAsync(live.Model, None))
+        {
+            var snapshot = await lease.Session.GetSnapshotAsync(None);
+            Assert.Same(published.Snapshot, snapshot);
+            Assert.IsNotAssignableFrom<IModelMutationSession>(lease.Session);
+            // Readers of one published snapshot share one dependency graph.
+            Assert.Same(Deps.DependencyGraph.FromSnapshot(snapshot), Deps.DependencyGraph.FromSnapshot(snapshot));
+        }
+
+        var set = await new SetModelPropertyHandler(live.Source, live.Config.Stores).HandleAsync(
+            new SetModelPropertyRequest(live.Model, "Sales/Total Sales", [new ModelPropertyAssignment("expression", "1")],
+                null, Save: false, SaveTo: null, Serialization: ""), None);
+
+        Assert.False(set.Success);
+        Assert.Equal(0, live.Session.Version);
+        Assert.Equal("SUM ( Sales[Amount] )", await live.ExpressionAsync("Sales/Total Sales"));
+    }
+
+    [Fact]
     public void The_same_folder_matches_however_it_is_spelled()
     {
         using var dir = new TempDir();

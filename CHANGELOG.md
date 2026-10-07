@@ -12,6 +12,13 @@ and the API surface that major versions protect.
 
 ### Added
 
+- A client of a live session (`tx serve`, `tx ui`) can ask in `initialize` for
+  `capabilities.diagnostics`. The host then recomputes dependencies, DAX diagnostics and,
+  with `{ "bpa": true }`, BPA findings 250 ms after the last change and sends
+  `diagnostics.updated`; `dax.check` and `bpa.run` answer from those results. `deps.get`,
+  `dax.check` and `bpa.run` now read the last committed version instead of waiting for
+  another client's transaction (#350).
+
 - A live session (`tx interactive`, `tx serve`, `tx ui`) on a TMDL folder or `.bim` file now
   notices when the files change outside it, for example by a `git checkout` or another editor.
   The session turns `stale`, and saving fails with `TOMIX_SESSION_STALE` instead of overwriting

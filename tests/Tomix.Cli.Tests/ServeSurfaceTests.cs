@@ -17,7 +17,7 @@ namespace Tomix.Cli.Tests;
 public sealed partial class ServeSurfaceTests
 {
     /// <summary>In the spec's method table but not served yet; <c>capabilities</c> leaves them out.</summary>
-    private static readonly string[] NotYetServed = ["query.run", "$/progress", "diagnostics.updated"];
+    private static readonly string[] NotYetServed = ["query.run", "$/progress"];
 
     /// <summary>Handled by the protocol layer itself rather than advertised.</summary>
     private static readonly string[] Lifecycle = ["initialize", "shutdown", "exit", "$/cancelRequest"];

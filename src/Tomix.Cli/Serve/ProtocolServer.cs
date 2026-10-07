@@ -18,9 +18,11 @@ internal interface IProtocolMethods
 
     /// <summary>Called once <c>initialize</c> has named the client, before any other request.</summary>
     /// <param name="clientName">The <c>clientInfo.name</c> the client gave, or <c>client</c>.</param>
+    /// <param name="capabilities">The <c>capabilities</c> the client sent, if any.</param>
     /// <param name="notify">Sends a notification to the client; never blocks.</param>
     /// <returns>The client's ID in the session, for example <c>mcp-1</c>.</returns>
-    string Attach(string clientName, Action<string, JsonNode?> notify);
+    /// <exception cref="ProtocolException">The capabilities are not valid.</exception>
+    string Attach(string clientName, JsonObject? capabilities, Action<string, JsonNode?> notify);
 
     /// <summary>Answers one request. Throws <see cref="ProtocolException"/> to answer with an error.</summary>
     Task<JsonNode?> InvokeAsync(string method, JsonObject parameters, CancellationToken cancellationToken);
@@ -253,7 +255,13 @@ internal sealed class ProtocolServer
         var name = parameters["clientInfo"]?["name"] is JsonValue clientName && clientName.TryGetValue<string>(out var given) && given.Length > 0
             ? given
             : "client";
-        var clientId = _methods.Attach(name, Notify);
+        var capabilities = parameters["capabilities"] switch
+        {
+            null => null,
+            JsonObject sent => sent,
+            _ => throw ProtocolException.InvalidParams("'capabilities' must be an object.")
+        };
+        var clientId = _methods.Attach(name, capabilities, Notify);
         _initialized = true;
         Log($"initialized for {clientId}");
 

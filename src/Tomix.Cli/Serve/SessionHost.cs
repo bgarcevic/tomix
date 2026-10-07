@@ -30,12 +30,14 @@ internal sealed class SessionHost
         SessionOpener opener,
         TextWriter log,
         ILiveModelSession? session,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        TimeSpan? diagnosticsDelay = null)
     {
         BuildRoot = buildRoot;
         Opener = opener;
         Log = log;
         _time = time ?? TimeProvider.System;
+        Diagnostics = new DerivedState(this, _time, diagnosticsDelay ?? DerivedState.DefaultDelay);
         Use(session);
         RefreshStatus();
     }
@@ -48,6 +50,19 @@ internal sealed class SessionHost
 
     /// <summary>The open session, or <c>null</c> before <c>session.open</c> and after <c>session.close</c>.</summary>
     public ILiveModelSession? Session => _session;
+
+    /// <summary>Dependencies, DAX diagnostics and BPA findings, recomputed after changes for the clients that ask.</summary>
+    internal DerivedState Diagnostics { get; }
+
+    /// <summary>The most any connected client asked to be kept up to date on.</summary>
+    internal DiagnosticsInterest Interest
+    {
+        get
+        {
+            lock (_sync)
+                return _clients.Select(client => client.Interest).DefaultIfEmpty().Max();
+        }
+    }
 
     /// <summary>Raised after a client connects or leaves; <c>tx ui</c> ends the process on it.</summary>
     public event EventHandler? ClientsChanged;
@@ -97,6 +112,9 @@ internal sealed class SessionHost
             _clients.Add(client);
 
         RefreshStatus();
+        // Results the client asked for that are not there yet; already computed ones are reused.
+        if (client.Interest != DiagnosticsInterest.None)
+            Diagnostics.Schedule();
         ClientsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -129,6 +147,16 @@ internal sealed class SessionHost
             client.Notify(method, parameters?.DeepClone());
     }
 
+    /// <summary>Sends <c>diagnostics.updated</c> to the clients that asked for it.</summary>
+    internal void AnnounceDiagnostics(long version)
+    {
+        ServeSession[] clients;
+        lock (_sync)
+            clients = [.. _clients.Where(client => client.Interest != DiagnosticsInterest.None)];
+        foreach (var client in clients)
+            client.Notify("diagnostics.updated", new JsonObject { ["version"] = version });
+    }
+
     /// <summary>Makes <paramref name="session"/> the open one, closing the one before it.</summary>
     internal async Task ReplaceAsync(ILiveModelSession? session)
     {
@@ -148,6 +176,7 @@ internal sealed class SessionHost
     {
         if (_session is { IsDirty: true } session)
             Log.WriteLine($"[tx serve] unsaved changes to {session.Reference.Value} are discarded");
+        await Diagnostics.DisposeAsync();
         await ReplaceAsync(null);
     }
 
@@ -167,6 +196,8 @@ internal sealed class SessionHost
         }
 
         RefreshStatus();
+        if (session is not null)
+            Diagnostics.Schedule();
     }
 
     /// <summary>Keeps what <c>/status</c> reports beyond the session's own counters.</summary>
@@ -230,7 +261,10 @@ internal sealed class SessionHost
     }
 
     private void OnChanged(object? sender, ModelChangeBatch batch)
-        => Broadcast("model.changed", JsonSerializer.SerializeToNode(batch, ProtocolJsonContext.Default.ModelChangeBatch));
+    {
+        Broadcast("model.changed", JsonSerializer.SerializeToNode(batch, ProtocolJsonContext.Default.ModelChangeBatch));
+        Diagnostics.Schedule();
+    }
 
     private void OnStateChanged(object? sender, SessionStateChange change)
         => Broadcast("session.state", new JsonObject

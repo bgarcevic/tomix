@@ -32,3 +32,4 @@ session.state
 session.saved
 transaction.opened
 transaction.closed
+diagnostics.updated
