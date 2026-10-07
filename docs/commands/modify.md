@@ -619,8 +619,8 @@ without `shutdown`. When the client disconnects (the end of stdin), the server
 discards unsaved changes, says so in its log, and exits 0. Ctrl+C (or SIGTERM)
 does the same and exits 130 (143), even while the client keeps stdin open. Requests run one at
 a time in arrival order; `$/cancelRequest` cancels one that is waiting or
-running. `initialize` lists the methods this version serves: `query.run`,
-`$/progress` and `diagnostics.updated` are in the spec but not served yet.
+running. `initialize` lists the methods this version serves: `query.run` and
+`$/progress` are in the spec but not served yet.
 
 ```sh
 tx serve ./model
@@ -694,6 +694,69 @@ The page is a small companion view for now: the model, its unsaved state, who
 else is connected, an activity feed of every client's changes, and Undo, Redo
 and Save. The full tomix UI replaces it. In the Claude desktop app, open the
 URL in the built-in browser pane to keep the page next to the agent.
+
+## `mcp` — give AI agents a session as tools
+
+```
+tx mcp [model] [options]
+```
+
+Serves a model session to an agent harness (Claude Code, Codex, Cursor and
+others) as [Model Context Protocol](https://modelcontextprotocol.io) tools on
+stdin and stdout. Each tool calls the [session protocol](../protocol.md) method
+of the same name (`object_set` calls `object.set`), so an agent's edit works as
+an edit in `tx interactive` does: it applies to the session at once, becomes one
+undo step, and stays unsaved until `session_save`.
+
+When `tx ui` already holds the model, `tx mcp` joins that session, so you
+watch the agent's edits in the page and undo or save them there. Otherwise
+`tx mcp` holds a session of its own, and discards what is unsaved when the
+harness stops it. Start `tx ui` first to keep the agent's work open after the
+agent is done. Without a model argument, the agent opens one with
+`session_open`. Opening a model that `tx ui` holds joins that session too.
+
+| Option | Description |
+|--------|-------------|
+| `--read-only` | List only the tools that change nothing: no edits, undo or save. |
+| `--log <file>` | Append the server's log to this file instead of writing it to stderr. |
+
+Add it to Claude Code, for every model or for one:
+
+```sh
+claude mcp add tomix -- tx mcp
+claude mcp add tomix-sales -- tx mcp ./model --read-only
+```
+
+Other harnesses take the same command in their MCP configuration:
+
+```json
+{ "mcpServers": { "tomix": { "command": "tx", "args": ["mcp"] } } }
+```
+
+| Tool | What it does | Writes |
+|------|--------------|--------|
+| `session_open` | Open a model, or join the `tx ui` session that holds it | no |
+| `session_status`, `session_history` | The session's state, and the changes undo and redo can step through | no |
+| `model_summary`, `model_tree` | Counts of the model's objects; its objects one level at a time | no |
+| `object_get`, `object_find`, `deps_get` | As `tx get`, `tx find` and `tx deps` | no |
+| `dax_check`, `bpa_run` | As `tx validate` and `tx bpa run` | no |
+| `object_add`, `object_set`, `object_move`, `object_remove`, `model_replace` | As `tx add`, `tx set`, `tx mv`, `tx rm` and `tx replace` | yes |
+| `dax_format`, `bpa_fix` | As `tx format` and `tx bpa run --fix` | yes |
+| `transaction_begin`, `transaction_commit`, `transaction_rollback` | Group edits into one labelled undo step | yes |
+| `session_undo`, `session_redo`, `session_save` | Undo, redo, and write the session to the model's files or server | yes |
+
+A tool's arguments are the options of its command in camel case
+(`caseSensitive` for `--case-sensitive`), less those that save, stage or write
+files. `tools/list` describes each one. Every tool carries `readOnlyHint` and
+`destructiveHint`, so the harness knows which ones to ask you about before they
+run. A failure comes back as the tool's result, with the `TOMIX_*` code and the
+hint the CLI would print, so the agent can correct itself
+([error codes](../error-codes.md#mcp-codes-tomix_mcp_)).
+
+The server tells the agent how to work in the session: read with the tools,
+which see unsaved edits; group related edits in a transaction; never edit the
+model's files directly while the session is open; leave saving to you; and on
+`TOMIX_SESSION_STALE`, ask you instead of choosing.
 
 ## Refresh policies
 

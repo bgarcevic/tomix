@@ -517,6 +517,47 @@ public sealed class SharedSessionTests
     }
 
     [Fact]
+    public async Task TxMcp_OnAModelTxUiHolds_JoinsItsSession_AndLeavesItOpen()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+
+        var run = await shared.McpAsync(
+            shared.ModelPath,
+            McpCommandTests.Initialize(name: "claude-code"),
+            McpCommandTests.Call(2, "object_add", new JsonObject { ["path"] = "Sales/ByAgent", ["type"] = "Measure", ["expression"] = "1" }),
+            McpCommandTests.Call(3, "session_status"));
+
+        Assert.True(run.ExitCode == 0, run.Stderr);
+        Assert.Equal("Sales/ByAgent", (string?)run.Tool(2)["data"]!["added"]);
+        Assert.Equal(true, (bool?)run.Tool(3)["data"]!["dirty"]);
+        var changed = await web.NotificationAsync("model.changed");
+        Assert.Equal("claude-code-1", (string?)changed["origin"]!["client"]);
+        var status = await shared.StatusAsync();
+        Assert.Equal("dirty", (string?)status["state"]);
+        Assert.Equal(["web-1"], status["clients"]!.AsArray().Select(id => (string?)id));
+    }
+
+    [Fact]
+    public async Task TxMcp_SessionOpen_OnAModelTxUiHolds_JoinsIt()
+    {
+        await using var shared = await Shared.StartAsync();
+        await using var web = await shared.ConnectAsync("web");
+
+        var run = await shared.McpAsync(
+            null,
+            McpCommandTests.Initialize(name: "agent"),
+            McpCommandTests.Call(2, "session_open", new JsonObject { ["model"] = shared.ModelPath }),
+            McpCommandTests.Call(3, "object_set", new JsonObject { ["path"] = "Sales/Amount", ["set"] = new JsonObject { ["description"] = "Net" } }));
+
+        Assert.True(run.ExitCode == 0, run.Stderr);
+        Assert.Equal(Path.GetFullPath(shared.ModelPath), (string?)run.Tool(2)["data"]!["source"]);
+        var changed = await web.NotificationAsync("model.changed");
+        Assert.Equal("agent-1", (string?)changed["origin"]!["client"]);
+        Assert.Contains("joined the session tx ui holds", run.Stderr);
+    }
+
+    [Fact]
     public async Task ACommandOnTheLiveModel_RunsInTheSession_AsAnUndoStep_AndLeavesTheFilesAlone()
     {
         await using var shared = await Shared.StartAsync();
@@ -833,6 +874,40 @@ public sealed class SharedSessionTests
                 var exitCode = await ServeRelay.RunAsync(new StreamChannel(input, output), new WebSocketChannel(socket), CancellationToken.None)
                     .WaitAsync(TimeSpan.FromSeconds(30));
                 return new ServeRun(exitCode, "", "", ServeRun.ReadFrames(output.ToArray()));
+            }
+        }
+
+        /// <summary>Runs <c>tx mcp</c>, with <paramref name="lines"/> as its stdin, where this session is the running tx ui.</summary>
+        public async Task<McpRun> McpAsync(string? model, params string[] lines)
+        {
+            var root = FullRoot(_services);
+            root.Subcommands.Remove(root.Subcommands.Single(command => command.Name == "mcp"));
+            var formatter = new CompositeExpressionFormatterClient([new OfflineDaxFormatterClient()]);
+            root.Subcommands.Add(new McpCommand(
+                Providers,
+                _services.State,
+                _services.Staging,
+                "test",
+                (scope, commands) => Program.BuildSessionRootCommand(scope, commands, Providers, formatter, _services, httpClient: null),
+                _registry,
+                (_, cancellationToken) => Server.CreateWebSocketClient().ConnectAsync(new Uri($"ws://localhost/ws?token={Token}"), cancellationToken)).Build());
+
+            using var input = new MemoryStream(Encoding.UTF8.GetBytes(string.Concat(lines)));
+            using var output = new MemoryStream();
+            using var logDir = new TempDir();
+            var logPath = Path.Combine(logDir.Path, "mcp.log");
+            McpCommand.TestStreams.Value = (input, output);
+            try
+            {
+                string[] args = model is null ? ["mcp", "--log", logPath] : ["mcp", model, "--log", logPath];
+                var exitCode = await root.Parse(args).InvokeAsync(
+                    new System.CommandLine.InvocationConfiguration { EnableDefaultExceptionHandler = false, ProcessTerminationTimeout = null })
+                    .WaitAsync(TimeSpan.FromSeconds(30));
+                return new McpRun(exitCode, "", File.ReadAllText(logPath), McpRun.ReadLines(output.ToArray()));
+            }
+            finally
+            {
+                McpCommand.TestStreams.Value = null;
             }
         }
 

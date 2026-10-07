@@ -54,7 +54,11 @@ CLI entry point for `tx`.
   holds in that session (`command.run`, #400): `Program.Run` asks it before invoking, and it
   makes the command's paths absolute and sends its stdin, colors and width along.
   `UiLifetime` decides when `tx ui` stops: never with changes unsaved.
-  `tx interactive`, `tx serve` and `tx ui` handle Ctrl+C themselves (the last two through
+  `McpServer` speaks MCP for `tx mcp` (#354) over a `LineChannel` (one JSON message per line):
+  `McpTools` lists one tool per session protocol method, its arguments built from the command's
+  options, and `McpSession` makes each call as one client of the session, of this process's host
+  or, through `ProtocolClient` over the WebSocket, of the one `tx ui` holds.
+  `tx interactive`, `tx serve`, `tx ui` and `tx mcp` handle Ctrl+C themselves (the last two through
   `ConsoleSignals`), so `Program.TerminationTimeout` turns off the library's handling for them:
   every Ctrl+C handler in a process runs, and the library's would end the process two seconds
   later, before the session is closed or after a Ctrl+C meant for one command.

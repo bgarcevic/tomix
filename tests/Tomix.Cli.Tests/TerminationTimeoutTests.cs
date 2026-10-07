@@ -20,6 +20,7 @@ public sealed class TerminationTimeoutTests
     [InlineData("shell")]
     [InlineData("serve")]
     [InlineData("ui")]
+    [InlineData("mcp")]
     public void SessionCommands_HandleCtrlCThemselves(string command)
         => Assert.Null(Program.TerminationTimeout(Parse(command)));
 

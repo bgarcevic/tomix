@@ -34,7 +34,7 @@ try {
       Write-Host "  build     dotnet build"
       Write-Host "  test      dotnet test"
       Write-Host "  format    dotnet format (applies fixes; CI verifies with --verify-no-changes)"
-      Write-Host "  snapshot  regenerate CommandSurface, ServeSurface and ServeTranscript snapshots"
+      Write-Host "  snapshot  regenerate the CommandSurface, ServeSurface, ServeTranscript and McpTools snapshots"
       Write-Host "  docs      strict docs-site build (what CI runs; requires uv)"
       exit 2
     }

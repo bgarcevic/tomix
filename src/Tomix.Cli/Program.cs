@@ -147,7 +147,7 @@ internal static class Program
     }
 
     /// <summary>Commands that hold a session and handle Ctrl+C themselves.</summary>
-    private static readonly HashSet<string> HandleCtrlC = new(StringComparer.Ordinal) { "interactive", "serve", "ui" };
+    private static readonly HashSet<string> HandleCtrlC = new(StringComparer.Ordinal) { "interactive", "mcp", "serve", "ui" };
 
     /// <summary>
     /// How long the library waits after Ctrl+C before ending the process with 130: two seconds, or
@@ -264,6 +264,13 @@ internal static class Program
                 (session, sessionCommands) => BuildSessionRootCommand(
                     session, sessionCommands, providers, formatter, services, httpClient, workspaceCatalog, cachedUsername)),
             new LsCommand(providers, services.State),
+            new McpCommand(
+                providers,
+                services.State,
+                services.Staging,
+                version,
+                (session, sessionCommands) => BuildSessionRootCommand(
+                    session, sessionCommands, providers, formatter, services, httpClient, workspaceCatalog, cachedUsername)),
             new MvCommand(providers, services.State, mutations),
             new ProfileCommand(services.State),
             new QueryCommand(providers, loadCurrentSession),

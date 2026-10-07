@@ -84,6 +84,19 @@ public sealed partial class ServeSurfaceTests
         Approve("ServeTranscript.approved.txt", normalized);
     }
 
+    [Fact]
+    public void McpTools_MatchApprovedSnapshot()
+    {
+        var run = McpCommandTests.Mcp(null, McpCommandTests.Initialize(), McpCommandTests.Request(2, "tools/list"));
+        var tools = run.Result(2)["tools"]!.ToJsonString(new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+
+        Approve("McpTools.approved.txt", tools.ReplaceLineEndings("\n") + "\n");
+    }
+
     private static (string[] Methods, string[] Notifications) Capabilities()
     {
         var run = ServeCommandTests.Serve(Initialize());
@@ -111,7 +124,7 @@ public sealed partial class ServeSurfaceTests
         var approved = File.Exists(path) ? File.ReadAllText(path).ReplaceLineEndings("\n") : "";
         Assert.True(
             approved == actual,
-            $"{name} differs from what tx serve answers. If the change is intended, update docs/protocol.md and " +
+            $"{name} differs from what tx serve or tx mcp answers. If the change is intended, update docs/protocol.md or docs/commands/modify.md and " +
             "regenerate: .\\scripts\\dev.ps1 snapshot (Windows) or ./scripts/dev.sh snapshot (macOS/Linux)." + Environment.NewLine +
             FirstDifference(approved, actual));
     }

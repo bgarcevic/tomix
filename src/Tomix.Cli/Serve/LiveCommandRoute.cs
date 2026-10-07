@@ -101,7 +101,7 @@ internal sealed class LiveCommandRoute(
         using (socket)
         {
             var channel = new WebSocketChannel(socket);
-            var client = new Client(channel);
+            var client = new ProtocolClient(channel);
             JsonObject result;
             try
             {
@@ -119,7 +119,7 @@ internal sealed class LiveCommandRoute(
                 }, cancellationToken);
                 result = run["data"]!.AsObject();
                 await client.RequestAsync("shutdown", null, cancellationToken);
-                channel.Send(new JsonObject { ["jsonrpc"] = "2.0", ["method"] = "exit" }.ToJsonString());
+                client.Notify("exit");
                 // The session closes the socket once it has let the client go: then tx has left it.
                 using var patience = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 patience.CancelAfter(TimeSpan.FromSeconds(5));
@@ -230,32 +230,4 @@ internal sealed class LiveCommandRoute(
     /// <param name="Stdin">What the command reads for a <c>-</c> value, read from tx's own stdin.</param>
     /// <param name="Command">The command, for example <c>bpa run</c>, which names the client.</param>
     internal sealed record Routed(LiveEntry Session, IReadOnlyList<string> Args, string? Stdin, string Command);
-
-    /// <summary>Requests one at a time; notifications, which a routed command does not wait for, are skipped.</summary>
-    private sealed class Client(IMessageChannel channel)
-    {
-        private int _nextId;
-
-        /// <exception cref="ProtocolException">The session answered with an error.</exception>
-        /// <exception cref="InvalidOperationException">The session closed before it answered.</exception>
-        public async Task<JsonObject> RequestAsync(string method, JsonObject? parameters, CancellationToken cancellationToken)
-        {
-            var id = ++_nextId;
-            var request = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = method };
-            if (parameters is not null)
-                request["params"] = parameters;
-            channel.Send(request.ToJsonString());
-
-            while (await channel.ReadAsync(cancellationToken) is { } frame)
-            {
-                if (frame.Body is not { } body || JsonNode.Parse(body) is not JsonObject message || (int?)message["id"] != id)
-                    continue;
-                if (message["error"] is JsonObject error)
-                    throw new ProtocolException((int?)error["code"] ?? ProtocolErrors.InternalError, (string?)error["message"] ?? $"{method} failed.", error["data"] as JsonObject);
-                return message["result"] as JsonObject ?? [];
-            }
-
-            throw new InvalidOperationException($"the session closed before it answered {method}.");
-        }
-    }
 }

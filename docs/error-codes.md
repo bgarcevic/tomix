@@ -150,7 +150,15 @@ Answered by the localhost endpoint of a shared session ([session protocol](proto
 | `TOMIX_UI_NOT_WEBSOCKET` | — | HTTP 400: a plain HTTP request to `/ws`, which takes WebSocket upgrades only. |
 | `TOMIX_UI_NOT_FOUND` | — | HTTP 404: nothing is served at that path. |
 | `TOMIX_UI_PORT_IN_USE` | 2 | `tx ui --port` names a port another program listens on. Pick another, or leave `--port` out to use a free one. |
-| `TOMIX_UI_UNREACHABLE` | 2 | `tx serve <model>`, or a command run on a model `tx ui` holds, found the model open in `tx ui` but could not connect to it. Stop that `tx ui`, or wait for it to start, and try again. |
+| `TOMIX_UI_UNREACHABLE` | 2 | `tx serve <model>`, `tx mcp`, or a command run on a model `tx ui` holds, found the model open in `tx ui` but could not connect to it. Stop that `tx ui`, or wait for it to start, and try again. |
+
+## MCP Codes (`TOMIX_MCP_*`)
+
+Returned by `tx mcp` as the result of a failed tool call (`isError: true`, a JSON body `{"error", "code", "hint"}`) rather than as an exit code. A tool call that fails in the session returns that failure's own code, for example `TOMIX_OBJECT_NOT_FOUND`.
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_MCP_INVALID_ARGUMENT` | — | A tool call passed an argument the tool's input schema does not list, or a value of the wrong type. The hint lists the arguments the tool takes. |
 
 ## Save Codes (`TOMIX_SAVE_*`)
 

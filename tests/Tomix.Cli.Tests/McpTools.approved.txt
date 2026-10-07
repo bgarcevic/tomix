@@ -1,0 +1,762 @@
+[
+  {
+    "name": "session_open",
+    "description": "Open a model in the session: a TMDL folder or .bim file, or a server and database. A model that tx ui has open is joined, so the person sees your edits there.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "A TMDL folder or .bim file"
+        },
+        "server": {
+          "type": "string",
+          "description": "A server: an XMLA endpoint, or localhost:<port> for Power BI Desktop"
+        },
+        "database": {
+          "type": "string",
+          "description": "The database on that server"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "session_status",
+    "description": "The open model, whether it has unsaved changes, the undo and redo depth and any open transaction.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "session_history",
+    "description": "The changes undo can revert and redo can reapply, newest last, with who made them.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "model_summary",
+    "description": "Counts of the model's tables, columns, measures, relationships and other objects.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "model_tree",
+    "description": "The model's objects one level at a time: the tables without a path, the children of the object at a path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The object whose children to list, for example 'Sales'; leave out for the top level"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "object_get",
+    "description": "The properties of one object ('Sales/Amount'), or a list of the objects a wildcard or container selects ('Sa*', 'Sales/Measures').",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "One object shows its properties ('Sales/Amount'); a wildcard ('Sa*') or container ('Sales/Measures') lists every match (default: the tables)"
+        },
+        "query": {
+          "type": "string",
+          "description": "Read just one property of one object (for example --query expression)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Object kind: picks one when a path matches several objects, or filters a list; for example table, measure, or column; an invalid value lists them all"
+        },
+        "ls": {
+          "type": "boolean",
+          "description": "List the objects the path selects, as a compact table (same as tx ls)"
+        },
+        "where": {
+          "type": "array",
+          "description": "Keep objects whose property matches Prop=Value, ignoring case; '*' is a wildcard. Repeat to combine filters.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deps": {
+          "type": "string",
+          "description": "Trace what one object uses and what uses it: upstream, downstream, or both (default: both)"
+        },
+        "deep": {
+          "type": "boolean",
+          "description": "With --deps: walk the dependency chain recursively"
+        },
+        "maxDepth": {
+          "type": "integer",
+          "description": "With --deps --deep: how deep to walk (default: 10)"
+        },
+        "unused": {
+          "type": "boolean",
+          "description": "List measures and columns that nothing depends on (whole model, no path)"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "With --unused: only unused objects that are hidden"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "object_find",
+    "description": "Find objects whose names, expressions, descriptions, display folders or format strings contain a text or regex.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "The text or regex to look for"
+        },
+        "in": {
+          "type": "string",
+          "description": "Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all (default: all, which skips annotations; name them explicitly to include them)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Only search objects of this kind, for example table, measure, or column; an invalid value lists them all"
+        },
+        "regex": {
+          "type": "boolean",
+          "description": "Interpret the pattern as a regular expression"
+        },
+        "caseSensitive": {
+          "type": "boolean",
+          "description": "Match text exactly, including letter case"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pattern"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "deps_get",
+    "description": "What an object uses and what uses it, or the measures and columns nothing uses.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The object to trace, slash-separated: 'Sales/Revenue'. DAX form works too."
+        },
+        "upstream": {
+          "type": "boolean",
+          "description": "Trace only what this object uses"
+        },
+        "downstream": {
+          "type": "boolean",
+          "description": "Trace only what uses this object"
+        },
+        "deep": {
+          "type": "boolean",
+          "description": "Walk the dependency chain recursively"
+        },
+        "unused": {
+          "type": "boolean",
+          "description": "List measures and columns that nothing depends on"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "With --unused: restrict the list to unused objects that are hidden"
+        },
+        "maxDepth": {
+          "type": "integer",
+          "description": "How deep --deep walks (default: 10)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type to pick when the path matches several objects under a table"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "dax_check",
+    "description": "Check every DAX expression in the model for syntax errors and broken references.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "errorsOnly": {
+          "type": "boolean",
+          "description": "Only show errors"
+        },
+        "warnings": {
+          "type": "boolean",
+          "description": "Default: true. false: Leave out analyzer warnings"
+        },
+        "serverOnly": {
+          "type": "boolean",
+          "description": "Only show errors reported by the connected server"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "bpa_run",
+    "description": "Run the Best Practice Analyzer rules on the model and list the violations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rules": {
+          "type": "array",
+          "description": "BPA rule files or URLs (JSON). Repeatable.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ruleset": {
+          "type": "array",
+          "description": "Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "modelRules": {
+          "type": "boolean",
+          "description": "Default: true. false: Skip rules embedded in the model's annotations"
+        },
+        "defaults": {
+          "type": "boolean",
+          "description": "Default: true. false: Exclude the selected standard BPA ruleset"
+        },
+        "rule": {
+          "type": "array",
+          "description": "Run only this rule. Repeatable.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "path": {
+          "type": "string",
+          "description": "Limit analysis to matched objects (literal names, wildcards, or paths)"
+        },
+        "errors": {
+          "type": "boolean",
+          "description": "Show only error-severity rules (combinable with --warnings/--info)"
+        },
+        "warnings": {
+          "type": "boolean",
+          "description": "Show only warning-severity rules (combinable with --errors/--info)"
+        },
+        "info": {
+          "type": "boolean",
+          "description": "Show only info-severity rules (combinable with --errors/--warnings)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "object_add",
+    "description": "Add an object: a measure, table, column, calculated column, relationship, role, perspective and more.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Where to create the object, slash-separated: 'Sales/Revenue', 'Products', 'Admin'. DAX form also accepted: \"'Sales'[Revenue]\". Combine with -t. For relationships, use 'Sales[Key]->Product[Key]' (many side first)."
+        },
+        "type": {
+          "type": "string",
+          "description": "Kind of object to create, for example Measure, Table, CalcColumn, or Relationship; an invalid value lists them all. Data sources always need -t."
+        },
+        "expression": {
+          "type": "string",
+          "description": "Expression or value for the new object. Use '-' to read from stdin."
+        },
+        "set": {
+          "type": "object",
+          "description": "Properties to set, by name: { \"expression\": \"SUM(Sales[Amount])\", \"formatString\": \"0.0%\" }. Names can use dotted paths, bracket indexers or a display name.",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "file": {
+          "type": "string",
+          "description": "Read the expression from this file"
+        },
+        "ifNotExists": {
+          "type": "boolean",
+          "description": "Do nothing and exit 0 when the object already exists"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Storage mode for the partition: Import, DirectQuery, Dual, DirectLake, Push, or Default"
+        },
+        "source": {
+          "type": "string",
+          "description": "Provider name for a ProviderDataSource (e.g. System.Data.SqlClient)"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Server or endpoint address for a data source connection"
+        },
+        "connectionString": {
+          "type": "string",
+          "description": "Connection string for a ProviderDataSource"
+        },
+        "sourceTable": {
+          "type": "string",
+          "description": "Source entity or table name for an EntityPartition"
+        },
+        "sourceDatabase": {
+          "type": "string",
+          "description": "Source database name for a ProviderDataSource or StructuredDataSource"
+        },
+        "sourceSchema": {
+          "type": "string",
+          "description": "Source schema name for an EntityPartition"
+        },
+        "partitionExpression": {
+          "type": "string",
+          "description": "M or DAX expression that defines the partition's source"
+        },
+        "columns": {
+          "type": "string",
+          "description": "Comma-separated column names to create on a new table (Table type only)"
+        },
+        "sourceType": {
+          "type": "string",
+          "description": "Connection protocol for a StructuredDataSource (e.g. tds)"
+        },
+        "rangeStart": {
+          "type": "string",
+          "description": "Refresh-policy range start for a PolicyRangePartition (yyyy-MM-dd)"
+        },
+        "rangeEnd": {
+          "type": "string",
+          "description": "Refresh-policy range end for a PolicyRangePartition (yyyy-MM-dd)"
+        },
+        "rangeGranularity": {
+          "type": "string",
+          "description": "Refresh-policy range granularity for a PolicyRangePartition: Day, Month, Quarter, or Year (default: Day)"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "object_set",
+    "description": "Set properties of an object, for example its expression, format string, description or name. A rename rewrites the DAX that refers to it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The object to change, slash-separated. DAX form works too."
+        },
+        "set": {
+          "type": "object",
+          "description": "Properties to set, by name: { \"expression\": \"SUM(Sales[Amount])\", \"formatString\": \"0.0%\" }. Names can use dotted paths, bracket indexers or a display name.",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "type": {
+          "type": "string",
+          "description": "Type to pick when the path matches several objects (e.g. a measure and a partition sharing a name)"
+        },
+        "strictRefs": {
+          "type": "boolean",
+          "description": "Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)"
+        },
+        "fixRefs": {
+          "type": "boolean",
+          "description": "Default: true. false: Do not rewrite DAX references to the renamed object; warn instead"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "object_move",
+    "description": "Rename an object or move it to another table, rewriting the DAX that refers to it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Source object path"
+        },
+        "to": {
+          "type": "string",
+          "description": "Destination object path"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type to pick when the path matches several objects under a table"
+        },
+        "strictRefs": {
+          "type": "boolean",
+          "description": "Fail when a rename or move leaves DAX references broken (with fixup on, only unfixable references fail)"
+        },
+        "fixRefs": {
+          "type": "boolean",
+          "description": "Default: true. false: Do not rewrite DAX references to the renamed or moved object; warn instead"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "to"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "object_remove",
+    "description": "Remove an object. Fails while DAX still refers to it, unless forced.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Object path to remove"
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Remove even if DAX still references the object, and save even if the change adds validation errors"
+        },
+        "ifExists": {
+          "type": "boolean",
+          "description": "Exit 0 when the object is already gone"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type to pick when the path matches several objects under a table"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "model_replace",
+    "description": "Replace a text or regex in names, expressions, descriptions, display folders or format strings across the model.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "The text or regex to look for"
+        },
+        "replacement": {
+          "type": "string",
+          "description": "Replacement text"
+        },
+        "in": {
+          "type": "string",
+          "description": "Where to look: names, expressions, descriptions, displayFolders, formatStrings, annotations, or all (default: all, which skips annotations; name them explicitly to include them)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Only replace in objects of this kind, for example table, measure, or column; an invalid value lists them all"
+        },
+        "regex": {
+          "type": "boolean",
+          "description": "Interpret the pattern as a regular expression"
+        },
+        "caseSensitive": {
+          "type": "boolean",
+          "description": "Match text exactly, including letter case"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "dax_format",
+    "description": "Format DAX: one expression given inline (nothing changes), the expression of the object at a path, or every expression in the model.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "The expression to format, given inline"
+        },
+        "path": {
+          "type": "string",
+          "description": "Format the expression on a model object path"
+        },
+        "long": {
+          "type": "boolean",
+          "description": "Prefer long lines when formatting M"
+        },
+        "lang": {
+          "type": "string",
+          "description": "Expression language: dax or m"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type to pick when the path matches several objects under a table"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "bpa_fix",
+    "description": "Apply the fixes of the Best Practice Analyzer rules that have one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rules": {
+          "type": "array",
+          "description": "BPA rule files or URLs (JSON). Repeatable.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ruleset": {
+          "type": "array",
+          "description": "Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "modelRules": {
+          "type": "boolean",
+          "description": "Default: true. false: Skip rules embedded in the model's annotations"
+        },
+        "defaults": {
+          "type": "boolean",
+          "description": "Default: true. false: Exclude the selected standard BPA ruleset"
+        },
+        "rule": {
+          "type": "array",
+          "description": "Run only this rule. Repeatable.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "path": {
+          "type": "string",
+          "description": "Limit analysis to matched objects (literal names, wildcards, or paths)"
+        },
+        "errors": {
+          "type": "boolean",
+          "description": "Show only error-severity rules (combinable with --warnings/--info)"
+        },
+        "warnings": {
+          "type": "boolean",
+          "description": "Show only warning-severity rules (combinable with --errors/--info)"
+        },
+        "info": {
+          "type": "boolean",
+          "description": "Show only info-severity rules (combinable with --errors/--warnings)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "transaction_begin",
+    "description": "Group the edits that follow into one undo step, until transaction_commit or transaction_rollback. Give it a label the person will recognise in history.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A name for the step, shown in history, for example 'Margin measures'"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "transaction_commit",
+    "description": "Keep the open transaction's edits as one undo step.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "transaction_rollback",
+    "description": "Discard the open transaction's edits.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "session_undo",
+    "description": "Revert the last change in the session as one step, whoever made it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "session_redo",
+    "description": "Reapply the last undone change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "session_save",
+    "description": "Write the session's changes to the model's files or server. Save only when the person asks you to.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  }
+]

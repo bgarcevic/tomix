@@ -355,6 +355,12 @@ List model objects
   opt --paths-only  Print one object path per line, ready for piping
   opt --no-multiline  Show multi-line cell content (e.g. measure expressions) on one line, truncated. Applies to text output.
 
+# tx mcp
+Serve a model session to AI agents as MCP tools over stdio
+  arg [model]  Model to open at start: a TMDL folder or .bim file (default: none; the agent calls session_open)
+  opt --read-only  List only the tools that change nothing: no edits, undo or save
+  opt --log <file>  Append the server's log to this file instead of writing it to stderr
+
 # tx mv (aliases: move, rename)
 Move or rename a model object or display folder
   arg <source>  Source object path

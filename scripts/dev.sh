@@ -13,7 +13,7 @@ case "${1:-}" in
     echo "  build     dotnet build" >&2
     echo "  test      dotnet test" >&2
     echo "  format    dotnet format (applies fixes; CI verifies with --verify-no-changes)" >&2
-    echo "  snapshot  regenerate CommandSurface, ServeSurface and ServeTranscript snapshots" >&2
+    echo "  snapshot  regenerate the CommandSurface, ServeSurface, ServeTranscript and McpTools snapshots" >&2
     echo "  docs      strict docs-site build (what CI runs; requires uv)" >&2
     exit 2
     ;;

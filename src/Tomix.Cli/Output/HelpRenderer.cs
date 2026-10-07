@@ -28,7 +28,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     internal static readonly (string Heading, string[] Commands)[] RootSections =
     [
         ("Discover", ["summary", "ls", "get", "find", "deps", "query"]),
-        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "interactive", "serve", "ui"]),
+        ("Modify", ["add", "set", "mv", "rm", "replace", "format", "interactive", "serve", "ui", "mcp"]),
         ("Connect", ["connect", "deploy", "refresh", "save", "auth"]),
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
         ("Manage", ["config", "profile", "init", "completion", "skills", "stage", "update"]),
@@ -51,6 +51,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["format"] = "Formats an inline expression (--expression), one object (--path), or every expression in the model.",
         ["interactive"] = "Alias: shell. Edits stay in memory until 'save'. Inside the session, 'connect' switches models and 'undo', 'redo', 'begin', 'commit', 'rollback', 'status', 'history' and 'exit' also work. Piped input runs as a script that stops at the first failure.",
         ["ls"] = "A shortcut for tx get --ls; both run the same read pipeline.",
+        ["mcp"] = "Speaks the Model Context Protocol on stdin and stdout, one JSON message per line; each tool calls the session protocol method of the same name (object_set is object.set). When tx ui holds the model, it joins that session, so the person sees and undoes the agent's edits there. The log goes to stderr unless --log names a file.",
         ["query"] = "The query comes from the positional argument, --query, --file, or stdin.",
         ["refresh"] = "Runs an automatic refresh unless --refresh-type says otherwise.",
         ["serve"] = "Speaks the tomix session protocol (JSON-RPC 2.0, Content-Length framing) on stdin and stdout; see docs/protocol.md. Without a model, the client opens one with session.open. The log goes to stderr unless --log names a file. When tx ui holds the model, it joins that session instead of opening another.",
@@ -246,6 +247,10 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["serve"] = [
             "tx serve ./model",
             "tx serve --log serve.log",
+        ],
+        ["mcp"] = [
+            "tx mcp",
+            "tx mcp ./model --read-only --log mcp.log",
         ],
         ["ui"] = [
             "tx ui ./model --open",
