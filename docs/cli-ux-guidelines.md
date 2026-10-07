@@ -54,6 +54,10 @@ the bottom for where each concern lives.
 - Help wraps to the terminal width (capped at 100) with hanging indents, and is
   not wrapped when redirected. Every page must fit in 80 columns
   (`HelpLayoutTests`).
+- Redirected stdout is plain (`StdOut.PlainWhenRedirected`): not wrapped, so a table row
+  stays on one line in a pipe, a file, or an agent's tool call, and drawn with ASCII
+  borders (`Styling.Border`) instead of box-drawing glyphs. Renderers that lay out prose
+  cap their own width.
 - Command descriptions are one line of at most 60 characters with no trailing
   period and no flags; detail goes in `SpectreHelpAction.CommandNotes`. Option
   descriptions: one sentence has no trailing period, several sentences each end

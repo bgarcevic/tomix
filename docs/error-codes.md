@@ -378,6 +378,15 @@ whether or not an update is available; these codes cover failures only.
 | `TOMIX_UPDATE_CHECKSUM_MISMATCH` | 1 | The downloaded asset's SHA-256 does not match `checksums.txt`; nothing was installed. |
 | `TOMIX_UPDATE_APPLY_FAILED` | 1 | The binary swap failed (permissions, IO); the previous binary is restored. |
 
+## Skill Codes (`TOMIX_SKILL_*`)
+
+Emitted by `tx skills install` and `tx skills uninstall` (see `docs/commands/manage.md`).
+
+| Code | Exit | Trigger |
+|------|------|---------|
+| `TOMIX_SKILL_CONFLICT` | 1 | The skill folder at one location was edited after tx installed it, or tx did not write it. That location is left untouched and the others still proceed. Pass `--force` to overwrite or remove it. |
+| `TOMIX_SKILL_WRITE_FAILED` | 1 | A skill folder could not be written or deleted (permissions, IO). |
+
 ## Environment Variables
 
 The following `TOMIX_*` tokens are **environment variables**, not diagnostic codes:

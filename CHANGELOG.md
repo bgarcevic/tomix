@@ -12,6 +12,12 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx skills install`, `status`, and `uninstall` install the tomix agent skill for Claude Code
+  (`.claude/skills/tomix`) and Codex and other Agent Skills harnesses (`.agents/skills/tomix`),
+  in the repository or with `--user` in your home folder. The skill ships inside the binary, so it
+  matches the installed `tx`. `status` reports copies from another version as outdated, and copies
+  that were edited or not written by tx are left alone unless you pass `--force`
+  (`TOMIX_SKILL_CONFLICT`). A new guide, "Using tomix from your agent", covers setup.
 - A client of a live session (`tx serve`, `tx ui`) can ask in `initialize` for
   `capabilities.diagnostics`. The host then recomputes dependencies, DAX diagnostics and,
   with `{ "bpa": true }`, BPA findings 250 ms after the last change and sends
@@ -47,6 +53,10 @@ and the API surface that major versions protect.
   and a hint to reopen it, instead of waiting about 4 seconds for a raw socket error.
   Opening a session (`tx interactive`, `tx serve`, `tx ui`) there, or on a server it cannot
   reach, reports the connection error instead of "Unexpected error" (#351).
+- Tables written to a pipe or a file no longer wrap at 80 columns, and use ASCII borders
+  (`+`, `-`, `|`) instead of box-drawing characters, as do `tx deps --deep` trees. A DAX
+  expression or format string in `tx ls` output stays on one row, so it can be grepped or read
+  by an agent, and borders no longer turn into mojibake in Windows PowerShell 5.1 or `more`.
 
 ## [0.9.0] - 2026-10-06
 

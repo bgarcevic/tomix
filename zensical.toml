@@ -19,6 +19,7 @@ nav = [
     { "Connections & sessions" = "guides/connections.md" },
     { "Editing & staging" = "guides/editing.md" },
     { "Output & scripting" = "guides/scripting.md" },
+    { "Using tomix from your agent" = "guides/agents.md" },
   ] },
   { "Commands" = [
     { "Overview" = "commands/index.md" },

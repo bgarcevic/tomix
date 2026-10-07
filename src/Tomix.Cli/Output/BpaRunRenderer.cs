@@ -41,7 +41,10 @@ internal static class BpaRunRenderer
                 RenderSections(visible, view);
 
             AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule().RuleStyle(new Style(Palette.Slate)));
+            // A Rule spans the console width, which is unbounded when stdout is redirected.
+            var ruleWidth = Math.Min(MaxTextWidth, AnsiConsole.Profile.Width);
+            var ruleGlyph = AnsiConsole.Profile.Capabilities.Unicode ? '─' : '-';
+            AnsiConsole.Write(new Text(new string(ruleGlyph, ruleWidth) + "\n", new Style(Palette.Slate)));
         }
 
         RenderSummary(result, groups.Count, view);

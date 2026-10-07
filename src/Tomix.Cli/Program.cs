@@ -54,6 +54,7 @@ internal static class Program
         var noColorCfg = config.TryGetValue(ConfigKeys.NoColor, out var noColor) && bool.TryParse(noColor, out var noColorEnabled) && noColorEnabled;
         if (noColorEnv || noColorCfg)
             AnsiConsole.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
+        StdOut.PlainWhenRedirected(AnsiConsole.Console);
 
         config.TryGetValue(ConfigKeys.DefaultFormat, out var defaultOutputFormat);
         GlobalOptions.ConfigureDefaultOutputFormat(defaultOutputFormat);
@@ -278,6 +279,7 @@ internal static class Program
                 (session, sessionCommands) => BuildSessionRootCommand(
                     session, sessionCommands, providers, formatter, services, httpClient, workspaceCatalog, cachedUsername)),
             new SetCommand(providers, services.State, mutations),
+            new SkillsCommand(version),
             new SummaryCommand(providers, services.State),
             new StageCommand(providers, services.State, services.Staging, services.ConfigStore.ValidateOnSaveEnabled),
             new TestCommand(providers, loadCurrentSession),

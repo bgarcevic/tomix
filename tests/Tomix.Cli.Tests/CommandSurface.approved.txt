@@ -485,6 +485,24 @@ Change a property on a model object
   opt --strict-refs  Fail when a rename leaves DAX references broken (with fixup on, only unfixable references fail)
   opt --no-fix-refs  Do not rewrite DAX references to the renamed object; warn instead
 
+# tx skills
+Install the tomix skill for coding agents
+
+# tx skills install
+Install or update the skill for coding agents
+  opt --agent <agent>  Agent to install for: claude, codex, or all (default: the agents this repository or home folder uses, else all)
+  opt --user  Install for every project in your home folder instead of this repository
+  opt --force  Overwrite a copy that was edited or not installed by tx
+
+# tx skills status
+Show where the skill is installed and whether it is current
+
+# tx skills uninstall
+Remove the skill installed by tx skills install
+  opt --agent <agent>  Agent to remove the skill for: claude, codex, or all (default: all)
+  opt --user  Remove the copy in your home folder instead of this repository
+  opt --force  Remove a copy that was edited or not installed by tx
+
 # tx summary
 Show where a model lives and what it contains
   arg [model]  Model path, Fabric path, or omit to use the active connection

@@ -271,7 +271,7 @@ internal sealed partial class LsRenderer
         var exprLines = objects.ToDictionary(o => o, o => ExpressionLines(o, noMultiline));
 
         var table = new Table()
-            .RoundedBorder()
+            .Border(Styling.Border)
             .BorderColor(Color.Grey)
             .AddColumn(new TableColumn("[bold]Name[/]") { Alignment = Justify.Left })
             .AddColumn(new TableColumn("[bold]Mode[/]") { Alignment = Justify.Left });

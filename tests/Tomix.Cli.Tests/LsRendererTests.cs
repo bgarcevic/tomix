@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Spectre.Console;
 using Tomix.App.Get;
 using Tomix.Cli.Output;
 using Tomix.Core.Models;
@@ -128,6 +129,28 @@ public sealed class LsRendererTests
         Assert.Contains(Orchid + "[Cost]", output);
         // An unqualified bracket that resolves to no measure stays a column.
         Assert.Contains(Moss + "[Qty]", output);
+    }
+
+    [Fact]
+    public void RedirectedStdout_IsUnwrappedWithAsciiBorders()
+    {
+        const string expression = "DIVIDE(SUMX('Opportunities', 'Opportunities'[Product Revenue] * 'Opportunities'[Factor]), [Revenue])";
+        var captured = ConsoleCapture.Run(
+            () =>
+            {
+                StdOut.PlainWhenRedirected(AnsiConsole.Console);
+                Assert.Equal(TableBorder.Ascii, Styling.Border);
+                LsRenderer.Render(
+                    new GetListResult("Sample", 1550, [Measure("Factored Share", expression)], null),
+                    pathsOnly: false,
+                    noMultiline: false);
+            },
+            captureAnsiConsole: true);
+
+        var output = AnsiCodes.Replace(captured.Stdout, "");
+        Assert.Contains(expression, output);
+        Assert.Matches(@"^\| Factored Share +\|", RowLine(output, "Factored Share"));
+        Assert.DoesNotContain('│', output);
     }
 
     private static string RenderTables(params GetListObject[] objects) => Render(objects, noMultiline: true);

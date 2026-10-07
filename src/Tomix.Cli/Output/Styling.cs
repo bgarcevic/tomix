@@ -172,10 +172,21 @@ internal static class Styling
 
     private static void Plain(StringBuilder markup, string text) => markup.Append(MarkupEscape(text));
 
+    /// <summary>
+    /// Rounded borders in a terminal; ASCII borders when stdout is redirected
+    /// (<see cref="StdOut.PlainWhenRedirected"/> turns Unicode off there).
+    /// </summary>
+    public static TableBorder Border
+        => AnsiConsole.Profile.Capabilities.Unicode ? TableBorder.Rounded : TableBorder.Ascii;
+
+    /// <summary>Line guides in a terminal; ASCII guides when stdout is redirected (see <see cref="Border"/>).</summary>
+    public static TreeGuide TreeGuide
+        => AnsiConsole.Profile.Capabilities.Unicode ? TreeGuide.Line : TreeGuide.Ascii;
+
     public static Table NewTable(params string[] headers)
     {
         var table = new Table()
-            .RoundedBorder()
+            .Border(Border)
             .BorderColor(Palette.Slate);
 
         foreach (var header in headers)

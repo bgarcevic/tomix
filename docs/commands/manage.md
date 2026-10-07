@@ -104,6 +104,46 @@ tx completion bash >> ~/.bashrc
 tx completion powershell | Invoke-Expression
 ```
 
+## `skills` — agent skill
+
+```
+tx skills install [--agent claude|codex|all] [--user] [--force]
+tx skills status
+tx skills uninstall [--agent claude|codex|all] [--user] [--force]
+```
+
+Installs the tomix skill, which teaches a coding agent how to use `tx`, from the copy
+built into this binary. The installed skill therefore always matches the commands of
+the `tx` you have. It is written to:
+
+| Agent | This repository (default) | `--user` (every project) |
+|-------|---------------------------|--------------------------|
+| `claude` (Claude Code) | `.claude/skills/tomix/` | `~/.claude/skills/tomix/` |
+| `codex` (Codex and other Agent Skills harnesses) | `.agents/skills/tomix/` | `~/.agents/skills/tomix/` |
+
+"This repository" means the enclosing git repository root, or the current folder
+outside one. Without `--agent`, `install` picks the agents the folder already shows
+signs of (`.claude/` or `CLAUDE.md`; `.agents/`, `.codex/` or `AGENTS.md`), and both
+when there are none.
+
+The installed `SKILL.md` records the tomix version and a content hash in its
+frontmatter (`metadata.tomix-version`, `metadata.tomix-hash`). `status` uses them to
+report each location as `current`, `outdated` (from another tomix version; run
+`install` again to update it), `edited`, `not installed by tx`, or `not installed`.
+
+`install` and `uninstall` never overwrite or remove a copy that was edited or that tx
+did not write. They skip that location with `TOMIX_SKILL_CONFLICT` (exit 1) and carry
+on with the others. Pass `--force` to replace or remove it anyway.
+
+```sh
+tx skills install                          # this repository, detected agents
+tx skills install --agent codex --user     # Codex, for every project
+tx skills status --output-format json
+tx skills uninstall --agent claude
+```
+
+Start a new agent session after installing so the agent loads the skill.
+
 ## `stage` — staged mutations
 
 ```

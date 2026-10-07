@@ -86,6 +86,11 @@ Application use cases and command handlers.
   code and severity; a new rule goes in that catalog and in `docs/error-codes.md` (pinned by
   `RuleDefinitionTests`). `Dax/` is the model-aware DAX analysis those rules build on
   (sites, tokenizer, reference extraction), not a rule engine of its own.
+- The user-facing agent skill lives in `/skills/tomix` and is embedded in this assembly
+  (`Skills/SkillBundle`); edit it there, never in an installed copy. `Skills/SkillsHandler` installs
+  it and stamps `SKILL.md` frontmatter with `metadata.tomix-version` and `metadata.tomix-hash`, so the
+  bundle's own frontmatter must not declare `metadata`. `SkillsHandlerTests` pins the embedded copy to
+  the folder.
 - BPA default rules use the embedded `Bpa/Rules/bpa-rules.json` catalog as the single offline source.
 - BPA rule loading may support selectable upstream Microsoft Analysis Services BestPracticeRules catalogs from https://github.com/microsoft/Analysis-Services/tree/master/BestPracticeRules.
 - Keep licensing-sensitive compatibility work free of versioned third-party product names or abbreviations in source, docs, help, and output.

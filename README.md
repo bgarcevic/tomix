@@ -131,9 +131,14 @@ reconnect to a previous target with `--recent`), `deploy`, `refresh`,
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `test`
 (DAX regression tests against a live model), `vertipaq` (storage statistics,
 `.vpax` export/import), `diff`, `doctor`
-Manage: `config`, `profile`, `init`, `completion`, `stage` (mutations are
+Manage: `config`, `profile`, `init`, `completion`, `skills` (install the
+agent skill for Claude Code and Codex), `stage` (mutations are
 staged, then committed or discarded), `update` (self-update with
 release-notes preview)
+
+Working from a coding agent? `tx skills install` teaches Claude Code, Codex,
+and other Agent Skills harnesses how to use `tx`; see
+[Using tomix from your agent](https://bgarcevic.github.io/tomix-cli/guides/agents/).
 
 `tx <command> --help` shows options and examples. `tx doctor` checks your
 environment when something seems off.

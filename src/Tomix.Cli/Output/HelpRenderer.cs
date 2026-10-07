@@ -31,7 +31,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ("Modify", ["add", "set", "mv", "rm", "replace", "format", "interactive", "serve", "ui"]),
         ("Connect", ["connect", "deploy", "refresh", "save", "auth"]),
         ("Validate", ["bpa", "validate", "test", "vertipaq", "diff", "doctor"]),
-        ("Manage", ["config", "profile", "init", "completion", "stage", "update"]),
+        ("Manage", ["config", "profile", "init", "completion", "skills", "stage", "update"]),
     ];
 
     /// <summary>
@@ -56,6 +56,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["serve"] = "Speaks the tomix session protocol (JSON-RPC 2.0, Content-Length framing) on stdin and stdout; see docs/protocol.md. Without a model, the client opens one with session.open. The log goes to stderr unless --log names a file. When tx ui holds the model, it joins that session instead of opening another.",
         ["ui"] = "Prints the page's URL, with the session token, on stdout; agents join the same session through tx serve. Stops on Ctrl+C (asking again when changes are unsaved), or --grace seconds after the last client leaves, unless changes are unsaved.",
         ["test"] = "--update records snapshots; --trx and --ci produce pipeline output.",
+        ["skills"] = "Writes the skill to .claude/skills/tomix (Claude Code) and .agents/skills/tomix (Codex and other Agent Skills harnesses). Copies you edited are left alone unless you pass --force.",
         ["validate"] = "--ci prints CI log groups; --trx writes a test-results file.",
     };
 
@@ -231,6 +232,11 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["profile set"] = [
             "tx profile set dev -s MyWorkspace -d Sales",
             "tx profile set dev --from-active",
+        ],
+        ["skills"] = [
+            "tx skills install",
+            "tx skills install --agent codex --user",
+            "tx skills status",
         ],
         ["interactive"] = [
             "tx interactive ./model",

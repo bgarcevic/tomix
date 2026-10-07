@@ -76,7 +76,7 @@ internal static class DepsRenderer
 
         if (deep)
         {
-            var tree = new Tree(Styling.Bold(header));
+            var tree = new Tree(Styling.Bold(header)).Guide(Styling.TreeGuide);
             AddTreeNodes(tree, dependencies);
             AnsiConsole.Write(tree);
             return;
