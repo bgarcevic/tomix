@@ -76,6 +76,8 @@ removed within a protocol version.
   "version": 42,
   "undoSteps": 7,
   "redoSteps": 0,
+  "canReload": true,
+  "sourceUnavailable": false,
   "transaction": { "id": "t18", "client": "mcp-1", "label": "rename measures" },
   "clients": ["tomix-ui-1", "mcp-1"],
   "lastChange": { "version": 42, "client": "mcp-1", "at": "2026-10-05T14:03:11Z" }
@@ -84,6 +86,11 @@ removed within a protocol version.
 
 - `state` is a session state (`clean`, `dirty`, …), or `closed` when no model is
   open.
+- `canReload` is `false` for a model on a server or in Power BI Desktop, which
+  the session cannot read again; `stale` then ends only with a forced save.
+- `sourceUnavailable` is `true` when the session's last check could not reach
+  its server, for example because Power BI Desktop has closed. Saving there
+  fails; `session.save` with `outputFile` still writes the model to files.
 - `transaction` is the open explicit transaction, or `null`.
 - `clients` lists the connected clients that have sent `initialize`.
 - `lastChange` is the last `model.changed` batch since the model was opened, or
@@ -424,7 +431,9 @@ The `status` payload of `tx interactive`.
       "version": 6,
       "undoSteps": 4,
       "redoSteps": 0,
-      "transaction": null
+      "transaction": null,
+      "canReload": true,
+      "sourceUnavailable": false
     },
     "diagnostics": [],
     "version": 6
@@ -1273,6 +1282,16 @@ content differs from what the session last opened, reloaded or saved, it turns
 `stale` (it may also have unsaved changes; `session.status` reports `dirty`
 separately), and back again if the files return to that content. `stale` ends
 with `session.reload` or a `session.save` with `force`.
+
+A session on a server or Power BI Desktop asks the server whether any object
+in the model changed (every 10 seconds for Power BI Desktop, 30 for a remote
+server), and turns `stale` when something else changed it
+(including a refresh it did not run). It cannot reload: `session.status`
+reports `canReload: false`, and `stale` ends with a `session.save` with
+`force`. When the server cannot be reached (Power BI Desktop closed), requests
+that need it fail with `TOMIX_SESSION_SOURCE_UNAVAILABLE`, and
+`session.status` reports `sourceUnavailable: true` from the next check;
+`session.save` with `outputFile` still writes the model to files.
 
 ```json
 {

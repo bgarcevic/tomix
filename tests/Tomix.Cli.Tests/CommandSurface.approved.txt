@@ -461,7 +461,7 @@ Write a model to disk in a chosen format
   opt --bpa-rules <file>  Additional BPA rule files to enforce for this save, alongside the built-in ruleset
   opt --supporting-files  Write a {modelName}.SemanticModel/ folder (with .platform and definition.pbism) around the output. Only applies to tmdl/bim written to a bare target.
   opt --no-sync  Skip workspace sync when workspace mode is active
-  opt --force, -f  In a live session (tx interactive, tx ui), overwrite changes made to the model's files outside it
+  opt --force, -f  In a live session (tx interactive, tx ui), overwrite changes made to the model's files or server model outside it
 
 # tx serve
 Serve a model session to editors and agents over stdio

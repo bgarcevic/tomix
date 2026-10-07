@@ -46,6 +46,10 @@ public static class ProviderConnectionGuard
     /// Maps a classified <see cref="ModelConnectionException"/> to its diagnostic. Public for
     /// handlers that open sessions outside <see cref="RunAsync{T}"/> (e.g. <c>query</c>).
     /// </summary>
+    /// <summary>The hint for <c>TOMIX_DESKTOP_NOT_RUNNING</c>.</summary>
+    public const string DesktopNotRunningHint =
+        "Open the report in Power BI Desktop again, then run 'tx connect --local' to pick its new port.";
+
     public static TomixResult<T> ConnectionFailure<T>(ModelReference? model, ModelConnectionException ex)
         => ex.Kind switch
         {
@@ -56,6 +60,8 @@ public static class ProviderConnectionGuard
                 hint: model is null
                     ? "Name the model with --database."
                     : $"List the models on the endpoint: tx connect \"{model.Value}\" --list"),
+            ModelConnectionFailureKind.LocalInstanceGone => TomixResult<T>.Fail(
+                "TOMIX_DESKTOP_NOT_RUNNING", ex.Message, exitCode: 1, hint: DesktopNotRunningHint),
             _ => TomixResult<T>.Fail("TOMIX_DATABASE_NOT_FOUND", ex.Message, exitCode: 1)
         };
 }

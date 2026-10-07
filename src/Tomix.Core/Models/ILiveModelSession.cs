@@ -89,6 +89,13 @@ public interface ILiveModelSession : IModelSession
     bool CanReload { get; }
 
     /// <summary>
+    /// True when the session's last look at its source could not reach it, for example because
+    /// the Power BI Desktop it was opened from has closed. The model stays in memory; saving to
+    /// another place still works. Clears when the source answers again.
+    /// </summary>
+    bool SourceUnavailable => false;
+
+    /// <summary>
     /// Compares the source with the state the session last opened, reloaded or saved, and marks
     /// the session <see cref="SessionState.Stale"/> when it changed (or clears that when it is
     /// back as it was). Sessions also check on their own when they see the source change, and

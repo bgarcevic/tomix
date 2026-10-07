@@ -134,7 +134,8 @@ Raised when a command runs against an open live session (`tx shell` and the othe
 | `TOMIX_SESSION_TRANSACTION_OPEN` | 2 | `begin` while a transaction is open; transactions do not nest. |
 | `TOMIX_SESSION_NO_TRANSACTION` | 2 | `commit` or `rollback` with no open transaction. |
 | `TOMIX_SESSION_TRANSACTION_ENDED` | 1 | The transaction was rolled back because it sat idle for 15 minutes. |
-| `TOMIX_SESSION_STALE` | 1 | A live session would save over changes made to the model's files outside it (a `git checkout`, another editor) since it opened, reloaded or last saved. Nothing was written. Run `reload` to take the files' version (unsaved changes are lost), or `save --force` to overwrite them with the session's. From `tx serve`: `session.reload`, or `session.save` with `"force": true`. |
+| `TOMIX_SESSION_STALE` | 1 | A live session would save over changes made to the model outside it since it opened, reloaded or last saved: to its files (a `git checkout`, another editor), or to its server model (Power BI Desktop, another tool, a refresh). Nothing was written. Run `reload` to take the files' version (unsaved changes are lost), or `save --force` to overwrite them with the session's. A session on a server cannot reload: connect again to take the server's version. From `tx serve`: `session.reload`, or `session.save` with `"force": true`. |
+| `TOMIX_SESSION_SOURCE_UNAVAILABLE` | 1 | A live session on a server cannot reach it, for example because the Power BI Desktop instance it was opened from has closed. The session's changes are still in memory: write them to files with `save -o <folder>`. |
 | `TOMIX_SESSION_IN_USE` | 1 | A session client sent `session.open` or `session.close` while other clients are connected to the same session. Disconnect them first, or start another session for the other model. |
 | `TOMIX_PROTOCOL_VERSION` | 2 | A `tx serve` client asked for a session protocol version the server does not speak. `data.supported` lists the versions it does ([session protocol](protocol.md)). |
 
@@ -327,6 +328,7 @@ come from structural integrity checks.
 | `TOMIX_INTERACTIVE_REQUIRED` | 1 | An interactive-only flow (`connect --remote`, a valueless `-w`) was invoked without a TTY (e.g. `--non-interactive`, `--quiet`, redirected input, or json/csv output). Pass the workspace/model explicitly. |
 | `TOMIX_REMOTE_LIST_FAILED` | 1 | Listing workspaces or models failed (Power BI REST or XMLA error) during an interactive `connect` or `connect <server> --list`. |
 | `TOMIX_DATABASE_NOT_FOUND` | 1 | The database/model name was not found on the server. |
+| `TOMIX_DESKTOP_NOT_RUNNING` | 1 | Nothing listens on the `localhost:<port>` Power BI Desktop endpoint: the report was closed, or Desktop restarted on another port. Open it again, then run `tx connect --local` to pick its new port. |
 | `TOMIX_DATABASE_REQUIRED` | 2 | The endpoint hosts more than one database/model and none was named. List them with `tx connect <server> --list`, then pass one with `-d/--database`. |
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `get --deps` (or `deps`) called without an object path. |
 | `TOMIX_SINGLE_OBJECT_REQUIRED` | 2 | `get --query` or `get --deps` was given a path that selects a set (a wildcard such as `Sa*`, a container such as `Sales/Measures`, or `--ls`/`--where`). Name one object. |

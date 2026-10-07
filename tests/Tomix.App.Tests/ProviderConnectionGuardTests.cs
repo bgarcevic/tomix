@@ -71,6 +71,20 @@ public sealed class ProviderConnectionGuardTests
     }
 
     [Fact]
+    public async Task RunAsync_LocalInstanceGone_MapsToDesktopNotRunning()
+    {
+        var result = await ProviderConnectionGuard.RunAsync(
+            ModelReference.Remote("localhost:52067"), () => Throwing(new ModelConnectionException(
+                ModelConnectionFailureKind.LocalInstanceGone,
+                "Power BI Desktop is not running on localhost:52067.")));
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_DESKTOP_NOT_RUNNING", result.Diagnostics[0].Code);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(ProviderConnectionGuard.DesktopNotRunningHint, result.Diagnostics[0].Hint);
+    }
+
+    [Fact]
     public async Task RunAsync_DoesNotClassifyDatabaseFromExceptionMessage()
     {
         var result = await ProviderConnectionGuard.RunAsync(

@@ -1,8 +1,10 @@
 using System.CommandLine;
+using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Cli.Commands;
 using Tomix.Cli.Output;
+using Tomix.Core.Authentication;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
@@ -79,11 +81,27 @@ internal sealed class SessionOpener(IReadOnlyList<IModelProvider> providers, Cli
                 $"A session cannot open {reference.Value} yet; it opens TMDL folders and .bim files.",
                 "Save the model locally with 'tx save -o <folder>' and open that.");
 
-        var session = await CliSpinner.RunAsync(
-            "Loading model...",
-            () => live.OpenLiveAsync(reference, cancellationToken),
-            suppress: !showSpinner);
-        return (session, null);
+        try
+        {
+            var session = await CliSpinner.RunAsync(
+                "Loading model...",
+                () => live.OpenLiveAsync(reference, cancellationToken),
+                suppress: !showSpinner);
+            return (session, null);
+        }
+        catch (ModelConnectionException ex)
+        {
+            // A closed Power BI Desktop, a missing database, or several to choose from.
+            return (null, ProviderConnectionGuard.ConnectionFailure<object>(reference, ex).Diagnostics[0]);
+        }
+        catch (AuthenticationRequiredException ex)
+        {
+            return Fail("TOMIX_AUTH_REQUIRED", ex.Message, "Run 'tx auth login' to authenticate, or use --auth spn for service principal.");
+        }
+        catch (Exception ex) when (reference.IsRemote && ex is not OperationCanceledException)
+        {
+            return Fail("TOMIX_CONNECT_FAILED", RemoteConnectError.Describe(reference.Value, ex), "Verify the server URL and credentials.");
+        }
     }
 
     private static (ILiveModelSession?, TomixDiagnostic) Fail(string code, string message, string hint)

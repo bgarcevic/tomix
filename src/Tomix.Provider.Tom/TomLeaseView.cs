@@ -25,6 +25,8 @@ internal class TomLeaseView : IModelSession, IModelExportSession, IModelMutation
 
     protected TomModelSource Source => _session.Source;
 
+    protected TomLiveModelSession Session => _session;
+
     /// <summary>The model, if the lease is still open.</summary>
     protected Database Database
     {
@@ -113,18 +115,22 @@ internal sealed class TomServerLeaseView(TomLiveModelSession session, TomLiveMod
         IProgress<RefreshProgress>? progress,
         TextWriter? traceWriter,
         CancellationToken cancellationToken)
-        => TomModelRefresher.RefreshAsync(server.Server, Database, request, progress, traceWriter, cancellationToken);
+        => Session.ChangeSourceAsync(
+            () => server.Reach(() => TomModelRefresher.RefreshAsync(server.Server, Database, request, progress, traceWriter, cancellationToken)),
+            cancellationToken);
 
     public string GenerateRefreshScript(ModelRefreshRequest request)
         => TomModelRefresher.GenerateRefreshScript(Database, request);
 
     public Task<RefreshPolicyApplyResult> ApplyRefreshPolicyAsync(RefreshPolicyApplyRequest request, CancellationToken cancellationToken)
-        => TomRefreshPolicyApplier.ApplyAsync(server.Server, Database, request, cancellationToken);
+        => Session.ChangeSourceAsync(
+            () => server.Reach(() => TomRefreshPolicyApplier.ApplyAsync(server.Server, Database, request, cancellationToken)),
+            cancellationToken);
 
     public Task<ModelQueryResult> ExecuteQueryAsync(ModelQueryRequest request, TextWriter? traceWriter, CancellationToken cancellationToken)
     {
         var database = Database;
-        return TomServerModelSession.ExecuteQueryAsync(
-            server.Reference, database, server.ModelName(database), server.TokenProvider, request, traceWriter, cancellationToken);
+        return server.Reach(() => TomServerModelSession.ExecuteQueryAsync(
+            server.Reference, database, server.ModelName(database), server.TokenProvider, request, traceWriter, cancellationToken));
     }
 }

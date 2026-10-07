@@ -57,9 +57,12 @@ footer{font-size:12px;color:var(--muted);margin-top:24px}
   <div class="bar"><span id="clients"></span><span id="steps"></span></div>
   <div class="txn" id="txn" hidden></div>
   <div class="stale" id="stale" role="alert" hidden>
-    <span>The model's files changed outside this session, for example by a git checkout or another editor. Saving would overwrite those changes.</span>
+    <span id="stale-text">The model's files changed outside this session, for example by a git checkout or another editor. Saving would overwrite those changes.</span>
     <button id="reload">Reload from disk</button>
     <button id="keep">Keep this version</button>
+  </div>
+  <div class="stale" id="gone" role="alert" hidden>
+    <span id="gone-text"></span>
   </div>
   <div class="error" id="error" role="alert" hidden></div>
   <h2>Activity</h2>
@@ -102,16 +105,25 @@ async function refresh() {
   $("model").title = status.model || "";
   const state = $("state");
   const stale = status.state === "stale";
-  state.textContent = stale ? "● files changed on disk" : status.dirty ? "● unsaved changes" : status.state === "closed" ? "" : "saved";
+  const server = status.canReload === false;
+  state.textContent = stale ? (server ? "● changed on the server" : "● files changed on disk") : status.dirty ? "● unsaved changes" : status.state === "closed" ? "" : "saved";
   state.className = "state" + (stale || status.dirty ? " dirty" : "");
   $("stale").hidden = !stale;
+  $("stale-text").textContent = server
+    ? "The model changed on the server outside this session, for example in Power BI Desktop or by a refresh. Saving would overwrite those changes; to take the server's version, connect again."
+    : "The model's files changed outside this session, for example by a git checkout or another editor. Saving would overwrite those changes.";
+  $("reload").hidden = server;
   $("reload").dataset.dirty = status.dirty ? "1" : "";
   const others = status.clients.filter(id => id !== me);
   $("clients").textContent = others.length ? "Also here: " + others.join(", ") : "No other clients";
   $("steps").textContent = status.undoSteps + " undo · " + status.redoSteps + " redo";
   $("undo").disabled = !status.undoSteps;
   $("redo").disabled = !status.redoSteps;
-  $("save").disabled = !status.dirty;
+  const gone = status.sourceUnavailable === true;
+  $("gone").hidden = !gone;
+  $("gone-text").textContent = (/^(localhost|127\.0\.0\.1):/i.test(status.model || "") ? "Power BI Desktop is no longer running" : "The server cannot be reached")
+    + ", so this session cannot save to it. Its changes are still here: run 'save -o <folder>' in a shell on this session to write them to files.";
+  $("save").disabled = !status.dirty || gone;
   const txn = status.transaction;
   $("txn").hidden = !txn;
   if (txn) $("txn").textContent = txn.client + " is editing" + (txn.label ? ": “" + txn.label + "”" : "") + ". Its changes appear when it commits.";
@@ -217,7 +229,8 @@ $("reload").addEventListener("click", async () => {
   refresh();
 });
 $("keep").addEventListener("click", async () => {
-  if (!confirm("Save this session's version over the files, discarding the changes made outside it?")) return;
+  const where = $("reload").hidden ? "the server's model" : "the files";
+  if (!confirm("Save this session's version over " + where + ", discarding the changes made outside it?")) return;
   try { showError(""); await request("session.save", { force: true }); } catch (error) { showError(error.message); }
   refresh();
 });

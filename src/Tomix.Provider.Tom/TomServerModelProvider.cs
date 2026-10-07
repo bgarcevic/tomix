@@ -89,6 +89,13 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
 
     private async Task<TabularServer> ConnectServerAsync(ModelReference reference, CancellationToken cancellationToken)
     {
+        // A closed Desktop leaves a refused port, which AMO takes seconds to report as a raw
+        // socket error; nothing listening is known up front.
+        if (TomServerModelSource.LocalInstanceGone(reference.Value, TomServerModelSource.IsPortListening))
+            throw new ModelConnectionException(
+                ModelConnectionFailureKind.LocalInstanceGone,
+                $"Power BI Desktop is not running on {reference.Value}: the report was closed, or Desktop restarted on another port.");
+
         var server = new TabularServer();
         try
         {

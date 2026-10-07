@@ -66,7 +66,7 @@ internal sealed class SaveCommand : ICommandModule
             Description = "Skip workspace sync when workspace mode is active"
         };
         var forceOption = LifecycleOptions.Force(
-            "In a live session (tx interactive, tx ui), overwrite changes made to the model's files outside it");
+            "In a live session (tx interactive, tx ui), overwrite changes made to the model's files or server model outside it");
 
         var command = new Command("save", "Write a model to disk in a chosen format")
         {

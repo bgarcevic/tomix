@@ -59,7 +59,17 @@ public static class ModelSessionRunner
 
             await using (lease)
             {
-                var result = await action(lease.Session);
+                TomixResult<TResult> result;
+                try
+                {
+                    result = await action(lease.Session);
+                }
+                catch (ModelSourceUnavailableException ex)
+                {
+                    // A live session whose server is gone (#351); its model is still in memory.
+                    return Session.SourceChangedFailure.Result<TResult>(ex);
+                }
+
                 if (result.Success)
                     await lease.CommitAsync(cancellationToken);
                 return result;

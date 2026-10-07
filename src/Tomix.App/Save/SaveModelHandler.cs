@@ -43,13 +43,17 @@ public sealed class SaveModelHandler
             ? InferSerialization(request.Model.Value)
             : request.Serialization;
 
-        // A live session saves in place through its own save, which records the save point.
-        var inPlace = string.IsNullOrWhiteSpace(request.OutputPath);
+        // A live session saves in place through its own save, which records the save point and
+        // refuses to overwrite changes made outside it. Naming its own files is saving in place.
+        var inPlace = string.IsNullOrWhiteSpace(request.OutputPath)
+            || (_sessions.IsLive && SamePath(request.OutputPath, session.SourcePath));
         var outputPath = request.OutputPath;
         if (string.IsNullOrWhiteSpace(outputPath))
             outputPath = session.SourcePath;
 
-        if (string.IsNullOrWhiteSpace(outputPath))
+        // A live session on a server saves to the server (#351); -o only writes a copy.
+        var toServer = _sessions.IsLive && inPlace && request.Model.IsRemote;
+        if (string.IsNullOrWhiteSpace(outputPath) && !toServer)
             return TomixResult<SaveModelResult>.Fail(
                 code: "TOMIX_SAVE_OUTPUT_REQUIRED",
                 message: "An output path is required when no model source is active.",
@@ -94,7 +98,7 @@ public sealed class SaveModelHandler
 
             // A failed workspace sync leaves the mirror behind the source; render the saved
             // result but exit non-zero so CI catches the drift.
-            var (savedTo, persistence) = MutationLifecycle.Describe(request.Model, outputPath, export.SavedPath);
+            var (savedTo, persistence) = MutationLifecycle.Describe(request.Model, toServer ? null : outputPath, export.SavedPath);
             var outcome = new MutationOutcome(MutationStatus.Saved, savedTo, persistence, sync);
             return TomixResult<SaveModelResult>.Ok(
                 new SaveModelResult(export.Format) { Outcome = outcome },
@@ -172,6 +176,24 @@ public sealed class SaveModelHandler
         }
 
         return null;
+    }
+
+    private static bool SamePath(string a, string b)
+    {
+        if (string.IsNullOrWhiteSpace(b))
+            return false;
+
+        try
+        {
+            return string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
     }
 
     private static string InferSerialization(string modelPath)

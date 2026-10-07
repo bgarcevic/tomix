@@ -1,3 +1,4 @@
+using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.App.Save;
 using Tomix.Core.Models;
@@ -241,6 +242,126 @@ public sealed class SaveModelHandlerTests
 
         public Task<ModelDeployPlan> GeneratePlanAsync(ModelDeployRequest request, CancellationToken cancellationToken)
             => throw new NotSupportedException("This stub never plans a deploy.");
+    }
+
+    [Fact]
+    public async Task ALiveSessionOnAServer_SavesToTheServer_WithoutAnOutputPath()
+    {
+        var session = new LiveStubSession(sourcePath: "");
+        var result = await new SaveModelHandler(new LiveStubSource(session)).HandleAsync(LiveSave(Desktop), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, session.Saves);
+        Assert.Equal(0, session.Exports);
+        Assert.Equal("localhost:51234 / Sales", result.Data!.Outcome.SavedTo);
+    }
+
+    [Fact]
+    public async Task ALiveSessionOnAServer_WritesOnlyACopy_WithAnOutputPath()
+    {
+        using var dir = new TempDir();
+        var session = new LiveStubSession(sourcePath: "");
+        var result = await new SaveModelHandler(new LiveStubSource(session)).HandleAsync(
+            LiveSave(Desktop) with { OutputPath = dir.Path }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, session.Saves);
+        Assert.Equal(1, session.Exports);
+    }
+
+    [Fact]
+    public async Task ALiveSession_NamingItsOwnFiles_SavesInPlace()
+    {
+        using var dir = new TempDir();
+        var session = new LiveStubSession(sourcePath: dir.Path);
+        var result = await new SaveModelHandler(new LiveStubSource(session)).HandleAsync(
+            LiveSave(new ModelReference(dir.Path)) with { OutputPath = dir.Path + Path.DirectorySeparatorChar }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, session.Saves);
+        Assert.Equal(0, session.Exports);
+    }
+
+    [Fact]
+    public async Task AServerModelChangedOutsideTheSession_FailsAsStale_WithoutOfferingReload()
+    {
+        var session = new LiveStubSession(sourcePath: "") { Fails = new ModelSourceChangedException("'Sales' on localhost:51234", canReload: false) };
+        var result = await new SaveModelHandler(new LiveStubSource(session)).HandleAsync(LiveSave(Desktop), CancellationToken.None);
+
+        var failure = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_SESSION_STALE", failure.Code);
+        Assert.Contains("save --force", failure.Hint);
+        Assert.DoesNotContain("'reload'", failure.Hint);
+    }
+
+    [Fact]
+    public async Task AServerThatIsGone_FailsAsUnavailable_AndPointsAtSavingACopy()
+    {
+        var session = new LiveStubSession(sourcePath: "")
+        {
+            Fails = new ModelSourceUnavailableException("'Sales' on localhost:51234", "The Power BI Desktop instance at localhost:51234 is no longer running.")
+        };
+        var result = await new SaveModelHandler(new LiveStubSource(session)).HandleAsync(LiveSave(Desktop), CancellationToken.None);
+
+        var failure = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_SESSION_SOURCE_UNAVAILABLE", failure.Code);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("save -o", failure.Hint);
+    }
+
+    private static readonly ModelReference Desktop = new("localhost:51234", "Sales");
+
+    private static SaveModelRequest LiveSave(ModelReference model)
+        => new(model, OutputPath: null, Serialization: "", Overwrite: false, SupportingFiles: false);
+
+    private sealed class LiveStubSource(IModelSession session) : IModelSessionSource
+    {
+        public bool IsLive => true;
+
+        public Task<ModelSessionLease> LeaseAsync(ModelReference model, CancellationToken cancellationToken)
+            => Task.FromResult(ModelSessionLease.OneShot(session));
+    }
+
+    /// <summary>A live session's lease view: its own save writes the source, export a copy.</summary>
+    private sealed class LiveStubSession(string sourcePath) : IModelSession, IModelExportSession, IModelMutationSession
+    {
+        public int Saves { get; private set; }
+
+        public int Exports { get; private set; }
+
+        public Exception? Fails { get; init; }
+
+        public string SourcePath => sourcePath;
+
+        public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
+            => Task.FromResult(new ModelSummary("Sales", 1601, 1, 0, 0, 0, 0));
+
+        public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken _)
+            => Task.FromResult(new ModelSnapshot("Sales", 1601, []));
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public Task<ModelExportResult> ExportAsync(ModelExportRequest request, CancellationToken ct)
+        {
+            Exports++;
+            return Task.FromResult(new ModelExportResult(request.OutputPath, request.Serialization));
+        }
+
+        public Task<ModelExportResult> SaveAsync(string? outputPath, string serialization, bool overwrite, CancellationToken cancellationToken)
+        {
+            if (Fails is not null)
+                throw Fails;
+            Saves++;
+            return Task.FromResult(new ModelExportResult(sourcePath.Length == 0 ? "Sales" : sourcePath, "tmdl"));
+        }
+
+        public ModelObjectMutationResult AddObject(ModelObjectAddRequest request) => throw new NotSupportedException();
+
+        public ModelObjectMutationResult SetProperty(ModelObjectSetRequest request) => throw new NotSupportedException();
+
+        public ModelObjectMutationResult RemoveObject(ModelObjectRemoveRequest request) => throw new NotSupportedException();
+
+        public ModelReplaceResult ReplaceText(ModelReplaceRequest request) => throw new NotSupportedException();
     }
 
     private sealed class StubExportOnlyProvider : IModelProvider

@@ -377,6 +377,12 @@ public sealed partial class InteractiveCommandTests
     public void ModelName_IsTheFolderOrDatabase(string value, string expected)
         => Assert.Equal(expected, Interactive.InteractiveLoop.ModelName(new ModelReference(value, expected == "Revenue" ? "Revenue" : null)));
 
+    [Theory]
+    [InlineData("localhost:50623", "Power BI Desktop is not running; 'save -o <folder>' writes the changes to files")]
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/Finance", "cannot be reached; 'save -o <folder>' writes the changes to files")]
+    public void Status_SaysWhenTheServerIsUnreachable(string model, string expected)
+        => Assert.Equal(expected, Interactive.SessionCommands.Unreachable(model));
+
     private static ConsoleCapture.Captured Run(string modelPath, string script, params string[] flags)
         => RunAs("interactive", modelPath, script, TestServices.Create(), flags);
 

@@ -36,7 +36,9 @@ public sealed class LiveSessionHandler
             _session.Version,
             _session.History.Count(step => !step.Undone),
             _session.History.Count(step => step.Undone),
-            _transaction is null ? null : new SessionTransactionInfo(_transaction.Transaction, _transactionLabel)));
+            _transaction is null ? null : new SessionTransactionInfo(_transaction.Transaction, _transactionLabel),
+            _session.CanReload,
+            _session.SourceUnavailable));
 
     public TomixResult<SessionHistoryResult> History()
         => TomixResult<SessionHistoryResult>.Ok(new SessionHistoryResult(

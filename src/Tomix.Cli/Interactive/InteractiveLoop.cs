@@ -50,6 +50,7 @@ internal sealed class InteractiveLoop : IAsyncDisposable
     private RootCommand _root;
     private CancellationTokenSource? _running;
     private bool _staleNoticed;
+    private bool _unavailableNoticed;
     private bool _exitRequested;
 
     /// <param name="buildRoot">Builds the command tree around the loop's own commands: with a
@@ -102,6 +103,7 @@ internal sealed class InteractiveLoop : IAsyncDisposable
             while (true)
             {
                 NoticeStale();
+                NoticeUnavailable();
                 var line = reader.ReadLine(Prompt());
                 lineNumber++;
                 if (line is null)
@@ -367,14 +369,29 @@ internal sealed class InteractiveLoop : IAsyncDisposable
     private void Error(string code, string message, string hint)
         => ErrorOutput.Write([new TomixDiagnostic(code, DiagnosticSeverity.Error, message, hint)], _options.ErrorFormat);
 
-    /// <summary>Says once, before the prompt, that the model's files changed outside the session (#351).</summary>
+    /// <summary>Says once, before the prompt, that the model's source changed outside the session (#351).</summary>
     private void NoticeStale()
     {
         var stale = _scope?.Session.State == SessionState.Stale;
         if (stale && !_staleNoticed)
             StdErr.MarkupLine(Styling.Warning(
-                "The model's files changed outside this session. Run 'reload' to take them (unsaved changes are lost), or 'save --force' to keep this session's version."));
+                _scope!.Session.CanReload
+                    ? "The model's files changed outside this session. Run 'reload' to take them (unsaved changes are lost), or 'save --force' to keep this session's version."
+                    : "The model changed on the server outside this session, for example in Power BI Desktop or by a refresh. Run 'save --force' to overwrite it with this session's version, or connect again to take the server's."));
         _staleNoticed = stale;
+    }
+
+    /// <summary>Says once, before the prompt, that the session's server can no longer be reached (#351).</summary>
+    private void NoticeUnavailable()
+    {
+        var unavailable = _scope?.Session.SourceUnavailable == true;
+        if (unavailable && !_unavailableNoticed)
+            StdErr.MarkupLine(Styling.Warning(
+                (ModelReference.IsLocalInstanceEndpoint(_scope!.Model.Value)
+                    ? $"Power BI Desktop at {_scope.Model.Value} is no longer running"
+                    : $"{_scope.Model.Value} cannot be reached")
+                + ". This session's changes are still here: 'save -o <folder>' writes them to files."));
+        _unavailableNoticed = unavailable;
     }
 
     /// <summary><c>tx [model*] (transaction)&gt;</c>, or <c>tx&gt;</c> with no model open.</summary>

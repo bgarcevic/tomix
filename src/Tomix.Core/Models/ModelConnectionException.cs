@@ -7,7 +7,13 @@ public enum ModelConnectionFailureKind
     DatabaseNotFound,
 
     /// <summary>The endpoint hosts several databases and none was named.</summary>
-    DatabaseRequired
+    DatabaseRequired,
+
+    /// <summary>
+    /// A local Power BI Desktop endpoint (<c>localhost:&lt;port&gt;</c>) has nothing listening:
+    /// its report was closed, or Desktop restarted on another port.
+    /// </summary>
+    LocalInstanceGone
 }
 
 /// <summary>

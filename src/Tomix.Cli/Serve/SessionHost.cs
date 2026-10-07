@@ -23,6 +23,7 @@ internal sealed class SessionHost
     private JsonObject? _transaction;
     private JsonObject? _lastChange;
     private string _status = "{}";
+    private volatile bool _statusUnavailable;
 
     public SessionHost(
         Func<SessionScope?, IEnumerable<Command>, RootCommand> buildRoot,
@@ -55,7 +56,17 @@ internal sealed class SessionHost
     /// The body of <c>GET /status</c> (docs/protocol.md, Status endpoint), rebuilt whenever the
     /// session, its clients or its transaction change, so reading it never touches the model.
     /// </summary>
-    public string Status => Volatile.Read(ref _status);
+    public string Status
+    {
+        get
+        {
+            // A server going away changes no session state, so nothing else rebuilds the status
+            // for it (#351).
+            if (_session is { } session && session.SourceUnavailable != _statusUnavailable)
+                RefreshStatus();
+            return Volatile.Read(ref _status);
+        }
+    }
 
     public int ClientCount
     {
@@ -193,6 +204,7 @@ internal sealed class SessionHost
     private void RefreshStatus()
     {
         var session = _session;
+        var unavailable = session?.SourceUnavailable ?? false;
         JsonObject status;
         lock (_sync)
         {
@@ -205,6 +217,8 @@ internal sealed class SessionHost
                 ["version"] = session?.Version ?? 0,
                 ["undoSteps"] = session?.History.Count(step => !step.Undone) ?? 0,
                 ["redoSteps"] = session?.History.Count(step => step.Undone) ?? 0,
+                ["canReload"] = session?.CanReload ?? false,
+                ["sourceUnavailable"] = unavailable,
                 ["transaction"] = _transaction?.DeepClone(),
                 ["clients"] = new JsonArray([.. _clients.Where(client => client.Id is not null).Select(client => (JsonNode)client.Id!)]),
                 ["lastChange"] = _lastChange?.DeepClone()
@@ -212,6 +226,7 @@ internal sealed class SessionHost
         }
 
         Volatile.Write(ref _status, status.ToJsonString());
+        _statusUnavailable = unavailable;
     }
 
     private void OnChanged(object? sender, ModelChangeBatch batch)

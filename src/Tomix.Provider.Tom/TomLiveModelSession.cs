@@ -56,6 +56,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
     private readonly SemaphoreSlim _sourceLock = new(1, 1);
     private string? _baseline;
     private bool _sourceChanged;
+    private volatile bool _sourceUnavailable;
     private readonly IDisposable? _watch;
     private readonly Timer _settle;
 
@@ -125,6 +126,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
 
     public bool CanReload => _source.CanReload;
 
+    public bool SourceUnavailable => _sourceUnavailable;
+
     /// <summary>True when the source changed outside the session since it was opened, reloaded or saved.</summary>
     public bool SourceChanged
     {
@@ -188,7 +191,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
         bool changed;
         try
         {
-            changed = _baseline is not null && _source.Fingerprint() != _baseline;
+            changed = _baseline is not null && SourceFingerprint() != _baseline;
             lock (_sync)
                 _sourceChanged = changed;
         }
@@ -221,7 +224,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
             try
             {
                 // Fingerprint first: a change landing while the model loads is then seen as one.
-                var baseline = _source.Fingerprint();
+                var baseline = SourceFingerprint();
                 var database = _source.Load();
                 var before = Snapshot();
                 Journal.Reload(database);
@@ -323,16 +326,16 @@ public sealed class TomLiveModelSession : ILiveModelSession
             await _sourceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (_baseline is not null && _source.Fingerprint() != _baseline)
+                if (_baseline is not null && SourceFingerprint() != _baseline)
                 {
                     lock (_sync)
                         _sourceChanged = true;
-                    throw new ModelSourceChangedException(SourcePath);
+                    throw new ModelSourceChangedException(_source.DisplayName, _source.CanReload);
                 }
 
                 var result = await _source.SaveAsync(Journal.Database, outputPath, serialization, overwrite, cancellationToken).ConfigureAwait(false);
                 lease.Root.EntriesAtSave = Journal.Entries.Count;
-                _baseline = _source.Fingerprint();
+                _baseline = SourceFingerprint();
                 lock (_sync)
                     _sourceChanged = false;
                 return result;
@@ -357,7 +360,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
         _sourceLock.Wait();
         try
         {
-            _baseline = _source.Fingerprint();
+            _baseline = SourceFingerprint();
             lock (_sync)
                 _sourceChanged = false;
         }
@@ -369,9 +372,57 @@ public sealed class TomLiveModelSession : ILiveModelSession
         UpdateState();
     }
 
+    /// <summary>
+    /// Runs <paramref name="action"/>, which changes the source itself (a refresh on the server),
+    /// without the session then taking that change for one made outside it: when the source
+    /// was as the session last saw it, what <paramref name="action"/> leaves becomes the baseline.
+    /// Callers hold a lease.
+    /// </summary>
+    internal async Task<T> ChangeSourceAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        await _sourceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var unchanged = _baseline is not null && SourceFingerprint() == _baseline;
+            try
+            {
+                return await action().ConfigureAwait(false);
+            }
+            finally
+            {
+                if (unchanged)
+                    _baseline = SourceFingerprint();
+            }
+        }
+        finally
+        {
+            _sourceLock.Release();
+        }
+    }
+
+    /// <summary>The source's fingerprint, noting whether the source could be reached (<see cref="SourceUnavailable"/>).</summary>
+    private string? SourceFingerprint()
+    {
+        try
+        {
+            var fingerprint = _source.Fingerprint();
+            _sourceUnavailable = false;
+            return fingerprint;
+        }
+        catch (ModelSourceUnavailableException)
+        {
+            _sourceUnavailable = true;
+            throw;
+        }
+    }
+
     /// <summary>A check the watcher starts: it reports through <see cref="StateChanged"/> and never throws.</summary>
     private async Task CheckQuietlyAsync()
     {
+        // A save or a refresh holds the source; it sets the baseline itself.
+        if (_sourceLock.CurrentCount == 0)
+            return;
+
         try
         {
             await CheckSourceAsync(CancellationToken.None).ConfigureAwait(false);
@@ -379,6 +430,11 @@ public sealed class TomLiveModelSession : ILiveModelSession
         catch (ObjectDisposedException)
         {
             // Closed while the source settled.
+        }
+        catch (Exception ex) when (ex is ModelSourceUnavailableException or InvalidOperationException or Microsoft.AnalysisServices.AmoException)
+        {
+            // The server is gone or did not answer; the next poll asks again, and the next call
+            // that needs the server says so.
         }
     }
 
