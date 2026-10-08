@@ -170,17 +170,17 @@ public sealed class VpaxVertipaqAnalyzer : IVertipaqAnalyzer
     {
         var connectionString = XmlaConnectionString.Build(model);
 
-        if (model.IsLocalInstance)
+        if (!model.RequiresAccessToken)
             return (connectionString, null, null);
 
         if (_tokenProvider is null)
             throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
 
-        var token = await _tokenProvider.GetTokenAsync(model.Value, cancellationToken).ConfigureAwait(false);
+        var token = await _tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(model.Value), cancellationToken).ConfigureAwait(false);
 
         AsAccessToken Refresh(AsAccessToken _)
         {
-            var refreshed = _tokenProvider.GetTokenAsync(model.Value, cancellationToken)
+            var refreshed = _tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(model.Value), cancellationToken)
                 .ConfigureAwait(false).GetAwaiter().GetResult();
             return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
         }

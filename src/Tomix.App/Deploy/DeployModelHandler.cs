@@ -152,6 +152,8 @@ public sealed class DeployModelHandler
                     hint: "Specify --workspace or --server and --database."));
             }
 
+            warnings = [.. warnings, .. AmbiguousServerWarning(server)];
+
             var deployRequest = new ModelDeployRequest(
                 server,
                 database,
@@ -189,6 +191,23 @@ public sealed class DeployModelHandler
                     Hint: $"Run '{BpaEngine.VertipaqAnnotateCommand}' on a deployed model. For a model file, "
                         + $"connect it to a deployed copy in workspace mode first ({BpaEngine.VertipaqWorkspaceConnectCommand}).")
             ];
+
+    /// <summary>
+    /// A dotted two-part target such as <c>Sales.Prod</c> deploys to the Analysis Services server
+    /// of that name, but reads just as well as a Power BI workspace. Say which one it went to, and
+    /// how to pick the other, so a misrouted deploy is visible in the CI log.
+    /// </summary>
+    internal static IReadOnlyList<TomixDiagnostic> AmbiguousServerWarning(string server)
+        => ModelReference.IsAmbiguousServerName(server)
+            ?
+            [
+                new TomixDiagnostic(
+                    "TOMIX_DEPLOY_AMBIGUOUS_SERVER",
+                    DiagnosticSeverity.Warning,
+                    $"Deploying to the Analysis Services server '{server}'.",
+                    Hint: $"For a Power BI workspace with that name, pass -s powerbi://api.powerbi.com/v1.0/myorg/{server}.")
+            ]
+            : [];
 
     private async Task<(TomixResult<DeployModelResult>? Failure, IReadOnlyList<BpaResult> NotChecked)> RunBpaGate(
         IModelSession session,

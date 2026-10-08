@@ -230,6 +230,28 @@ public sealed class DeployBpaGateTests
         Assert.Contains("workspace mode", warning.Hint);
     }
 
+    [Theory]
+    [InlineData("Sales.Prod", true)]
+    [InlineData("ssas01.contoso.com", false)]
+    [InlineData("MyWorkspace", false)]
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/Sales.Prod", false)]
+    public void AmbiguousServerWarning_NamesTheServerAndTheWorkspaceAlternative(string server, bool warns)
+    {
+        var warnings = DeployModelHandler.AmbiguousServerWarning(server);
+
+        if (!warns)
+        {
+            Assert.Empty(warnings);
+            return;
+        }
+
+        var warning = Assert.Single(warnings);
+        Assert.Equal("TOMIX_DEPLOY_AMBIGUOUS_SERVER", warning.Code);
+        Assert.Equal(Tomix.Core.Diagnostics.DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains($"'{server}'", warning.Message);
+        Assert.Contains($"powerbi://api.powerbi.com/v1.0/myorg/{server}", warning.Hint);
+    }
+
     private static BpaResult StatsSentinel(string id)
         => BpaResult.Sentinel(BpaResultKind.MissingVertipaqStats,
             new BpaRule(id, id, "Performance", RuleSeverity.Warning, ["Table"]));

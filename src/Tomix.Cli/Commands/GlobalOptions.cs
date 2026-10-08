@@ -29,7 +29,7 @@ internal static class GlobalOptions
 
     public static readonly Option<string?> Server = new("--server")
     {
-        Description = "Workspace to connect to: a name, a powerbi:// or asazure:// endpoint, or a local address",
+        Description = "Workspace or server to connect to: a workspace name, a powerbi:// or asazure:// endpoint, an Analysis Services server (host name, IP, host:port, host\\instance, or connection string), or a local address",
         Recursive = true
     };
 

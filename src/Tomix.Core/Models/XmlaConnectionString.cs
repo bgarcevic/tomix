@@ -47,6 +47,9 @@ public static class XmlaConnectionString
         if (string.IsNullOrWhiteSpace(endpoint))
             throw new ArgumentException("An endpoint is required to build a connection string.", nameof(endpoint));
 
+        if (ModelReference.IsConnectionString(endpoint))
+            return BuildFromConnectionString(endpoint, database);
+
         var connectionString = $"Data Source={ModelReference.NormalizeEndpoint(endpoint)}";
         if (!string.IsNullOrWhiteSpace(database))
             connectionString += $";Initial Catalog={database}";
@@ -56,6 +59,27 @@ public static class XmlaConnectionString
         return ModelReference.IsLocalInstanceEndpoint(endpoint)
             ? connectionString
             : $"{connectionString};Connect Timeout={RemoteConnectTimeoutSeconds}";
+    }
+
+    /// <summary>
+    /// A connection string the caller wrote in full (an on-premises target with its own provider,
+    /// credentials or instance) is kept as written. The requested database replaces any catalog it
+    /// names, and the remote connect timeout is added only when it sets none of its own.
+    /// </summary>
+    private static string BuildFromConnectionString(string connectionString, string? database)
+    {
+        var builder = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = connectionString };
+        if (!string.IsNullOrWhiteSpace(database))
+        {
+            builder.Remove("Catalog");
+            builder["Initial Catalog"] = database;
+        }
+
+        if (!ModelReference.IsLocalInstanceEndpoint(ModelReference.DataSourceOf(connectionString))
+            && !builder.ContainsKey("Connect Timeout"))
+            builder["Connect Timeout"] = RemoteConnectTimeoutSeconds;
+
+        return builder.ConnectionString;
     }
 
     /// <summary>The connection string for <paramref name="reference"/> and its database, if any.</summary>

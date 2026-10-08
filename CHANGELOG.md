@@ -22,6 +22,12 @@ and the API surface that major versions protect.
   `~ CalculatedColumn Calculations/Date: DataType`, so the changed property no longer reads as
   part of the object's name (`Calculations/Date Detail`). A column's type change is labelled
   `DataType` in text output; JSON keeps `Detail`.
+- `-s/--server` and `tx connect` now reach an on-premises Analysis Services server as typed
+  (`ssas01.contoso.com`, `10.0.0.5`, `ssas01:2383`, `ssas01.contoso.com\TABULAR`, or a full
+  MSOLAP connection string) with your Windows identity, instead of prefixing it with
+  `powerbi://api.powerbi.com/v1.0/myorg/` and sending the deploy to Power BI. `deploy` warns
+  (`TOMIX_DEPLOY_AMBIGUOUS_SERVER`) when a dotted two-part name such as `Sales.Prod` could also
+  be a workspace name.
 
 ## [0.10.0] - 2026-10-08
 

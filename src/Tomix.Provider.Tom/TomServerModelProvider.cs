@@ -19,7 +19,12 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
 
     public TomServerModelProvider(IAccessTokenProvider? tokenProvider) => _tokenProvider = tokenProvider;
 
-    public bool CanOpen(ModelReference reference) => reference.IsRemote;
+    // A server name is recognized lexically, so a model folder that happens to look like a host
+    // name (Sales.v2) belongs to the file providers when it exists on disk.
+    public bool CanOpen(ModelReference reference)
+        => reference.IsRemote
+            && !(ModelReference.IsAnalysisServicesServer(reference.Value)
+                && (Directory.Exists(reference.Value) || File.Exists(reference.Value)));
 
     public async Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
     {
@@ -99,16 +104,16 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
         var server = new TabularServer();
         try
         {
-            if (!reference.IsLocalInstance)
+            if (reference.RequiresAccessToken)
             {
                 if (_tokenProvider is null)
                     throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
 
-                var token = await _tokenProvider.GetTokenAsync(reference.Value, cancellationToken).ConfigureAwait(false);
+                var token = await _tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(reference.Value), cancellationToken).ConfigureAwait(false);
                 server.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
                 server.OnAccessTokenExpired = _ =>
                 {
-                    var refreshed = _tokenProvider.GetTokenAsync(reference.Value, cancellationToken)
+                    var refreshed = _tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(reference.Value), cancellationToken)
                         .ConfigureAwait(false).GetAwaiter().GetResult();
                     return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
                 };

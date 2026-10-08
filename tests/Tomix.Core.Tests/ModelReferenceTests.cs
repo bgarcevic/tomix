@@ -121,4 +121,91 @@ public sealed class ModelReferenceTests
     [InlineData("", "")]
     public void NormalizeEndpoint_ReturnsEmptyForBlank(string? input, string expected)
         => Assert.Equal(expected, ModelReference.NormalizeEndpoint(input));
+
+    // ── Analysis Services servers ───────────────────────────────────────────
+
+    public static TheoryData<string> AnalysisServicesServers =>
+    [
+        "MY.SERVER.COM",
+        "ssas01.contoso.com",
+        "ssas01.corp",
+        "10.0.0.5",
+        "10.0.0.5:2383",
+        "ssas01:2383",
+        "ssas01.contoso.com:2383",
+        @"ssas01.contoso.com\TABULAR",
+        @"localhost\TABULAR",
+        @"10.0.0.5\TABULAR",
+        @"Data Source=SSAS01\TABULAR",
+        "Provider=MSOLAP;Data Source=ssas01.contoso.com;Initial Catalog=Sales",
+        "Data Source=ssas01;Integrated Security=SSPI",
+    ];
+
+    [Theory]
+    [MemberData(nameof(AnalysisServicesServers))]
+    public void AnalysisServicesServer_IsRemoteAndPassesThroughNormalization(string value)
+    {
+        // The Tabular Editor CLI #13 shape: an on-premises server prefixed with
+        // powerbi://api.powerbi.com/v1.0/myorg/ and deployed to a workspace that does not exist.
+        Assert.True(ModelReference.IsAnalysisServicesServer(value));
+        Assert.True(ModelReference.IsRemoteEndpoint(value));
+        Assert.Equal(value, ModelReference.NormalizeEndpoint(value));
+    }
+
+    [Theory]
+    [InlineData("MyWorkspace")] // a single word is a Power BI workspace
+    [InlineData("My Workspace")]
+    [InlineData("Sales.Prod Workspace")] // spaces never appear in a host name
+    [InlineData("model.bim")] // dotted names ending in a model extension are paths
+    [InlineData("Sales.SemanticModel")]
+    [InlineData("Sales.pbip")]
+    [InlineData("v1.2")] // numeric last label
+    [InlineData(@"samples\basic-tmdl")] // relative path, not host\instance
+    [InlineData(@"SSAS01\TABULAR")] // single-word host reads as a path; needs a connection string
+    [InlineData(@"C:\models\model.bim")]
+    [InlineData("C:2383")] // a drive letter is not a host
+    [InlineData("localhost:12345")] // Power BI Desktop, classified separately
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/ws")]
+    [InlineData("asazure://westeurope.asazure.windows.net/server")]
+    [InlineData("Sales=Archive")] // '=' alone does not make a connection string
+    [InlineData("")]
+    [InlineData(null)]
+    public void IsAnalysisServicesServer_RejectsWorkspacesPathsAndOtherEndpoints(string? value)
+        => Assert.False(ModelReference.IsAnalysisServicesServer(value));
+
+    [Theory]
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/ws", true)]
+    [InlineData("asazure://westeurope.asazure.windows.net/server", true)]
+    [InlineData("MyWorkspace", true)]
+    [InlineData("Provider=MSOLAP;Data Source=asazure://westeurope.asazure.windows.net/server", true)]
+    [InlineData("localhost:52123", false)]
+    [InlineData("ssas01.contoso.com", false)]
+    [InlineData("10.0.0.5:2383", false)]
+    [InlineData(@"localhost\TABULAR", false)]
+    [InlineData(@"Data Source=SSAS01\TABULAR", false)]
+    [InlineData("", false)]
+    public void RequiresAccessToken_OnlyForCloudEndpoints(string value, bool expected)
+    {
+        Assert.Equal(expected, ModelReference.RequiresAccessTokenFor(value));
+        Assert.Equal(expected, new ModelReference(value).RequiresAccessToken);
+    }
+
+    [Theory]
+    [InlineData("Provider=MSOLAP;Data Source=ssas01.contoso.com;Initial Catalog=Sales", "ssas01.contoso.com")]
+    [InlineData(@"data source=SSAS01\TABULAR", @"SSAS01\TABULAR")]
+    [InlineData("ssas01.contoso.com", "ssas01.contoso.com")]
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/ws", "powerbi://api.powerbi.com/v1.0/myorg/ws")]
+    public void DataSourceOf_ExtractsTheServerFromAConnectionString(string value, string expected)
+        => Assert.Equal(expected, ModelReference.DataSourceOf(value));
+
+    [Theory]
+    [InlineData("Sales.Prod", true)]
+    [InlineData("ssas01.corp", true)]
+    [InlineData("ssas01.contoso.com", false)]
+    [InlineData("10.0.0.5", false)]
+    [InlineData("ssas01.corp:2383", false)]
+    [InlineData("MyWorkspace", false)]
+    [InlineData("model.bim", false)]
+    public void IsAmbiguousServerName_FlagsTwoPartDottedNames(string value, bool expected)
+        => Assert.Equal(expected, ModelReference.IsAmbiguousServerName(value));
 }

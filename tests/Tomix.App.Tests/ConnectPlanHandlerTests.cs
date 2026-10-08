@@ -468,6 +468,41 @@ public class ConnectPlanHandlerTests
         Assert.False(target.InitializeWorkspace);
     }
 
+    [Theory]
+    [InlineData("ssas01.contoso.com")]
+    [InlineData("10.0.0.5:2383")]
+    [InlineData(@"Provider=MSOLAP;Data Source=SSAS01\TABULAR")]
+    public void Plan_AnalysisServicesServer_IsStoredAsTyped(string server)
+    {
+        var plan = ConnectPlanHandler.Plan(Request(server: server, database: "Sales"));
+
+        var target = plan.Target!;
+        Assert.Equal(server, target.RemoteServer);
+        Assert.Null(target.Model);
+        Assert.Equal(server, target.Validation!.Value);
+        Assert.Equal("Sales", target.Validation.Database);
+    }
+
+    [Fact]
+    public void Plan_ExistingFolderNamedLikeAHost_IsALocalModel()
+    {
+        // Relative to the working directory, as typed; a unique name keeps parallel runs apart.
+        var name = $"Sales-{Guid.NewGuid():N}.v2";
+        Assert.True(Tomix.Core.Models.ModelReference.IsAnalysisServicesServer(name));
+        var folder = Directory.CreateDirectory(name);
+        try
+        {
+            var plan = ConnectPlanHandler.Plan(Request(server: name));
+
+            Assert.Equal(folder.FullName, plan.Target!.Model);
+            Assert.Null(plan.Target.RemoteServer);
+        }
+        finally
+        {
+            folder.Delete();
+        }
+    }
+
     [Fact]
     public void Plan_RemoteWithoutDatabase_StoresWithoutValidation()
     {

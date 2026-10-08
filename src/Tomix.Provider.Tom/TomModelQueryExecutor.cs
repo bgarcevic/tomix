@@ -52,17 +52,17 @@ public static class TomModelQueryExecutor
         using var connection = new AdomdConnection(connectionString);
 
         Func<AsAccessToken>? tokenFactory = null;
-        if (!reference.IsLocalInstance)
+        if (reference.RequiresAccessToken)
         {
             if (tokenProvider is null)
                 throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
 
-            var token = await tokenProvider.GetTokenAsync(reference.Value, cancellationToken).ConfigureAwait(false);
+            var token = await tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(reference.Value), cancellationToken).ConfigureAwait(false);
             connection.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
             // Shared by the ADOMD connection's expiry callback and the trace connection.
             tokenFactory = () =>
             {
-                var refreshed = tokenProvider.GetTokenAsync(reference.Value, cancellationToken)
+                var refreshed = tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(reference.Value), cancellationToken)
                     .ConfigureAwait(false).GetAwaiter().GetResult();
                 return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
             };

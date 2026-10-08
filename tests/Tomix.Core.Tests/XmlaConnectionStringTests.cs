@@ -49,6 +49,40 @@ public sealed class XmlaConnectionStringTests
             XmlaConnectionString.Build("MyWorkspace"),
             StringComparison.Ordinal);
 
+    [Theory]
+    [InlineData("ssas01.contoso.com")]
+    [InlineData("10.0.0.5:2383")]
+    [InlineData(@"ssas01.contoso.com\TABULAR")]
+    public void AnalysisServicesServer_IsConnectedToAsTyped(string server)
+        => Assert.Equal(
+            $"Data Source={server};Initial Catalog=Sales;Connect Timeout=30",
+            XmlaConnectionString.Build(server, "Sales"));
+
+    [Fact]
+    public void ConnectionString_KeepsItsKeysAndTakesTheRequestedDatabase()
+    {
+        var built = new System.Data.Common.DbConnectionStringBuilder
+        {
+            ConnectionString = XmlaConnectionString.Build(
+                @"Provider=MSOLAP;Data Source=SSAS01\TABULAR;Initial Catalog=Old;Integrated Security=SSPI", "Sales"),
+        };
+
+        Assert.Equal("MSOLAP", built["Provider"]);
+        Assert.Equal(@"SSAS01\TABULAR", built["Data Source"]);
+        Assert.Equal("Sales", built["Initial Catalog"]);
+        Assert.Equal("SSPI", built["Integrated Security"]);
+        Assert.Equal("30", built["Connect Timeout"]);
+    }
+
+    [Fact]
+    public void ConnectionString_KeepsItsOwnConnectTimeout()
+    {
+        var connectionString = XmlaConnectionString.Build("Data Source=ssas01;Connect Timeout=5");
+
+        Assert.Contains("Connect Timeout=5", connectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("=30", connectionString, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// Files allowed to contain a <c>Data Source=</c> literal, and why.
     /// </summary>

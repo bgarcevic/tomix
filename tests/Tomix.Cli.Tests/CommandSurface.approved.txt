@@ -5,7 +5,7 @@ browse, edit, lint, diff, and deploy tabular semantic models
   opt --model, -m <path>  Path to the semantic model: a TMDL folder, a .bim file, or a model folder
   opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
   opt --error-format <format>  Format for messages written to stderr: text or json (default: text). Unrecognized values fall back to text.
-  opt --server, -s <workspace>  Workspace to connect to: a name, a powerbi:// or asazure:// endpoint, or a local address
+  opt --server, -s <workspace>  Workspace or server to connect to: a workspace name, a powerbi:// or asazure:// endpoint, an Analysis Services server (host name, IP, host:port, host\instance, or connection string), or a local address
   opt --database, -d <name>  Name of the semantic model to use on the workspace
   opt --auth <method>  How to authenticate: auto, interactive, spn, or managed-identity (default: auto)
   opt --recent, --recents [<n>]  Pick a model from the recently used list: no value opens a picker, a number picks that entry (1 is the most recent)

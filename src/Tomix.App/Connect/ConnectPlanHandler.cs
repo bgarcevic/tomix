@@ -47,7 +47,7 @@ public sealed class ConnectPlanHandler
         if (r.Local &&
             string.IsNullOrWhiteSpace(r.Database) &&
             !LooksLikeLocalModelPath(r.Server) &&
-            !ModelReference.IsRemoteEndpoint(r.Server))
+            !IsServerTarget(r.Server))
         {
             r = r with { Database = r.Server, Server = null };
         }
@@ -58,7 +58,7 @@ public sealed class ConnectPlanHandler
         if (r.CanPrompt && !r.Local && !r.Remote)
         {
             var primaryIsLocalModel = !string.IsNullOrWhiteSpace(r.Server) &&
-                                      !ModelReference.IsRemoteEndpoint(r.Server) &&
+                                      !IsServerTarget(r.Server) &&
                                       LooksLikeLocalModelPath(r.Server);
 
             // Local model + valueless -w: pick the remote mirror workspace.
@@ -139,7 +139,7 @@ public sealed class ConnectPlanHandler
             return Outcome(r, reinterpreted, showCurrent: true);
         }
 
-        var isRemoteEndpoint = ModelReference.IsRemoteEndpoint(r.Server);
+        var isRemoteEndpoint = IsServerTarget(r.Server);
         var model = (!isRemoteEndpoint && LooksLikeLocalModelPath(r.Server)) ? Path.GetFullPath(r.Server!) : null;
         var remoteServer = model is null ? r.Server : null;
 
@@ -246,6 +246,11 @@ public sealed class ConnectPlanHandler
         var slug = new string(value.Trim().Select(ch => char.IsAsciiLetterOrDigit(ch) ? ch : '-').ToArray());
         return slug.Trim('-') is { Length: > 0 } s ? s : "workspace";
     }
+
+    // A remote endpoint, unless it names something on disk: server names are recognized
+    // lexically, and a model folder such as "Sales.v2" reads like a host name.
+    internal static bool IsServerTarget(string? value)
+        => ModelReference.IsRemoteEndpoint(value) && !Directory.Exists(value) && !File.Exists(value);
 
     internal static bool LooksLikeLocalModelPath(string? value)
         => !string.IsNullOrWhiteSpace(value) &&

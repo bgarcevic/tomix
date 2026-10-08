@@ -253,7 +253,7 @@ public static class TomModelDeployer
     /// makes redeploys fail, so they are stripped for cloud targets.</summary>
     private static bool IsCloudEndpoint(string server)
     {
-        var endpoint = ResolveEndpoint(server);
+        var endpoint = ModelReference.DataSourceOf(ResolveEndpoint(server));
         return endpoint.StartsWith("powerbi://", StringComparison.OrdinalIgnoreCase)
             || endpoint.StartsWith("asazure://", StringComparison.OrdinalIgnoreCase);
     }
@@ -264,16 +264,16 @@ public static class TomModelDeployer
         IAccessTokenProvider? tokenProvider,
         CancellationToken cancellationToken)
     {
-        if (!ModelReference.IsLocalInstanceEndpoint(endpoint))
+        if (ModelReference.RequiresAccessTokenFor(endpoint))
         {
             if (tokenProvider is null)
                 throw new AuthenticationRequiredException("Not authenticated. Run 'tx auth login'.");
 
-            var token = await tokenProvider.GetTokenAsync(endpoint, cancellationToken).ConfigureAwait(false);
+            var token = await tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(endpoint), cancellationToken).ConfigureAwait(false);
             server.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
             server.OnAccessTokenExpired = _ =>
             {
-                var refreshed = tokenProvider.GetTokenAsync(endpoint, cancellationToken)
+                var refreshed = tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(endpoint), cancellationToken)
                     .ConfigureAwait(false).GetAwaiter().GetResult();
                 return new AsAccessToken(refreshed.Token, refreshed.ExpiresOn.UtcDateTime);
             };
