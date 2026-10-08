@@ -92,6 +92,32 @@ do edit TMDL files directly, run `tx validate` afterwards.
 Stop and ask the user first when `tx` refuses a change and the only way forward is
 `--force`, `--allow-delete`, or `--no-fix-refs`.
 
+## Live sessions (`tx mcp`, `tx ui`)
+
+When the harness lists tomix MCP tools (`session_open`, `object_get`, `object_set`, ...),
+edit through them rather than through one-shot commands. Edits apply at once as undo
+steps and stay unsaved until `session_save`. If the person has the model open in `tx ui`,
+they see each edit as it happens.
+
+- Read with `object_get`, `object_find`, `model_tree` and `deps_get`. They see unsaved
+  edits, and a `cat` of the TMDL files doesn't.
+- Wrap related edits in `transaction_begin` (with a label) and `transaction_commit`, so
+  they undo as one step.
+- While a session is open, never edit its `.tmdl` or `.bim` files directly. It would save
+  over them.
+- Saving:
+  - For a TMDL folder or `.bim` file, call `session_save` when the task is done and
+    `dax_check` shows no new errors. Git and `session_undo` can take it back, and a
+    session that `tx mcp` holds on its own discards unsaved edits when it stops.
+  - For a server or Power BI Desktop model, ask the person before `session_save`.
+    It changes the live model, which has no git history.
+- On `TOMIX_SESSION_STALE`, the model changed outside the session. Tell the person,
+  and let them choose between reloading and overwriting.
+
+While `tx ui` holds a model, one-shot `tx add`, `set`, `mv`, `rm`, `get`, `ls`, `find`,
+`validate` and the other model commands run in its session instead of on the files.
+Their edits stay unsaved until `tx save`, and `--stage` is refused.
+
 ## Best Practice Analyzer
 
 ```bash

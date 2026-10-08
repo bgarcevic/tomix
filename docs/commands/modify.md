@@ -755,7 +755,9 @@ hint the CLI would print, so the agent can correct itself
 
 The server tells the agent how to work in the session: read with the tools,
 which see unsaved edits; group related edits in a transaction; never edit the
-model's files directly while the session is open; leave saving to you; and on
+model's files directly while the session is open; save a TMDL folder or `.bim`
+file when the task is done and checks pass, since git and undo can take it
+back, but ask you before saving to a server or Power BI Desktop; and on
 `TOMIX_SESSION_STALE`, ask you instead of choosing.
 
 ## Refresh policies

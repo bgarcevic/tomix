@@ -28,7 +28,8 @@ internal sealed class McpServer
         - Read with object_get, object_find, model_tree and deps_get; they see the session's unsaved edits. Object paths are slash-separated: 'Sales/Amount'.
         - Group related edits between transaction_begin (with a label) and transaction_commit, so the person can undo them as one step.
         - While the session is open, change the model only through these tools; never edit its .tmdl or .bim files directly.
-        - Leave saving to the person unless they ask you to save.
+        - Save a TMDL folder or .bim file with session_save when the task is done and dax_check reports no new errors; git and undo can take it back. A session tx mcp holds on its own discards unsaved edits when it stops.
+        - A server or Power BI Desktop model has no git history: ask the person before session_save.
         - When a call fails with TOMIX_SESSION_STALE, the model changed outside the session: tell the person and let them decide.
         """;
 

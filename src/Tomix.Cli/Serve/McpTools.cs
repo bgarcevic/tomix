@@ -113,7 +113,7 @@ internal static class McpTools
             "Reapply the last undone change.",
             Schema: Schema()),
         new("session_save", "session.save", Kind.Change,
-            "Write the session's changes to the model's files or server. Save only when the person asks you to.",
+            "Write the session's changes to the model's files or server. Ask the person before saving to a server or Power BI Desktop.",
             Schema: Schema()),
     ];
 

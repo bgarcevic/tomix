@@ -18,13 +18,16 @@ and the API surface that major versions protect.
   `transaction_begin`/`transaction_commit` group several under a label. When `tx ui` holds the
   model, `tx mcp` joins that session, so you watch, undo and save the agent's work in the page.
   Every tool says whether it writes (`readOnlyHint`, `destructiveHint`), and `--read-only` lists
-  only the ones that change nothing (#354).
+  only the ones that change nothing (#354). The server tells the agent to save a TMDL folder or
+  `.bim` file once its checks pass, and to ask before saving to a server or Power BI Desktop.
 - `tx skills install`, `status`, and `uninstall` install the tomix agent skill for Claude Code
   (`.claude/skills/tomix`) and Codex and other Agent Skills harnesses (`.agents/skills/tomix`),
   in the repository or with `--user` in your home folder. The skill ships inside the binary, so it
   matches the installed `tx`. `status` reports copies from another version as outdated, and copies
   that were edited or not written by tx are left alone unless you pass `--force`
-  (`TOMIX_SKILL_CONFLICT`). A new guide, "Using tomix from your agent", covers setup.
+  (`TOMIX_SKILL_CONFLICT`). The skill covers live sessions too: edit through the `tx mcp` tools
+  rather than the files while a session is open. A new guide, "Using tomix from your agent",
+  covers setup, including watching an agent's edits in `tx ui` (#404).
 - A client of a live session (`tx serve`, `tx ui`) can ask in `initialize` for
   `capabilities.diagnostics`. The host then recomputes dependencies, DAX diagnostics and,
   with `{ "bpa": true }`, BPA findings 250 ms after the last change and sends

@@ -747,7 +747,7 @@
   },
   {
     "name": "session_save",
-    "description": "Write the session's changes to the model's files or server. Save only when the person asks you to.",
+    "description": "Write the session's changes to the model's files or server. Ask the person before saving to a server or Power BI Desktop.",
     "inputSchema": {
       "type": "object",
       "properties": {},

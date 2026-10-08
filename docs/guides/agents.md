@@ -73,6 +73,22 @@ The agent should list measures with `tx get`, propose `tx set ... --set formatSt
 commands, show you the previews, and only run them with `--save` once you agree.
 Then it should run `tx validate`.
 
+## Watch the agent work: `tx mcp` and `tx ui`
+
+To see each edit as the agent makes it, and undo any of them, give the agent a live
+session as MCP tools and open the same model in `tx ui`:
+
+```sh
+claude mcp add tomix -- tx mcp          # Claude Code; other harnesses run `tx mcp` from their MCP config
+tx ui "./samples/Revenue Opportunities.SemanticModel" --open
+```
+
+The agent's edits appear in the page as undo steps. They reach the files when the agent
+or you save. The skill tells the agent to save a TMDL folder or `.bim` file itself once
+its checks pass, since git and undo can take it back, and to ask you before saving to a
+server or Power BI Desktop. See [`mcp`](../commands/modify.md#mcp-give-ai-agents-a-session-as-tools)
+for the tools and options.
+
 ## What the skill tells the agent
 
 - Use `--output-format json` when it needs exact values or parses output, and plain text
@@ -84,6 +100,8 @@ Then it should run `tx validate`.
 - Ask before using `--force`, `--allow-delete`, or `--no-fix-refs`, before ignoring BPA
   rules, and before `deploy` or `refresh` with `--yes`.
 - Use `-m <path>` in scripts and CI instead of a saved connection.
+- In a live session (`tx mcp` tools, or a model open in `tx ui`), edit through the session and
+  never the files. Save file models when done, and ask before saving to a server.
 
 The skill's [CI reference](https://github.com/bgarcevic/tomix-cli/blob/main/skills/tomix/references/ci.md)
 has GitHub Actions workflows for pull-request checks and deploying after merge.
