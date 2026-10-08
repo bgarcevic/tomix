@@ -110,6 +110,13 @@ drift apart silently. Anything that creates files must clean up after itself.
 A class-scoped `Directory.CreateTempSubdirectory(...)` field deleted in `Dispose` is also fine when
 every test in the class shares one directory; reach for `TempDir` when the directory is per-test.
 
+### Performance benchmark
+
+`Tomix.Cli.Tests/Performance/LiveSessionBenchmarkTests` times the live session on a generated
+large model against the budgets in `docs/design/adr-0004-live-session-performance-budgets.md`.
+It is a `[PerfFact]`, skipped unless `TOMIX_PERF=1`, so it never runs in the default suite or CI.
+Run it in Release on a quiet machine, using the command in that ADR.
+
 ### Contract, snapshot, and drift-guard tests
 
 Some tests exist to fail loudly when a public surface moves; do not weaken them to make a change

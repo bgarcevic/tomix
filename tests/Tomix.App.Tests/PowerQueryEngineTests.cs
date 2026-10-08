@@ -182,10 +182,15 @@ public sealed class PowerQueryEngineTests(PowerQueryEngineTests.SharedEngine sha
     [Fact]
     public async Task Format_CancelledMidCall_RethrowsAndTheEngineRecovers()
     {
-        using var engine = new PowerQueryEngine();
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        using var cts = new CancellationTokenSource();
+        // Cancellation lands while the bundle is being evaluated: the loader cancels just before
+        // returning it, so the outcome does not depend on how fast the runner is.
+        using var engine = new PowerQueryEngine(() =>
+        {
+            cts.Cancel();
+            return PowerQueryEngineBundle.Load();
+        });
 
-        // Cancellation lands while the bundle is being evaluated.
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => engine.FormatAsync("let x = 1 in x", Options(40), cts.Token));
 
