@@ -143,6 +143,14 @@ public sealed class DiffModelHandler
         => obj.Kind is ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
            && obj.Property(PropertyBagKeys.ColumnType) == "CalculatedTableColumn";
 
+    /// <summary>
+    /// A calculated column authored without a dataType loads as <c>unknown</c> until the engine
+    /// evaluates its expression; its Detail reads <c>unknown, calculated</c>.
+    /// </summary>
+    private static bool HasUninferredType(ModelObject obj)
+        => obj.Kind == ModelObjectKind.CalculatedColumn
+           && ModelPropertyCatalog.NormalizeDataType(obj.Detail?.Split(',')[0]) == "";
+
     private static IEnumerable<DiffChange> CompareProperties(
         ModelObject left, ModelObject right, bool ignoreEngineComputedState)
     {
@@ -168,8 +176,12 @@ public sealed class DiffModelHandler
         yield return ("Name", left.Name, right.Name);
         yield return ("Kind", ModelObjectProjection.KindLabel(left.Kind), ModelObjectProjection.KindLabel(right.Kind));
         // A column's Detail carries its data type. For calculated-table columns on both sides,
-        // that type comes from evaluating the table expression and is not an authored change.
-        if (!ignoreEngineComputedState || !IsEngineMaterialized(left) || !IsEngineMaterialized(right))
+        // that type comes from evaluating the table expression, and a calculated column whose
+        // source carries no dataType gets one when the engine evaluates its expression. Against a
+        // live database, neither is an authored change.
+        if (!ignoreEngineComputedState
+            || ((!IsEngineMaterialized(left) || !IsEngineMaterialized(right))
+                && !HasUninferredType(left) && !HasUninferredType(right)))
             yield return ("Detail", left.Detail, right.Detail);
         yield return ("Expression", NormalizeExpression(left.Expression), NormalizeExpression(right.Expression));
         yield return ("Description", left.Description, right.Description);

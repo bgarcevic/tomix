@@ -83,24 +83,6 @@ internal sealed class DiffCommand : ICommandModule
         AnsiConsole.WriteLine();
 
         foreach (var change in result.Changes)
-            RenderChange(change);
-    }
-
-    private static void RenderChange(DiffChange change)
-    {
-        switch (change.Action)
-        {
-            case "added":
-                AnsiConsole.MarkupLine($"  {Styling.Success("+")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                break;
-            case "removed":
-                AnsiConsole.MarkupLine($"  {Styling.Error("-")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                break;
-            case "modified":
-                AnsiConsole.MarkupLine($"  {Styling.Warning("~")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                AnsiConsole.MarkupLine($"    {Styling.Error($"- {change.OldValue}")}");
-                AnsiConsole.MarkupLine($"    {Styling.Success($"+ {change.NewValue}")}");
-                break;
-        }
+            DiffChangeRenderer.Render(change);
     }
 }

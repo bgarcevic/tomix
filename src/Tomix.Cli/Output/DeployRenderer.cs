@@ -43,7 +43,7 @@ internal static class DeployRenderer
                 AnsiConsole.WriteLine();
 
                 foreach (var change in result.Diff.Changes)
-                    RenderDiffChange(change);
+                    DiffChangeRenderer.Render(change);
             }
             else if (result.DiffError is not null)
             {
@@ -57,26 +57,5 @@ internal static class DeployRenderer
             $"Deploying {modelName} to {result.Server} / {result.Database}..."));
         AnsiConsole.MarkupLine(Styling.Success(
             $"Deployed: {result.Status} ({result.DurationMs}ms)"));
-    }
-
-    private static void RenderDiffChange(DiffChange change)
-    {
-        switch (change.Action)
-        {
-            case "added":
-                AnsiConsole.MarkupLine(
-                    $"  {Styling.Success("+")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                break;
-            case "removed":
-                AnsiConsole.MarkupLine(
-                    $"  {Styling.Error("-")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                break;
-            case "modified":
-                AnsiConsole.MarkupLine(
-                    $"  {Styling.Warning("~")} {Styling.MarkupEscape(change.ObjectType)} {Styling.Path(change.Path)}");
-                AnsiConsole.MarkupLine($"    {Styling.Error($"- {change.OldValue}")}");
-                AnsiConsole.MarkupLine($"    {Styling.Success($"+ {change.NewValue}")}");
-                break;
-        }
     }
 }

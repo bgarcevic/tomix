@@ -247,6 +247,49 @@ public sealed class DiffModelHandlerTests
         Assert.Equal("double", change.NewValue);
     }
 
+    /// <summary>
+    /// A calculated column authored without a dataType (as Power BI Desktop writes one) loads as
+    /// "unknown" until the engine evaluates it; a deployed copy carries the inferred type.
+    /// </summary>
+    [Theory]
+    [InlineData("unknown, calculated", "datetime, calculated", true, false)]
+    [InlineData("datetime, calculated", "unknown, calculated", true, false)]
+    [InlineData("unknown, calculated", "datetime, calculated", false, true)]
+    [InlineData("int64, calculated", "datetime, calculated", true, true)]
+    public async Task HandleAsync_CalculatedColumnTypeChange_IgnoredOnlyWhileUninferredAgainstLiveTarget(
+        string leftDetail, string rightDetail, bool liveTarget, bool reported)
+    {
+        var left = CalculatedColumnSnapshot(leftDetail);
+        var right = CalculatedColumnSnapshot(rightDetail);
+
+        var changes = liveTarget
+            ? await DiffAgainstLiveTarget(left, right)
+            : await Diff(left, right);
+
+        if (!reported)
+            Assert.Empty(changes);
+        else
+        {
+            var change = Assert.Single(changes);
+            Assert.Equal("CalculatedColumn/Sales/Date", change.ObjectType);
+            Assert.Equal("Detail", change.Path);
+        }
+    }
+
+    private static ModelSnapshot CalculatedColumnSnapshot(string detail)
+    {
+        var column = new ModelObject(
+            "Date", ModelObjectKind.CalculatedColumn, "Sales/Date",
+            Detail: detail, Expression: "DATE(2026, 1, 1)", Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+        var sales = new ModelObject(
+            "Sales", ModelObjectKind.Table, "Sales",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [column]);
+
+        return new ModelSnapshot("stub", 1601, [sales]);
+    }
+
     private static ModelSnapshot CalcTableSnapshot(
         bool withEngineColumns,
         bool engineColumnHidden = false,

@@ -10,6 +10,16 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Fixed
+
+- The `tx deploy` preview no longer reports a calculated column as modified when its source
+  has no `dataType` (as Power BI Desktop writes it) and the deployed model holds the type the
+  engine inferred, for example `datetime, calculated` to `unknown, calculated`.
+- A modified object in `tx diff` and the `tx deploy` preview now prints as
+  `~ CalculatedColumn Calculations/Date: DataType`, so the changed property no longer reads as
+  part of the object's name (`Calculations/Date Detail`). A column's type change is labelled
+  `DataType` in text output; JSON keeps `Detail`.
+
 ## [0.10.0] - 2026-10-08
 
 ### Added

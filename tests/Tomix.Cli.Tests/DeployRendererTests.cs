@@ -44,15 +44,29 @@ public sealed class DeployRendererTests
             [
                 new DiffChange("added", "Measure", "Sales/Total Sales"),
                 new DiffChange("removed", "Table", "Sales"),
-                new DiffChange("modified", "Partition", "Sales/Fact", "2024", "Fact")
+                new DiffChange("modified", "Partition/Sales/Fact", "Name", "2024", "Fact")
             ])));
 
         Assert.Contains("1 added, 1 removed, 1 modified", output);
         Assert.Contains("+ Measure Sales/Total Sales", output);
         Assert.Contains("- Table Sales", output);
-        Assert.Contains("~ Partition Sales/Fact", output);
+        Assert.Contains("~ Partition Sales/Fact: Name", output);
         Assert.Contains("- 2024", output);
         Assert.Contains("+ Fact", output);
+    }
+
+    [Theory]
+    [InlineData("CalculatedColumn/Sales/Date", "~ CalculatedColumn Sales/Date: DataType")]
+    [InlineData("Column/Sales/Amount", "~ Column Sales/Amount: DataType")]
+    [InlineData("Partition/Sales/Fact", "~ Partition Sales/Fact: Detail")]
+    public void ModifiedColumnDetail_IsLabelledDataType(string objectType, string expected)
+    {
+        var output = Render(Preview(diff: new DiffModelResult(
+            HasChanges: true,
+            Summary: new DiffSummary(Added: 0, Removed: 0, Modified: 1),
+            Changes: [new DiffChange("modified", objectType, "Detail", "datetime", "int64")])));
+
+        Assert.Contains(expected, output);
     }
 
     [Fact]
