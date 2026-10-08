@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-08
+
 ### Added
 
 - `tx mcp` serves a model session to AI agents (Claude Code, Codex, Cursor and others) as Model
@@ -1223,7 +1225,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.6.0...v0.7.0
