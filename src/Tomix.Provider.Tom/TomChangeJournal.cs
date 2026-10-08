@@ -34,6 +34,10 @@ internal sealed class TomChangeJournal
     private readonly TomCheckpointRestore _restore;
     private readonly List<TomJournalEntry> _entries = [];
     private readonly Stack<Frame> _frames = new();
+    // A checkpoint of the model as it is now, taken ahead of the next write (#423). Any write
+    // or restore makes it stale, so it is dropped then; a checkpoint is never mutated, so the
+    // same one can serve as a transaction's start and an undo's redo step.
+    private TomCheckpoint? _spare;
 
     public TomChangeJournal(Database database, TomCheckpointRestore? restore = null)
     {
@@ -85,13 +89,29 @@ internal sealed class TomChangeJournal
         return changes;
     }
 
+    /// <summary>True when a checkpoint of the model as it is now is ready, so the next
+    /// transaction's first write and the next <see cref="Capture"/> take no copy.</summary>
+    public bool HasSpareCheckpoint => _spare is not null;
+
     /// <summary>A checkpoint of the model as it is now, outside any transaction: the redo step
     /// an undo keeps.</summary>
     public TomCheckpoint Capture()
     {
         RequireNoTransaction();
-        return TakeCheckpoint();
+        return _spare ??= TakeCheckpoint();
     }
+
+    /// <summary>Takes the checkpoint the next write would take, outside any transaction, so
+    /// the write does not wait for it (#423). Does nothing when one is ready.</summary>
+    public void PrepareCheckpoint()
+    {
+        RequireNoTransaction();
+        _spare ??= TakeCheckpoint();
+    }
+
+    /// <summary>Drops the ready checkpoint: the model changed in a way the journal does not
+    /// record, such as a save that updates it from the server.</summary>
+    public void DiscardSpareCheckpoint() => _spare = null;
 
     /// <summary>Puts <paramref name="checkpoint"/> back outside any transaction: an undo or redo.
     /// The checkpoint stays unchanged, so it can be restored again.</summary>
@@ -124,6 +144,7 @@ internal sealed class TomChangeJournal
 
         Database = database;
         Ids.Reset(ids);
+        _spare = null;
     }
 
     /// <summary>Rolls back the innermost transaction: restores the model and IDs to where they
@@ -155,11 +176,13 @@ internal sealed class TomChangeJournal
             // Every frame without a checkpoint has seen no write since it began, so the current
             // state is its starting state and one copy serves them all. A restore never mutates
             // a checkpoint, so sharing it is safe.
-            var checkpoint = TakeCheckpoint();
+            var checkpoint = _spare ?? TakeCheckpoint();
             foreach (var frame in _frames.Where(f => f.Checkpoint is null))
                 frame.Checkpoint = checkpoint;
         }
 
+        // The write about to run makes the spare stale.
+        _spare = null;
         return owner;
     }
 
@@ -255,6 +278,8 @@ internal sealed class TomChangeJournal
         }
 
         Ids.Reset(ids);
+        // The model now holds what the checkpoint holds, so the next write can start from it.
+        _spare = checkpoint;
     }
 
     /// <summary>The provider-neutral text of a value: object references by path or name.</summary>

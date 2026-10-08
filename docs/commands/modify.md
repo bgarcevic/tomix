@@ -525,7 +525,7 @@ Inside a session these commands also work:
 | `exit`, `quit` | Leave the session. |
 | `help` | List the commands that work in the session. |
 
-The session keeps the last 50 undo steps. A command that fails changes nothing.
+The session keeps the last 50 undo steps, or fewer on a large model, so that the undo history stays near 250 MB. A command that fails changes nothing.
 
 **Files changed outside the session.** The session watches the model's files.
 When something else changes them (a `git checkout`, a pull, another editor),

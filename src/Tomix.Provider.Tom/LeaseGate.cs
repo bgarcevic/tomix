@@ -9,7 +9,28 @@ internal sealed class LeaseGate
 {
     private readonly object _lock = new();
     private readonly LinkedList<TaskCompletionSource> _waiters = new();
+    private readonly Queue<TaskCompletionSource> _idle = new();
     private bool _held;
+
+    /// <summary>
+    /// Waits for the gate behind every waiter of <see cref="WaitAsync"/>, including those that
+    /// ask later: background work that must not delay a request (#423). Not cancellable.
+    /// </summary>
+    public Task WaitIdleAsync()
+    {
+        lock (_lock)
+        {
+            if (!_held)
+            {
+                _held = true;
+                return Task.CompletedTask;
+            }
+
+            var waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _idle.Enqueue(waiter);
+            return waiter.Task;
+        }
+    }
 
     public Task WaitAsync(CancellationToken cancellationToken)
     {
@@ -58,6 +79,10 @@ internal sealed class LeaseGate
             {
                 _waiters.RemoveFirst();
                 next.Value.SetResult();
+            }
+            else if (_idle.TryDequeue(out var idle))
+            {
+                idle.SetResult();
             }
             else
             {

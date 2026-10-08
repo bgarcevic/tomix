@@ -21,8 +21,13 @@ namespace Tomix.Provider.Tom;
 public sealed class TomLiveModelSession : ILiveModelSession
 {
     /// <summary>Undo steps kept by default. Each holds a full copy of the model (ADR 0003 §3),
-    /// so memory grows with model size times this number.</summary>
+    /// so on a large model <see cref="DefaultUndoObjectLimit"/> keeps fewer.</summary>
     public const int DefaultUndoLimit = 50;
+
+    /// <summary>Objects the undo steps may hold in all by default (#423). A checkpoint costs
+    /// about 2.5 KB per object, so this keeps the undo memory near 250 MB: 50 steps of a model
+    /// with up to 2,000 objects, and fewer steps of a larger one.</summary>
+    public const int DefaultUndoObjectLimit = 100_000;
 
     /// <summary>How long an explicit transaction may sit with no lease in it before it is
     /// rolled back, so a client that went away cannot hold the model forever.</summary>
@@ -49,6 +54,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
     private bool _closed;
     private int _closing;
     private int _transactions;
+    private int _preparing;
     private SessionState _state = SessionState.Clean;
     private LiveModelSnapshot? _snapshot;
     // The source as the session last opened, reloaded or saved it, and whether it now differs.
@@ -81,6 +87,14 @@ public sealed class TomLiveModelSession : ILiveModelSession
 
     /// <summary>How many undo steps to keep; the oldest is dropped past it.</summary>
     internal int UndoLimit { get; init; } = DefaultUndoLimit;
+
+    /// <summary>Objects the undo steps may hold in all, counted as the objects of each step's
+    /// checkpoint; the oldest steps are dropped past it, keeping at least one.</summary>
+    internal int UndoObjectLimit { get; init; } = DefaultUndoObjectLimit;
+
+    /// <summary>Whether the next checkpoint is taken in the background once the session is
+    /// idle, so an edit does not wait for it (#423).</summary>
+    internal bool PrepareCheckpoints { get; init; } = true;
 
     /// <summary>Idle time after which an explicit transaction is rolled back;
     /// <see cref="Timeout.InfiniteTimeSpan"/> never rolls it back.</summary>
@@ -251,6 +265,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
         }
         finally
         {
+            PrepareCheckpointWhenIdle();
             _gate.Release();
         }
     }
@@ -334,6 +349,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
                 }
 
                 var result = await _source.SaveAsync(Journal.Database, outputPath, serialization, overwrite, cancellationToken).ConfigureAwait(false);
+                // A server save updates the model from the server, which the journal does not see.
+                Journal.DiscardSpareCheckpoint();
                 lease.Root.EntriesAtSave = Journal.Entries.Count;
                 _baseline = SourceFingerprint();
                 lock (_sync)
@@ -390,6 +407,7 @@ public sealed class TomLiveModelSession : ILiveModelSession
             }
             finally
             {
+                Journal.DiscardSpareCheckpoint();
                 if (unchanged)
                     _baseline = SourceFingerprint();
             }
@@ -605,9 +623,8 @@ public sealed class TomLiveModelSession : ILiveModelSession
                     var previous = _content;
                     _content = new object();
                     _undo.AddLast(new UndoStep(before!, previous, _content, changes, lease.Transaction, lease.Options));
-                    while (_undo.Count > UndoLimit)
-                        _undo.RemoveFirst();
                     _redo.Clear();
+                    TrimUndo();
                 }
 
                 if (lease.EntriesAtSave is { } atSave)
@@ -703,6 +720,56 @@ public sealed class TomLiveModelSession : ILiveModelSession
             lease.Turns!.Release();
         }
 
+        PrepareCheckpointWhenIdle();
+        _gate.Release();
+    }
+
+    /// <summary>Drops the oldest undo steps past <see cref="UndoLimit"/> and
+    /// <see cref="UndoObjectLimit"/>, keeping the latest one. Callers hold <c>_sync</c>.</summary>
+    private void TrimUndo()
+    {
+        var objects = _undo.Sum(step => step.Objects);
+        while (_undo.Count > UndoLimit || (_undo.Count > 1 && objects > UndoObjectLimit))
+        {
+            objects -= _undo.First!.Value.Objects;
+            _undo.RemoveFirst();
+        }
+    }
+
+    /// <summary>
+    /// Takes the next transaction's checkpoint once no request waits for the gate, so the next
+    /// edit finds it ready (#423). Callers hold the gate. A request that arrives while it is
+    /// being taken waits for it, as it would have waited to take it itself.
+    /// </summary>
+    private void PrepareCheckpointWhenIdle()
+    {
+        if (!PrepareCheckpoints || _closed || Journal.Depth > 0 || Journal.HasSpareCheckpoint
+            || Interlocked.Exchange(ref _preparing, 1) == 1)
+            return;
+
+        _ = PrepareCheckpointAsync();
+    }
+
+    private async Task PrepareCheckpointAsync()
+    {
+        await _gate.WaitIdleAsync().ConfigureAwait(false);
+        try
+        {
+            Volatile.Write(ref _preparing, 0);
+            // A failed copy is not reported here: the next write takes the checkpoint itself and fails there.
+            if (!_closed && Journal.Depth == 0)
+                Journal.PrepareCheckpoint();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Completes once the gate has served every request and background task queued before it.</summary>
+    internal async Task WhenIdleAsync()
+    {
+        await _gate.WaitIdleAsync().ConfigureAwait(false);
         _gate.Release();
     }
 
@@ -865,6 +932,9 @@ public sealed class TomLiveModelSession : ILiveModelSession
         public object AfterContent { get; } = afterContent;
 
         public IReadOnlyList<ModelChange> Changes { get; } = changes;
+
+        /// <summary>The objects of the step's checkpoint: its share of the undo memory.</summary>
+        public int Objects => Before.Ids.Count;
 
         public LiveHistoryStep ToHistory(bool undone) => new(transaction, options.Label, options.Client, Changes, undone);
     }

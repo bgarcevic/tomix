@@ -10,6 +10,15 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed
+
+- Edits and undo in a live session (`tx shell`, `tx serve`, `tx mcp`, `tx ui`) are faster on
+  large models: the session copies the model for the next undo step in the background after
+  each edit instead of during it. On a model with 1,000 measures an edit drops from about
+  100 ms to about 50 ms and undo from about 55 ms to about 30 ms (#423).
+- The undo history of a live session is capped by model size as well as by count, so a large
+  model keeps fewer than 50 steps and the session's memory stays near 250 MB (#423).
+
 ### Fixed
 
 - Reference tracking (`deps`, `validate`, rename and remove guards, BPA) now reads DAX with the

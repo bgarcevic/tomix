@@ -253,6 +253,70 @@ public sealed class TomLiveModelSessionUndoTests
     }
 
     [Fact]
+    public async Task TheUndoObjectLimit_KeepsOnlyTheLatestStepWhenOneStepExceedsIt()
+    {
+        await using var session = OpenRich(undoObjectLimit: 1);
+        for (var i = 1; i <= 3; i++)
+        {
+            var value = i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await Apply(session, m => m.SetProperty(Set("Sales/Revenue", "expression", value)));
+        }
+
+        Assert.NotNull(await session.UndoAsync("shell", None));
+        Assert.Null(await session.UndoAsync("shell", None));
+        Assert.Equal("2", await Expression(session, "Sales/Revenue"));
+    }
+
+    [Fact]
+    public async Task AnEditAfterTheSessionIdles_StartsFromTheCheckpointTakenAhead()
+    {
+        await using var session = (TomLiveModelSession)OpenRich();
+        var original = Tmdl(session);
+        await Apply(session, m => m.SetProperty(Set("Sales/Revenue", "expression", "1")));
+        var first = Tmdl(session);
+
+        await session.WhenIdleAsync();
+        Assert.True(session.Journal.HasSpareCheckpoint);
+        await Apply(session, m => m.RemoveObject(Remove("Customer")));
+        Assert.False(session.Journal.HasSpareCheckpoint);
+        var second = Tmdl(session);
+
+        await session.UndoAsync("shell", None);
+        Assert.Equal(first, Tmdl(session));
+        await session.UndoAsync("shell", None);
+        Assert.Equal(original, Tmdl(session));
+        await session.RedoAsync("shell", None);
+        await session.RedoAsync("shell", None);
+        Assert.Equal(second, Tmdl(session));
+    }
+
+    [Fact]
+    public async Task AWriteAfterARolledBackSavepoint_DropsTheCheckpointTheRollbackLeft()
+    {
+        // No background checkpoints: the next edit starts from whatever the journal kept.
+        await using var session = OpenRich(prepareCheckpoints: false);
+        await using (var outer = await session.LeaseAsync(Shell, None))
+        {
+            var model = (IModelMutationSession)outer.Session;
+            model.SetProperty(Set("Sales/Revenue", "expression", "1"));
+            await using (var inner = await session.LeaseAsync(Shell, None))
+            {
+                ((IModelMutationSession)inner.Session).SetProperty(Set("Sales/Revenue", "expression", "2"));
+                await inner.RollbackAsync(None);
+            }
+
+            // Written in the outer transaction, which already has its checkpoint.
+            model.SetProperty(Set("Sales/Revenue", "expression", "3"));
+            await outer.CommitAsync(None);
+        }
+
+        await Apply(session, m => m.SetProperty(Set("Sales/Revenue", "expression", "4")));
+        await session.UndoAsync("shell", None);
+
+        Assert.Equal("3", await Expression(session, "Sales/Revenue"));
+    }
+
+    [Fact]
     public async Task UndoInsideALease_Throws()
     {
         await using var session = OpenRich();
@@ -373,12 +437,15 @@ public sealed class TomLiveModelSessionUndoTests
         await Assert.ThrowsAsync<ObjectDisposedException>(() => transaction.CommitAsync(None));
     }
 
-    private static ILiveModelSession OpenRich(int undoLimit = TomLiveModelSession.DefaultUndoLimit, TimeSpan? idleTimeout = null)
+    private static ILiveModelSession OpenRich(int undoLimit = TomLiveModelSession.DefaultUndoLimit, TimeSpan? idleTimeout = null,
+        int undoObjectLimit = TomLiveModelSession.DefaultUndoObjectLimit, bool prepareCheckpoints = true)
     {
         var folder = Path.Combine(Path.GetTempPath(), "tomix-rich-unused");
         return new TomLiveModelSession(TomModelSource.File(new ModelReference(folder), folder, "tmdl", _ => JournalFixture.Rich(), null))
         {
             UndoLimit = undoLimit,
+            UndoObjectLimit = undoObjectLimit,
+            PrepareCheckpoints = prepareCheckpoints,
             TransactionIdleTimeout = idleTimeout ?? Timeout.InfiniteTimeSpan
         };
     }
