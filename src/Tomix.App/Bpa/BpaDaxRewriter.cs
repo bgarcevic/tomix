@@ -1,6 +1,7 @@
 using System.Text;
 using Tomix.App.Dax;
 using Tomix.App.Mutations;
+using Tomix.Core.Dax;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Bpa;
@@ -46,7 +47,9 @@ internal static class BpaDaxRewriter
         // A string literal can name a query-scoped column (ADDCOLUMNS(..., "Amount", ...)) that a
         // bracketed [Amount] then resolves to; re-qualifying such a reference would change what it
         // means, so any name that also appears as a literal is left for a human to decide.
-        var literals = new HashSet<string>(DaxTokenizer.StringLiterals(expression), StringComparer.OrdinalIgnoreCase);
+        var literals = new HashSet<string>(
+            DaxLexicalTokens.Read(expression).Where(t => t.Kind == DaxLexemeKind.String).Select(t => t.Name),
+            StringComparer.OrdinalIgnoreCase);
         var edits = new List<(int Start, int End, string Text)>();
         var errors = new List<string>();
 

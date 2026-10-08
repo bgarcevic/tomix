@@ -85,7 +85,7 @@ Application use cases and command handlers.
   A validate issue is raised only through its rule (`ValidationRule.Issue`), so the rule owns the
   code and severity; a new rule goes in that catalog and in `docs/error-codes.md` (pinned by
   `RuleDefinitionTests`). `Dax/` is the model-aware DAX analysis those rules build on
-  (sites, tokenizer, reference extraction), not a rule engine of its own.
+  (sites, reference extraction over Core's `DaxLexicalTokens`), not a rule engine of its own.
 - The user-facing agent skill lives in `/skills/tomix` and is embedded in this assembly
   (`Skills/SkillBundle`); edit it there, never in an installed copy. `Skills/SkillsHandler` installs
   it and stamps `SKILL.md` frontmatter with `metadata.tomix-version` and `metadata.tomix-hash`, so the

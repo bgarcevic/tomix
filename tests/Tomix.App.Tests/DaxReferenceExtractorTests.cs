@@ -236,6 +236,38 @@ public sealed class DaxReferenceExtractorTests
         Assert.Empty(DaxReferenceExtractor.Extract("Local.AddTax(1)"));
     }
 
+    [Theory]
+    [InlineData("dt\"2024-01-01\"")]
+    [InlineData("@Risk + 1")]
+    [InlineData("Sales[E] + 1.5E+10")]
+    public void Literals_AndQueryParameters_ShedNoCandidates(string expression)
+    {
+        var references = DaxReferenceExtractor.Extract(expression);
+
+        Assert.DoesNotContain(references, r => r.Shape == DaxReferenceShape.TableCandidate);
+    }
+
+    [Fact]
+    public void DottedWord_WithoutCall_IsOneCandidate()
+    {
+        var reference = Assert.Single(DaxReferenceExtractor.Extract("Ns.Name + 1"));
+
+        Assert.Equal(DaxReferenceShape.TableCandidate, reference.Shape);
+        Assert.Equal("Ns.Name", reference.Table);
+    }
+
+    [Theory]
+    [InlineData("sum(1)", "sum")]
+    [InlineData("norm.dist ( 1 )", "norm.dist")]
+    [InlineData("Local.Fin.AddTax ( 1 )", "Local.Fin.AddTax")]
+    public void FunctionCalls_KeepTheNameAsWritten(string expression, string name)
+    {
+        var reference = Assert.Single(DaxReferenceExtractor.Extract(expression, includeFunctionCalls: true));
+
+        Assert.Equal(name, reference.Object);
+        AssertSpan(name, expression, reference);
+    }
+
     private static void AssertSpan(
         string expected, string expression, DaxReferenceExtractor.DaxReference reference)
         => Assert.Equal(expected, expression[reference.Start..(reference.End + 1)]);

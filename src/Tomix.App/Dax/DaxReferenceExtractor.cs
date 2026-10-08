@@ -1,3 +1,5 @@
+using Tomix.Core.Dax;
+
 namespace Tomix.App.Dax;
 
 /// <summary>How a reference is written in the expression, which decides how it can be resolved.</summary>
@@ -31,8 +33,10 @@ public enum DaxReferenceShape
 /// Extracts column/measure/table references from a DAX expression, with the exact character span
 /// each reference occupies so a rename can splice-rewrite it in place. Shared by dependency
 /// analysis (<c>deps</c>) and the rename reference check so the recognition lives in one place.
-/// Lexer-based (see <see cref="DaxTokenizer"/>): references inside string literals and comments
-/// are never reported, and escaped names (<c>''</c>/<c>]]</c>) are unescaped.
+/// A token-pattern pass over the DAX engine's lexer (<see cref="DaxLexicalTokens"/>): references
+/// inside string literals and comments are never reported, and escaped names (<c>''</c>/<c>]]</c>)
+/// are unescaped. It is not a parser; grammar-level analysis is out of scope (same design as
+/// Tabular Editor's lexer-only FormulaFixup).
 /// </summary>
 public static class DaxReferenceExtractor
 {
@@ -58,7 +62,7 @@ public static class DaxReferenceExtractor
         if (string.IsNullOrWhiteSpace(expression))
             return [];
 
-        var tokens = DaxTokenizer.Tokenize(expression);
+        var tokens = DaxLexicalTokens.Read(expression);
         var variables = DeclaredVariables(tokens);
         var references = new List<DaxReference>();
 
@@ -67,54 +71,53 @@ public static class DaxReferenceExtractor
             var token = tokens[i];
             var next = i + 1 < tokens.Count ? tokens[i + 1] : default;
 
-            // A word followed by '(' is a function, never a table.
-            if (token.Kind == DaxTokenKind.Identifier && FunctionCallEnd(tokens, i) is { } last)
+            // A word followed by '(' is a function, never a table. The lexer keeps an unbroken
+            // dotted chain (Local.AddTax, NORM.DIST) as one identifier, so the name is whole.
+            if (token.Kind == DaxLexemeKind.Identifier && next.Kind == DaxLexemeKind.OpenParenthesis)
             {
                 if (includeFunctionCalls)
                     references.Add(new DaxReference(
-                        DaxReferenceShape.FunctionCall, null, FunctionName(tokens, i, last),
-                        token.Start, tokens[last].End));
-                i = last;
+                        DaxReferenceShape.FunctionCall, null, token.Name, token.Start, token.End));
                 continue;
             }
 
             switch (token.Kind)
             {
-                case DaxTokenKind.QuotedTable when next.Kind == DaxTokenKind.BracketName:
+                case DaxLexemeKind.QuotedTable when next.Kind == DaxLexemeKind.ColumnReference:
                     references.Add(new DaxReference(
-                        DaxReferenceShape.Qualified, token.Text, next.Text, token.Start, next.End));
+                        DaxReferenceShape.Qualified, token.Name, next.Name, token.Start, next.End));
                     i++;
                     break;
 
-                case DaxTokenKind.QuotedTable:
+                case DaxLexemeKind.QuotedTable:
                     references.Add(new DaxReference(
-                        DaxReferenceShape.Table, token.Text, null, token.Start, token.End));
+                        DaxReferenceShape.Table, token.Name, null, token.Start, token.End));
                     break;
 
                 // Keywords and VAR names never qualify a bracket ("RETURN [Total]" is the keyword
                 // followed by an unqualified measure, not table "RETURN"); reserved words must be
                 // quoted to name a table. On a failed guard the identifier falls to the case below
                 // and the bracket is reported as Unqualified on the next iteration.
-                case DaxTokenKind.Identifier when next.Kind == DaxTokenKind.BracketName
-                    && !Keywords.Contains(token.Text)
-                    && !variables.Contains(token.Text):
+                case DaxLexemeKind.Identifier when next.Kind == DaxLexemeKind.ColumnReference
+                    && !Keywords.Contains(token.Name)
+                    && !variables.Contains(token.Name):
                     references.Add(new DaxReference(
-                        DaxReferenceShape.Qualified, token.Text, next.Text, token.Start, next.End));
+                        DaxReferenceShape.Qualified, token.Name, next.Name, token.Start, next.End));
                     i++;
                     break;
 
-                case DaxTokenKind.Identifier:
+                case DaxLexemeKind.Identifier:
                     // A VAR name or keyword is not a table (function calls were taken above).
-                    if (variables.Contains(token.Text) || Keywords.Contains(token.Text))
+                    if (variables.Contains(token.Name) || Keywords.Contains(token.Name))
                         break;
 
                     references.Add(new DaxReference(
-                        DaxReferenceShape.TableCandidate, token.Text, null, token.Start, token.End));
+                        DaxReferenceShape.TableCandidate, token.Name, null, token.Start, token.End));
                     break;
 
-                case DaxTokenKind.BracketName:
+                case DaxLexemeKind.ColumnReference:
                     references.Add(new DaxReference(
-                        DaxReferenceShape.Unqualified, null, token.Text, token.Start, token.End));
+                        DaxReferenceShape.Unqualified, null, token.Name, token.Start, token.End));
                     break;
             }
         }
@@ -123,45 +126,19 @@ public static class DaxReferenceExtractor
     }
 
     /// <summary>
-    /// When the identifier at <paramref name="first"/> starts a call — a name, or an unbroken
-    /// dotted chain (<c>Ns.Func</c>, no whitespace around the dots), followed by <c>(</c> —
-    /// returns the index of the chain's last identifier; otherwise <c>null</c>. Whitespace
-    /// before the parenthesis is allowed (<c>AddTax ( x )</c>).
-    /// </summary>
-    private static int? FunctionCallEnd(List<DaxToken> tokens, int first)
-    {
-        var last = first;
-        while (last + 2 < tokens.Count
-               && tokens[last + 1] is { Kind: DaxTokenKind.Symbol, Text: "." } dot
-               && tokens[last + 2].Kind == DaxTokenKind.Identifier
-               && dot.Start == tokens[last].End + 1
-               && tokens[last + 2].Start == dot.End + 1)
-            last += 2;
-
-        return last + 1 < tokens.Count && tokens[last + 1] is { Kind: DaxTokenKind.Symbol, Text: "(" }
-            ? last
-            : null;
-    }
-
-    private static string FunctionName(List<DaxToken> tokens, int first, int last)
-        => string.Join('.', tokens.Skip(first).Take(last - first + 1)
-            .Where(t => t.Kind == DaxTokenKind.Identifier)
-            .Select(t => t.Text));
-
-    /// <summary>
     /// Names declared with <c>VAR</c> anywhere in the expression. Collected up front so a bare
     /// word matching a VAR is never reported as a table candidate — a rare table-shadowed-by-VAR
     /// false negative is safer than a VAR-reported-as-table false positive.
     /// </summary>
-    private static HashSet<string> DeclaredVariables(List<DaxToken> tokens)
+    private static HashSet<string> DeclaredVariables(IReadOnlyList<DaxLexeme> tokens)
     {
         var variables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i + 1 < tokens.Count; i++)
         {
-            if (tokens[i].Kind == DaxTokenKind.Identifier
-                && tokens[i].Text.Equals("VAR", StringComparison.OrdinalIgnoreCase)
-                && tokens[i + 1].Kind == DaxTokenKind.Identifier)
-                variables.Add(tokens[i + 1].Text);
+            if (tokens[i].Kind == DaxLexemeKind.Identifier
+                && tokens[i].Name.Equals("VAR", StringComparison.OrdinalIgnoreCase)
+                && tokens[i + 1].Kind == DaxLexemeKind.Identifier)
+                variables.Add(tokens[i + 1].Name);
         }
 
         return variables;
