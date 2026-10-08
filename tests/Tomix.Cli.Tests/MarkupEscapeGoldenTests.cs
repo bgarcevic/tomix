@@ -68,7 +68,9 @@ public sealed partial class MarkupEscapeGoldenTests
         if (command is "get-measure" or "ls-children")
         {
             Assert.Contains("SUM(Sales[Amount])", visible);
-            Assert.Contains("\x1b[38;2;64;129;57m[Amount]", captured.Stdout);
+            // Highlighted: the function is colored while the column reference stays plain.
+            Assert.Contains("\x1b[38;5;12mSUM", captured.Stdout);
+            Assert.Contains("(Sales[Amount])", captured.Stdout);
         }
 
         AssertGolden(command, visible);

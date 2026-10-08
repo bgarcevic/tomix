@@ -272,7 +272,7 @@ internal sealed partial class LsRenderer
 
         var table = new Table()
             .Border(Styling.Border)
-            .BorderColor(Color.Grey)
+            .BorderStyle(Palette.Muted)
             .AddColumn(new TableColumn("[bold]Name[/]") { Alignment = Justify.Left })
             .AddColumn(new TableColumn("[bold]Mode[/]") { Alignment = Justify.Left });
 

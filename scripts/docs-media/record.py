@@ -45,8 +45,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 OUT_DIR = REPO / "docs" / "assets" / "media"
 
-# Theme: a neutral dark terminal. tx itself emits truecolor for its palette,
-# so these only matter for default text and the 16 named ANSI colors.
+# Theme: a neutral dark terminal. tx colors with the 16 ANSI palette indexes
+# (ESC[38;5;0-15m), so this table decides every color in the media.
 BG = (22, 24, 29)
 FG = (215, 218, 224)
 CHROME = (40, 43, 50)
@@ -134,6 +134,39 @@ def hex_rgb(value: str, default):
     return default
 
 
+# Blend toward the background for faint (SGR 2) text, as most terminals draw it.
+DIM_MIX = 0.5
+
+
+def dimmed(rgb):
+    return tuple(round(c * (1 - DIM_MIX) + b * DIM_MIX) for c, b in zip(rgb, BG))
+
+
+class PaletteScreen(pyte.Screen):
+    """pyte with tx's color and faint text: ESC[38;5;n] for n < 16 becomes the
+    named ANSI color (so ANSI above themes it), and faint rides in pyte's blink
+    attribute, which tx never uses."""
+
+    def select_graphic_rendition(self, *attrs, **kwargs):
+        out: list[int] = []
+        i = 0
+        while i < len(attrs):
+            a = attrs[i]
+            if a in (38, 48) and i + 2 < len(attrs) and attrs[i + 1] == 5 and attrs[i + 2] < 16:
+                n = attrs[i + 2]
+                base = 30 if a == 38 else 40
+                out.append(base + n if n < 8 else base + 60 + n - 8)
+                i += 3
+            elif a in (38, 48) and i + 1 < len(attrs) and attrs[i + 1] in (2, 5):
+                width = 5 if attrs[i + 1] == 2 else 3
+                out.extend(attrs[i:i + width])
+                i += width
+            else:
+                out.extend({2: [5], 22: [22, 25]}.get(a, [a]))
+                i += 1
+        super().select_graphic_rendition(*out, **kwargs)
+
+
 def screen_lines(screen: pyte.Screen) -> list[Line]:
     """Visible lines of a per-command screen, trimmed to what has been written."""
     last = -1
@@ -144,6 +177,8 @@ def screen_lines(screen: pyte.Screen) -> list[Line]:
         for x in range(screen.columns):
             ch = row[x]
             fg = hex_rgb(ch.fg, FG)
+            if ch.blink:  # faint, see PaletteScreen
+                fg = dimmed(fg)
             bg = hex_rgb(ch.bg, None)
             if ch.reverse:
                 fg, bg = (bg or BG), fg
@@ -305,7 +340,7 @@ def build_frames(scene: dict, tx: list[str], workdir: Path, env: dict[str, str],
         history = history + text_line([prompt, (command, FG, False)], cols)
 
         # Replay output with its real timing (long gaps compressed).
-        screen = pyte.Screen(cols, 400)
+        screen = PaletteScreen(cols, 400)
         stream = pyte.Stream(screen)
         prev_t = 0.0
         for t, data in cap.chunks:

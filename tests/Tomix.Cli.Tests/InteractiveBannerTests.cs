@@ -51,6 +51,18 @@ public sealed class InteractiveBannerTests
         Assert.All(output.Split('\n'), line => Assert.True(line.TrimEnd().Length <= width, $"Wider than {width}: {line}"));
     }
 
+    [Fact]
+    public void Logo_BlocksAreBoldWithoutColor_OutlineDim()
+    {
+        var console = new TestConsole().Width(120).Colors(ColorSystem.Standard).EmitAnsiSequences();
+        InteractiveBanner.Write(console, "1.2.3", Model, new Random(1));
+
+        // No color: the terminal's own foreground looks right in every theme.
+        Assert.Contains("\x1b[1m█", console.Output);
+        Assert.DoesNotContain("\x1b[38;5;", console.Output);
+        Assert.Contains("\x1b[2m╗", console.Output);
+    }
+
     private static string Render(SessionModelInfo? model, int width)
     {
         var console = new TestConsole().Width(width);

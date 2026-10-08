@@ -48,15 +48,18 @@ the bottom for where each concern lives.
   and names the globals on one line instead of repeating them.
 - Group subcommands into sections in root help (Discover / Modify / Connect /
   Validate / Manage). A flat list of 30+ commands is unusable.
-- Group a long option list with `HelpGroups` tags (`Save options:`, `Rule
-  options:`, ...). The mutation lifecycle flags are tagged by `LifecycleOptions`;
-  compatibility forms go in `Compatibility options:`, last.
+- Section headings are bold and uppercase on their own line (`USAGE`, `DISCOVER`,
+  `GLOBAL OPTIONS`); the command and option names under them stay regular weight.
+- Group a long option list with `HelpGroups` tags (`Save options`, `Rule
+  options`, ...). The mutation lifecycle flags are tagged by `LifecycleOptions`;
+  compatibility forms go in `Compatibility options`, last.
 - Help wraps to the terminal width (capped at 100) with hanging indents, and is
   not wrapped when redirected. Every page must fit in 80 columns
   (`HelpLayoutTests`).
 - Redirected stdout is plain (`StdOut.PlainWhenRedirected`): not wrapped, so a table row
   stays on one line in a pipe, a file, or an agent's tool call, and drawn with ASCII
-  borders (`Styling.Border`) instead of box-drawing glyphs. Renderers that lay out prose
+  borders (`Styling.Border`) instead of box-drawing glyphs, and with ASCII symbols
+  (`Styling.Glyphs`) in tomix's own text. Renderers that lay out prose
   cap their own width.
 - Command descriptions are one line of at most 60 characters with no trailing
   period and no flags; detail goes in `SpectreHelpAction.CommandNotes`. Option
@@ -81,7 +84,7 @@ the bottom for where each concern lives.
 - If you change state, say exactly what changed and what the new state is
   (model object counts, target workspace, file written). Make current state easy
   to inspect (`session`, `stage`, `doctor` are our `git status` equivalents).
-- Suggest the next command after workflow steps (Slate `Guidance`), and give every
+- Suggest the next command after workflow steps (dim `Guidance`), and give every
   empty result a message plus a hint — never print nothing.
 - Crossing the program boundary (network calls, writing files not named by the
   user) should be visible: name the server/file on stderr as it happens. A command

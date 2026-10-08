@@ -20,7 +20,8 @@ Shared output wiring for all commands.
 - `PropertyCsvRenderer` — CSV columns/rows driven by the shared property catalog (`Tomix.Core.Properties.ModelPropertyCatalog`); `get` and `ls` both render CSV through it so their columns cannot drift.
 - `ErrorOutput` — diagnostic rendering to stderr (JSON or colored text).
 - `SyntaxErrorCaret` — the source line and `^` marker under an expression syntax error, for inline `tx format -e` failures in text mode.
-- `StdOut` — the redirected-stdout policy applied at startup: unwrapped instead of Spectre's 80-column fallback, and Unicode off so `Styling.Border`/`Styling.TreeGuide` pick ASCII.
+- `StdOut` — the redirected-stdout policy applied at startup: unwrapped instead of Spectre's 80-column fallback, and Unicode off so `Styling.Border`/`Styling.TreeGuide`/`Styling.Glyphs` pick ASCII.
+- `Glyphs` — the symbols tomix writes into its own text (`●`, `×`, `·`, `✓`, `✗`, `—`, `→`, `…`) and their ASCII forms. Renderers take `Styling.Glyphs`; Spectre-free views take a `Glyphs` parameter. Model data is never folded.
 - `StdErr` — the stderr console for commentary (banners, hints, prompts, notices). Use it instead of constructing `AnsiConsole.Create(... Console.Error)`; it is created per call so tests can swap `Console.Error`, and it inherits the no-color setting. Stdout carries only results.
 - `DidYouMean` — Levenshtein-based "Did you mean?" suggestion helper for unknown subcommands.
 - `HelpRenderer` (`SpectreHelpAction`) — all `--help` output: root sections, per-command notes and
@@ -53,7 +54,7 @@ See [`/docs/cli-color-strategy.md`](../../docs/cli-color-strategy.md) for the fu
 Key rules:
 
 - Use `Styling` helpers and `Palette` constants. Do not hard-code Spectre markup strings or raw ANSI escape codes.
-- Tables use `Styling.NewTable()` (rounded border, Slate border color; ASCII when redirected). A table or tree built directly takes `Styling.Border` / `Styling.TreeGuide`.
+- Tables use `Styling.NewTable()` (rounded border, dim border; ASCII when redirected). A table or tree built directly takes `Styling.Border` / `Styling.TreeGuide`.
 - Escape model-derived text exactly once at a Spectre markup boundary. Use `Styling.MarkupEscape()`
   when inserting raw text into markup; pass raw text to `Styling` helpers, which already escape it.
   Literal `WriteLine` and JSON/CSV/TMDL/BIM output do not use Spectre escaping.

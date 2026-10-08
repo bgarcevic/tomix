@@ -39,11 +39,11 @@ internal static class RefreshRenderer
         var seconds = Styling.DurationSeconds(result.DurationMs / 1000.0);
 
         var header =
-            $"[{Palette.Moss.ToMarkup()}]Refreshed[/] " +
-            $"[{Palette.Terra.ToMarkup()}]{Styling.MarkupEscape(database)}[/] " +
-            $"[{Palette.Moss.ToMarkup()}]on[/] " +
-            $"[{Palette.Harbor.ToMarkup()}]{Styling.MarkupEscape(server)}[/] " +
-            $"[{Palette.Moss.ToMarkup()}]({seconds})[/]";
+            $"{Styling.Success("Refreshed")} " +
+            $"{Styling.Bold(database)} " +
+            $"{Styling.Muted("on")} " +
+            $"{Styling.Path(server)} " +
+            Styling.Muted($"({seconds})");
         // The header is commentary: stderr keeps `tx refresh > file` down to the statistics.
         var err = StdErr.Console();
         err.MarkupLine(header);
@@ -76,9 +76,6 @@ internal static class RefreshRenderer
 
         if (result.Totals is { } total)
         {
-            // Build bold-styled values directly. Styling.Bold(Styling.Muted(...)) would
-            // double-escape the brackets; the Slate palette constant is the muted color.
-            var slate = Palette.Slate.ToMarkup();
             var totalSeconds = (total.TotalMs / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + "s";
             table.AddRow(
                 Styling.Bold("Total"),
@@ -86,7 +83,7 @@ internal static class RefreshRenderer
                 Styling.Muted(""),
                 Styling.Muted(""),
                 DurationMarkup(total.ProcessMs),
-                $"[{slate}]{totalSeconds}[/]",
+                Styling.Muted(totalSeconds),
                 Styling.Muted(""));
         }
 

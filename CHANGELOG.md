@@ -50,6 +50,16 @@ and the API surface that major versions protect.
   does, instead of failing with `TOMIX_REFRESH_NO_REMOTE_TARGET`. It says so with
   `TOMIX_REFRESH_IN_DESKTOP`.
 
+### Changed
+
+- `tx` now colors its output with your terminal theme's own ANSI colors instead of a fixed
+  RGB palette, so it matches Campbell, Dark+, Solarized, high-contrast and color-blind-friendly
+  themes. Color is kept for status (red, yellow, green) and DAX and M highlighting; names,
+  paths and values print plain, options bold, and secondary text dimmed. DAX keywords are
+  magenta, functions bright blue, measure references cyan, and literals green; tables,
+  columns and variables are no longer colored. Help section headings are bold and
+  uppercase (`USAGE`, `DISCOVER`), and the command and option names under them regular weight. The `tx ui` page moves to warm neutrals with a single persimmon accent.
+
 ### Fixed
 
 - `save` in a live session on a server or Power BI Desktop sends the changes to the server
@@ -64,6 +74,8 @@ and the API surface that major versions protect.
   (`+`, `-`, `|`) instead of box-drawing characters, as do `tx deps --deep` trees. A DAX
   expression or format string in `tx ls` output stays on one row, so it can be grepped or read
   by an agent, and borders no longer turn into mojibake in Windows PowerShell 5.1 or `more`.
+  `tx bpa run` and `tx bpa rules` switch their symbols to ASCII there too (`*` for `●`, `x`
+  for `×`, `-` for `·` and `—`, `OK`/`FAIL` for `✓`/`✗`).
 
 ## [0.9.0] - 2026-10-06
 

@@ -9,13 +9,11 @@ public sealed class MMarkupTests
     {
         var markup = Styling.MMarkup("let Source = Table.SelectRows(T, each [Amount] > 0.5) // check\nin Source");
 
-        Assert.Contains($"[{Palette.Lav.ToMarkup()}]let[/]", markup);
-        Assert.Contains($"[{Palette.Terra.ToMarkup()}]Source[/]", markup);
-        Assert.Contains($"[{Palette.Harbor.ToMarkup()}]Table.SelectRows[/]", markup);
-        Assert.Contains($"[{Palette.Lav.ToMarkup()}]each[/]", markup);
-        Assert.Contains($"[{Palette.Moss.ToMarkup()}][[Amount]][/]", markup);
-        Assert.Contains($"[{Palette.Amber.ToMarkup()}]0.5[/]", markup);
-        Assert.Contains($"[{Palette.Slate.ToMarkup()}]// check[/]", markup);
+        Assert.Contains($"[{Palette.Keyword.ToMarkup()}]let[/] Source =", markup);
+        Assert.Contains($"[{Palette.Function.ToMarkup()}]Table.SelectRows[/]", markup);
+        Assert.Contains($"[{Palette.Keyword.ToMarkup()}]each[/] [[Amount]] >", markup);
+        Assert.Contains($"[{Palette.Literal.ToMarkup()}]0.5[/]", markup);
+        Assert.Contains("[dim]// check[/]", markup);
     }
 
     [Theory]

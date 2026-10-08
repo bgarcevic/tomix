@@ -85,14 +85,15 @@ internal static class BpaRunView
     /// list exceeds <paramref name="cap"/>, keeps the first <paramref name="cap"/> and appends
     /// <c>… +N more</c>. Returns raw text — callers escape for markup.
     /// </summary>
-    internal static IReadOnlyList<string> ObjectLines(IReadOnlyList<string> names, bool full, int cap = DefaultObjectCap)
+    internal static IReadOnlyList<string> ObjectLines(
+        IReadOnlyList<string> names, bool full, int cap = DefaultObjectCap, Glyphs? glyphs = null)
     {
         // Rule-error findings carry no object name; they must not render an empty bullet.
         var present = names.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
         if (full || present.Count <= cap)
             return present;
 
-        return [.. present.Take(cap), $"… +{present.Count - cap} more"];
+        return [.. present.Take(cap), $"{(glyphs ?? Glyphs.Unicode).Ellipsis} +{present.Count - cap} more"];
     }
 
     /// <summary>
@@ -122,13 +123,13 @@ internal static class BpaRunView
     /// The footer's "Ignored:" value, e.g. <c>1 rule by you · 2 rules by the model · 3 findings</c>:
     /// whole rules per level, then findings an object-level annotation hid. Empty when none.
     /// </summary>
-    internal static string IgnoredLine(int rulesByUser, int rulesByModel, int findings)
+    internal static string IgnoredLine(int rulesByUser, int rulesByModel, int findings, Glyphs? glyphs = null)
     {
         var parts = new List<string>(3);
         if (rulesByUser > 0) parts.Add($"{Plural(rulesByUser, "rule")} by you");
         if (rulesByModel > 0) parts.Add($"{Plural(rulesByModel, "rule")} by the model");
         if (findings > 0) parts.Add(Plural(findings, "finding"));
-        return string.Join(" · ", parts);
+        return string.Join((glyphs ?? Glyphs.Unicode).Separator, parts);
 
         static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
     }
@@ -223,10 +224,12 @@ internal static class BpaRunView
     /// <paramref name="notChecked"/> (no VertiPaq statistics) are never counted as passed.
     /// </summary>
     internal static string SummaryLine(
-        int errors, int warnings, int info, int failedRules, int rulesEvaluated, long durationMs, int notChecked = 0)
+        int errors, int warnings, int info, int failedRules, int rulesEvaluated, long durationMs, int notChecked = 0,
+        Glyphs? glyphs = null)
     {
-        var duration = durationMs > 0 ? $" · {durationMs}ms" : "";
-        var skipped = notChecked > 0 ? $" · {notChecked} not checked" : "";
+        var sep = (glyphs ?? Glyphs.Unicode).Separator;
+        var duration = durationMs > 0 ? $"{sep}{durationMs}ms" : "";
+        var skipped = notChecked > 0 ? $"{sep}{notChecked} not checked" : "";
         if (failedRules == 0)
             return notChecked == 0
                 ? $"All {rulesEvaluated} {Plural(rulesEvaluated, "rule")} passed{duration}"
@@ -240,7 +243,7 @@ internal static class BpaRunView
         // Rule-error findings can come from rules outside the evaluated count; never go negative.
         var total = Math.Max(rulesEvaluated, failedRules);
         var passed = Math.Max(0, total - failedRules - notChecked);
-        return $"{string.Join(" · ", counts)} in {failedRules} of {Count(total, "rule")} · {passed} passed{skipped}{duration}";
+        return $"{string.Join(sep, counts)} in {failedRules} of {Count(total, "rule")}{sep}{passed} passed{skipped}{duration}";
     }
 
     /// <summary>
@@ -330,24 +333,25 @@ internal static class BpaRunView
     /// a property set, the change (<c>FormatString: "" → "#,##0"</c>). Values stay on one line
     /// and are cut at a fixed width, so a rewritten expression cannot flood the preview.
     /// </summary>
-    internal static (string Headline, string? Change) PendingFix(BpaFixChange change)
+    internal static (string Headline, string? Change) PendingFix(BpaFixChange change, Glyphs? glyphs = null)
     {
+        glyphs ??= Glyphs.Unicode;
         var verb = change.Action == BpaFixAction.Delete ? "Would delete:" : "Would fix:";
-        var headline = $"{verb} {change.ObjectType} '{change.ObjectPath}' — {change.RuleId}";
+        var headline = $"{verb} {change.ObjectType} '{change.ObjectPath}'{glyphs.Dash}{change.RuleId}";
         if (change.Action == BpaFixAction.Delete || change.Property is null)
             return (headline, null);
 
-        return (headline, $"{change.Property}: {FixValue(change.Before)} → {FixValue(change.After)}");
+        return (headline, $"{change.Property}: {FixValue(change.Before, glyphs)}{glyphs.Arrow}{FixValue(change.After, glyphs)}");
     }
 
-    private static string FixValue(string? value)
+    private static string FixValue(string? value, Glyphs glyphs)
     {
         if (value is null)
             return "(unset)";
 
         var flat = string.Join(" ", value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()));
         if (flat.Length > FixValueWidth)
-            flat = flat[..(FixValueWidth - 1)] + "…";
+            flat = flat[..(FixValueWidth - glyphs.Ellipsis.Length)] + glyphs.Ellipsis;
         return $"\"{flat}\"";
     }
 

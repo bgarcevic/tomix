@@ -73,8 +73,8 @@ public sealed partial class HelpLayoutTests
     {
         var help = Render(TestRoot.Full(), 100);
 
-        Assert.True(help.IndexOf("Discover:", StringComparison.Ordinal)
-                    < help.IndexOf("Global options:", StringComparison.Ordinal));
+        Assert.True(help.IndexOf("DISCOVER", StringComparison.Ordinal)
+                    < help.IndexOf("GLOBAL OPTIONS", StringComparison.Ordinal));
         Assert.Contains("  -h, --help", help);
         Assert.DoesNotContain("/?", help);
         Assert.Contains("-m, --model <path>", help);
@@ -88,8 +88,8 @@ public sealed partial class HelpLayoutTests
             () => SpectreHelpAction.Write(TestRoot.Full(), concise: true, 100), captureAnsiConsole: true);
 
         var help = Plain(captured.Stdout);
-        Assert.Contains("Discover:", help);
-        Assert.DoesNotContain("Global options:", help);
+        Assert.Contains("DISCOVER", help);
+        Assert.DoesNotContain("GLOBAL OPTIONS", help);
         Assert.Contains("tx --help", help);
     }
 
@@ -98,7 +98,7 @@ public sealed partial class HelpLayoutTests
     {
         var help = Render(Command("ls"), 100);
 
-        Assert.Contains("Global options: --help, --model", help);
+        Assert.Matches(@"(?m)^GLOBAL OPTIONS\r?\n  --help, --model", help);
         Assert.DoesNotContain("Path to the semantic model", help);
         Assert.DoesNotContain("Description:", help);
     }
@@ -108,9 +108,9 @@ public sealed partial class HelpLayoutTests
     {
         var help = Render(Command("add"), 100);
 
-        var options = help.IndexOf("\nOptions:", StringComparison.Ordinal);
-        var partition = help.IndexOf("\nPartition and data source options:", StringComparison.Ordinal);
-        var save = help.IndexOf("\nSave options:", StringComparison.Ordinal);
+        var options = help.IndexOf("\nOPTIONS", StringComparison.Ordinal);
+        var partition = help.IndexOf("\nPARTITION AND DATA SOURCE OPTIONS", StringComparison.Ordinal);
+        var save = help.IndexOf("\nSAVE OPTIONS", StringComparison.Ordinal);
         Assert.True(options >= 0 && options < partition && partition < save, help);
         Assert.Contains("--save-to <path>", help[save..]);
     }
@@ -190,7 +190,7 @@ public sealed partial class HelpLayoutTests
         var captured = ConsoleCapture.Invoke(parsed, captureAnsiConsole: true);
 
         Assert.Equal(0, captured.ExitCode);
-        Assert.Contains("Usage: tx bpa run [model] [options]", Plain(captured.Stdout));
+        Assert.Matches(@"(?m)^USAGE\r?\n  tx bpa run \[model\] \[options\]", Plain(captured.Stdout));
     }
 
     [Fact]
@@ -230,7 +230,7 @@ public sealed partial class HelpLayoutTests
         var captured = Report("bpa");
 
         Assert.Equal(0, captured.ExitCode);
-        Assert.Contains("Usage: tx bpa <command> [options]", captured.Stdout);
+        Assert.Matches(@"(?m)^USAGE\r?\n  tx bpa <command> \[options\]", captured.Stdout);
         Assert.Equal("", captured.Stderr);
     }
 

@@ -14,56 +14,59 @@ internal enum ExpressionLanguage
     M,
 }
 
-// Hue and chroma are the original design; each color's lightness is tuned so every role keeps
-// ≥3.3:1 contrast on both dark and light terminal backgrounds (the practical ceiling — 4.5:1 on
-// both is mathematically impossible for one palette), and so same-view roles separate by
-// lightness as well as hue, which keeps them distinguishable for red-green color-blind users.
-// Construction and thresholds: docs/cli-color-strategy.md; enforced by PaletteTests.
+// ANSI-16 roles, not RGB: each color is a terminal palette index, so the user's own theme decides
+// the shade and its contrast. Only red, green, yellow, cyan, magenta and bright blue are used:
+// normal blue is unreadable on the Windows Terminal default (Campbell), and the other bright codes
+// turn grey in Solarized. Color never carries meaning alone; every status also has a glyph or a
+// word. Everything else is bold, dim, or plain. Rationale: docs/cli-color-strategy.md; the role
+// mapping is pinned by PaletteTests.
 internal static class Palette
 {
-    public static readonly Color Sage = new(0x34, 0x89, 0x7E);
-    public static readonly Color Lav = new(0x85, 0x72, 0xAF);
-    public static readonly Color Terra = new(0x96, 0x64, 0x42);
-    public static readonly Color Harbor = new(0x45, 0x82, 0xAC);
-    public static readonly Color Moss = new(0x40, 0x81, 0x39);
-    public static readonly Color Amber = new(0xB0, 0x7E, 0x2A);
-    public static readonly Color Rose = new(0xCC, 0x67, 0x66);
-    public static readonly Color Orchid = new(0xCF, 0x67, 0xAC);
-    public static readonly Color Slate = new(0x75, 0x7F, 0x88);
+    public static readonly Color Error = Color.Maroon;
+    public static readonly Color Success = Color.Green;
+    public static readonly Color Warning = Color.Olive;
+    public static readonly Color Info = Color.Teal;
+    public static readonly Color Keyword = Color.Purple;
+    public static readonly Color Function = Color.Blue;
+    public static readonly Color Reference = Color.Teal;
+    public static readonly Color Literal = Color.Green;
+
+    /// <summary>Secondary text, borders and rules: the terminal's own foreground, dimmed.</summary>
+    public static readonly Style Muted = new(decoration: Decoration.Dim);
 }
 
 internal static class Styling
 {
-    public static string Title(string text) => $"[bold {Palette.Sage.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Title(string text) => Bold(text);
 
     public static string Bold(string text) => $"[bold]{MarkupEscape(text)}[/]";
 
-    public static string Success(string text) => $"[{Palette.Moss.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Success(string text) => $"[{Palette.Success.ToMarkup()}]{MarkupEscape(text)}[/]";
 
-    public static string Warning(string text) => $"[{Palette.Amber.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Warning(string text) => $"[{Palette.Warning.ToMarkup()}]{MarkupEscape(text)}[/]";
 
-    public static string Error(string text) => $"[bold {Palette.Rose.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Error(string text) => $"[bold {Palette.Error.ToMarkup()}]{MarkupEscape(text)}[/]";
 
-    public static string Muted(string text) => $"[{Palette.Slate.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Muted(string text) => $"[dim]{MarkupEscape(text)}[/]";
 
-    public static string Path(string text) => $"[{Palette.Harbor.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Path(string text) => MarkupEscape(text);
 
-    public static string Value(string text) => $"[{Palette.Terra.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Value(string text) => MarkupEscape(text);
 
-    public static string Option(string text) => $"[{Palette.Lav.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Option(string text) => Bold(text);
 
     public static string KeyValue(string label, string value)
         => $"[bold]{MarkupEscape(label)}[/] {MarkupEscape(value)}";
 
-    public static string Guidance(string text) => $"[{Palette.Slate.ToMarkup()}]{MarkupEscape(text)}[/]";
+    public static string Guidance(string text) => Muted(text);
 
     public static string MarkupEscape(string text)
         => text.Replace("[", "[[").Replace("]", "]]");
 
     /// <summary>
     /// A DAX expression as Spectre markup, syntax-highlighted from
-    /// <see cref="DaxLanguage.Classify"/>: keywords, functions, strings, comments, and
-    /// table/column references each take the palette role they read as. Unstyled text (and all
+    /// <see cref="DaxLanguage.Classify"/>: keywords, functions, measure references, literals, and
+    /// comments each take their palette role; tables, columns and variables stay plain. Unstyled text (and all
     /// markup) is escaped, so a DAX <c>[Column]</c> can never inject markup of its own. Pass
     /// <paramref name="measureNames"/> (from <c>DaxModelNames.MeasureNames</c>) to resolve
     /// bracketed references to measures, which get their own role. Use only in human output;
@@ -78,7 +81,7 @@ internal static class Styling
     /// <summary>
     /// A Power Query (M) expression as Spectre markup, syntax-highlighted from
     /// <see cref="MLanguage.Classify"/> with the same palette roles as DAX: keywords, library
-    /// functions, step and field definitions, field access, literals, and comments. Unstyled text
+    /// functions, literals, and comments; steps and field access stay plain. Unstyled text
     /// is escaped, so a field access <c>[Amount]</c> can never inject markup. Use only in human
     /// output; JSON/CSV paths stay markup-free.
     /// </summary>
@@ -117,33 +120,29 @@ internal static class Styling
     private static string? ClassificationStyle(DaxTextClassification classification) =>
         classification switch
         {
-            DaxTextClassification.Keyword => Palette.Lav.ToMarkup(),
-            DaxTextClassification.Function => Palette.Harbor.ToMarkup(),
-            DaxTextClassification.TableName => Palette.Sage.ToMarkup(),
-            DaxTextClassification.ColumnReference => Palette.Moss.ToMarkup(),
-            DaxTextClassification.MeasureReference => Palette.Orchid.ToMarkup(),
-            DaxTextClassification.Variable => Palette.Terra.ToMarkup(),
+            DaxTextClassification.Keyword => Palette.Keyword.ToMarkup(),
+            DaxTextClassification.Function => Palette.Function.ToMarkup(),
+            DaxTextClassification.MeasureReference => Palette.Reference.ToMarkup(),
             DaxTextClassification.StringLiteral or DaxTextClassification.Number
-                or DaxTextClassification.QueryParameter => Palette.Amber.ToMarkup(),
-            DaxTextClassification.Comment => Palette.Slate.ToMarkup(),
+                or DaxTextClassification.QueryParameter => Palette.Literal.ToMarkup(),
+            DaxTextClassification.Comment => "dim",
             DaxTextClassification.DefinitionName => "bold",
             _ => null,
         };
 
     /// <summary>
     /// The palette style for an M classification, or null when printed plain. M reuses the DAX
-    /// roles: a step or field definition reads as a DAX variable, a field access as a column.
+    /// roles: step and field definitions read as DAX variables and field access as columns, so
+    /// all three stay plain.
     /// </summary>
     private static string? ClassificationStyle(MTextClassification classification) =>
         classification switch
         {
-            MTextClassification.Keyword => Palette.Lav.ToMarkup(),
-            MTextClassification.Function => Palette.Harbor.ToMarkup(),
-            MTextClassification.FieldAccess => Palette.Moss.ToMarkup(),
-            MTextClassification.DefinitionName => Palette.Terra.ToMarkup(),
+            MTextClassification.Keyword => Palette.Keyword.ToMarkup(),
+            MTextClassification.Function => Palette.Function.ToMarkup(),
             MTextClassification.StringLiteral or MTextClassification.Number
-                or MTextClassification.Literal => Palette.Amber.ToMarkup(),
-            MTextClassification.Comment => Palette.Slate.ToMarkup(),
+                or MTextClassification.Literal => Palette.Literal.ToMarkup(),
+            MTextClassification.Comment => "dim",
             _ => null,
         };
 
@@ -183,11 +182,15 @@ internal static class Styling
     public static TreeGuide TreeGuide
         => AnsiConsole.Profile.Capabilities.Unicode ? TreeGuide.Line : TreeGuide.Ascii;
 
+    /// <summary>Unicode symbols in a terminal; ASCII ones when stdout is redirected (see <see cref="Border"/>).</summary>
+    public static Glyphs Glyphs
+        => AnsiConsole.Profile.Capabilities.Unicode ? Glyphs.Unicode : Glyphs.Ascii;
+
     public static Table NewTable(params string[] headers)
     {
         var table = new Table()
             .Border(Border)
-            .BorderColor(Palette.Slate);
+            .BorderStyle(Palette.Muted);
 
         foreach (var header in headers)
             table.AddColumn(new TableColumn(MarkupEscape(header)) { Alignment = Justify.Left });
@@ -213,22 +216,22 @@ internal static class Styling
         => seconds.ToString("0.0", CultureInfo.InvariantCulture) + "s";
 
     public static string BoolText(bool value)
-        => value ? $"[{Palette.Slate.ToMarkup()}]True[/]" : "False";
+        => value ? "[dim]True[/]" : "False";
 
     public static string SeverityMarkup(string severity) => severity switch
     {
-        "Error" => $"[bold {Palette.Rose.ToMarkup()}]Error[/]",
-        "Warning" => $"[bold {Palette.Amber.ToMarkup()}]Warning[/]",
-        "Info" => $"[{Palette.Sage.ToMarkup()}]Info[/]",
+        "Error" => $"[bold {Palette.Error.ToMarkup()}]Error[/]",
+        "Warning" => $"[bold {Palette.Warning.ToMarkup()}]Warning[/]",
+        "Info" => $"[{Palette.Info.ToMarkup()}]Info[/]",
         _ => MarkupEscape(severity)
     };
 
     /// <summary>A severity-colored "● SEVERITY" heading for grouped report sections.</summary>
     public static string SeverityHeading(string severity) => severity switch
     {
-        "Error" => $"[bold {Palette.Rose.ToMarkup()}]● ERROR[/]",
-        "Warning" => $"[bold {Palette.Amber.ToMarkup()}]● WARNING[/]",
-        "Info" => $"[{Palette.Sage.ToMarkup()}]● INFO[/]",
+        "Error" => $"[bold {Palette.Error.ToMarkup()}]{Glyphs.Bullet} ERROR[/]",
+        "Warning" => $"[bold {Palette.Warning.ToMarkup()}]{Glyphs.Bullet} WARNING[/]",
+        "Info" => $"[{Palette.Info.ToMarkup()}]{Glyphs.Bullet} INFO[/]",
         _ => MarkupEscape(severity)
     };
 }

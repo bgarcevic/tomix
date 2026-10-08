@@ -11,9 +11,7 @@ namespace Tomix.Cli.Tests;
 [Collection(ConsoleStateCollection.Name)]
 public sealed partial class SetRenderTests
 {
-    private const string Harbor = "\x1b[38;2;69;130;172m";  // functions
-    private const string Sage = "\x1b[38;2;52;137;126m";    // table names
-    private const string Moss = "\x1b[38;2;64;129;57m";     // column references
+    private const string Function = "\x1b[38;5;12m"; // functions (bright blue)
 
     [Fact]
     public void DaxEdit_ShowsColoredBeforeAndAfter()
@@ -28,9 +26,9 @@ public sealed partial class SetRenderTests
 
         var output = Render(result);
 
-        Assert.Contains(Harbor + "SUM", output);
-        Assert.Contains(Sage + "'Sales'", output);
-        Assert.Contains(Moss + "[Amount]", output);
+        Assert.Contains(Function + "SUM", output);
+        // Tables and columns stay plain.
+        Assert.Contains("('Sales'[Amount])", output);
         Assert.Contains("Before: SUM('Sales'[Amount])", StripAnsi(output));
         Assert.Contains("After: SUM('Sales'[Amount]) + 1", StripAnsi(output));
     }
@@ -49,7 +47,7 @@ public sealed partial class SetRenderTests
         var output = Render(result);
 
         Assert.Contains("Before: " + Environment.NewLine, StripAnsi(output));
-        Assert.Contains(Harbor + "SUM", output);
+        Assert.Contains(Function + "SUM", output);
     }
 
     [Fact]
@@ -65,7 +63,7 @@ public sealed partial class SetRenderTests
 
         var output = Render(result);
 
-        Assert.DoesNotContain(Harbor, output);
+        Assert.DoesNotContain(Function, output);
         Assert.DoesNotContain("Before:", StripAnsi(output));
         Assert.DoesNotContain("After:", StripAnsi(output));
     }

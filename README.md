@@ -128,7 +128,7 @@ Refresh policies use `get`/`set`/`rm` with `<table>/RefreshPolicy`;
 `refresh --policy-only` applies a saved policy without loading data.
 Connect: `connect` (interactive workspace/model pickers with `--remote`,
 reconnect to a previous target with `--recent`), `deploy`, `refresh`,
-`save`, `auth`, `session`
+`save`, `auth`
 Validate: `bpa` (Best Practice Analyzer with auto-fix), `validate`, `test`
 (DAX regression tests against a live model), `vertipaq` (storage statistics,
 `.vpax` export/import), `diff`, `doctor`
@@ -163,6 +163,11 @@ tx find "CALCULATE" --in expressions --paths-only | xargs -I{} tx format --path 
 tx ls --type column --output-format json |
   jq '.data | group_by(.path | split("/")[0]) | map({(.[0].path | split("/")[0]): length}) | add'
 ```
+
+Piped or redirected, text output is plain: tables keep one row per line instead of
+wrapping, and borders and symbols are ASCII, so output greps cleanly and reads
+correctly in Windows PowerShell 5.1. Use `--output-format json` when a script
+parses the result.
 
 `query` runs DAX or DMV against a live model, with DAX Studio-style performance
 options: `--trace` (formula- vs storage-engine timings), `--cold` (clear the

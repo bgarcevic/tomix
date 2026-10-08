@@ -127,7 +127,7 @@ internal static class BpaRulesRenderer
         var name = BpaRunView.StripCategoryPrefix(rule.Name, rule.Category);
         foreach (var line in BpaRunView.WrapText(name, width))
             AnsiConsole.MarkupLine(Styling.Bold(line));
-        AnsiConsole.MarkupLine(string.Join(Styling.Muted(" · "),
+        AnsiConsole.MarkupLine(string.Join(Styling.Muted(Styling.Glyphs.Separator),
             Styling.Muted(rule.Id),
             Styling.Muted(rule.Category),
             $"{SeverityDot(rule.Severity)} {Styling.Muted(BpaRunView.SeverityWord(rule.Severity).ToLowerInvariant())}"));
@@ -179,7 +179,7 @@ internal static class BpaRulesRenderer
                 ReferenceEquals(s, status) ? Styling.Warning(s)
                 : ReferenceEquals(s, fixable) ? Styling.Success(s)
                 : Styling.Muted(s));
-            AnsiConsole.MarkupLine(indent + string.Join(Styling.Muted(" · "), parts));
+            AnsiConsole.MarkupLine(indent + string.Join(Styling.Muted(Styling.Glyphs.Separator), parts));
         }
     }
 
@@ -191,10 +191,10 @@ internal static class BpaRulesRenderer
         if (summary.Ignored > 0) parts.Add($"{summary.Ignored} ignored by the model");
 
         var line = result.Rules.Count < summary.Total
-            ? $"{result.Rules.Count} of {summary.Total} rules shown · {string.Join(" · ", parts)}"
+            ? $"{result.Rules.Count} of {summary.Total} rules shown{Styling.Glyphs.Separator}{string.Join(Styling.Glyphs.Separator, parts)}"
             : parts.Count == 1
                 ? $"{summary.Total} rules"
-                : $"{summary.Total} rules · {string.Join(" · ", parts)}";
+                : $"{summary.Total} rules{Styling.Glyphs.Separator}{string.Join(Styling.Glyphs.Separator, parts)}";
         AnsiConsole.MarkupLine(Styling.MarkupEscape(line));
 
         if (result.Rules.Count < summary.Total)
@@ -203,9 +203,9 @@ internal static class BpaRulesRenderer
 
     private static string SeverityDot(RuleSeverity severity) => severity switch
     {
-        RuleSeverity.Error => Styling.Error("●"),
-        RuleSeverity.Warning => Styling.Warning("●"),
-        _ => Styling.Muted("●")
+        RuleSeverity.Error => Styling.Error(Styling.Glyphs.Bullet),
+        RuleSeverity.Warning => Styling.Warning(Styling.Glyphs.Bullet),
+        _ => Styling.Muted(Styling.Glyphs.Bullet)
     };
 
     /// <summary>
@@ -271,7 +271,7 @@ internal static class BpaRulesRenderer
         if (!result.Changed)
         {
             AnsiConsole.MarkupLine(Styling.Muted(
-                $"You {(result.Disabled ? "already ignore" : "weren't ignoring")} rule '{result.RuleId}' — no change."));
+                $"You {(result.Disabled ? "already ignore" : "weren't ignoring")} rule '{result.RuleId}'{Styling.Glyphs.Dash}no change."));
             return;
         }
 
@@ -297,7 +297,7 @@ internal static class BpaRulesRenderer
                 AnsiConsole.MarkupLine($"Removed rule {id} from {path}.");
                 break;
             case "set" when !result.Changed:
-                AnsiConsole.MarkupLine(Styling.Muted($"Rule '{result.RuleId}' already has those values — no change."));
+                AnsiConsole.MarkupLine(Styling.Muted($"Rule '{result.RuleId}' already has those values{Styling.Glyphs.Dash}no change."));
                 return;
             case "set":
                 AnsiConsole.MarkupLine($"Updated rule {id} in {path}.");
@@ -321,7 +321,7 @@ internal static class BpaRulesRenderer
         switch (result.Action)
         {
             case "set" when !result.Changed:
-                AnsiConsole.MarkupLine(Styling.Muted($"Rule '{result.RuleId}' already has those values — no change."));
+                AnsiConsole.MarkupLine(Styling.Muted($"Rule '{result.RuleId}' already has those values{Styling.Glyphs.Dash}no change."));
                 return;
             case "set":
                 AnsiConsole.MarkupLine($"Updated model rule {id} in {model}.");
@@ -348,7 +348,7 @@ internal static class BpaRulesRenderer
         if (!result.Changed)
         {
             AnsiConsole.MarkupLine(Styling.Muted(
-                $"Rule '{result.RuleId}' was already {(result.Ignored ? "ignored" : "not ignored")} — no change."));
+                $"Rule '{result.RuleId}' was already {(result.Ignored ? "ignored" : "not ignored")}{Styling.Glyphs.Dash}no change."));
             return;
         }
 
@@ -364,7 +364,7 @@ internal static class BpaRulesRenderer
         else if (result.Status == MutationStatus.Staged)
             AnsiConsole.MarkupLine($"  {Styling.Success("Mutation staged.")}");
         else
-            AnsiConsole.MarkupLine($"  {Styling.Muted("Not saved — re-run with --save to persist or --stage to stage.")}");
+            AnsiConsole.MarkupLine($"  {Styling.Muted($"Not saved{Styling.Glyphs.Dash}re-run with --save to persist or --stage to stage.")}");
 
         MutationOutput.RenderSync(result.Outcome, "  ");
     }

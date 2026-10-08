@@ -7,21 +7,19 @@ using Tomix.Core.Models;
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// The hidden-row contract of the ls tables: a hidden object's whole row is muted (Slate), so
+/// The hidden-row contract of the ls tables: a hidden object's whole row is muted (dim), so
 /// hidden objects read at a glance instead of only their grey "True" cell. Expression cells
 /// additionally carry DAX syntax highlighting on visible rows. Both are asserted on the
-/// true-color escape sequences because markup is consumed before the writer sees it.
+/// ANSI escape sequences because markup is consumed before the writer sees it.
 /// </summary>
 [Collection(ConsoleStateCollection.Name)]
 public sealed class LsRendererTests
 {
-    private const string Slate = "\x1b[38;2;117;127;136m";
-    private const string Harbor = "\x1b[38;2;69;130;172m";  // functions
-    private const string Sage = "\x1b[38;2;52;137;126m";    // table names
-    private const string Moss = "\x1b[38;2;64;129;57m";     // column references
-    private const string Orchid = "\x1b[38;2;207;103;172m"; // measure references
-    private const string Lav = "\x1b[38;2;133;114;175m";    // keywords
-    private const string Terra = "\x1b[38;2;150;100;66m";   // variables, M definitions
+    private const string Dim = "\x1b[2m";       // muted
+    private const string Function = "\x1b[38;5;12m";  // functions (bright blue)
+    private const string Keyword = "\x1b[38;5;5m";   // keywords (magenta)
+    private const string Reference = "\x1b[38;5;6m"; // measure references (cyan)
+    private const string Literal = "\x1b[38;5;2m";   // strings and numbers (green)
 
     [Fact]
     public void HiddenTable_MutesEveryCell()
@@ -29,9 +27,9 @@ public sealed class LsRendererTests
         var output = RenderTables(Table("Secret", hidden: true));
 
         var row = RowLine(output, "Secret");
-        Assert.Contains(Slate + "Secret", row);
-        Assert.Contains(Slate + "hush", row);
-        Assert.Contains(Slate + "True", row);
+        Assert.Contains(Dim + "Secret", row);
+        Assert.Contains(Dim + "hush", row);
+        Assert.Contains(Dim + "True", row);
     }
 
     [Fact]
@@ -40,8 +38,8 @@ public sealed class LsRendererTests
         var output = RenderTables(Table("Open", hidden: false));
 
         var row = RowLine(output, "Open");
-        Assert.DoesNotContain(Slate + "Open", row);
-        Assert.DoesNotContain(Slate + "loud", row);
+        Assert.DoesNotContain(Dim + "Open", row);
+        Assert.DoesNotContain(Dim + "loud", row);
     }
 
     [Fact]
@@ -49,8 +47,8 @@ public sealed class LsRendererTests
     {
         var output = RenderTables(Table("Secret", hidden: true), Table("Open", hidden: false));
 
-        Assert.Contains(Slate + "Secret", RowLine(output, "Secret"));
-        Assert.DoesNotContain(Slate + "Open", RowLine(output, "Open"));
+        Assert.Contains(Dim + "Secret", RowLine(output, "Secret"));
+        Assert.DoesNotContain(Dim + "Open", RowLine(output, "Open"));
     }
 
     [Fact]
@@ -68,8 +66,8 @@ public sealed class LsRendererTests
     {
         var output = RenderTables(Measure("Sales", "SUM('Sales'[Amount])"));
 
-        Assert.Contains(Harbor + "SUM", output);
-        Assert.Contains(Sage + "'Sales'", output);
+        Assert.Contains(Function + "SUM", output);
+        Assert.Contains("('Sales'[Amount])", output);
     }
 
     [Fact]
@@ -77,8 +75,8 @@ public sealed class LsRendererTests
     {
         var output = RenderTables(Measure("Secret", "SUM('Sales'[Amount])", hidden: true));
 
-        Assert.Contains(Slate + "SUM('Sales'[Amount])", output);
-        Assert.DoesNotContain(Harbor, output);
+        Assert.Contains(Dim + "SUM('Sales'[Amount])", output);
+        Assert.DoesNotContain(Function, output);
     }
 
     [Fact]
@@ -87,8 +85,8 @@ public sealed class LsRendererTests
         var output = RenderMultiline(Measure("Sales", "SUM('Sales'[Amount])\n- [Qty]\n- [Price]\n- [Tax]"));
 
         Assert.Contains("... (+1 line)", output);
-        // No literal in the cell or the suffix, so Amber (strings/numbers) must not appear at all.
-        Assert.DoesNotContain("\x1b[38;2;176;126;42m", output);
+        // No literal in the cell or the suffix, so the literal color must not appear at all.
+        Assert.DoesNotContain(Literal, output);
     }
 
     [Fact]
@@ -96,9 +94,9 @@ public sealed class LsRendererTests
     {
         var output = RenderTables(Partition("Orders", detail: "import", "let Source = Sql.Database(\"srv\") in Source"));
 
-        Assert.Contains(Lav + "let", output);
-        Assert.Contains(Terra + "Source", output);
-        Assert.Contains(Harbor + "Sql.Database", output);
+        Assert.Contains(Keyword + "let", output);
+        Assert.Contains(" Source = ", output);
+        Assert.Contains(Function + "Sql.Database", output);
         Assert.Contains("let Source = Sql.Database(\"srv\") in Source", AnsiCodes.Replace(output, ""));
     }
 
@@ -107,7 +105,7 @@ public sealed class LsRendererTests
     {
         var output = RenderTables(Partition("SalesCalc", detail: "calculated", "ROW(\"A\", 1)"));
 
-        Assert.Contains(Harbor + "ROW", output);
+        Assert.Contains(Function + "ROW", output);
     }
 
     [Fact]
@@ -115,8 +113,8 @@ public sealed class LsRendererTests
     {
         var output = RenderTables(CalculationItem("YoY", "CALCULATE('Sales'[Amount])"));
 
-        Assert.Contains(Harbor + "CALCULATE", output);
-        Assert.Contains(Sage + "'Sales'", output);
+        Assert.Contains(Function + "CALCULATE", output);
+        Assert.Contains("('Sales'[Amount])", output);
     }
 
     [Fact]
@@ -125,10 +123,10 @@ public sealed class LsRendererTests
         var measures = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Profit", "Cost" };
         var output = RenderWith(measures, Measure("Profit", "DIVIDE([Profit], [Cost]) + [Qty]"));
 
-        Assert.Contains(Orchid + "[Profit]", output);
-        Assert.Contains(Orchid + "[Cost]", output);
-        // An unqualified bracket that resolves to no measure stays a column.
-        Assert.Contains(Moss + "[Qty]", output);
+        Assert.Contains(Reference + "[Profit]", output);
+        Assert.Contains(Reference + "[Cost]", output);
+        // An unqualified bracket that resolves to no measure stays a column, which is plain.
+        Assert.DoesNotContain(Reference + "[Qty]", output);
     }
 
     [Fact]

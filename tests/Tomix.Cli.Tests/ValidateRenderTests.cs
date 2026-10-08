@@ -13,11 +13,9 @@ namespace Tomix.Cli.Tests;
 [Collection(ConsoleStateCollection.Name)]
 public sealed partial class ValidateRenderTests
 {
-    private const string Harbor = "\x1b[38;2;69;130;172m";  // functions
-    private const string Sage = "\x1b[38;2;52;137;126m";    // table names
-    private const string Moss = "\x1b[38;2;64;129;57m";     // column references
-    private const string Orchid = "\x1b[38;2;207;103;172m"; // measure references
-    private const string Slate = "\x1b[38;2;117;127;136m";  // muted gutter
+    private const string Function = "\x1b[38;5;12m";  // functions (bright blue)
+    private const string Reference = "\x1b[38;5;6m"; // measure references (cyan)
+    private const string Dim = "\x1b[2m";        // muted gutter
 
     [Fact]
     public void Render_Banner_ShowsResultModelName()
@@ -53,9 +51,9 @@ public sealed partial class ValidateRenderTests
 
         var output = Render(result, noMultiline: false);
 
-        Assert.Contains(Harbor + "SUM", output);
-        Assert.Contains(Sage + "'Sales'", output);
-        Assert.Contains(Slate + "│ ", output);
+        Assert.Contains(Function + "SUM", output);
+        Assert.Contains("('Sales'[Missing])", output);
+        Assert.Contains(Dim + "│ ", output);
     }
 
     [Fact]
@@ -77,8 +75,8 @@ public sealed partial class ValidateRenderTests
 
         var output = Render(result, noMultiline: false);
 
-        Assert.Contains(Orchid + "[Profit]", output);
-        Assert.Contains(Moss + "[Qty]", output);
+        Assert.Contains(Reference + "[Profit]", output);
+        Assert.Contains(", 'Sales'[Qty])", output);
     }
 
     [Fact]
@@ -88,8 +86,7 @@ public sealed partial class ValidateRenderTests
 
         var output = Render(result, noMultiline: true);
 
-        Assert.DoesNotContain(Harbor, output);
-        Assert.DoesNotContain(Sage, output);
+        Assert.DoesNotContain(Function, output);
         Assert.DoesNotContain("SUM('Sales'[Missing])", output);
     }
 
@@ -147,9 +144,8 @@ public sealed partial class ValidateRenderTests
 
         var output = Render(result, noMultiline: false);
 
-        Assert.DoesNotContain(Harbor, output);
-        Assert.DoesNotContain(Sage, output);
-        Assert.DoesNotContain(Slate + "│ ", output);
+        Assert.DoesNotContain(Function, output);
+        Assert.DoesNotContain(Dim + "│ ", output);
         Assert.Contains("Sort-by column 'MonthNo'", StripAnsi(output));
     }
 

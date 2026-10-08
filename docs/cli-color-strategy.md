@@ -2,57 +2,57 @@
 
 Reference for all ANSI color usage in `tx`. Read this before adding or changing colored output.
 
+## Principles
+
+- **The terminal's colors, not ours.** `tx` uses ANSI-16 palette indexes, never RGB. Each user's theme (Campbell, Dark+, Solarized, a high-contrast or color-blind-friendly theme) decides the actual shade, so output looks native everywhere and contrast is the theme's job.
+- **Color means something, or it isn't used.** Red, yellow, and green carry status; DAX and M highlighting uses a few roles. Everything else is bold (headings, commands to copy), dim (secondary text, borders), or plain (names, paths, values, options).
+- **Color is never the only signal.** Every status also has a glyph or a word (`✓ ! ✗`, `+ - ~`, `ERROR`, `FAIL`), so the output reads the same for color-blind users and with `NO_COLOR`.
+
 ## Palette
 
-Every role keeps at least ~3.3:1 contrast on both dark (`#1E1E1E`) and light (`#FFFFFF`) terminal backgrounds — the practical ceiling for a single palette, since 4.5:1 (WCAG normal text) on both is mathematically impossible: it would require every color's luminance to sit in a near-zero-width band. Roles that appear in the same view are separated by lightness as well as hue, so the distinction survives for red-green color-blind readers (see [Palette construction](#palette-construction)). The guarantees are enforced by `PaletteTests`.
+| Role      | ANSI index      | Use                                                        |
+|-----------|-----------------|------------------------------------------------------------|
+| Error     | 1, red          | Failures, removed lines in diffs (bold for headings)       |
+| Success   | 2, green        | Completed actions, added lines in diffs                    |
+| Warning   | 3, yellow       | Recoverable issues, modified lines in diffs                |
+| Info      | 6, cyan         | Spinners, progress, `Info` severity, VertiPaq bars         |
+| Keyword   | 5, magenta      | DAX and M keywords                                         |
+| Function  | 12, bright blue | DAX and M functions                                        |
+| Reference | 6, cyan         | DAX measure references                                     |
+| Literal   | 2, green        | Strings and numbers in DAX and M                           |
+| Muted     | dim             | Hints, timings, table borders, rules, hidden rows, comments |
 
-| Role    | Name    | Hex       | Example                    | Use                          |
-|---------|---------|-----------|----------------------------|------------------------------|
-| Title   | Sage    | `#34897E` | `MyCli`                    | App names, section headers   |
-| Command | Default | —         | `mycli build`              | Commands (bold, no color)    |
-| Option  | Lav     | `#8572AF` | `--project`                | Flags and options            |
-| Value   | Terra   | `#966442` | `api-service`              | IDs, names, literals         |
-| Path    | Harbor  | `#4582AC` | `./src/api-service`        | Files and folders            |
-| Success | Moss    | `#408139` | `OK Project initialized`   | Completed actions            |
-| Warning | Amber   | `#B07E2A` | `WARN Config not found`    | Recoverable issues           |
-| Error   | Rose    | `#CC6766` | `ERROR Build failed`       | Failures                     |
-| Measures| Orchid  | `#CF67AC` | `[Profit]` in DAX          | Measure references in DAX    |
-| Muted   | Slate   | `#757F88` | `(2.3s elapsed)`           | Hints, timings, secondary    |
+Only these indexes are allowed: normal blue (4) is unreadable on the Windows Terminal default (Campbell), and the bright codes other than blue (9 to 15) turn grey in Solarized. Bright blue is the one exception because normal blue fails where most Windows users look. Yellow is the weakest color on some light themes (VS Code Light+), so keep it to short labels and prefixes, never long text.
 
 ## Palette Implementation
 
 Defined in `src/Tomix.Cli/Output/Styling.cs`:
 
 ```csharp
-using Spectre.Console;
-
-namespace Tomix.Cli.Output;
-
 internal static class Palette
 {
-    public static readonly Color Sage   = new(0x34, 0x89, 0x7E);
-    public static readonly Color Lav    = new(0x85, 0x72, 0xAF);
-    public static readonly Color Terra  = new(0x96, 0x64, 0x42);
-    public static readonly Color Harbor = new(0x45, 0x82, 0xAC);
-    public static readonly Color Moss   = new(0x40, 0x81, 0x39);
-    public static readonly Color Amber  = new(0xB0, 0x7E, 0x2A);
-    public static readonly Color Rose   = new(0xCC, 0x67, 0x66);
-    public static readonly Color Orchid = new(0xCF, 0x67, 0xAC);
-    public static readonly Color Slate  = new(0x75, 0x7F, 0x88);
+    public static readonly Color Error = Color.Maroon;
+    public static readonly Color Success = Color.Green;
+    public static readonly Color Warning = Color.Olive;
+    public static readonly Color Info = Color.Teal;
+    public static readonly Color Keyword = Color.Purple;
+    public static readonly Color Function = Color.Blue;
+    public static readonly Color Reference = Color.Teal;
+    public static readonly Color Literal = Color.Green;
+
+    public static readonly Style Muted = new(decoration: Decoration.Dim);
 }
 ```
 
-Use `Palette.Sage` for Spectre widget styling (table borders, panel borders). Use the markup helpers below for inline text.
+Spectre names the ANSI colors after the HTML ones: `Maroon` is red (1), `Olive` is yellow (3), `Purple` is magenta (5), `Teal` is cyan (6), and `Blue` is bright blue (12). Spectre writes them as 256-color indexes (`ESC[38;5;1m`), and indexes 0 to 15 are the theme's colors in every mainstream terminal. Never construct a `Color` from RGB.
 
-## Palette Construction
+Use `Palette.Muted` for Spectre widget styling (table borders, rules). Use the markup helpers below for inline text.
 
-The palette is derived, not hand-picked: hues and chroma come from the original design, and each color's CIELAB lightness is set deliberately.
+`PaletteTests` pins the contract: every role is one of the allowed indexes, it renders as a palette index even on a true-color terminal, and the four DAX roles never share a color.
 
-- **Contrast first.** Lightness targets pull every role toward the luminance that maximizes its worst-case contrast against dark and light backgrounds, so no role drops below ~3.3:1 on either.
-- **Lightness as a second channel.** Roles that appear side by side get a deliberate lightness gap in addition to their hue difference (columns darker than measures, variables darker than literals). Under red-green color vision deficiency the hue difference vanishes and the lightness gap carries the distinction: the columns/measures pair improves from ΔE 13 to 29 under deuteranopia simulation, variables/literals from 13 to 16.
-- **Enforced by tests.** `PaletteTests` computes WCAG contrast ratios and CIELAB ΔE76 for every role and fails when a color falls below 3.2:1 on either background or a same-view pair drifts under ΔE 25.
+## Color Blindness
 
-When changing a palette color, keep this contract: adjust lightness before hue, and let `PaletteTests` arbitrate.
+The most common forms of color blindness (deuteranopia and protanopia) merge red and green, so the status colors only reinforce what the glyph or word already says. In highlighted expressions the roles also differ by shape: functions are uppercase and followed by `(`, measure references sit in `[...]`, strings in quotes, comments start with `//`. Magenta keywords and bright-blue functions stay apart by lightness in most themes. Users who need more pick a theme tuned for their vision, and `tx` follows it.
 
 ## Message Categories
 
@@ -60,20 +60,21 @@ When changing a palette color, keep this contract: adjust lightness before hue, 
 |--------------------|-----------------------------------------------|--------------------------------------------------|
 | Banner             | `[bold]` on title                             | `[bold]tx doctor[/]`                            |
 | Section header     | `[bold]` label                                | `[bold]Tables[/] (4)`                            |
-| Status progress    | Sage                                          | `Validating...` in Sage                          |
-| Success            | Moss                                          | `Saved: model.tmdl` in Moss                      |
-| Warning            | Amber                                         | `Changes not saved.` in Amber                    |
-| Error              | Rose + bold                                   | `Build failed` in Rose bold                      |
+| Help               | `[bold]` headings, plain command and option names | `[bold]Discover:[/]` then `summary  ...`     |
+| Status progress    | Info                                          | spinner frame in cyan, label plain               |
+| Success            | Success                                       | `Saved: model.tmdl` in green                     |
+| Warning            | Warning                                       | `Changes not saved.` in yellow                   |
+| Error              | Error + bold                                  | `Build failed` in bold red                       |
 | Key-value label    | `[bold]` label, plain value                   | `[bold]Version:[/] 1.0.0`                        |
-| Guidance hint      | Slate                                         | `Run 'tx stage commit' to promote.` in Slate    |
-| Diff added         | Moss prefix `+`                               | `+ table Sales`                                  |
-| Diff removed       | Rose prefix `-`                               | `- table Sales`                                  |
-| Diff modified      | Amber prefix `~`                              | `~ table Sales`                                  |
-| Table              | Spectre `Table().RoundedBorder().BorderColor(Palette.Slate)` | Already established in `LsRenderer` |
-| Table row de-emphasis | Whole row in Slate (`Styling.Muted` per cell) | Hidden-object rows in `ls` are muted end to end |
-| Connection banner  | Slate on stderr                               | `Connected to: C:\models\Sales` before the model opens |
-| DAX highlighting   | Role-mapped palette on text output only       | `get` properties, `ls` expression cells, `validate` offending lines, `set` DAX before/after previews, and `format` inline/`--path` output: keywords Lav, functions Harbor, tables Sage, columns Moss, measures Orchid, variables Terra, literals Amber, comments Slate; JSON/CSV/TMDL/BIM stay markup-free; `bpa run --fix` stays plain because it carries no DAX today |
-| M highlighting     | Same roles, text output only                  | `get` properties, `ls` expression cells (partitions, shared expressions), and `format --lang m` output: keywords and type names Lav, library functions and `#table`-style constructors Harbor, step and field definitions Terra, field access (`[Amount]`) Moss, literals Amber, comments Slate. A lexical pass (`MLanguage.Classify`), not the parser, so it costs nothing per command |
+| Guidance hint      | Dim                                           | `Run 'tx stage commit' to promote.` dimmed       |
+| Diff added         | Success, prefix `+`                           | `+ table Sales`                                  |
+| Diff removed       | Error, prefix `-`                             | `- table Sales`                                  |
+| Diff modified      | Warning, prefix `~`                           | `~ table Sales`                                  |
+| Table              | `Styling.NewTable()`: rounded border, dim     | Already established in `LsRenderer`              |
+| Table row de-emphasis | Whole row dim (`Styling.Muted` per cell)   | Hidden-object rows in `ls` are muted end to end  |
+| Connection banner  | Dim on stderr                                 | `Connected to: C:\models\Sales` before the model opens |
+| DAX highlighting   | Role-mapped palette on text output only       | `get` properties, `ls` expression cells, `validate` offending lines, `set` DAX before/after previews, and `format` inline/`--path` output: keywords magenta, functions bright blue, measure references cyan, literals green, comments dim, definition names bold; tables, columns, and variables plain. JSON/CSV/TMDL/BIM stay markup-free; `bpa run --fix` stays plain because it carries no DAX today |
+| M highlighting     | Same roles, text output only                  | `get` properties, `ls` expression cells (partitions, shared expressions), and `format --lang m` output: keywords and type names magenta, library functions and `#table`-style constructors bright blue, literals green, comments dim; step and field definitions and field access (`[Amount]`) plain. A lexical pass (`MLanguage.Classify`), not the parser, so it costs nothing per command |
 | CI annotations     | Plain text, no markup                         | `::error::...` / `##vso[task.logissue...]`       |
 
 ## NO_COLOR Compliance
@@ -94,22 +95,22 @@ All output helpers live in `src/Tomix.Cli/Output/Styling.cs`. Use these instead 
 | Helper                                  | Output                                   |
 |-----------------------------------------|------------------------------------------|
 | `Styling.Bold(text)`                    | Bold text                                |
-| `Styling.Title(text)`                   | Sage bold                                |
-| `Styling.Success(text)`                 | Moss                                     |
-| `Styling.Warning(text)`                 | Amber                                    |
-| `Styling.Error(text)`                   | Rose bold                                |
-| `Styling.Muted(text)`                   | Slate                                    |
-| `Styling.Path(text)`                    | Harbor                                   |
-| `Styling.Value(text)`                   | Terra                                    |
-| `Styling.Option(text)`                  | Lav                                      |
+| `Styling.Title(text)`                   | Bold                                     |
+| `Styling.Success(text)`                 | Green                                    |
+| `Styling.Warning(text)`                 | Yellow                                   |
+| `Styling.Error(text)`                   | Bold red                                 |
+| `Styling.Muted(text)`                   | Dim                                      |
+| `Styling.Path(text)`                    | Plain (escaped)                          |
+| `Styling.Value(text)`                   | Plain (escaped)                          |
+| `Styling.Option(text)`                  | Bold                                     |
 | `Styling.KeyValue(label, value)`        | Bold label + plain value                 |
-| `Styling.Guidance(text)`                | Slate                                    |
+| `Styling.Guidance(text)`                | Dim                                      |
 | `Styling.MarkupEscape(text)`            | Escapes `[` and `]` for Spectre markup  |
 | `Styling.DaxMarkup(expression)`         | Syntax-highlighted DAX as escaped markup (see Message Categories) |
 | `Styling.MMarkup(expression)`           | Syntax-highlighted M as escaped markup (see Message Categories) |
 | `Styling.ExpressionMarkup(language, text)` | The shared entry point for expression text: `ExpressionLanguage.Dax` or `.M` highlights (decide with `DaxExpressions.IsDaxValue`/`IsDaxExpression` and `MExpressions.IsMValue`/`IsMExpression`), `.Plain` escapes; optional `measureNames` resolves DAX measure references to their own color, optional `suffix` (e.g. `... (+2 lines)`) stays plain |
 | `Styling.SeverityMarkup(severity)`      | Colored severity label (Error/Warning/Info) |
-| `Styling.NewTable(params columns)`      | Rounded-border table with Slate border   |
+| `Styling.NewTable(params columns)`      | Rounded-border table with a dim border   |
 
 ## What NOT to Color
 

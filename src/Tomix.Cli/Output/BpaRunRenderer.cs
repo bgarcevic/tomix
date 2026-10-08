@@ -44,7 +44,7 @@ internal static class BpaRunRenderer
             // A Rule spans the console width, which is unbounded when stdout is redirected.
             var ruleWidth = Math.Min(MaxTextWidth, AnsiConsole.Profile.Width);
             var ruleGlyph = AnsiConsole.Profile.Capabilities.Unicode ? '─' : '-';
-            AnsiConsole.Write(new Text(new string(ruleGlyph, ruleWidth) + "\n", new Style(Palette.Slate)));
+            AnsiConsole.Write(new Text(new string(ruleGlyph, ruleWidth) + "\n", Palette.Muted));
         }
 
         RenderSummary(result, groups.Count, view);
@@ -67,11 +67,13 @@ internal static class BpaRunRenderer
         var info = result.Violations.Count(v => v.Severity == RuleSeverity.Info);
 
         var text = BpaRunView.SummaryLine(
-            errors, warnings, info, failedRules, result.RulesEvaluated, result.DurationMs, result.MissingVertipaqStatsRules.Count);
-        var line = failedRules == 0 ? Styling.Success($"✓ {text}")
-            : errors > 0 ? Styling.Error($"✗ {text}")
-            : warnings > 0 ? Styling.Warning($"✗ {text}")
-            : $"✗ {Styling.MarkupEscape(text)}";
+            errors, warnings, info, failedRules, result.RulesEvaluated, result.DurationMs, result.MissingVertipaqStatsRules.Count,
+            Styling.Glyphs);
+        var fail = Styling.Glyphs.Fail;
+        var line = failedRules == 0 ? Styling.Success($"{Styling.Glyphs.Pass} {text}")
+            : errors > 0 ? Styling.Error($"{fail} {text}")
+            : warnings > 0 ? Styling.Warning($"{fail} {text}")
+            : $"{fail} {Styling.MarkupEscape(text)}";
 
         if (view.Errors || view.Warnings || view.Info)
         {
@@ -92,7 +94,7 @@ internal static class BpaRunRenderer
     /// </summary>
     private static void RenderSections(IReadOnlyList<BpaRunView.RuleGroup> groups, BpaRunView.RunOptions view)
     {
-        var countWidth = groups.Max(g => $"×{g.Objects.Count}".Length);
+        var countWidth = groups.Max(g => $"{Styling.Glyphs.Times}{g.Objects.Count}".Length);
         var indent = new string(' ', 2 + countWidth + 2);
         // Wrap to the effective render width so Spectre never re-wraps (which would split words).
         var width = Math.Max(24, Math.Min(MaxTextWidth, AnsiConsole.Profile.Width) - indent.Length);
@@ -107,7 +109,7 @@ internal static class BpaRunRenderer
             var rules = section.Groups.Count == 1 ? "1 rule" : $"{section.Groups.Count} rules";
             var objects = section.ObjectCount == 1 ? "1 object" : $"{section.ObjectCount} objects";
             AnsiConsole.MarkupLine(
-                $"{Styling.SeverityHeading(BpaRunView.SeverityWord(section.Severity))}  {Styling.Muted($"{rules} · {objects}")}");
+                $"{Styling.SeverityHeading(BpaRunView.SeverityWord(section.Severity))}  {Styling.Muted($"{rules}{Styling.Glyphs.Separator}{objects}")}");
 
             foreach (var group in section.Groups)
             {
@@ -121,7 +123,7 @@ internal static class BpaRunRenderer
     private static void RenderRule(
         BpaRunView.RuleGroup group, BpaRunView.RunOptions view, int countWidth, string indent, int width)
     {
-        var count = $"×{group.Objects.Count}".PadRight(countWidth);
+        var count = $"{Styling.Glyphs.Times}{group.Objects.Count}".PadRight(countWidth);
         var name = BpaRunView.StripCategoryPrefix(group.RuleName, group.Category);
         var nameLines = BpaRunView.WrapText(name, width);
         for (var i = 0; i < nameLines.Count; i++)
@@ -134,7 +136,7 @@ internal static class BpaRunRenderer
         foreach (var line in BpaRunView.PackSegments([group.RuleId, group.Category, fixable], width))
         {
             var parts = line.Select(s => ReferenceEquals(s, fixable) ? Styling.Success(s) : Styling.Muted(s));
-            AnsiConsole.MarkupLine(indent + string.Join(Styling.Muted(" · "), parts));
+            AnsiConsole.MarkupLine(indent + string.Join(Styling.Muted(Styling.Glyphs.Separator), parts));
         }
 
         if (!view.Details)
@@ -144,7 +146,7 @@ internal static class BpaRunRenderer
         foreach (var line in BpaRunView.WrapText(guidance, width))
             AnsiConsole.MarkupLine(indent + Styling.Guidance(line));
 
-        var objects = BpaRunView.ObjectLines(group.Objects, view.Full);
+        var objects = BpaRunView.ObjectLines(group.Objects, view.Full, glyphs: Styling.Glyphs);
         if (objects.Count == 0)
             return;
 
@@ -169,13 +171,13 @@ internal static class BpaRunRenderer
         };
         if (result.FixesSkipped > 0)
             parts.Add($"{result.FixesSkipped} skipped");
-        var summary = string.Join(" · ", parts);
-        AnsiConsole.MarkupLine(result.FixesApplied > 0 ? Styling.Success($"✓ {summary}") : Styling.Warning(summary));
+        var summary = string.Join(Styling.Glyphs.Separator, parts);
+        AnsiConsole.MarkupLine(result.FixesApplied > 0 ? Styling.Success($"{Styling.Glyphs.Pass} {summary}") : Styling.Warning(summary));
 
         if (result.DestructiveFixesSkipped > 0)
             AnsiConsole.MarkupLine(
                 $"  {Styling.Warning($"{result.DestructiveFixesSkipped} destructive fixes skipped")}"
-                + Styling.Muted(" — they delete objects; add --allow-delete to apply"));
+                + Styling.Muted($"{Styling.Glyphs.Dash}they delete objects; add --allow-delete to apply"));
 
         if (result.FixErrors is { Count: > 0 })
         {
@@ -210,7 +212,7 @@ internal static class BpaRunRenderer
 
         foreach (var change in result.FixChanges)
         {
-            var (headline, detail) = BpaRunView.PendingFix(change);
+            var (headline, detail) = BpaRunView.PendingFix(change, Styling.Glyphs);
             AnsiConsole.MarkupLine($"  {Styling.MarkupEscape(headline)}");
             if (detail is not null)
                 AnsiConsole.MarkupLine($"    {Styling.Muted(detail)}");
@@ -227,12 +229,12 @@ internal static class BpaRunRenderer
         };
         if (result.FixesSkipped > 0)
             parts.Add($"{result.FixesSkipped} skipped");
-        AnsiConsole.MarkupLine(Styling.Warning(string.Join(" · ", parts)));
+        AnsiConsole.MarkupLine(Styling.Warning(string.Join(Styling.Glyphs.Separator, parts)));
 
         if (result.DestructiveFixesSkipped > 0)
             AnsiConsole.MarkupLine(
                 $"  {Styling.Warning($"{result.DestructiveFixesSkipped} destructive fixes not previewed")}"
-                + Styling.Muted(" — they delete objects; add --allow-delete to include them"));
+                + Styling.Muted($"{Styling.Glyphs.Dash}they delete objects; add --allow-delete to include them"));
 
         if (result.FixErrors is { Count: > 0 })
         {
@@ -315,13 +317,13 @@ internal static class BpaRunRenderer
 
         // Ignoring is a choice, not a problem, so it gets its own line rather than "Diagnostics".
         var ignored = BpaRunView.IgnoredLine(
-            result.UserIgnoredRules.Count, result.ModelIgnoredRules.Count, result.IgnoredViolations);
+            result.UserIgnoredRules.Count, result.ModelIgnoredRules.Count, result.IgnoredViolations, Styling.Glyphs);
 
         if (parts.Count == 0 && ignored.Length == 0)
             return;
 
         if (parts.Count > 0)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Diagnostics:", string.Join(" · ", parts))}");
+            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Diagnostics:", string.Join(Styling.Glyphs.Separator, parts))}");
         if (ignored.Length > 0)
             AnsiConsole.MarkupLine($"  {Styling.KeyValue("Ignored:", ignored)}");
 
@@ -352,7 +354,7 @@ internal static class BpaRunRenderer
             var message = diag.Kind == BpaResultKind.DisabledRule
                 ? BpaRunView.SuppressionLabel(diag.SuppressedBy)
                 : diag.ErrorMessage;
-            var detail = string.IsNullOrWhiteSpace(message) ? "" : $" — {message}";
+            var detail = string.IsNullOrWhiteSpace(message) ? "" : $"{Styling.Glyphs.Dash}{message}";
             AnsiConsole.MarkupLine(
                 "    {0} {1}{2}{3}",
                 Styling.Muted($"[{label}]"),

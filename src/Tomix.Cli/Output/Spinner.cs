@@ -15,7 +15,7 @@ internal static class CliSpinner
 
         await AnsiConsole.Status()
             .Spinner(Spectre.Console.Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse(Palette.Sage.ToMarkup()))
+            .SpinnerStyle(new Style(Palette.Info))
             .StartAsync(label, async ctx =>
             {
                 using var _ = ReportToStatus(ctx);
@@ -30,7 +30,7 @@ internal static class CliSpinner
 
         return await AnsiConsole.Status()
             .Spinner(Spectre.Console.Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse(Palette.Sage.ToMarkup()))
+            .SpinnerStyle(new Style(Palette.Info))
             .StartAsync(label, async ctx =>
             {
                 using var _ = ReportToStatus(ctx);

@@ -94,7 +94,7 @@ internal sealed class RefreshLiveDisplay : IDisposable
         var frame = frames[(int)(elapsed.TotalMilliseconds / Spectre.Console.Spinner.Known.Dots.Interval.TotalMilliseconds) % frames.Count];
         var lines = new List<string>
         {
-            $"[{Palette.Sage.ToMarkup()}]{Styling.MarkupEscape(frame)}[/] {Styling.MarkupEscape(label.TrimEnd('.'))} {Styling.Muted("· " + Clock(elapsed))}",
+            $"[{Palette.Info.ToMarkup()}]{Styling.MarkupEscape(frame)}[/] {Styling.MarkupEscape(label.TrimEnd('.'))} {Styling.Muted("· " + Clock(elapsed))}",
         };
 
         // Oldest first: the order is stable, and long-running tables stay in view.
@@ -129,7 +129,7 @@ internal sealed class RefreshLiveDisplay : IDisposable
             var name = Fit(names[i], nameWidth);
             var count = t.Rows > 0 ? $"{Styling.Number(t.Rows)} rows" : "";
             lines.Add(
-                $"  [{Palette.Harbor.ToMarkup()}]{Styling.MarkupEscape(Verb(t.Phase).PadRight(13))}[/]" +
+                $"  {Styling.Muted(Verb(t.Phase).PadRight(13))}" +
                 $"{Styling.MarkupEscape(name.PadRight(nameWidth))}  " +
                 $"{Styling.MarkupEscape(count.PadLeft(16))}  " +
                 Styling.Muted(Clock(elapsed - t.Started)));

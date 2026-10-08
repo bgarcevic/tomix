@@ -56,7 +56,7 @@ internal static class InteractiveBanner
         console.WriteLine();
         var tip = Tips[(random ?? Random.Shared).Next(Tips.Length)];
         console.MarkupLine($"  {Styling.Muted("Tip:")} {Styling.Muted(tip)}");
-        console.Write(new Rule().RuleStyle(new Style(Palette.Harbor)));
+        console.Write(new Rule().RuleStyle(Palette.Muted));
     }
 
     /// <summary>The model block the welcome shows.</summary>
@@ -76,7 +76,7 @@ internal static class InteractiveBanner
     }
 
     /// <summary>
-    /// The logo, shaded from harbor blue to lavender with its outline muted, and the title beside it.
+    /// The logo, bold in the terminal's own foreground with its outline dimmed, and the title beside it.
     /// A narrow terminal gets the title alone.
     /// </summary>
     private static void WriteLogo(IAnsiConsole console, string version, int width)
@@ -88,11 +88,11 @@ internal static class InteractiveBanner
             return;
         }
 
-        string?[] side = [null, $"[bold {Palette.Harbor.ToMarkup()}]T O M I X[/]", Styling.Muted(new string('─', 25)), Styling.Muted("Interactive model session"), Styling.Muted($"v{version}"), null];
+        string?[] side = [null, Styling.Bold("T O M I X"), Styling.Muted(new string('─', 25)), Styling.Muted("Interactive model session"), Styling.Muted($"v{version}"), null];
         var beside = width >= logoWidth + 2 + Gap + 25;
         for (var row = 0; row < Logo.Length; row++)
         {
-            var line = "  " + Shade(Logo[row], logoWidth);
+            var line = "  " + Shade(Logo[row]);
             if (beside && side[row] is { } text)
                 line += new string(' ', Gap) + text;
             console.MarkupLine(line);
@@ -102,30 +102,22 @@ internal static class InteractiveBanner
             console.MarkupLine($"  {Styling.Muted($"Interactive model session · v{version}")}");
     }
 
-    private static string Shade(string line, int width)
+    private static string Shade(string line)
     {
         var markup = new StringBuilder();
-        for (var column = 0; column < line.Length; column++)
+        foreach (var character in line)
         {
-            var character = line[column];
             if (character == ' ')
             {
                 markup.Append(' ');
                 continue;
             }
 
-            var color = character == '█' ? Between(Palette.Harbor, Palette.Lav, column / (double)(width - 1)) : Palette.Slate;
-            markup.Append('[').Append(color.ToMarkup()).Append(']').Append(character).Append("[/]");
+            markup.Append(character == '█' ? "[bold]" : "[dim]").Append(character).Append("[/]");
         }
 
         return markup.ToString();
     }
-
-    private static Color Between(Color from, Color to, double amount)
-        => new(
-            (byte)Math.Round(from.R + (to.R - from.R) * amount),
-            (byte)Math.Round(from.G + (to.G - from.G) * amount),
-            (byte)Math.Round(from.B + (to.B - from.B) * amount));
 
     private static string Count(int count, string noun)
         => $"{count} {noun}{(count == 1 ? "" : "s")}";

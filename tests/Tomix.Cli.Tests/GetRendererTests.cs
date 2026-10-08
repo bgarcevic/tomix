@@ -13,11 +13,9 @@ namespace Tomix.Cli.Tests;
 [Collection(ConsoleStateCollection.Name)]
 public sealed class GetRendererTests
 {
-    private const string Harbor = "\x1b[38;2;69;130;172m";  // functions
-    private const string Sage = "\x1b[38;2;52;137;126m";    // table names
-    private const string Moss = "\x1b[38;2;64;129;57m";     // column references
-    private const string Orchid = "\x1b[38;2;207;103;172m"; // measure references
-    private const string Lav = "\x1b[38;2;133;114;175m";    // keywords
+    private const string Function = "\x1b[38;5;12m";  // functions (bright blue)
+    private const string Keyword = "\x1b[38;5;5m";   // keywords (magenta)
+    private const string Reference = "\x1b[38;5;6m"; // measure references (cyan)
 
     [Fact]
     public void DaxExpression_IsHighlighted()
@@ -28,8 +26,9 @@ public sealed class GetRendererTests
 
         var output = Render(measure);
 
-        Assert.Contains(Harbor + "SUM", output);
-        Assert.Contains(Sage + "'Sales'", output);
+        Assert.Contains(Function + "SUM", output);
+        // Tables and columns stay plain.
+        Assert.Contains("('Sales'[Total Product Cost])", output);
     }
 
     [Fact]
@@ -43,8 +42,8 @@ public sealed class GetRendererTests
 
         var output = Render(measure, measureNames: measureNames);
 
-        Assert.Contains(Orchid + "[Profit]", output);
-        Assert.Contains(Moss + "[Qty]", output);
+        Assert.Contains(Reference + "[Profit]", output);
+        Assert.Contains(", 'Sales'[Qty])", output);
     }
 
     [Fact]
@@ -58,9 +57,9 @@ public sealed class GetRendererTests
 
         var output = Render(partition, [("expression", m), ("mode", "import")]);
 
-        Assert.Contains(Harbor + "Table.SelectRows", output);
-        Assert.Contains(Lav + "each", output);
-        Assert.Contains(Moss + "[X]", output);
+        Assert.Contains(Function + "Table.SelectRows", output);
+        Assert.Contains(Keyword + "each", output);
+        Assert.Contains(" [X] > ", output);
         // Only the expression highlights; other values (the mode) stay plain.
         var visible = StripAnsi(output);
         Assert.Contains("mode        import", visible);
@@ -77,8 +76,8 @@ public sealed class GetRendererTests
 
         var output = Render(expression, [("name", "Env"), ("expression", m)]);
 
-        Assert.Contains(Lav + "meta", output);
-        Assert.DoesNotContain(Sage, output);
+        Assert.Contains(Keyword + "meta", output);
+        Assert.DoesNotContain(Reference, output);
     }
 
     private static string Render(

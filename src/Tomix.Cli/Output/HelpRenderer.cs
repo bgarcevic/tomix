@@ -365,14 +365,15 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         {
             AnsiConsole.MarkupLine($"{Styling.Bold("tx")} {Styling.Muted("—")} {Styling.MarkupEscape(root.Description ?? "")}");
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"{Styling.Title("Usage:")} {Styling.Bold("tx")} {Styling.Value("<command>")} {Styling.Option("[options]")}");
+            Heading("Usage");
+            AnsiConsole.MarkupLine($"  {Styling.Bold("tx")} {Styling.Value("<command>")} {Styling.Option("[options]")}");
             AnsiConsole.WriteLine();
 
             WriteSectionedCommands(root);
 
             if (!concise)
             {
-                AnsiConsole.MarkupLine(Styling.Title("Global options:"));
+                Heading("Global options");
                 // Derived from the actual root options (help/version plus the recursive globals)
                 // so the root help can never drift from what the parser accepts.
                 WriteOptionRows(root.Options.Where(option => !option.Hidden).ToList());
@@ -405,7 +406,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 
             if (command.Subcommands.Any(sc => !sc.Hidden))
             {
-                AnsiConsole.MarkupLine(Styling.Title("Commands:"));
+                Heading("Commands");
                 WriteCommandRows(command.Subcommands.Where(sc => !sc.Hidden).ToList(), includeArguments: true);
                 AnsiConsole.WriteLine();
             }
@@ -413,7 +414,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             var arguments = command.Arguments.Where(a => !a.Hidden).ToList();
             if (arguments.Count > 0)
             {
-                AnsiConsole.MarkupLine(Styling.Title("Arguments:"));
+                Heading("Arguments");
                 WriteRows(arguments.Select(a =>
                 {
                     var label = ArgumentLabel(a);
@@ -429,7 +430,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             foreach (var group in local.GroupBy(o => HelpGroups.Of(o) ?? "")
                          .OrderBy(g => g.Key switch { "" => 0, HelpGroups.Save => 2, _ => 1 }))
             {
-                AnsiConsole.MarkupLine(Styling.Title($"{(group.Key.Length == 0 ? "Options" : group.Key)}:"));
+                Heading(group.Key.Length == 0 ? "Options" : group.Key);
                 WriteOptionRows(group.Key == HelpGroups.Save
                     ? group.OrderBy(o => Array.IndexOf(SaveOrder, o.Name) is var i and >= 0 ? i : SaveOrder.Length).ToList()
                     : group.ToList());
@@ -438,7 +439,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 
             if (CommandExamples.TryGetValue(path, out var examples))
             {
-                AnsiConsole.MarkupLine(Styling.Title("Examples:"));
+                Heading("Examples");
                 foreach (var example in examples)
                     AnsiConsole.MarkupLine($"  {Styling.Path(example)}");
                 AnsiConsole.WriteLine();
@@ -449,17 +450,16 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
                 // Each page used to list all thirteen globals in full: nearly half of every
                 // command's help. They are the same everywhere, so name them and point at the root.
                 var names = string.Join(", ", global.Select(o => o.Name));
-                var heading = "Global options:";
-                var lines = Wrap($"{names} (see 'tx --help')", width - heading.Length - 1);
-                AnsiConsole.MarkupLine($"{Styling.Title(heading)} {Styling.Muted(lines[0])}");
-                foreach (var line in lines.Skip(1))
-                    AnsiConsole.MarkupLine($"{new string(' ', heading.Length + 1)}{Styling.Muted(line)}");
+                Heading("Global options");
+                foreach (var line in Wrap($"{names} (see 'tx --help')", width - 2))
+                    AnsiConsole.MarkupLine($"  {Styling.Muted(line)}");
             }
         }
 
         private void WriteUsage(Command command, string path)
         {
-            var usage = $"{Styling.Title("Usage:")} {Styling.Bold($"tx {path}")}";
+            Heading("Usage");
+            var usage = $"  {Styling.Bold($"tx {path}")}";
             foreach (var arg in command.Arguments.Where(a => !a.Hidden))
                 usage += " " + Styling.Value(ArgumentLabel(arg, bracketOptional: true));
             if (command.Subcommands.Any(sc => !sc.Hidden))
@@ -487,18 +487,26 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             var labelWidth = sections.SelectMany(s => s.Commands).Max(c => CommandLabel(c, false).Length);
             foreach (var (heading, commands) in sections)
             {
-                AnsiConsole.MarkupLine(Styling.Title($"{heading}:"));
+                Heading(heading);
                 WriteCommandRows(commands, includeArguments: false, labelWidth);
                 AnsiConsole.WriteLine();
             }
         }
+
+        /// <summary>
+        /// A section heading on its own line: bold and uppercase, so it stands apart from the
+        /// regular-weight names under it even where a font's bold is subtle.
+        /// </summary>
+        private static void Heading(string text)
+            => AnsiConsole.MarkupLine(Styling.Title(text.ToUpperInvariant()));
 
         private void WriteCommandRows(List<Command> commands, bool includeArguments, int? labelWidth = null)
         {
             var rows = commands.Select(c =>
             {
                 var label = CommandLabel(c, includeArguments);
-                var styled = Styling.Bold(c.Name) + label[c.Name.Length..] switch
+                // Names stay regular weight so the bold section headings carry the hierarchy.
+                var styled = Styling.MarkupEscape(c.Name) + label[c.Name.Length..] switch
                 {
                     "" => "",
                     var args => " " + Styling.Value(args.TrimStart()),
@@ -521,7 +529,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 
                 var placeholder = Placeholder(option);
                 var label = placeholder is null ? joined : $"{joined} {placeholder}";
-                var styled = Styling.Option(joined) + (placeholder is null ? "" : " " + Styling.Value(placeholder));
+                var styled = Styling.MarkupEscape(joined) + (placeholder is null ? "" : " " + Styling.Value(placeholder));
                 return new Row(label, styled, option.Description ?? "");
             }).ToList();
             WriteRows(rows);

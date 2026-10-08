@@ -1,32 +1,47 @@
-using Spectre.Console;
-using Tomix.Cli.Output;
+using System.Text.RegularExpressions;
 using Tomix.Ui;
 
 namespace Tomix.Cli.Tests;
 
-/// <summary>The <c>tx ui</c> page wears the CLI's palette: a change to one shows up in the other.</summary>
-public sealed class UiPagePaletteTests
+/// <summary>
+/// The <c>tx ui</c> page keeps its colors in one token block: every color it uses is a token
+/// defined there, and the accent is redefined for dark mode so it keeps its contrast.
+/// </summary>
+public sealed partial class UiPagePaletteTests
 {
-    public static TheoryData<string, string> Colors => new()
+    [Fact]
+    public void EveryTokenThePageUses_IsDefined()
     {
-        { "harbor", Hex(Palette.Harbor) },
-        { "lav", Hex(Palette.Lav) },
-        { "moss", Hex(Palette.Moss) },
-        { "amber", Hex(Palette.Amber) },
-        { "rose", Hex(Palette.Rose) },
-        { "slate", Hex(Palette.Slate) }
-    };
+        var page = Page();
+        var defined = TokenDefinition().Matches(page).Select(match => match.Groups[1].Value).ToHashSet();
 
-    [Theory]
-    [MemberData(nameof(Colors))]
-    public void PageColor_IsThePaletteColor(string name, string hex)
-        => Assert.Contains($"--{name}:{hex};", Page(), StringComparison.Ordinal);
+        var undefined = TokenUse().Matches(page)
+            .Select(match => match.Groups[1].Value)
+            .Where(token => !defined.Contains(token))
+            .Distinct();
+
+        Assert.Empty(undefined);
+    }
 
     [Fact]
-    public void Logo_IsShadedLikeTheWelcomeBanner()
-        => Assert.Contains("linear-gradient(90deg,var(--harbor),var(--lav))", Page(), StringComparison.Ordinal);
+    public void Accent_IsRedefinedForDarkMode()
+    {
+        var page = Page();
+        var dark = page[page.IndexOf("prefers-color-scheme:dark", StringComparison.Ordinal)..];
 
-    private static string Hex(Color color) => $"#{color.R:x2}{color.G:x2}{color.B:x2}";
+        Assert.Contains("--accent:", dark, StringComparison.Ordinal);
+        Assert.Contains("--on-accent:", dark, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Logo_WearsTheAccent()
+        => Assert.Contains(".logo{width:22px;height:22px;border-radius:6px;background:var(--accent);color:var(--on-accent);", Page(), StringComparison.Ordinal);
+
+    [GeneratedRegex(@"--([a-z-]+):")]
+    private static partial Regex TokenDefinition();
+
+    [GeneratedRegex(@"var\(--([a-z-]+)\)")]
+    private static partial Regex TokenUse();
 
     private static string Page()
     {
