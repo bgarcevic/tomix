@@ -61,6 +61,27 @@ public sealed class PaletteTests
         Assert.Equal(roles.Length, roles.Distinct().Count());
     }
 
+    [Fact]
+    public void KeyValueLines_ArePlainWithValuesAlignedPastTheLongestLabel()
+    {
+        var output = new StringWriter();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Out = new AnsiConsoleOutput(output),
+            Ansi = AnsiSupport.Yes,
+            ColorSystem = ColorSystemSupport.TrueColor,
+        });
+
+        foreach (var line in Styling.KeyValueLines([("Tenant:", "contoso"), ("Expires:", "[soon]")], indent: "  "))
+            console.MarkupLine(line);
+
+        Assert.Equal(["  Tenant:   contoso", "  Expires:  [soon]"], output.ToString().ReplaceLineEndings().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    [Fact]
+    public void Placeholder_IsDim()
+        => Assert.Equal("[dim]<path>[/]", Styling.Placeholder("<path>"));
+
     private static Dictionary<string, Color> PaletteColors()
         => typeof(Palette)
             .GetFields(BindingFlags.Public | BindingFlags.Static)

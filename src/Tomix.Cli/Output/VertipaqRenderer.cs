@@ -39,8 +39,9 @@ internal static class VertipaqRenderer
     private static void RenderSummary(VertipaqResult data)
     {
         AnsiConsole.MarkupLine(Styling.Title("Storage summary"));
-        foreach (var (label, value) in VertipaqView.BuildSummary(data.Stats))
-            AnsiConsole.MarkupLine("  " + Styling.KeyValue(label + ":", value));
+        Styling.WriteKeyValues(
+            [.. VertipaqView.BuildSummary(data.Stats).Select(row => (row.Label + ":", row.Value))],
+            indent: "  ");
         AnsiConsole.WriteLine();
     }
 

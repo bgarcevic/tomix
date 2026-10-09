@@ -190,20 +190,19 @@ internal static class ConnectRenderer
 
     public static void RenderConnection(CliConnectionState connection)
     {
-        if (!string.IsNullOrWhiteSpace(connection.Profile))
-            AnsiConsole.MarkupLine(Styling.KeyValue("profile:", connection.Profile));
-        if (!string.IsNullOrWhiteSpace(connection.Model))
-            AnsiConsole.MarkupLine(Styling.KeyValue("model:", connection.Model));
-        if (!string.IsNullOrWhiteSpace(connection.Server))
-            AnsiConsole.MarkupLine(Styling.KeyValue("server:", connection.Server));
-        if (!string.IsNullOrWhiteSpace(connection.Database))
-            AnsiConsole.MarkupLine(Styling.KeyValue("database:", connection.Database));
-        if (!string.IsNullOrWhiteSpace(connection.Workspace))
-            AnsiConsole.MarkupLine(Styling.KeyValue("workspace:", connection.Workspace));
-        if (!string.IsNullOrWhiteSpace(connection.WorkspaceFormat))
-            AnsiConsole.MarkupLine(Styling.KeyValue("workspace-format:", connection.WorkspaceFormat));
-        if (!string.IsNullOrWhiteSpace(connection.WorkspaceAuth))
-            AnsiConsole.MarkupLine(Styling.KeyValue("workspace-auth:", connection.WorkspaceAuth));
+        (string Label, string? Value)[] rows =
+        [
+            ("profile:", connection.Profile),
+            ("model:", connection.Model),
+            ("server:", connection.Server),
+            ("database:", connection.Database),
+            ("workspace:", connection.Workspace),
+            ("workspace-format:", connection.WorkspaceFormat),
+            ("workspace-auth:", connection.WorkspaceAuth),
+        ];
+        Styling.WriteKeyValues([.. rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.Value))
+            .Select(row => (row.Label, row.Value!))]);
     }
 
     /// <summary>

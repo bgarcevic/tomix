@@ -55,8 +55,35 @@ internal static class Styling
 
     public static string Option(string text) => Bold(text);
 
+    /// <summary>
+    /// A stand-in the user replaces, such as <c>&lt;path&gt;</c> or <c>[options]</c> in help: dim, so
+    /// the command or flag it follows stays the thing the eye lands on.
+    /// </summary>
+    public static string Placeholder(string text) => Muted(text);
+
+    /// <summary>
+    /// One label and value, both plain. For two or more rows use <see cref="KeyValueLines"/>, which
+    /// lines the values up.
+    /// </summary>
     public static string KeyValue(string label, string value)
-        => $"[bold]{MarkupEscape(label)}[/] {MarkupEscape(value)}";
+        => $"{MarkupEscape(label)} {MarkupEscape(value)}";
+
+    /// <summary>
+    /// A block of label/value rows as markup lines, both plain, with every value starting in one
+    /// column two spaces past the longest label: alignment, not color, carries the structure.
+    /// </summary>
+    public static IEnumerable<string> KeyValueLines(IReadOnlyCollection<(string Label, string Value)> rows, string indent = "")
+    {
+        var width = rows.Count == 0 ? 0 : rows.Max(row => row.Label.Length);
+        return rows.Select(row => indent + MarkupEscape(row.Label.PadRight(width)) + "  " + MarkupEscape(row.Value));
+    }
+
+    /// <summary>Writes <see cref="KeyValueLines"/> to stdout.</summary>
+    public static void WriteKeyValues(IReadOnlyCollection<(string Label, string Value)> rows, string indent = "")
+    {
+        foreach (var line in KeyValueLines(rows, indent))
+            AnsiConsole.MarkupLine(line);
+    }
 
     public static string Guidance(string text) => Muted(text);
 

@@ -286,6 +286,7 @@ internal static class BpaRulesRenderer
     {
         var id = Styling.Value(result.RuleId ?? "");
         var path = Styling.Path(result.Path);
+        var rows = new List<(string, string)>();
         switch (result.Action)
         {
             case "init":
@@ -301,7 +302,7 @@ internal static class BpaRulesRenderer
                 return;
             case "set":
                 AnsiConsole.MarkupLine($"Updated rule {id} in {path}.");
-                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Changed:", string.Join(", ", result.ChangedFields ?? []))}");
+                rows.Add(("Changed:", string.Join(", ", result.ChangedFields ?? [])));
                 break;
             default:
                 AnsiConsole.MarkupLine($"Added rule {id} to {path}.");
@@ -309,8 +310,9 @@ internal static class BpaRulesRenderer
         }
 
         if (result.Rule is { } rule)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Applies to:", rule.Scope)}");
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules in file:", result.RuleCount.ToString())}");
+            rows.Add(("Applies to:", rule.Scope));
+        rows.Add(("Rules in file:", result.RuleCount.ToString()));
+        Styling.WriteKeyValues(rows, indent: "  ");
     }
 
     /// <summary><c>bpa rules add/set/remove</c> against a model: what changed, and whether it was kept.</summary>
@@ -318,6 +320,7 @@ internal static class BpaRulesRenderer
     {
         var id = Styling.Value(result.RuleId);
         var model = Styling.Value(result.ModelName);
+        var rows = new List<(string, string)>();
         switch (result.Action)
         {
             case "set" when !result.Changed:
@@ -325,7 +328,7 @@ internal static class BpaRulesRenderer
                 return;
             case "set":
                 AnsiConsole.MarkupLine($"Updated model rule {id} in {model}.");
-                AnsiConsole.MarkupLine($"  {Styling.KeyValue("Changed:", string.Join(", ", result.ChangedFields ?? []))}");
+                rows.Add(("Changed:", string.Join(", ", result.ChangedFields ?? [])));
                 break;
             case "remove":
                 AnsiConsole.MarkupLine($"Removed model rule {id} from {model}.");
@@ -336,8 +339,9 @@ internal static class BpaRulesRenderer
         }
 
         if (result.Rule is { } rule)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Applies to:", rule.Scope)}");
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Rules in model:", result.RuleCount.ToString())}");
+            rows.Add(("Applies to:", rule.Scope));
+        rows.Add(("Rules in model:", result.RuleCount.ToString()));
+        Styling.WriteKeyValues(rows, indent: "  ");
         RenderMutationTail(result);
     }
 

@@ -1,6 +1,6 @@
 Comparing models...
-Left: <SAMPLE>
-Right: <MODEL_1>
+Left:   <SAMPLE>
+Right:  <MODEL_1>
 5 added, 0 removed, 0 modified
 
   + Column [Test] [Table]/[Test] [Column]

@@ -18,6 +18,13 @@ and the API surface that major versions protect.
   100 ms to about 50 ms and undo from about 55 ms to about 30 ms (#423).
 - The undo history of a live session is capped by model size as well as by count, so a large
   model keeps fewer than 50 steps and the session's memory stays near 250 MB (#423).
+- Text output uses color more sparingly. Labels in key-value blocks (`auth status`, `doctor`,
+  `diff`, `connect`, `validate`, `vertipaq`, …) are plain instead of bold, with the values lined
+  up in one column. Progress lines and notices such as "Authenticating..." and where
+  credentials were saved are dim. Placeholders in `--help` (`<path>`, `[options]`) are dim too
+  (#440).
+- With stdin piped (`$secret | tx auth login --password -`), a command's progress label prints
+  once, dim, on stderr instead of as plain text on stdout (#440).
 
 ### Fixed
 

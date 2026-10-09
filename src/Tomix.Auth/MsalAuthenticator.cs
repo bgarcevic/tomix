@@ -24,7 +24,10 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
     private readonly string _cacheDirectory;
     private readonly AuthStateStore _stateStore;
     private readonly CredentialStore _credentialStore;
+    // Messages the user must act on (the device-code prompt) vs. secondary notices (where
+    // credentials were saved); the CLI renders the second kind dimmed.
     private readonly Action<string> _messageWriter;
+    private readonly Action<string> _noticeWriter;
 
     private IPublicClientApplication? _publicApp;
     private IConfidentialClientApplication? _confidentialApp;
@@ -36,13 +39,15 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
         string? cacheDirectory = null,
         string? stateFile = null,
         string? credentialFile = null,
-        Action<string>? messageWriter = null)
+        Action<string>? messageWriter = null,
+        Action<string>? noticeWriter = null)
     {
         _settings = settings;
         _cacheDirectory = cacheDirectory ?? TomixPaths.AuthDirectory;
         _stateStore = new AuthStateStore(stateFile ?? TomixPaths.AuthStateFile);
         _credentialStore = new CredentialStore(credentialFile);
         _messageWriter = messageWriter ?? (_ => { });
+        _noticeWriter = noticeWriter ?? _messageWriter;
     }
 
     public async Task<AuthIdentity> LoginAsync(AuthLoginOptions options, CancellationToken cancellationToken)
@@ -72,7 +77,7 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
             if (options.Method is AuthMethod.ServicePrincipalSecret or AuthMethod.ServicePrincipalCertificate)
             {
                 _credentialStore.Save(options);
-                _messageWriter($"Service-principal credentials saved for silent renewal: {_credentialStore.StorageDescription}. Use --save false to skip.");
+                _noticeWriter($"Service-principal credentials saved for silent renewal: {_credentialStore.StorageDescription}. Use --save false to skip.");
             }
         }
         return identity;

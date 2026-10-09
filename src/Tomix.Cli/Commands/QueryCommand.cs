@@ -224,7 +224,7 @@ internal sealed class QueryCommand : ICommandModule
 
                 QueryResultRenderer.WriteFile(result.Data, outputFile!, fileFormat);
                 if (!quiet)
-                    Console.Error.WriteLine($"Wrote {result.Data.RowCount} row(s) to {outputFile}");
+                    StdErr.MarkupLine(Styling.Success($"Wrote {result.Data.RowCount} row(s) to {outputFile}"));
                 exitCode = result.ExitCode;
             }
             else

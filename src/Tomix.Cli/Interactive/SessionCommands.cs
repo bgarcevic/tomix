@@ -97,19 +97,23 @@ internal static class SessionCommands
     internal static void RenderStatus(SessionStatusResult status)
     {
         // A model on a server has no source path; name the endpoint instead.
-        AnsiConsole.MarkupLine(Styling.KeyValue("Model:", string.IsNullOrEmpty(status.Source) ? status.Model : status.Source));
-        AnsiConsole.MarkupLine(Styling.KeyValue("Unsaved changes:", status.Dirty ? "yes" : "no"));
+        var rows = new List<(string, string)>
+        {
+            ("Model:", string.IsNullOrEmpty(status.Source) ? status.Model : status.Source),
+            ("Unsaved changes:", status.Dirty ? "yes" : "no"),
+        };
         if (status.State == SessionState.Stale)
-            AnsiConsole.MarkupLine(status.CanReload
-                ? Styling.KeyValue("Files:", "changed outside the session; run 'reload' or 'save --force'")
-                : Styling.KeyValue("Server:", "model changed outside the session; run 'save --force' or connect again"));
+            rows.Add(status.CanReload
+                ? ("Files:", "changed outside the session; run 'reload' or 'save --force'")
+                : ("Server:", "model changed outside the session; run 'save --force' or connect again"));
         if (status.SourceUnavailable)
-            AnsiConsole.MarkupLine(Styling.KeyValue("Server:", Unreachable(status.Model)));
-        AnsiConsole.MarkupLine(Styling.KeyValue("Undo steps:", Styling.Number(status.UndoSteps)));
-        AnsiConsole.MarkupLine(Styling.KeyValue("Redo steps:", Styling.Number(status.RedoSteps)));
-        AnsiConsole.MarkupLine(Styling.KeyValue("Transaction:", status.Transaction is { } open
+            rows.Add(("Server:", Unreachable(status.Model)));
+        rows.Add(("Undo steps:", Styling.Number(status.UndoSteps)));
+        rows.Add(("Redo steps:", Styling.Number(status.RedoSteps)));
+        rows.Add(("Transaction:", status.Transaction is { } open
             ? open.Label is { Length: > 0 } label ? $"{open.Id} ({label})" : open.Id
             : "none"));
+        Styling.WriteKeyValues(rows);
     }
 
     internal static void RenderHistory(SessionHistoryResult history)

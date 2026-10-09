@@ -337,7 +337,7 @@ public sealed partial class InteractiveCommandTests
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("> status", run.Stderr);
         Assert.DoesNotContain("> # a comment", run.Stderr);
-        Assert.Contains("Unsaved changes: no", run.Stdout);
+        Assert.Contains("Unsaved changes:  no", run.Stdout);
     }
 
     [Fact]

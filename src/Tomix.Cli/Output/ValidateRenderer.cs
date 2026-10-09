@@ -103,10 +103,10 @@ internal static class ValidateRenderer
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"  {Styling.KeyValue("Errors:", result.Errors.Count.ToString())}");
-
+        var rows = new List<(string, string)> { ("Errors:", result.Errors.Count.ToString()) };
         if (!errorsOnly)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Warnings:", result.Warnings.Count.ToString())}");
+            rows.Add(("Warnings:", result.Warnings.Count.ToString()));
+        Styling.WriteKeyValues(rows, indent: "  ");
     }
 
     public static void EmitCi(string? ci, ValidateModelResult result)

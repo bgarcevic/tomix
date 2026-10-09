@@ -322,10 +322,12 @@ internal static class BpaRunRenderer
         if (parts.Count == 0 && ignored.Length == 0)
             return;
 
+        var rows = new List<(string, string)>();
         if (parts.Count > 0)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Diagnostics:", string.Join(Styling.Glyphs.Separator, parts))}");
+            rows.Add(("Diagnostics:", string.Join(Styling.Glyphs.Separator, parts)));
         if (ignored.Length > 0)
-            AnsiConsole.MarkupLine($"  {Styling.KeyValue("Ignored:", ignored)}");
+            rows.Add(("Ignored:", ignored));
+        Styling.WriteKeyValues(rows, indent: "  ");
 
         if (!view.Details)
         {

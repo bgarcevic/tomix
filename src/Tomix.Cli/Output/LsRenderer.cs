@@ -273,13 +273,13 @@ internal sealed partial class LsRenderer
         var table = new Table()
             .Border(Styling.Border)
             .BorderStyle(Palette.Muted)
-            .AddColumn(new TableColumn("[bold]Name[/]") { Alignment = Justify.Left })
-            .AddColumn(new TableColumn("[bold]Mode[/]") { Alignment = Justify.Left });
+            .AddColumn(new TableColumn(Styling.Bold("Name")) { Alignment = Justify.Left })
+            .AddColumn(new TableColumn(Styling.Bold("Mode")) { Alignment = Justify.Left });
 
         if (showExpression)
-            table.AddColumn(new TableColumn("[bold]Expression[/]") { Alignment = Justify.Left });
+            table.AddColumn(new TableColumn(Styling.Bold("Expression")) { Alignment = Justify.Left });
         if (showDescription)
-            table.AddColumn(new TableColumn("[bold]Description[/]") { Alignment = Justify.Left });
+            table.AddColumn(new TableColumn(Styling.Bold("Description")) { Alignment = Justify.Left });
 
         foreach (var obj in objects)
         {

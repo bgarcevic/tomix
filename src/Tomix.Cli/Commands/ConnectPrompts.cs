@@ -55,7 +55,7 @@ internal static class ConnectPrompts
         }
 
         var prompt = new SelectionPrompt<WorkspaceInfo>()
-            .Title("Select a [green]workspace[/]:")
+            .Title($"Select a {Styling.Bold("workspace")}:")
             .PageSize(15)
             .EnableSearch()
             .UseConverter(w => Styling.MarkupEscape(w.Name));
@@ -84,7 +84,7 @@ internal static class ConnectPrompts
         CancellationToken cancellationToken)
     {
         var prompt = new SelectionPrompt<PowerBiDesktopInstance>()
-            .Title("Select a [green]Power BI Desktop[/] instance:")
+            .Title($"Select a {Styling.Bold("Power BI Desktop")} instance:")
             .PageSize(15)
             .UseConverter(instance => Styling.MarkupEscape(DescribeInstance(instance)));
         prompt.AddChoices(instances);
@@ -143,7 +143,7 @@ internal static class ConnectPrompts
                 + "Deploy a model first, or pass a model name explicitly.");
 
         var prompt = new SelectionPrompt<DatabaseChoice>()
-            .Title("Select a [green]semantic model[/]:")
+            .Title($"Select a {Styling.Bold("semantic model")}:")
             .PageSize(15)
             .EnableSearch()
             .UseConverter(c => c.Label);
@@ -235,9 +235,9 @@ internal static class ConnectPrompts
             => new(DatabaseChoiceKind.Existing, name, Styling.MarkupEscape(name));
 
         public static DatabaseChoice CreateNew()
-            => new(DatabaseChoiceKind.CreateNew, "", "[green]+ Create new model...[/]");
+            => new(DatabaseChoiceKind.CreateNew, "", Styling.Success("+ Create new model..."));
 
         public static DatabaseChoice WorkspaceOnly()
-            => new(DatabaseChoiceKind.WorkspaceOnly, "", "[grey]Connect to workspace only (choose model later)[/]");
+            => new(DatabaseChoiceKind.WorkspaceOnly, "", Styling.Muted("Connect to workspace only (choose model later)"));
     }
 }

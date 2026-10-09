@@ -13,6 +13,13 @@ internal static class CliSpinner
             return;
         }
 
+        if (!AnsiConsole.Profile.Capabilities.Interactive)
+        {
+            using var _ = ReportToStdErr(label);
+            await action();
+            return;
+        }
+
         await AnsiConsole.Status()
             .Spinner(Spectre.Console.Spinner.Known.Dots)
             .SpinnerStyle(new Style(Palette.Info))
@@ -27,6 +34,12 @@ internal static class CliSpinner
     {
         if (suppress || ShouldSuppress())
             return await action();
+
+        if (!AnsiConsole.Profile.Capabilities.Interactive)
+        {
+            using var _ = ReportToStdErr(label);
+            return await action();
+        }
 
         return await AnsiConsole.Status()
             .Spinner(Spectre.Console.Spinner.Known.Dots)
@@ -44,6 +57,17 @@ internal static class CliSpinner
     /// </summary>
     private static IDisposable ReportToStatus(StatusContext ctx)
         => MutationProgress.Use(message => ctx.Status(Styling.MarkupEscape(message)));
+
+    /// <summary>
+    /// A terminal that cannot animate (stdin piped, as in <c>$secret | tx auth login -p -</c>):
+    /// Spectre's fallback would print the label as plain text on stdout, so print it, and each
+    /// progress phase, once as dim commentary on stderr instead.
+    /// </summary>
+    private static IDisposable ReportToStdErr(string label)
+    {
+        StdErr.MarkupLine(Styling.Muted(label));
+        return MutationProgress.Use(message => StdErr.MarkupLine(Styling.Muted(message)));
+    }
 
     public static bool ShouldSuppress() => Console.IsOutputRedirected;
 }

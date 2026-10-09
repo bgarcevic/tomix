@@ -366,7 +366,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             AnsiConsole.MarkupLine($"{Styling.Bold("tx")} {Styling.Muted("—")} {Styling.MarkupEscape(root.Description ?? "")}");
             AnsiConsole.WriteLine();
             Heading("Usage");
-            AnsiConsole.MarkupLine($"  {Styling.Bold("tx")} {Styling.Value("<command>")} {Styling.Option("[options]")}");
+            AnsiConsole.MarkupLine($"  {Styling.Bold("tx")} {Styling.Placeholder("<command>")} {Styling.Placeholder("[options]")}");
             AnsiConsole.WriteLine();
 
             WriteSectionedCommands(root);
@@ -461,10 +461,10 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             Heading("Usage");
             var usage = $"  {Styling.Bold($"tx {path}")}";
             foreach (var arg in command.Arguments.Where(a => !a.Hidden))
-                usage += " " + Styling.Value(ArgumentLabel(arg, bracketOptional: true));
+                usage += " " + Styling.Placeholder(ArgumentLabel(arg, bracketOptional: true));
             if (command.Subcommands.Any(sc => !sc.Hidden))
-                usage += " " + Styling.Value("<command>");
-            usage += " " + Styling.Option("[options]");
+                usage += " " + Styling.Placeholder("<command>");
+            usage += " " + Styling.Placeholder("[options]");
             AnsiConsole.MarkupLine(usage);
             AnsiConsole.WriteLine();
         }
@@ -509,7 +509,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
                 var styled = Styling.MarkupEscape(c.Name) + label[c.Name.Length..] switch
                 {
                     "" => "",
-                    var args => " " + Styling.Value(args.TrimStart()),
+                    var args => " " + Styling.Placeholder(args.TrimStart()),
                 };
                 return new Row(label, styled, c.Description ?? "");
             }).ToList();
@@ -529,7 +529,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
 
                 var placeholder = Placeholder(option);
                 var label = placeholder is null ? joined : $"{joined} {placeholder}";
-                var styled = Styling.MarkupEscape(joined) + (placeholder is null ? "" : " " + Styling.Value(placeholder));
+                var styled = Styling.MarkupEscape(joined) + (placeholder is null ? "" : " " + Styling.Placeholder(placeholder));
                 return new Row(label, styled, option.Description ?? "");
             }).ToList();
             WriteRows(rows);

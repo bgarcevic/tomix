@@ -61,7 +61,8 @@ internal static class Program
 
         var tokenProvider = new MsalAuthenticator(
             AuthSettingsFactory.Resolve(config),
-            messageWriter: Console.Error.WriteLine);
+            messageWriter: Console.Error.WriteLine,
+            noticeWriter: notice => StdErr.MarkupLine(Styling.Muted(notice)));
         IReadOnlyList<IModelProvider> providers =
             [new TmdlModelProvider(tokenProvider), new TomFileModelProvider(tokenProvider), new TomServerModelProvider(tokenProvider)];
         // Explicit timeout so hung REST endpoints fail predictably instead of holding the

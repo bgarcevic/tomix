@@ -70,9 +70,9 @@ internal static class QueryResultRenderer
             return;
 
         var seconds = Styling.DurationSeconds(result.DurationMs / 1000.0);
-        Console.Error.WriteLine($"{result.RowCount} row(s) ({seconds})");
+        StdErr.MarkupLine(Styling.Muted($"{result.RowCount} row(s) ({seconds})"));
         if (result.Truncated)
-            Console.Error.WriteLine($"Output truncated at {result.RowCount} rows (--limit {result.RowCount}).");
+            StdErr.MarkupLine(Styling.Warning($"Output truncated at {result.RowCount} rows (--limit {result.RowCount})."));
     }
 
     /// <summary>

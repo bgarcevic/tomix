@@ -136,7 +136,7 @@ internal sealed class AuthCommand : ICommandModule
             var handler = new AuthHandler(authenticator);
 
             if (method == AuthMethod.Interactive && !OutputFormats.IsJson(format))
-                Console.Error.WriteLine("Opening the browser to sign in...");
+                StdErr.MarkupLine(Styling.Muted("Opening the browser to sign in..."));
 
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             var result = await CliSpinner.RunAsync(
@@ -233,7 +233,8 @@ internal sealed class AuthCommand : ICommandModule
     private MsalAuthenticator CreateAuthenticator(string? clientIdOverride, string? tenant)
         => new(
             AuthSettingsFactory.Resolve(_configStore.Load(), clientIdOverride, tenant),
-            messageWriter: Console.Error.WriteLine);
+            messageWriter: Console.Error.WriteLine,
+            noticeWriter: notice => StdErr.MarkupLine(Styling.Muted(notice)));
 
     private static void RenderLogin(AuthLoginResult result)
     {
@@ -256,16 +257,20 @@ internal sealed class AuthCommand : ICommandModule
 
     private static void RenderIdentity(AuthIdentity identity, bool includeMethodAndStorage)
     {
-        AnsiConsole.MarkupLine(Styling.KeyValue("  Account:", identity.Username ?? ""));
-        AnsiConsole.MarkupLine(Styling.KeyValue("  Tenant:", identity.TenantId ?? ""));
+        var rows = new List<(string, string)>
+        {
+            ("Account:", identity.Username ?? ""),
+            ("Tenant:", identity.TenantId ?? ""),
+        };
         if (includeMethodAndStorage)
         {
-            AnsiConsole.MarkupLine(Styling.KeyValue("  Method:", MethodLabel(identity.Method)));
-            AnsiConsole.MarkupLine(Styling.KeyValue("  Storage:", identity.Storage ?? ""));
+            rows.Add(("Method:", MethodLabel(identity.Method)));
+            rows.Add(("Storage:", identity.Storage ?? ""));
         }
 
         if (identity.ExpiresOn is { } expires)
-            AnsiConsole.MarkupLine(Styling.KeyValue("  Expires:", $"{expires.ToLocalTime():yyyy-MM-dd HH:mm:ss}"));
+            rows.Add(("Expires:", $"{expires.ToLocalTime():yyyy-MM-dd HH:mm:ss}"));
+        Styling.WriteKeyValues(rows, indent: "  ");
     }
 
     private static string MethodLabel(AuthMethod method) => method switch

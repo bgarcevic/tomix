@@ -54,18 +54,29 @@ Use `Palette.Muted` for Spectre widget styling (table borders, rules). Use the m
 
 The most common forms of color blindness (deuteranopia and protanopia) merge red and green, so the status colors only reinforce what the glyph or word already says. In highlighted expressions the roles also differ by shape: functions are uppercase and followed by `(`, measure references sit in `[...]`, strings in quotes, comments start with `//`. Magenta keywords and bright-blue functions stay apart by lightness in most themes. Users who need more pick a theme tuned for their vision, and `tx` follows it.
 
+## Hierarchy
+
+Every line sits on one of four levels, loudest first. Pick the level by what the reader came for, not by what the code knows.
+
+1. **Status**: color (with its glyph or word). The outcome of the command: `Authenticated`, `✗ 3 errors`, `Not logged in`.
+2. **Structure**: bold. Titles, section headings, table column headers, and commands to copy.
+3. **Content**: plain. Names, paths, IDs, values — the data itself.
+4. **Commentary**: dim. Progress notes (`Authenticating...`), where something was saved, hints, timings, help placeholders, borders.
+
+A label never outranks its value: key-value labels stay plain and the values line up in one column, so alignment, not color, shows the structure. Keep dim for commentary; a block where every label is grey reads as all grey. Commentary goes to stderr, so a redirected stdout holds only content.
+
 ## Message Categories
 
 | Category           | Style                                         | Example                                          |
 |--------------------|-----------------------------------------------|--------------------------------------------------|
 | Banner             | `[bold]` on title                             | `[bold]tx doctor[/]`                            |
 | Section header     | `[bold]` label                                | `[bold]Tables[/] (4)`                            |
-| Help               | `[bold]` headings, plain command and option names | `[bold]Discover:[/]` then `summary  ...`     |
-| Status progress    | Info                                          | spinner frame in cyan, label plain               |
+| Help               | `[bold]` headings, plain command and option names, dim placeholders | `[bold]Discover:[/]` then `summary  ...`, `--model [dim]<path>[/]` |
+| Status progress    | Info                                          | spinner frame in cyan, label plain; without an animating terminal (stdin piped) the label prints once, dim, on stderr |
 | Success            | Success                                       | `Saved: model.tmdl` in green                     |
 | Warning            | Warning                                       | `Changes not saved.` in yellow                   |
 | Error              | Error + bold                                  | `Build failed` in bold red                       |
-| Key-value label    | `[bold]` label, plain value                   | `[bold]Version:[/] 1.0.0`                        |
+| Key-value block    | Plain label and value, values aligned (`Styling.WriteKeyValues`) | `Tenant:   contoso.onmicrosoft.com`   |
 | Guidance hint      | Dim                                           | `Run 'tx stage commit' to promote.` dimmed       |
 | Diff added         | Success, prefix `+`                           | `+ table Sales`                                  |
 | Diff removed       | Error, prefix `-`                             | `- table Sales`                                  |
@@ -103,7 +114,9 @@ All output helpers live in `src/Tomix.Cli/Output/Styling.cs`. Use these instead 
 | `Styling.Path(text)`                    | Plain (escaped)                          |
 | `Styling.Value(text)`                   | Plain (escaped)                          |
 | `Styling.Option(text)`                  | Bold                                     |
-| `Styling.KeyValue(label, value)`        | Bold label + plain value                 |
+| `Styling.KeyValue(label, value)`        | Plain label + plain value (one row)      |
+| `Styling.KeyValueLines(rows, indent)` / `WriteKeyValues` | Plain rows, values aligned two spaces past the longest label |
+| `Styling.Placeholder(text)`             | Dim (`<path>`, `[options]` in help)      |
 | `Styling.Guidance(text)`                | Dim                                      |
 | `Styling.MarkupEscape(text)`            | Escapes `[` and `]` for Spectre markup  |
 | `Styling.DaxMarkup(expression)`         | Syntax-highlighted DAX as escaped markup (see Message Categories) |

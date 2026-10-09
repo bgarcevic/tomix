@@ -76,8 +76,7 @@ internal sealed class DiffCommand : ICommandModule
             return;
         }
 
-        AnsiConsole.MarkupLine(Styling.KeyValue("Left:", left));
-        AnsiConsole.MarkupLine(Styling.KeyValue("Right:", right));
+        Styling.WriteKeyValues([("Left:", left), ("Right:", right)]);
         AnsiConsole.MarkupLine(
             Styling.Bold($"{result.Summary.Added} added, {result.Summary.Removed} removed, {result.Summary.Modified} modified"));
         AnsiConsole.WriteLine();
