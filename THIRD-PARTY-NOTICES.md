@@ -13,11 +13,8 @@ maintained primarily by Michael Kovalsky and Microsoft).
 - Source: <https://github.com/microsoft/Analysis-Services/tree/master/BestPracticeRules>
 - License: MIT — Copyright (c) Microsoft Corporation.
 
-The `tx bpa` engine and CLI are an independent implementation. The
-`BestPracticeAnalyzer*` annotation keys, the rule JSON schema, and the dynamic-LINQ expression
-dialect are interoperability conventions (also used by Tabular Editor) so that models authored
-elsewhere work with `tx`; **no Tabular Editor source code is used or included.** Tabular Editor 2 is
-itself MIT-licensed (Copyright (c) Tabular Editor ApS).
+The `tx bpa` engine and CLI are an independent implementation; see
+[Tabular Editor](#tabular-editor-interoperability-no-code-used) below for the conventions it shares.
 
 ## Vendored DAX language engine
 
@@ -61,6 +58,37 @@ The parser's other two dependencies, `grapheme-splitter` (MIT, Copyright (c) 201
 and `performance-now` (MIT, Copyright (c) 2013 Braveg1rl), are replaced at build time by small shims
 written for tomix, so no code from either ships. The bundling tool `esbuild` (MIT) is build-time
 only and is not redistributed.
+
+## Tabular Editor (interoperability; no code used)
+
+`tomix-cli` is not affiliated with, endorsed by, or sponsored by Tabular Editor ApS. "Tabular
+Editor" is used in this repository only to describe compatibility and prior art.
+
+**No Tabular Editor source code, binaries, or other files are used, included, or redistributed**,
+and none of its packages is a dependency. This covers Tabular Editor 2 (open source, MIT License,
+Copyright (c) Tabular Editor ApS, <https://github.com/TabularEditor/TabularEditor>) and Tabular
+Editor 3 (proprietary).
+
+`tx` reads and writes these conventions so that models and rule files shared with Tabular Editor
+users keep working:
+
+- the `BestPracticeAnalyzer`, `BestPracticeAnalyzer_IgnoreRules`, and related model annotations;
+- the Best Practice Analyzer rule JSON schema and its dynamic-LINQ rule expression dialect (evaluated
+  with `System.Linq.Dynamic.Core`).
+
+Some features follow techniques described in Tabular Editor 2's public, MIT-licensed source and
+documentation. Each is an independent implementation:
+
+- rewriting DAX references on rename by splicing exact token spans, so formatting and comments are
+  preserved (`src/Tomix.App/Mutations/RenameFixup.cs`, `src/Tomix.App/Dax/DaxReferenceExtractor.cs`),
+  built on the SQLBI DAX lexer above;
+- expanding transitive dependencies with a visited set so each object is expanded once
+  (`src/Tomix.App/Deps/DependencyGraph.cs`);
+- the list of DAX-bearing object properties scanned for dependencies
+  (`src/Tomix.App/Dax/DaxExpressions.cs`), which follows the Analysis Services Tabular Object
+  Model.
+
+Code comments that name Tabular Editor types or methods only credit the source of an idea.
 
 ## NuGet dependencies (redistributed)
 
