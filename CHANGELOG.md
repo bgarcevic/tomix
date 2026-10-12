@@ -10,6 +10,14 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx query` checks the tables, columns and measures a DAX query names before sending it. A
+  typo fails at once with `TOMIX_QUERY_UNKNOWN_REFERENCE` and the closest name
+  (`Did you mean 'Amount'?`), or the table's columns or the model's tables when nothing is
+  close, instead of a server error. Names the query defines itself are understood;
+  `--no-validate` skips the check (#240).
+
 ### Changed
 
 - Edits and undo in a live session (`tx shell`, `tx serve`, `tx mcp`, `tx ui`) are faster on
