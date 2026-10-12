@@ -5,7 +5,8 @@ Core domain types and abstractions.
 ## Responsibilities
 
 - Shared result types.
-- Diagnostics.
+- Diagnostics, including `Diagnostics/NameSuggestion`: the one edit-distance "did you mean" every
+  typo hint uses. Do not add another Levenshtein.
 - Semantic model abstractions.
 - Object paths.
 - Provider interfaces.
