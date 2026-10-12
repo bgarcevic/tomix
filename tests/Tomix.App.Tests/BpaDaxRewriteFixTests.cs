@@ -125,6 +125,53 @@ public sealed class BpaDaxRewriteFixTests
     }
 
     [Fact]
+    public async Task Fix_QualifiesColumnsInAnRlsFilter_SavesItOnItsTablePermission()
+    {
+        // TablePermission is part of the rule's scope: an RLS filter is checked and rewritten
+        // like a measure, on the permission's FilterExpression.
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = ModelWithRole(root, "[Amount] > 0");
+
+        var first = await RunAsync(config, model, "DAX_COLUMNS_FULLY_QUALIFIED", save: true);
+
+        Assert.True(first.Success, string.Join("; ", first.Diagnostics.Select(d => d.Message)));
+        var change = Assert.Single(first.Data!.FixChanges);
+        Assert.Equal("Roles/Reader/Sales", change.ObjectPath);
+        Assert.Equal("FilterExpression", change.Property);
+        Assert.Equal("'Sales'[Amount] > 0", change.After);
+        Assert.Equal("'Sales'[Amount] > 0", await FilterAsync(model));
+
+        var second = await RunAsync(config, model, "DAX_COLUMNS_FULLY_QUALIFIED", save: true);
+        Assert.Empty(second.Data!.Violations);
+    }
+
+    [Theory]
+    [InlineData("'Sales'[Amount] > LEN(USERPRINCIPALNAME())", true)]
+    [InlineData("'Sales'[Amount] > 0", false)]
+    public async Task DynamicRlsRule_ChecksTablePermissions(string filter, bool flagged)
+    {
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = ModelWithRole(root, filter);
+
+        // The rule ships in the full ruleset only.
+        var result = await RunAsync(config, model, "CHECK_IF_DYNAMIC_ROW_LEVEL_SECURITY_(RLS)_IS_NECESSARY", save: false, ruleset: "full");
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        if (!flagged)
+        {
+            Assert.Empty(result.Data!.Violations);
+            return;
+        }
+
+        var violation = Assert.Single(result.Data!.Violations);
+        Assert.Equal("Roles/Reader/Sales", violation.ObjectPath);
+        Assert.Equal(ModelObjectKind.TablePermission, violation.ObjectKind);
+        Assert.Equal("Reader/Sales", violation.ObjectName);
+    }
+
+    [Fact]
     public void ApplyFixes_WithoutSnapshot_ReportsFixError()
     {
         var rules = new List<BpaRule>
@@ -160,6 +207,24 @@ public sealed class BpaDaxRewriteFixTests
         return model;
     }
 
+    private static string ModelWithRole(TempDir root, string filter)
+    {
+        var model = SampleModel.CopyTo(root, "model");
+        var roles = Directory.CreateDirectory(Path.Combine(model, "roles"));
+        File.WriteAllText(
+            Path.Combine(roles.FullName, "Reader.tmdl"),
+            $"role Reader\n\tmodelPermission: read\n\n\ttablePermission Sales = {filter}\n");
+        return model;
+    }
+
+    private static async Task<string?> FilterAsync(string model)
+    {
+        await using var session = await new TmdlModelProvider().OpenAsync(new ModelReference(model), CancellationToken.None);
+        var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
+        return snapshot.Objects.Single(o => o.Kind == ModelObjectKind.Role && o.Name == "Reader").Children
+            .Single(c => c.Kind == ModelObjectKind.TablePermission).Expression;
+    }
+
     private static async Task<string?> ExpressionAsync(string model, string measure)
     {
         await using var session = await new TmdlModelProvider().OpenAsync(new ModelReference(model), CancellationToken.None);
@@ -168,7 +233,8 @@ public sealed class BpaDaxRewriteFixTests
             .Single(c => c.Kind == ModelObjectKind.Measure && c.Name == measure).Expression;
     }
 
-    private static Task<TomixResult<BpaRunResult>> RunAsync(TempConfigDir config, string model, string? ruleId, bool save)
+    private static Task<TomixResult<BpaRunResult>> RunAsync(
+        TempConfigDir config, string model, string? ruleId, bool save, string? ruleset = null)
         => new BpaRunHandler([new TmdlModelProvider()], config.Stores, new BpaUserRuleState(config.Path), config.Path)
             .HandleAsync(
                 new BpaRunRequest(new ModelReference(model))
@@ -177,6 +243,7 @@ public sealed class BpaDaxRewriteFixTests
                     Fix = true,
                     Save = save,
                     NoModelRules = true,
+                    Ruleset = ruleset,
                 },
                 CancellationToken.None);
 }

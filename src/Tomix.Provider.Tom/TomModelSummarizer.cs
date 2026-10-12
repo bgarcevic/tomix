@@ -550,6 +550,7 @@ public static class TomModelSummarizer
             Properties: new Dictionary<string, string>
             {
                 [PropertyBagKeys.Ordinal] = item.Ordinal.ToString(),
+                [PropFormatStringExpression] = item.FormatStringDefinition?.Expression ?? "",
                 [PropObjectType] = "CalculationItem"
             },
             Id: ids?.GetOrAdd(item));

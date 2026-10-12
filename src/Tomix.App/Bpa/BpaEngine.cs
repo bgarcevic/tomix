@@ -104,6 +104,7 @@ public sealed class BpaEngine
         Eval("Partition", model.AllPartitions);
         Eval("ModelRole", model.Roles);
         Eval("CalculationItem", model.AllCalculationItems);
+        Eval("TablePermission", model.AllTablePermissions);
         Eval("DataSource", model.DataSources);
         Eval("Perspective", model.Perspectives);
         Eval("Hierarchy", model.Hierarchies);
@@ -210,6 +211,7 @@ public sealed class BpaEngine
         BpaRelationship => Eq(token, "Relationship"),
         BpaPartition => Eq(token, "Partition"),
         BpaRole => Eq(token, "ModelRole"),
+        BpaTablePermission => Eq(token, "TablePermission"),
         _ => false
     };
 
@@ -290,6 +292,8 @@ public sealed class BpaEngine
             ModelObjectKind.Table => $"'{obj.Name}'",
             ModelObjectKind.Column or ModelObjectKind.CalculatedColumn when parts.Length >= 2 => $"'{parts[0]}'[{obj.Name}]",
             ModelObjectKind.Measure => $"[{obj.Name}]",
+            // A permission is named after its table, so the role tells same-table permissions apart.
+            ModelObjectKind.TablePermission when parts.Length >= 3 => $"{parts[1]}/{obj.Name}",
             _ => obj.Name
         };
     }

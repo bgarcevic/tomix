@@ -29,6 +29,17 @@ public static class BpaModelBuilder
             .Select(o => o.Name)
             .ToList();
 
+        // RLS filters come from the table permissions themselves: the joined, line-per-filter
+        // summaries would split a filter that spans several lines. A permission is named after
+        // the table it filters.
+        var rlsByTable = allObjects
+            .Where(o => o.Kind == ModelObjectKind.TablePermission && !string.IsNullOrWhiteSpace(o.Expression))
+            .GroupBy(o => o.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(o => o.Expression!).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
         var tables = new List<BpaTable>();
         var columns = new List<BpaColumn>();
         var measures = new List<BpaMeasure>();
@@ -46,7 +57,7 @@ public static class BpaModelBuilder
                 Description = tableObj.Description ?? "",
                 IsHidden = tableObj.Hidden,
                 DataCategory = tableObj.Property("DataCategory") ?? "",
-                RowLevelSecurity = SplitLines(tableObj.Property("RowLevelSecurity")),
+                RowLevelSecurity = rlsByTable.GetValueOrDefault(tableObj.Name, []),
             };
 
             var tableColumns = new List<BpaColumn>();
@@ -108,8 +119,9 @@ public static class BpaModelBuilder
 
         var roles = allObjects
             .Where(o => o.Kind == ModelObjectKind.Role)
-            .Select(r => BuildRole(r, model))
+            .Select(r => BuildRole(r, model, tablesByName))
             .ToList();
+        var tablePermissions = roles.SelectMany(r => r.TablePermissions).ToList();
 
         var perspectives = snapshot.Objects
             .Where(o => o.Kind == ModelObjectKind.Perspective)
@@ -138,6 +150,8 @@ public static class BpaModelBuilder
             column.DependsOn = ComputeDependsOn(column.Source.Expression, measureNames, columnNames);
         foreach (var item in calculationItems)
             item.DependsOn = ComputeDependsOn(item.Expression, measureNames, columnNames);
+        foreach (var permission in tablePermissions)
+            permission.DependsOn = ComputeDependsOn(permission.Expression, measureNames, columnNames);
         foreach (var table in tables)
             table.DependsOn = ComputeDependsOn(CalculatedTableExpression(table), measureNames, columnNames);
 
@@ -153,6 +167,7 @@ public static class BpaModelBuilder
         model.Roles = roles;
         model.Relationships = relationships;
         model.AllCalculationItems = calculationItems;
+        model.AllTablePermissions = tablePermissions;
         model.DataSources = dataSources;
         model.Perspectives = perspectives;
         model.Hierarchies = hierarchies;
@@ -266,18 +281,37 @@ public static class BpaModelBuilder
         };
     }
 
-    private static BpaRole BuildRole(ModelObject obj, BpaModel model)
-        => new()
+    private static BpaRole BuildRole(ModelObject obj, BpaModel model, Dictionary<string, BpaTable> tablesByName)
+    {
+        var role = new BpaRole
         {
             Source = obj,
             Model = model,
             Name = obj.Name,
             Description = obj.Description ?? "",
             Members = obj.Children.Where(c => c.Kind == ModelObjectKind.RoleMember).Select(c => c.Name).ToList(),
-            RowLevelSecurity = (obj.Property("RlsExpression") ?? "")
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            RowLevelSecurity = obj.Children
+                .Where(c => c.Kind == ModelObjectKind.TablePermission && !string.IsNullOrWhiteSpace(c.Expression))
+                .Select(c => c.Expression!)
                 .ToList(),
         };
+
+        // A permission is named after the table it applies to; Detail carries its metadata permission.
+        role.TablePermissions = obj.Children
+            .Where(c => c.Kind == ModelObjectKind.TablePermission)
+            .Select(c => new BpaTablePermission
+            {
+                Source = c,
+                Model = model,
+                Name = c.Name,
+                Expression = c.Expression ?? "",
+                MetadataPermission = c.Detail ?? "",
+                Role = role,
+                Table = tablesByName.GetValueOrDefault(c.Name),
+            })
+            .ToList();
+        return role;
+    }
 
     /// <summary>
     /// Groups the references in a DAX expression by referenced object type, tagging each with

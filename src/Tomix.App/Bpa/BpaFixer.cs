@@ -186,7 +186,7 @@ public sealed partial class BpaFixer
 
         try
         {
-            rewriter.RewriteExpressions([new ModelExpressionEdit(site.Path, site.Kind, "Expression", after!)]);
+            rewriter.RewriteExpressions([new ModelExpressionEdit(site.Path, site.Kind, site.Property, after!)]);
         }
         catch (Exception ex)
         {
@@ -198,7 +198,7 @@ public sealed partial class BpaFixer
         applied++;
         changes.Add(new BpaFixChange(
             violation.RuleId, violation.ObjectType, violation.ObjectPath, BpaFixAction.Set,
-            "Expression", Before: before, After: after)
+            site.Property, Before: before, After: after)
         { ObjectKind = violation.ObjectKind });
     }
 
@@ -222,13 +222,17 @@ public sealed partial class BpaFixer
             {
                 ModelObjectKind.Measure or ModelObjectKind.Column or ModelObjectKind.CalculatedColumn
                     or ModelObjectKind.CalculationItem when !string.IsNullOrWhiteSpace(target.Expression)
-                    => new DaxSite(target.Path, target.Kind, target.Expression!),
+                    => new DaxSite(target.Path, target.Kind, "Expression", target.Expression!),
+
+                // An RLS filter is its table permission's FilterExpression.
+                ModelObjectKind.TablePermission when !string.IsNullOrWhiteSpace(target.Expression)
+                    => new DaxSite(target.Path, target.Kind, DaxExpressions.FilterExpressionProperty, target.Expression!),
 
                 // A calculated table's DAX lives on its calculated partition.
                 ModelObjectKind.Table => target.Children
                     .Where(c => c.Kind == ModelObjectKind.Partition && DaxExpressions.IsCalculated(c)
                         && !string.IsNullOrWhiteSpace(c.Expression))
-                    .Select(c => (DaxSite?)new DaxSite(c.Path, c.Kind, c.Expression!))
+                    .Select(c => (DaxSite?)new DaxSite(c.Path, c.Kind, "Expression", c.Expression!))
                     .FirstOrDefault(),
 
                 _ => null,
@@ -245,7 +249,7 @@ public sealed partial class BpaFixer
             => objects.SelectMany(o => Flatten(o.Children).Prepend(o));
     }
 
-    private readonly record struct DaxSite(string Path, ModelObjectKind Kind, string Expression);
+    private readonly record struct DaxSite(string Path, ModelObjectKind Kind, string Property, string Expression);
 
     public static bool TryParseSimpleAssignment(
         string fixExpression,

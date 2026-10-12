@@ -161,6 +161,29 @@ public sealed class BpaRole : BpaObject
 
     /// <summary>Member names of this role.</summary>
     public IReadOnlyList<string> Members { get; internal set; } = [];
+
+    /// <summary>The role's table permissions, one per table it filters or secures.</summary>
+    public IReadOnlyList<BpaTablePermission> TablePermissions { get; internal set; } = [];
+}
+
+/// <summary>A role's permission on one table: its RLS filter (DAX-bearing, like a measure).</summary>
+public sealed class BpaTablePermission : BpaObject
+{
+    /// <summary>The RLS filter DAX (empty when the permission only sets metadata permission).</summary>
+    public string Expression { get; internal set; } = "";
+
+    /// <summary>Alias of <see cref="Expression"/>, the TOM property name.</summary>
+    public string FilterExpression => Expression;
+
+    /// <summary>"Default", "None" or "Read" (object-level security on the table).</summary>
+    public string MetadataPermission { get; internal set; } = "";
+
+    public BpaRole Role { get; internal set; } = null!;
+
+    /// <summary>The table the permission applies to; null when the model has no table by that name.</summary>
+    public BpaTable? Table { get; internal set; }
+
+    public IReadOnlyList<BpaDependsOnEntry> DependsOn { get; internal set; } = [];
 }
 
 public sealed class BpaHierarchy : BpaObject
@@ -203,6 +226,7 @@ public sealed class BpaModel
     public IReadOnlyList<BpaRole> Roles { get; internal set; } = [];
     public IReadOnlyList<BpaRelationship> Relationships { get; internal set; } = [];
     public IReadOnlyList<BpaCalculationItem> AllCalculationItems { get; internal set; } = [];
+    public IReadOnlyList<BpaTablePermission> AllTablePermissions { get; internal set; } = [];
     public IReadOnlyList<BpaDataSource> DataSources { get; internal set; } = [];
     public IReadOnlyList<BpaPerspective> Perspectives { get; internal set; } = [];
     public IReadOnlyList<BpaHierarchy> Hierarchies { get; internal set; } = [];

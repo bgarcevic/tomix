@@ -547,6 +547,62 @@ public sealed class ValidateModelHandlerTests
         Assert.Equal("TOMIX_CONNECT_FAILED", result.Diagnostics[0].Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_ChecksEachRlsFilterOnItsOwn()
+    {
+        // The role's summary joins its filters as "Table: <DAX>" lines, which is not DAX: a
+        // second filter used to fail with "Unexpected ':'" whenever its first line had no '='.
+        var result = await ValidateAsync(SalesSnapshot(Role("Reader",
+            Permission("Reader", "Sales", "CONTAINS ( Sales, Sales[Amount], 1 )"),
+            Permission("Reader", "Region", "NOT ISBLANK ( Sales[Amount] )"))));
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Data!.Errors);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsBrokenRlsFilter_OnItsTablePermission()
+    {
+        var result = await ValidateAsync(SalesSnapshot(Role("Reader",
+            Permission("Reader", "Sales", "TRUE ()"),
+            Permission("Reader", "Region", "Sales[Amount] > 0\n&& Sales[Missing] > 0"))));
+
+        var issue = Assert.Single(result.Data!.Errors);
+        Assert.Equal("DAX0002", issue.Code);
+        Assert.Equal("Roles/Reader/Region", issue.ObjectName);
+        Assert.Equal("2", issue.Expression);
+    }
+
+    [Theory]
+    [InlineData("NoSelectionExpression")]
+    [InlineData("MultipleOrEmptySelectionExpression")]
+    public async Task HandleAsync_ChecksCalculationGroupSelectionExpressions(string property)
+    {
+        var group = new ModelObject("Scenario", ModelObjectKind.Table, "Scenario",
+            Detail: "calculationGroup", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [],
+            Properties: new Dictionary<string, string> { [property] = "SUM ( Sales[Missing] )" });
+        var snapshot = SalesSnapshot();
+        snapshot = snapshot with { Objects = [.. snapshot.Objects, group] };
+
+        var issue = Assert.Single((await ValidateAsync(snapshot)).Data!.Errors);
+        Assert.Equal("DAX0002", issue.Code);
+        Assert.Equal("Scenario", issue.ObjectName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ChecksCalculationItemFormatStringExpression()
+    {
+        var item = new ModelObject("Current", ModelObjectKind.CalculationItem, "Sales/Current",
+            Detail: null, Expression: "SELECTEDMEASURE ()", Description: null, Hidden: false,
+            SourceColumn: null, Children: [],
+            Properties: new Dictionary<string, string> { ["FormatStringExpression"] = "IF ( Sales[Missing] > 0, \"0\" )" });
+
+        var issue = Assert.Single((await ValidateAsync(SalesSnapshot(item))).Data!.Errors);
+        Assert.Equal("DAX0002", issue.Code);
+        Assert.Equal("Sales/Current", issue.ObjectName);
+    }
+
     private sealed class ThrowingModelProvider : IModelProvider
     {
         private readonly Exception _exception;
@@ -571,8 +627,26 @@ public sealed class ValidateModelHandlerTests
             Detail: null, Expression: expression, Description: null, Hidden: false,
             SourceColumn: null, Children: []);
 
+    /// <summary>
+    /// A role shaped like the TOM snapshot: each filter on a table permission child, and the
+    /// role's display-only RlsExpression joining them as "Table: filter" lines.
+    /// </summary>
+    private static ModelObject Role(string name, params ModelObject[] permissions)
+        => new(name, ModelObjectKind.Role, $"Roles/{name}",
+            Detail: "Read", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: permissions,
+            Properties: new Dictionary<string, string>
+            {
+                ["RlsExpression"] = string.Join("\n", permissions.Select(p => $"{p.Name}: {p.Expression}"))
+            });
+
+    private static ModelObject Permission(string role, string table, string filter)
+        => new(table, ModelObjectKind.TablePermission, $"Roles/{role}/{table}",
+            Detail: "default", Expression: filter, Description: null, Hidden: false,
+            SourceColumn: null, Children: []);
+
     /// <summary>A Sales table with an Amount column, plus <paramref name="extras"/> as its children
-    /// (relationships are hoisted to the snapshot root, as in real snapshots).</summary>
+    /// (relationships and roles are hoisted to the snapshot root, as in real snapshots).</summary>
     private static ModelSnapshot SalesSnapshot(params ModelObject[] extras)
     {
         var amount = new ModelObject("Amount", ModelObjectKind.Column, "Sales/Amount",
@@ -582,7 +656,7 @@ public sealed class ValidateModelHandlerTests
         var roots = new List<ModelObject>();
         foreach (var extra in extras)
         {
-            if (extra.Kind == ModelObjectKind.Relationship)
+            if (extra.Kind is ModelObjectKind.Relationship or ModelObjectKind.Role)
                 roots.Add(extra);
             else
                 children.Add(extra);

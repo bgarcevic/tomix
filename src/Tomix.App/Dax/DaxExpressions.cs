@@ -1,4 +1,5 @@
 using Tomix.Core.Models;
+using Tomix.Core.Properties;
 
 namespace Tomix.App.Dax;
 
@@ -11,8 +12,9 @@ public readonly record struct DaxSite(string Property, string Expression);
 /// Yields every DAX-bearing string attached to a model object so dependency analysis can scan
 /// beyond a measure's main <see cref="ModelObject.Expression"/>. This mirrors Tabular Editor's set
 /// of <c>DAXProperty</c> values: detail-rows, format-string and KPI expressions on measures,
-/// default detail-rows expressions on tables, calculated column / calculation item expressions,
-/// calculated-table DAX (carried on the partition), and role RLS filters.
+/// default detail-rows and calculation group selection expressions on tables, calculated column
+/// and calculation item expressions (plus an item's format string), calculated-table DAX
+/// (carried on the partition), and each table permission's RLS filter.
 /// </summary>
 public static class DaxExpressions
 {
@@ -25,6 +27,17 @@ public static class DaxExpressions
         "KpiStatusExpression",
         "KpiTrendExpression",
     ];
+
+    private static readonly string[] TableExpressionProperties =
+    [
+        PropertyBagKeys.DefaultDetailRowsExpression,
+        PropertyBagKeys.NoSelectionExpression,
+        PropertyBagKeys.MultipleOrEmptySelectionExpression,
+    ];
+
+    /// <summary>The site key of a table permission's RLS filter, which the snapshot carries on
+    /// its <see cref="ModelObject.Expression"/>; named after the property <c>set</c> takes.</summary>
+    public const string FilterExpressionProperty = "FilterExpression";
 
     /// <summary>Enumerates the DAX expressions to scan for <paramref name="obj"/> (may be empty).</summary>
     public static IEnumerable<string> ForObject(ModelObject obj)
@@ -40,9 +53,9 @@ public static class DaxExpressions
     /// <summary>
     /// Whether an object's main <c>Expression</c> text is DAX rather than M or none, for
     /// renderers that hold only the flattened kind/detail projection (no property bag).
-    /// Mirrors <see cref="Sites"/>: measures, calculated columns, calculation items and
-    /// functions carry DAX, as do calculated-table partitions (detail "calculated"); M-query
-    /// partitions and shared expressions are M.
+    /// Mirrors <see cref="Sites"/>: measures, calculated columns, calculation items, functions
+    /// and table permissions (RLS filters) carry DAX, as do calculated-table partitions (detail
+    /// "calculated"); M-query partitions and shared expressions are M.
     /// </summary>
     public static bool IsDaxExpression(ModelObjectKind kind, string? detail)
         => kind is ModelObjectKind.Measure
@@ -50,6 +63,7 @@ public static class DaxExpressions
             or ModelObjectKind.CalculatedColumn
             or ModelObjectKind.CalculationItem
             or ModelObjectKind.Function
+            or ModelObjectKind.TablePermission
             || (kind is ModelObjectKind.Partition
                 && string.Equals(detail, "calculated", StringComparison.OrdinalIgnoreCase));
 
@@ -63,8 +77,8 @@ public static class DaxExpressions
     {
         var key = property.Trim();
         return string.Equals(key, "Expression", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(key, "DefaultDetailRowsExpression", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(key, "RlsExpression", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, FilterExpressionProperty, StringComparison.OrdinalIgnoreCase)
+            || TableExpressionProperties.Contains(key, StringComparer.OrdinalIgnoreCase)
             || MeasureExpressionProperties.Contains(key, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -76,11 +90,15 @@ public static class DaxExpressions
     {
         switch (obj.Kind)
         {
-            // A table's default detail-rows (drillthrough) DAX.
+            // A table's default detail-rows (drillthrough) DAX, and a calculation group's
+            // no-selection and multiple-or-empty-selection expressions.
             case ModelObjectKind.Table:
-                var detailRows = obj.Property("DefaultDetailRowsExpression");
-                if (!string.IsNullOrWhiteSpace(detailRows))
-                    yield return new DaxSite("DefaultDetailRowsExpression", detailRows!);
+                foreach (var key in TableExpressionProperties)
+                {
+                    var value = obj.Property(key);
+                    if (!string.IsNullOrWhiteSpace(value))
+                        yield return new DaxSite(key, value!);
+                }
                 break;
 
             case ModelObjectKind.Measure:
@@ -103,6 +121,11 @@ public static class DaxExpressions
             case ModelObjectKind.Function:
                 if (!string.IsNullOrWhiteSpace(obj.Expression))
                     yield return new DaxSite("Expression", obj.Expression!);
+                // A calculation item's dynamic format string.
+                if (obj.Kind == ModelObjectKind.CalculationItem
+                    && obj.Property(PropertyBagKeys.FormatStringExpression) is { } itemFormat
+                    && !string.IsNullOrWhiteSpace(itemFormat))
+                    yield return new DaxSite(PropertyBagKeys.FormatStringExpression, itemFormat);
                 break;
 
             // A calculated table's DAX lives on its (Calculated-source) partition; M-query
@@ -112,11 +135,11 @@ public static class DaxExpressions
                     yield return new DaxSite("Expression", obj.Expression!);
                 break;
 
-            // Role row-level-security filters (one filter per line: "Table: <DAX>").
-            case ModelObjectKind.Role:
-                var rls = obj.Property("RlsExpression");
-                if (!string.IsNullOrWhiteSpace(rls))
-                    yield return new DaxSite("RlsExpression", rls!);
+            // A row-level-security filter is checked on its own table permission. The role's
+            // RlsExpression only lists them for display ("Table: <DAX>" per line) and is not DAX.
+            case ModelObjectKind.TablePermission:
+                if (!string.IsNullOrWhiteSpace(obj.Expression))
+                    yield return new DaxSite(FilterExpressionProperty, obj.Expression!);
                 break;
         }
     }

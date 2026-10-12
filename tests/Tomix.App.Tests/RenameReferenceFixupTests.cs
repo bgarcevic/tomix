@@ -9,7 +9,7 @@ namespace Tomix.App.Tests;
 /// rename silently broke a calculation item, and only the workspace deploy surfaced it). By
 /// default set/mv rewrite those references (fixup); --no-fix-refs restores warn-only, and
 /// --strict-refs fails on whatever a run leaves broken — everything with fixup off, only
-/// unrewritable sites (role RLS) with fixup on.
+/// unrewritable sites (a name shared by a table and a calendar) with fixup on.
 /// </summary>
 public sealed class RenameReferenceFixupTests
 {
@@ -104,32 +104,25 @@ public sealed class RenameReferenceFixupTests
         Assert.Null(session.LastRewrites);
     }
 
-    [Fact]
-    public async Task Set_RlsReference_IsUnfixable_WarnsEvenWithFixupOn()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Set_RlsReference_RewritesTheTablePermissionFilter(bool strictRefs)
     {
-        // Role RLS filters are synthesized per-table in the snapshot and cannot be written
-        // back as one property, so they stay a warning.
+        // An RLS filter lives on its table permission, which takes the rewrite like any other
+        // DAX property, so strict refs has nothing left broken to fail on.
         var session = SessionWithRlsReference();
         var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
-            SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")]),
+            SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")], strictRefs: strictRefs),
             CancellationToken.None);
 
         Assert.True(result.Success);
-        Assert.Equal(["Analyst"], result.Data!.BrokenReferences);
-        Assert.Null(session.LastRewrites);
-    }
-
-    [Fact]
-    public async Task Set_RlsReference_StrictRefs_FailsBeforeMutating()
-    {
-        var session = SessionWithRlsReference();
-        var result = await new SetModelPropertyHandler([new MutationStubs.Provider(session)], TestStores).HandleAsync(
-            SetRequest("Sales/Amount", [new ModelPropertyAssignment("name", "NewName")], strictRefs: true),
-            CancellationToken.None);
-
-        Assert.False(result.Success);
-        Assert.Equal("TOMIX_RENAME_BREAKS_REFS", result.Diagnostics[0].Code);
-        Assert.False(session.SetPropertyCalled);
+        Assert.Null(result.Data!.BrokenReferences);
+        Assert.Equal(["Roles/Analyst/Sales"], result.Data.FixedReferences);
+        var edit = Assert.Single(session.LastRewrites!);
+        Assert.Equal(ModelObjectKind.TablePermission, edit.Kind);
+        Assert.Equal("FilterExpression", edit.Property);
+        Assert.Equal("'Sales'[NewName] > 0", edit.Value);
     }
 
     [Fact]
@@ -350,7 +343,10 @@ public sealed class RenameReferenceFixupTests
         => new(name, kind, path,
             Detail: null, Expression: expression, Description: null, Hidden: false, SourceColumn: null, Children: []);
 
-    /// <summary>A column referenced only by a role's RLS filter — the unfixable case.</summary>
+    /// <summary>
+    /// A column referenced only by a role's RLS filter, shaped like the TOM snapshot: the filter
+    /// on the table permission, and the role's display-only "Table: filter" summary.
+    /// </summary>
     private static MutationStubs.SnapshotSession SessionWithRlsReference()
         => new(new ModelSnapshot("M", 1601,
         [
@@ -358,8 +354,14 @@ public sealed class RenameReferenceFixupTests
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
             new ModelObject("Amount", ModelObjectKind.Column, "Sales/Amount",
                 Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: []),
-            new ModelObject("Analyst", ModelObjectKind.Role, "Analyst",
-                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null, Children: [],
-                Properties: new Dictionary<string, string> { ["RlsExpression"] = "'Sales'[Amount] > 0" })
+            new ModelObject("Analyst", ModelObjectKind.Role, "Roles/Analyst",
+                Detail: null, Expression: null, Description: null, Hidden: false, SourceColumn: null,
+                Children:
+                [
+                    new ModelObject("Sales", ModelObjectKind.TablePermission, "Roles/Analyst/Sales",
+                        Detail: "default", Expression: "'Sales'[Amount] > 0", Description: null, Hidden: false,
+                        SourceColumn: null, Children: [])
+                ],
+                Properties: new Dictionary<string, string> { ["RlsExpression"] = "Sales: 'Sales'[Amount] > 0" })
         ]));
 }

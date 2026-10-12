@@ -73,13 +73,13 @@ internal static class RenameFixup
 {
     /// <summary>
     /// Kinds whose DAX properties can be written back through
-    /// <see cref="IExpressionRewriteSession.RewriteExpressions"/>. Role RLS filters are synthesized
-    /// per-table in the snapshot and have no single writable property, so they stay warnings.
+    /// <see cref="IExpressionRewriteSession.RewriteExpressions"/>. RLS filters are rewritten on
+    /// their table permission; the role itself carries no DAX site.
     /// </summary>
     private static bool IsFixable(ModelObjectKind kind)
         => kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
             or ModelObjectKind.CalculatedColumn or ModelObjectKind.CalculationItem or ModelObjectKind.Partition
-            or ModelObjectKind.Function;
+            or ModelObjectKind.Function or ModelObjectKind.TablePermission;
 
     /// <summary>
     /// Plans the rewrites a rename — and, when <paramref name="newTable"/> is given, a move to
