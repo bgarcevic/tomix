@@ -217,7 +217,7 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
 }
 
 internal sealed class TomServerModelSession : IModelSession, IModelExportSession, IModelMutationSession,
-    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IModelRefreshSession, IRefreshPolicyApplySession, IModelQuerySession
+    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IModelRefreshSession, IRefreshPolicyApplySession, IModelQuerySession, IObjectScriptSession
 {
     private readonly TabularServer _server;
     private readonly TabularDatabase _database;
@@ -257,6 +257,9 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
         _server.Dispose();
         return ValueTask.CompletedTask;
     }
+
+    public string ScriptObject(string path, ModelObjectKind kind, ObjectScriptFormat format)
+        => TomObjectScripter.Script(_database, path, kind, format);
 
     public Task<ModelExportResult> ExportAsync(
         ModelExportRequest request,

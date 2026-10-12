@@ -347,6 +347,7 @@ come from structural integrity checks.
 | `TOMIX_DATABASE_REQUIRED` | 2 | The endpoint hosts more than one database/model and none was named. List them with `tx connect <server> --list`, then pass one with `-d/--database`. |
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `get --deps` (or `deps`) called without an object path. |
 | `TOMIX_SINGLE_OBJECT_REQUIRED` | 2 | `get --query` or `get --deps` was given a path that selects a set (a wildcard such as `Sa*`, a container such as `Sales/Measures`, or `--ls`/`--where`). Name one object. |
+| `TOMIX_SCRIPT_UNSUPPORTED` | 2 | `get --output-format tmdl`, `bim` or `tmsl` on a model source that has no serializer for model file fragments. TMDL folders, `.bim` files and server models all have one; use `--output-format json` otherwise. |
 | `TOMIX_UNUSED_PATH` | 2 | `get --unused` (or `deps --unused`) was given a path; it scans the whole model. |
 | `TOMIX_INVALID_WHERE` | 2 | A `get --where` value is not `Prop=Value`. |
 | `TOMIX_FIND_INVALID_REGEX` | 2 | `find --regex` called with an invalid regular expression pattern. |

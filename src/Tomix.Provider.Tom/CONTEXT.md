@@ -15,6 +15,10 @@ Adapter around Microsoft Tabular Object Model.
   staging folder, then write only files whose content changed (ignoring EOLs and
   trailing newlines), keep each rewritten file's EOL/BOM, match each M partition's
   existing `source =` depth, and delete only stale `.tmdl` files.
+- Emit one object for `get --output-format tmdl|bim|tmsl` (`TomObjectScripter`, the
+  `IObjectScriptSession` capability): resolve the snapshot path the way mutations do,
+  then serialize with TOM's own `TmdlSerializer`/`JsonSerializer`. Never hand-roll a
+  fragment; it drops properties.
 
 ## Mutation structure
 
