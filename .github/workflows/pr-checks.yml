@@ -42,6 +42,42 @@ jobs:
             exit 1
           fi
 
+  attribution:
+    name: no ai attribution
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A squash merge carries the PR body and the commit trailers into main,
+      # so both are checked. Matching is case-insensitive and anchored to the
+      # start of a line (the footer may lead with an emoji), so prose that
+      # mentions these lines does not trip the check.
+      - name: Reject AI co-author trailers and generated-with footers
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # Byte-wise matching, so [^a-z0-9]* also skips a multibyte emoji.
+          export LC_ALL=C
+          pattern='^co-authored-by:.*noreply@anthropic\.com|^[^a-z0-9]*generated with \[?claude code'
+          found=0
+          if grep -inE "${pattern}" <<<"${BODY}"; then
+            echo "::error::The PR description contains AI attribution. Remove the line(s) above."
+            found=1
+          fi
+          for sha in $(git rev-list "${BASE}..${HEAD}"); do
+            if git log -1 --format=%B "${sha}" | grep -iqE "${pattern}"; then
+              echo "::error::Commit ${sha:0:7} contains AI attribution. Reword it, for example with 'git rebase -i' and 'reword'."
+              found=1
+            fi
+          done
+          exit "${found}"
+
   changelog:
     name: changelog entry
     timeout-minutes: 5
