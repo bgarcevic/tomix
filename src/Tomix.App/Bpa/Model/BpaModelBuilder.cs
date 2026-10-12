@@ -119,8 +119,9 @@ public static class BpaModelBuilder
 
         var roles = allObjects
             .Where(o => o.Kind == ModelObjectKind.Role)
-            .Select(r => BuildRole(r, model))
+            .Select(r => BuildRole(r, model, tablesByName))
             .ToList();
+        var tablePermissions = roles.SelectMany(r => r.TablePermissions).ToList();
 
         var perspectives = snapshot.Objects
             .Where(o => o.Kind == ModelObjectKind.Perspective)
@@ -149,6 +150,8 @@ public static class BpaModelBuilder
             column.DependsOn = ComputeDependsOn(column.Source.Expression, measureNames, columnNames);
         foreach (var item in calculationItems)
             item.DependsOn = ComputeDependsOn(item.Expression, measureNames, columnNames);
+        foreach (var permission in tablePermissions)
+            permission.DependsOn = ComputeDependsOn(permission.Expression, measureNames, columnNames);
         foreach (var table in tables)
             table.DependsOn = ComputeDependsOn(CalculatedTableExpression(table), measureNames, columnNames);
 
@@ -164,6 +167,7 @@ public static class BpaModelBuilder
         model.Roles = roles;
         model.Relationships = relationships;
         model.AllCalculationItems = calculationItems;
+        model.AllTablePermissions = tablePermissions;
         model.DataSources = dataSources;
         model.Perspectives = perspectives;
         model.Hierarchies = hierarchies;
@@ -277,8 +281,9 @@ public static class BpaModelBuilder
         };
     }
 
-    private static BpaRole BuildRole(ModelObject obj, BpaModel model)
-        => new()
+    private static BpaRole BuildRole(ModelObject obj, BpaModel model, Dictionary<string, BpaTable> tablesByName)
+    {
+        var role = new BpaRole
         {
             Source = obj,
             Model = model,
@@ -290,6 +295,23 @@ public static class BpaModelBuilder
                 .Select(c => c.Expression!)
                 .ToList(),
         };
+
+        // A permission is named after the table it applies to; Detail carries its metadata permission.
+        role.TablePermissions = obj.Children
+            .Where(c => c.Kind == ModelObjectKind.TablePermission)
+            .Select(c => new BpaTablePermission
+            {
+                Source = c,
+                Model = model,
+                Name = c.Name,
+                Expression = c.Expression ?? "",
+                MetadataPermission = c.Detail ?? "",
+                Role = role,
+                Table = tablesByName.GetValueOrDefault(c.Name),
+            })
+            .ToList();
+        return role;
+    }
 
     /// <summary>
     /// Groups the references in a DAX expression by referenced object type, tagging each with

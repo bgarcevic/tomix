@@ -53,6 +53,10 @@ and the API surface that major versions protect.
   it instead of only warning, and BPA rules see filters that span several lines whole.
 - `tx validate`, `tx deps` and rename fixup also cover calculation group no-selection and
   multiple-or-empty-selection expressions and calculation item format string expressions.
+- `tx bpa run` checks rules scoped to `TablePermission`, which it used to skip: the dynamic RLS
+  rule (`full` ruleset) now reports roles that filter on `USERPRINCIPALNAME()` or `USERNAME()`,
+  and `DAX_COLUMNS_FULLY_QUALIFIED` checks RLS filters, with `--fix` qualifying their column
+  references. A permission is reported as `<role>/<table>`.
 
 - Reference tracking (`deps`, `validate`, rename and remove guards, BPA) now reads DAX with the
   same lexer as `tx format` and `dax check`, so a date literal (`dt"2024-01-01"`) or a query
