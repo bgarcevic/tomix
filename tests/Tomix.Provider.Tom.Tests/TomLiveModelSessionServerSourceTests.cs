@@ -106,9 +106,13 @@ public sealed class TomLiveModelSessionServerSourceTests
         Assert.False(session.SourceUnavailable);
         server.Gone = true;
         server.Poll();
-        await Task.Delay(TomLiveModelSession.SourceSettleDelay * 4);
-        Assert.Equal(SessionState.Clean, session.State);
+        // The settle timer fires on a thread-pool thread, which a loaded CI runner can delay well
+        // past a fixed wait: poll for the outcome instead.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!session.SourceUnavailable && DateTime.UtcNow < deadline)
+            await Task.Delay(TomLiveModelSession.SourceSettleDelay);
         Assert.True(session.SourceUnavailable);
+        Assert.Equal(SessionState.Clean, session.State);
 
         server.Gone = false;
         server.CommitFromElsewhere();
