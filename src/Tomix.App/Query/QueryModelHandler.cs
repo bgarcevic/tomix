@@ -71,23 +71,39 @@ public sealed class QueryModelHandler
                 $"No provider can open remote endpoint: {target.Value}",
                 exitCode: 2);
 
+        IModelSession? session = null;
         try
         {
-            await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
-            if (session is not IModelQuerySession querySession)
+            IModelQuerySession querySession;
+            try
+            {
+                session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ModelConnectionException ex)
+                when (ex.Kind == ModelConnectionFailureKind.MetadataUnavailable && provider is IQueryOnlyModelProvider)
+            {
+                // Read (Build) permission only: the model answers queries but its metadata is
+                // closed, so the query is sent without the reference check.
+            }
+
+            if (session is null)
+                querySession = ((IQueryOnlyModelProvider)provider).OpenQueryOnly(target);
+            else if (session is IModelQuerySession sessionQueries)
+                querySession = sessionQueries;
+            else
                 return TomixResult<QueryModelResult>.Fail(
                     "TOMIX_QUERY_UNSUPPORTED",
                     $"Provider session does not support queries: {target.Value}",
                     exitCode: 2,
                     hint: "Queries are only supported on live models connected via XMLA (-s <workspace> -d <model>).");
 
-            IReadOnlyList<TomixDiagnostic> warnings = [];
-            if (!request.NoValidate)
+            var warnings = new List<TomixDiagnostic>();
+            if (!request.NoValidate && session is not null)
             {
                 var preflight = await PreflightAsync(session, request.Query, cancellationToken).ConfigureAwait(false);
                 if (preflight.Misses.Count > 0)
                     return Blocked(preflight.Misses);
-                warnings = preflight.Warnings;
+                warnings.AddRange(preflight.Warnings);
             }
 
             var result = await querySession.ExecuteQueryAsync(
@@ -100,6 +116,13 @@ public sealed class QueryModelHandler
                     Runs: request.Runs < 1 ? 1 : request.Runs),
                 traceWriter,
                 cancellationToken).ConfigureAwait(false);
+
+            if (result.CacheClearError is { } clearError)
+                warnings.Add(new TomixDiagnostic(
+                    Code: "TOMIX_QUERY_COLD_UNAVAILABLE",
+                    Severity: DiagnosticSeverity.Warning,
+                    Message: $"--cold could not clear the cache, so every run was warm: {clearError}",
+                    Hint: "Clearing the cache needs write access to the model (workspace Admin, Member or Contributor)."));
 
             return TomixResult<QueryModelResult>.Ok(new QueryModelResult(
                 result.Server,
@@ -140,6 +163,11 @@ public sealed class QueryModelHandler
                 "TOMIX_QUERY_FAILED",
                 $"Query against '{target.Database ?? target.Value}' failed: {msg}",
                 exitCode: 1);
+        }
+        finally
+        {
+            if (session is not null)
+                await session.DisposeAsync().ConfigureAwait(false);
         }
     }
 

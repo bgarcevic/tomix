@@ -177,6 +177,51 @@ public sealed class QueryModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_SendsTheQueryUnchecked_WhenOnlyReadAccess()
+    {
+        // The reference is a typo the pre-flight would block, but without metadata it cannot run.
+        var session = new QueryStubs.Session { Snapshot = QueryPreflightTests.Model() };
+        var handler = new QueryModelHandler([new QueryStubs.ReadOnlyProvider(session)], RemoteState);
+        var result = await handler.HandleAsync(
+            Request(query: "EVALUATE ROW(\"x\", SUM(Sales[Amout]))"),
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(session.LastRequest);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReturnsMetadataAccessDenied_WhenTheProviderCannotQueryWithoutMetadata()
+    {
+        var handler = new QueryModelHandler(
+            [new QueryStubs.ThrowingProvider(new ModelConnectionException(
+                ModelConnectionFailureKind.MetadataUnavailable, "metadata closed"))],
+            RemoteState);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_METADATA_ACCESS_DENIED", result.Diagnostics[0].Code);
+        Assert.Contains("Build permission", result.Diagnostics[0].Hint);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WarnsThatEveryRunWasWarm_WhenTheCacheCouldNotBeCleared()
+    {
+        var session = new QueryStubs.Session { Result = QueryStubs.DefaultResult with { CacheClearError = "access denied" } };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var warning = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_QUERY_COLD_UNAVAILABLE", warning.Code);
+        Assert.Equal(Tomix.Core.Diagnostics.DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("access denied", warning.Message);
+        Assert.Contains("write access", warning.Hint);
+    }
+
+    [Fact]
     public async Task HandleAsync_ReturnsNoRemoteTarget_WhenConnectionIsLocal()
     {
         var handler = new QueryModelHandler([new QueryStubs.Provider(new QueryStubs.Session())], LocalState);

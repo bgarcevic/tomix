@@ -74,13 +74,13 @@ internal sealed class QueryCommand : ICommandModule
 
         var traceOption = new Option<string?>("--trace")
         {
-            Description = "Show server timings (formula vs storage engine). Add a path to also dump raw trace events. Needs admin rights.",
+            Description = "Show server timings (formula vs storage engine). Add a path to also dump raw trace events. Needs write access to the model.",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var coldOption = new Option<bool>("--cold")
         {
-            Description = "Clear the model cache before each run so timings reflect a cold cache. Needs admin rights."
+            Description = "Clear the model cache before each run so timings reflect a cold cache. Needs write access to the model; without it the runs stay warm and a warning says so."
         };
 
         var runsOption = new Option<int?>("--runs")

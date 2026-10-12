@@ -112,6 +112,20 @@ public static class QueryStubs
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
+    /// <summary>
+    /// A caller with read (Build) permission only: a full session fails with
+    /// <see cref="ModelConnectionFailureKind.MetadataUnavailable"/>, the query-only one answers.
+    /// </summary>
+    public sealed class ReadOnlyProvider(Session session) : IModelProvider, IQueryOnlyModelProvider
+    {
+        public bool CanOpen(ModelReference reference) => reference.IsRemote;
+
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
+            => throw new ModelConnectionException(ModelConnectionFailureKind.MetadataUnavailable, "metadata closed");
+
+        public IModelQuerySession OpenQueryOnly(ModelReference reference) => session;
+    }
+
     /// <summary>Claims remote references, then fails at open — a connection that cannot be made.</summary>
     public sealed class ThrowingProvider(Exception exception) : IModelProvider
     {

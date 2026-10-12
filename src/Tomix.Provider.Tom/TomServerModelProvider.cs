@@ -13,7 +13,7 @@ namespace Tomix.Provider.Tom;
 /// Supports read operations (summary, snapshot), mutation (add/set/rm/replace), deploy, and export.
 /// Mutations are persisted to the server via <c>Model.SaveChanges()</c> on save.
 /// </summary>
-public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider, IServerCatalog
+public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider, IServerCatalog, IQueryOnlyModelProvider
 {
     private readonly IAccessTokenProvider? _tokenProvider;
 
@@ -29,38 +29,72 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
     public async Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
     {
         var server = await ConnectServerAsync(reference, cancellationToken).ConfigureAwait(false);
+        TabularDatabase? database;
         try
         {
-            return new TomServerModelSession(server, ResolveDatabase(server, reference.Database), reference, _tokenProvider);
+            database = ResolveDatabase(server, reference.Database);
+            if (database is not null)
+                return new TomServerModelSession(server, database, reference, _tokenProvider);
         }
         catch
         {
             // The session owns the server once constructed; until then a failed database
             // resolution must not leak the live connection.
-            if (server.Connected)
-                server.Disconnect();
-            server.Dispose();
+            Close(server);
             throw;
         }
+
+        Close(server);
+        throw await NotListedAsync(reference, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ILiveModelSession> OpenLiveAsync(ModelReference reference, CancellationToken cancellationToken)
     {
         var server = await ConnectServerAsync(reference, cancellationToken).ConfigureAwait(false);
+        TabularDatabase? database;
         try
         {
-            return new TomLiveModelSession(
-                new TomServerModelSource(server, ResolveDatabase(server, reference.Database), reference, _tokenProvider));
+            database = ResolveDatabase(server, reference.Database);
+            if (database is not null)
+                return new TomLiveModelSession(new TomServerModelSource(server, database, reference, _tokenProvider));
         }
         catch
         {
             // Same ownership rule as OpenAsync: until the session exists, the connection is ours.
-            if (server.Connected)
-                server.Disconnect();
-            server.Dispose();
+            Close(server);
             throw;
         }
+
+        Close(server);
+        throw await NotListedAsync(reference, cancellationToken).ConfigureAwait(false);
     }
+
+    public IModelQuerySession OpenQueryOnly(ModelReference reference)
+        => new TomQueryOnlySession(reference, _tokenProvider);
+
+    /// <summary>
+    /// Why a named database is not listed: a wrong name, or a caller with read (Build) permission
+    /// only, who can query the model but not read its metadata.
+    /// </summary>
+    private async Task<ModelConnectionException> NotListedAsync(ModelReference reference, CancellationToken cancellationToken)
+        => await TomModelQueryExecutor.CanQueryAsync(BuildConnectionString(reference), reference, _tokenProvider, cancellationToken).ConfigureAwait(false)
+            ? MetadataUnavailable(reference.Database!)
+            : DatabaseNotFound(reference.Database!);
+
+    private static void Close(TabularServer server)
+    {
+        if (server.Connected)
+            server.Disconnect();
+        server.Dispose();
+    }
+
+    private static ModelConnectionException DatabaseNotFound(string database)
+        => new(ModelConnectionFailureKind.DatabaseNotFound, $"Database not found on endpoint: {database}");
+
+    private static ModelConnectionException MetadataUnavailable(string database)
+        => new(
+            ModelConnectionFailureKind.MetadataUnavailable,
+            $"'{database}' can be queried, but its metadata cannot be read with read (Build) permission only.");
 
     public bool CanList(ModelReference endpoint) => endpoint.IsRemote;
 
@@ -132,13 +166,14 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
     internal static string BuildConnectionString(ModelReference reference)
         => XmlaConnectionString.Build(reference);
 
-    private static TabularDatabase ResolveDatabase(TabularServer server, string? database)
+    /// <summary>
+    /// The named database, or the only one on the endpoint. Null when the named database is not
+    /// listed: the server lists only databases the caller can write to.
+    /// </summary>
+    private static TabularDatabase? ResolveDatabase(TabularServer server, string? database)
     {
         if (!string.IsNullOrWhiteSpace(database))
-            return server.Databases.FindByName(database)
-                ?? throw new ModelConnectionException(
-                    ModelConnectionFailureKind.DatabaseNotFound,
-                    $"Database not found on endpoint: {database}");
+            return server.Databases.FindByName(database);
 
         return server.Databases.Count switch
         {
@@ -323,4 +358,35 @@ internal sealed class TomServerModelSession : IModelSession, IModelExportSession
     // the database, fall back to its ID, and never yield the unnamed sentinel.
     private string ModelName()
         => ModelDisplayName.Resolve(_database.Name, sourcePath: null, fallback: _database.ID);
+}
+
+/// <summary>
+/// Queries a database the caller can query but not read the metadata of: read (Build)
+/// permission only. It holds no connection; each query opens its own over ADOMD.
+/// </summary>
+internal sealed class TomQueryOnlySession : IModelQuerySession
+{
+    private readonly ModelReference _reference;
+    private readonly IAccessTokenProvider? _tokenProvider;
+
+    public TomQueryOnlySession(ModelReference reference, IAccessTokenProvider? tokenProvider)
+    {
+        _reference = reference;
+        _tokenProvider = tokenProvider;
+    }
+
+    public Task<ModelQueryResult> ExecuteQueryAsync(
+        ModelQueryRequest request,
+        TextWriter? traceWriter,
+        CancellationToken cancellationToken)
+        => TomModelQueryExecutor.ExecuteAsync(
+            TomServerModelProvider.BuildConnectionString(_reference),
+            _reference,
+            _reference.Database!,
+            // Without metadata the ID is unknown; ClearCache accepts the name too.
+            _reference.Database!,
+            _tokenProvider,
+            request,
+            traceWriter,
+            cancellationToken);
 }

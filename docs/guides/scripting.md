@@ -42,7 +42,8 @@ tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace
 tx query --file heavy.dax --cold --runs 5
 ```
 
-The trace-based options require admin rights on the endpoint; when
+`--trace` and `--cold` need write access to the model (workspace Admin,
+Member or Contributor); Build permission alone is not enough. When they are
 unavailable they warn and the query still returns its rows.
 
 ## Exit codes

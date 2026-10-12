@@ -15,7 +15,7 @@ namespace Tomix.Provider.Tom;
 /// <c>Server.SessionTrace</c> because the refresh runs on the AMO session), a query runs on a
 /// separate ADOMD connection, so we open our own core <see cref="Server"/>, create a
 /// <see cref="Trace"/>, and subscribe to the query-perf event classes — the approach DAX Studio
-/// uses. Tracing requires admin rights on the endpoint; when unavailable the sink degrades to a
+/// uses. Tracing requires write access to the model; when unavailable the sink degrades to a
 /// no-op (the query still runs) with a one-line warning.
 /// <para>
 /// Three details matter on Power BI / Fabric XMLA endpoints, all mirrored from DAX Studio:
@@ -69,7 +69,7 @@ internal sealed class TomQueryTraceSink : IDisposable
     {
     }
 
-    /// <summary>True when a live trace is attached (admin rights present); false in degraded mode.</summary>
+    /// <summary>True when a live trace is attached (write access present); false in degraded mode.</summary>
     public bool Active => _trace is not null;
 
     /// <summary>
@@ -147,7 +147,7 @@ internal sealed class TomQueryTraceSink : IDisposable
         }
         catch (Exception ex)
         {
-            // Best-effort, exactly like RefreshTraceSink: tracing needs admin rights and is not
+            // Best-effort, exactly like RefreshTraceSink: tracing needs write access and is not
             // available on shared-capacity Power BI. Warn once and let the query run without timings.
             Warn($"query trace unavailable: {ex.Message}");
             if (sink is not null)
