@@ -128,6 +128,36 @@ public sealed class TomServerModelProvider : IModelProvider, ILiveModelProvider,
 
     private async Task<TabularServer> ConnectServerAsync(ModelReference reference, CancellationToken cancellationToken)
     {
+        try
+        {
+            return await ConnectEndpointAsync(reference, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!string.IsNullOrWhiteSpace(reference.Database)
+            && ex is not (OperationCanceledException or AuthenticationRequiredException or ModelConnectionException))
+        {
+            // Power BI rejects a connection to a model that does not exist (HTTP 404) before
+            // anything is looked up. If the endpoint answers without the model, the name is wrong.
+            if (!await EndpointAnswersAsync(reference, cancellationToken).ConfigureAwait(false))
+                throw;
+            throw await NotListedAsync(reference, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<bool> EndpointAnswersAsync(ModelReference reference, CancellationToken cancellationToken)
+    {
+        try
+        {
+            Close(await ConnectEndpointAsync(reference with { Database = null }, cancellationToken).ConfigureAwait(false));
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    private async Task<TabularServer> ConnectEndpointAsync(ModelReference reference, CancellationToken cancellationToken)
+    {
         // A closed Desktop leaves a refused port, which AMO takes seconds to report as a raw
         // socket error; nothing listening is known up front.
         if (TomServerModelSource.LocalInstanceGone(reference.Value, TomServerModelSource.IsPortListening))

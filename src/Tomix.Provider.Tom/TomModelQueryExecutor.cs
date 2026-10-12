@@ -96,8 +96,9 @@ public static class TomModelQueryExecutor
 
                 // Attach a trace only when timings are requested. Best-effort: a null sink
                 // (no write access) means the query still runs, just without server timings.
+                string? traceError = null;
                 using var sink = traced
-                    ? TomQueryTraceSink.Attach(connection, connectionString, applicationName, tokenFactory, traceWriter)
+                    ? TomQueryTraceSink.Attach(connection, connectionString, applicationName, tokenFactory, traceWriter, out traceError)
                     : null;
 
                 List<QueryColumn> columns = [];
@@ -105,7 +106,6 @@ public static class TomModelQueryExecutor
                 var truncated = false;
                 var runResults = new List<QueryRun>(runs);
                 string? cacheClearError = null;
-                var timingsWarned = false;
 
                 for (var run = 1; run <= runs; run++)
                 {
@@ -145,18 +145,17 @@ public static class TomModelQueryExecutor
 
                     var timings = sink is { Active: true }
                         // After one miss the trace is evidently not delivering; don't stall every run.
-                        ? sink.WaitForRun(timingsWarned ? TimeSpan.FromSeconds(2) : RunEventTimeout)
+                        ? sink.WaitForRun(traceError is not null ? TimeSpan.FromSeconds(2) : RunEventTimeout)
                         : null;
-                    if (sink is { Active: true } && timings is null && !timingsWarned)
+                    if (sink is { Active: true } && timings is null && traceError is null)
                     {
                         // The trace is live but this run's QueryEnd never arrived: say so rather
                         // than leave the timings silently null.
-                        timingsWarned = true;
-                        TomQueryTraceSink.Warn(
-                            $"no QueryEnd trace event arrived for run {run}; server timings are unavailable" +
+                        traceError =
+                            $"no QueryEnd trace event arrived for run {run}" +
                             (sink.ForeignEventCount > 0
                                 ? $" ({sink.ForeignEventCount} trace event(s) from other sessions were ignored)."
-                                : "."));
+                                : ".");
                     }
                     runResults.Add(new QueryRun(run, cold, runStopwatch.ElapsedMilliseconds, timings));
                 }
@@ -169,7 +168,8 @@ public static class TomModelQueryExecutor
                     truncated,
                     runResults[0].ClientMs,
                     runResults,
-                    cacheClearError);
+                    cacheClearError,
+                    traceError);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (AdomdException ex) when (cancellationToken.IsCancellationRequested)

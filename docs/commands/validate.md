@@ -439,7 +439,8 @@ single test file or a directory searched recursively for `.dax` files
 
 Like `query`, tests execute on a **deployed model** (XMLA) or a local
 instance — never on TMDL/BIM files. Target the model with `-s <workspace>
--d <model>` or the active session.
+-d <model>` or the active session. Read access is enough: the Viewer role
+with Build permission on the model.
 
 **Workflow.** Add a test by writing a `.dax` file (any `EVALUATE` query),
 then record its snapshot:

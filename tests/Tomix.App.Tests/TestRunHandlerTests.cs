@@ -125,6 +125,19 @@ public sealed class TestRunHandlerTests : IDisposable
         Assert.Equal(1, result.ExitCode);
     }
 
+    [Fact]
+    public async Task HandleAsync_RunsTheTests_WhenOnlyReadAccess()
+    {
+        WriteDax("sales");
+        var session = NewSession();
+        var handler = new TestRunHandler([new QueryStubs.ReadOnlyProvider(session)], RemoteState);
+        var result = await handler.HandleAsync(Request(update: true), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(TestOutcome.Updated, Assert.Single(result.Data!.Tests).Outcome);
+        Assert.NotNull(session.LastRequest);
+    }
+
     // ── Update mode ─────────────────────────────────────────────────────────
 
     [Fact]

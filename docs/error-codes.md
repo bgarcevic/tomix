@@ -208,6 +208,7 @@ Returned by `tx mcp` as the result of a failed tool call (`isError: true`, a JSO
 | `TOMIX_QUERY_INVALID` | 2 | The query does not start with `EVALUATE`, `DEFINE`, or `SELECT`; bypass with `--no-validate`. |
 | `TOMIX_QUERY_UNKNOWN_REFERENCE` | 2 | The query names a table, column, or measure the model does not have; found before the query is sent, one error per reference (JSON carries the first), with the closest name as a hint. Bypass with `--no-validate`. |
 | `TOMIX_QUERY_PREFLIGHT_SKIPPED` | 0 | Warning, not a failure. The reference check could not read the model's metadata, so the query was sent unchecked. |
+| `TOMIX_QUERY_TRACE_UNAVAILABLE` | 0 | Warning, not a failure. `--trace` could not capture server timings for some or all runs (the trace could not be started, or a run's events never arrived), so `timings` is `null` there. Tracing needs write access to the model (workspace Admin, Member or Contributor). |
 | `TOMIX_QUERY_COLD_UNAVAILABLE` | 0 | Warning, not a failure. `--cold` could not clear the cache, so every run was warm (labelled `warm` in the benchmark). Clearing the cache needs write access to the model (workspace Admin, Member or Contributor). |
 | `TOMIX_QUERY_NO_REMOTE_TARGET` | 2 | `query` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
 | `TOMIX_QUERY_UNSUPPORTED` | 2 | The provider session does not implement `IModelQuerySession` (e.g. a local TMDL/BIM model). |
@@ -216,9 +217,9 @@ Returned by `tx mcp` as the result of a failed tool call (`isError: true`, a JSO
 The performance options are **best-effort**: `--trace` and `--cold` need write access to the
 model (workspace Admin, Member or Contributor; read access with Build permission is not enough)
 and are unavailable on shared-capacity Power BI. When they cannot be honored, `tx query` still
-returns the rowset and exits `0`: `--cold` reports `TOMIX_QUERY_COLD_UNAVAILABLE`, and `--trace`
-prints a one-line warning to stderr. When `--trace` was requested, a `null` `timings` field is always accompanied
-by such a warning.
+returns the rowset and exits `0`, with a warning: `TOMIX_QUERY_COLD_UNAVAILABLE` or
+`TOMIX_QUERY_TRACE_UNAVAILABLE`. When `--trace` was requested, a `null` `timings` field is always
+accompanied by `TOMIX_QUERY_TRACE_UNAVAILABLE`.
 
 ## Regression Test Codes (`TOMIX_TEST_*`)
 

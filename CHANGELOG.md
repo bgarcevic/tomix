@@ -17,9 +17,9 @@ and the API surface that major versions protect.
   (`Did you mean 'Amount'?`), or the table's columns or the model's tables when nothing is
   close, instead of a server error. Names the query defines itself are understood;
   `--no-validate` skips the check (#240).
-- `tx query --cold` reports `TOMIX_QUERY_COLD_UNAVAILABLE` when it cannot clear the cache, so
-  a benchmark whose runs all stayed warm says so in the JSON output too, not only in a stderr
-  line.
+- `tx query --cold` reports `TOMIX_QUERY_COLD_UNAVAILABLE` when it cannot clear the cache, and
+  `--trace` reports `TOMIX_QUERY_TRACE_UNAVAILABLE` when it cannot capture server timings, so
+  the JSON output says so too, not only a stderr line.
 
 ### Changed
 
@@ -39,11 +39,13 @@ and the API surface that major versions protect.
 
 ### Fixed
 
-- `tx query` works with read access only (the Viewer role with Build permission). It used to
-  fail with `Database not found`, because the server lists only the models a caller can write
-  to. Commands that read the model's metadata now fail with `TOMIX_METADATA_ACCESS_DENIED`
+- `tx query` and `tx test` work with read access only (the Viewer role with Build permission).
+  They used to fail with `Database not found`, because the server lists only the models a
+  caller can write to. Commands that read the model's metadata now fail with `TOMIX_METADATA_ACCESS_DENIED`
   instead, naming the write access they need. The docs no longer say `--trace` and `--cold`
   need admin rights: write access (workspace Admin, Member or Contributor) is enough.
+- A wrong model name on a Power BI workspace fails with `TOMIX_DATABASE_NOT_FOUND` instead of
+  `TOMIX_CONNECT_FAILED` and a raw `(404) Not Found`.
 
 - Reference tracking (`deps`, `validate`, rename and remove guards, BPA) now reads DAX with the
   same lexer as `tx format` and `dax check`, so a date literal (`dt"2024-01-01"`) or a query

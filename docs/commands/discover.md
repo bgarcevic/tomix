@@ -270,7 +270,7 @@ the table's columns or the model's tables. Names the query defines itself
 check.
 
 Querying needs only read access: the Viewer role with Build permission on the
-model is enough. Reading the model's metadata needs write access (workspace
+model is enough, for `query` and for `test`. Reading the model's metadata needs write access (workspace
 Admin, Member or Contributor), so with Build permission only the reference
 check is skipped and the query is sent unchecked, and the commands that read
 metadata (`ls`, `get`, `deps`, ...) fail with `TOMIX_METADATA_ACCESS_DENIED`.

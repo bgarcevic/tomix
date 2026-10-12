@@ -62,7 +62,8 @@ public sealed record QueryRun(int Index, bool Cold, long ClientMs, QueryTimings?
 /// <see cref="double"/>, <see cref="decimal"/>, <see cref="bool"/>, <see cref="DateTime"/>,
 /// or null (DAX BLANK); implementations must map anything else to a string.
 /// <see cref="Runs"/> is null unless a perf option was requested and honored (append-only additions preserve the layering contract).
-/// <see cref="CacheClearError"/> is set when a cache clear was requested and failed, so no run was cold.
+/// <see cref="CacheClearError"/> is set when a cache clear was requested and failed, so no run was cold;
+/// <see cref="TraceError"/> when a trace was requested and some or all runs have no server timings.
 /// </summary>
 public sealed record ModelQueryResult(
     string Server,
@@ -72,4 +73,5 @@ public sealed record ModelQueryResult(
     bool Truncated,
     long DurationMs,
     IReadOnlyList<QueryRun>? Runs = null,
-    string? CacheClearError = null);
+    string? CacheClearError = null,
+    string? TraceError = null);

@@ -207,6 +207,20 @@ public sealed class QueryModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WarnsThatTimingsAreMissing_WhenTheTraceIsUnavailable()
+    {
+        var session = new QueryStubs.Session { Result = QueryStubs.DefaultResult with { TraceError = "access denied" } };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
+        var result = await handler.HandleAsync(Request(query: "EVALUATE 'Sales'"), null, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var warning = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_QUERY_TRACE_UNAVAILABLE", warning.Code);
+        Assert.Equal(Tomix.Core.Diagnostics.DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("access denied", warning.Message);
+    }
+
+    [Fact]
     public async Task HandleAsync_WarnsThatEveryRunWasWarm_WhenTheCacheCouldNotBeCleared()
     {
         var session = new QueryStubs.Session { Result = QueryStubs.DefaultResult with { CacheClearError = "access denied" } };

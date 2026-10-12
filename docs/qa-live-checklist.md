@@ -55,9 +55,11 @@ you compare against. A check with no expected value recorded is not a check.
       CSV stdout parse with an independent parser.
 - [ ] `query --trace` / `--cold` with write access (workspace Admin, Member
       or Contributor): expected column sets (#94). With Viewer + Build only:
-      `query` returns rows, `--cold` warns `TOMIX_QUERY_COLD_UNAVAILABLE`,
-      `--trace` warns, never a failure; `ls` fails with
-      `TOMIX_METADATA_ACCESS_DENIED`.
+      `query` and `test` return rows, `--cold` warns
+      `TOMIX_QUERY_COLD_UNAVAILABLE`, `--trace` warns
+      `TOMIX_QUERY_TRACE_UNAVAILABLE`, never a failure; `ls` fails with
+      `TOMIX_METADATA_ACCESS_DENIED`. A wrong `-d` name fails with
+      `TOMIX_DATABASE_NOT_FOUND`.
 - [ ] Repeated and concurrent reads are stable; no read changes server
       metadata, local baselines, or active connection.
 
