@@ -46,6 +46,13 @@ and the API surface that major versions protect.
   need admin rights: write access (workspace Admin, Member or Contributor) is enough.
 - A wrong model name on a Power BI workspace fails with `TOMIX_DATABASE_NOT_FOUND` instead of
   `TOMIX_CONNECT_FAILED` and a raw `(404) Not Found`.
+- `tx validate` checks each row-level security filter on its own table permission
+  (`Roles/<role>/<table>`). It used to parse a role's filters joined as `Table: <filter>` lines,
+  so a role with more than one filter could fail with `Unexpected ':' after the end of the
+  expression` (`DAX0007`). Renaming a column or table now rewrites the RLS filters that use
+  it instead of only warning, and BPA rules see filters that span several lines whole.
+- `tx validate`, `tx deps` and rename fixup also cover calculation group no-selection and
+  multiple-or-empty-selection expressions and calculation item format string expressions.
 
 - Reference tracking (`deps`, `validate`, rename and remove guards, BPA) now reads DAX with the
   same lexer as `tx format` and `dax check`, so a date literal (`dt"2024-01-01"`) or a query

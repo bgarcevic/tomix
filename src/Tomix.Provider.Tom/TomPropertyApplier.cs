@@ -110,6 +110,12 @@ internal static class TomPropertyApplier
             case CalculationItem item when isMainExpression:
                 w.Set(item, p => p.Expression, edit.Value);
                 break;
+            case CalculationItem { FormatStringDefinition: { } itemFormat } when edit.Property == "FormatStringExpression":
+                w.Set(itemFormat, p => p.Expression, edit.Value);
+                break;
+            case TablePermission permission when edit.Property == "FilterExpression":
+                w.Set(permission, p => p.FilterExpression, edit.Value);
+                break;
             case Function function when isMainExpression:
                 w.Set(function, p => p.Expression, edit.Value);
                 break;
@@ -118,6 +124,12 @@ internal static class TomPropertyApplier
                 break;
             case Table { DefaultDetailRowsDefinition: { } detailRows } when edit.Property == "DefaultDetailRowsExpression":
                 w.Set(detailRows, p => p.Expression, edit.Value);
+                break;
+            case Table { CalculationGroup.NoSelectionExpression: { } noSelection } when edit.Property == "NoSelectionExpression":
+                w.Set(noSelection, p => p.Expression, edit.Value);
+                break;
+            case Table { CalculationGroup.MultipleOrEmptySelectionExpression: { } multiSelection } when edit.Property == "MultipleOrEmptySelectionExpression":
+                w.Set(multiSelection, p => p.Expression, edit.Value);
                 break;
             default:
                 throw new NotSupportedException(

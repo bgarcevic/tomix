@@ -370,7 +370,9 @@ tx validate [model] [options]
 ```
 
 Offline analysis runs on every DAX-bearing expression (measures, calculated
-columns/items/tables, role filters, secondary measure expressions). Syntax is
+columns/items/tables, row-level security filters (each reported on its table
+permission, `Roles/<role>/<table>`), secondary measure expressions, calculation
+group selection expressions, and calculation item format strings). Syntax is
 checked first: illegal characters, unterminated string/table/bracket literals
 and block comments, and unbalanced parentheses or braces are reported as
 `DAX0004`/`DAX0005` errors. When those pass, the DAX parser reports its first

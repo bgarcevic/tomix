@@ -29,6 +29,17 @@ public static class BpaModelBuilder
             .Select(o => o.Name)
             .ToList();
 
+        // RLS filters come from the table permissions themselves: the joined, line-per-filter
+        // summaries would split a filter that spans several lines. A permission is named after
+        // the table it filters.
+        var rlsByTable = allObjects
+            .Where(o => o.Kind == ModelObjectKind.TablePermission && !string.IsNullOrWhiteSpace(o.Expression))
+            .GroupBy(o => o.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(o => o.Expression!).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
         var tables = new List<BpaTable>();
         var columns = new List<BpaColumn>();
         var measures = new List<BpaMeasure>();
@@ -46,7 +57,7 @@ public static class BpaModelBuilder
                 Description = tableObj.Description ?? "",
                 IsHidden = tableObj.Hidden,
                 DataCategory = tableObj.Property("DataCategory") ?? "",
-                RowLevelSecurity = SplitLines(tableObj.Property("RowLevelSecurity")),
+                RowLevelSecurity = rlsByTable.GetValueOrDefault(tableObj.Name, []),
             };
 
             var tableColumns = new List<BpaColumn>();
@@ -274,8 +285,9 @@ public static class BpaModelBuilder
             Name = obj.Name,
             Description = obj.Description ?? "",
             Members = obj.Children.Where(c => c.Kind == ModelObjectKind.RoleMember).Select(c => c.Name).ToList(),
-            RowLevelSecurity = (obj.Property("RlsExpression") ?? "")
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            RowLevelSecurity = obj.Children
+                .Where(c => c.Kind == ModelObjectKind.TablePermission && !string.IsNullOrWhiteSpace(c.Expression))
+                .Select(c => c.Expression!)
                 .ToList(),
         };
 
