@@ -52,7 +52,9 @@ jobs:
           fetch-depth: 0
 
       # A squash merge carries the PR body and the commit trailers into main,
-      # so both are checked. Matching is case-insensitive.
+      # so both are checked. Matching is case-insensitive and anchored to the
+      # start of a line (the footer may lead with an emoji), so prose that
+      # mentions these lines does not trip the check.
       - name: Reject AI co-author trailers and generated-with footers
         env:
           BODY: ${{ github.event.pull_request.body }}
@@ -60,7 +62,9 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          pattern='^co-authored-by:.*noreply@anthropic\.com|generated with \[?claude'
+          # Byte-wise matching, so [^a-z0-9]* also skips a multibyte emoji.
+          export LC_ALL=C
+          pattern='^co-authored-by:.*noreply@anthropic\.com|^[^a-z0-9]*generated with \[?claude code'
           found=0
           if grep -inE "${pattern}" <<<"${BODY}"; then
             echo "::error::The PR description contains AI attribution. Remove the line(s) above."
