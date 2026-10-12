@@ -13,7 +13,13 @@ public enum ModelConnectionFailureKind
     /// A local Power BI Desktop endpoint (<c>localhost:&lt;port&gt;</c>) has nothing listening:
     /// its report was closed, or Desktop restarted on another port.
     /// </summary>
-    LocalInstanceGone
+    LocalInstanceGone,
+
+    /// <summary>
+    /// The database exists and can be queried, but its metadata cannot be read: the caller has
+    /// read (Build) permission only, and reading model metadata over XMLA needs write access.
+    /// </summary>
+    MetadataUnavailable
 }
 
 /// <summary>

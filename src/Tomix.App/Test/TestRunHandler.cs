@@ -69,15 +69,15 @@ public sealed class TestRunHandler
 
         try
         {
-            await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
-            if (session is not IModelQuerySession querySession)
+            await using var connection = await QueryConnection.OpenAsync(provider, target, cancellationToken).ConfigureAwait(false);
+            if (connection is null)
                 return TomixResult<TestRunResult>.Fail(
                     "TOMIX_TEST_UNSUPPORTED",
                     $"Provider session does not support queries: {target.Value}",
                     exitCode: 2,
                     hint: "Tests run only on live models connected via XMLA (-s <workspace> -d <model>).");
 
-            return await RunTestsAsync(request, target, querySession, tests, cancellationToken).ConfigureAwait(false);
+            return await RunTestsAsync(request, target, connection.Queries, tests, cancellationToken).ConfigureAwait(false);
         }
         catch (ModelConnectionException ex)
         {

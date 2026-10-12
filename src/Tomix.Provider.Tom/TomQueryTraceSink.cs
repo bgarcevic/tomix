@@ -15,7 +15,7 @@ namespace Tomix.Provider.Tom;
 /// <c>Server.SessionTrace</c> because the refresh runs on the AMO session), a query runs on a
 /// separate ADOMD connection, so we open our own core <see cref="Server"/>, create a
 /// <see cref="Trace"/>, and subscribe to the query-perf event classes — the approach DAX Studio
-/// uses. Tracing requires admin rights on the endpoint; when unavailable the sink degrades to a
+/// uses. Tracing requires write access to the model; when unavailable the sink degrades to a
 /// no-op (the query still runs) with a one-line warning.
 /// <para>
 /// Three details matter on Power BI / Fabric XMLA endpoints, all mirrored from DAX Studio:
@@ -69,7 +69,7 @@ internal sealed class TomQueryTraceSink : IDisposable
     {
     }
 
-    /// <summary>True when a live trace is attached (admin rights present); false in degraded mode.</summary>
+    /// <summary>True when a live trace is attached (write access present); false in degraded mode.</summary>
     public bool Active => _trace is not null;
 
     /// <summary>
@@ -82,8 +82,9 @@ internal sealed class TomQueryTraceSink : IDisposable
     /// <summary>
     /// Opens a dedicated trace connection to <paramref name="connectionString"/>, creates a trace
     /// filtered to <paramref name="queryConnection"/>'s session and <paramref name="applicationName"/>,
-    /// starts it, and waits until it delivers its first event. Returns null (with a stderr warning)
-    /// when the trace cannot be created or never goes live — the caller then runs without timings.
+    /// starts it, and waits until it delivers its first event. Returns null, with the reason in
+    /// <paramref name="unavailableReason"/>, when the trace cannot be created or never goes live —
+    /// the caller then runs without timings.
     /// </summary>
     /// <param name="queryConnection">The open query connection; used for the supported-columns discover
     /// and the start-up heartbeat, and its <c>SessionID</c> scopes the trace.</param>
@@ -96,8 +97,10 @@ internal sealed class TomQueryTraceSink : IDisposable
         string connectionString,
         string applicationName,
         Func<AsAccessToken>? tokenFactory,
-        TextWriter? rawWriter)
+        TextWriter? rawWriter,
+        out string? unavailableReason)
     {
+        unavailableReason = null;
         Server? server = null;
         TomQueryTraceSink? sink = null;
         try
@@ -137,8 +140,8 @@ internal sealed class TomQueryTraceSink : IDisposable
 
             if (!sink.WaitUntilLive(() => Heartbeat(queryConnection)))
             {
-                Warn($"query trace was created but delivered no events within {StartTimeout.TotalSeconds:0}s; " +
-                     "server timings are unavailable for this query.");
+                unavailableReason =
+                    $"the trace was created but delivered no events within {StartTimeout.TotalSeconds:0}s.";
                 sink.Dispose();
                 return null;
             }
@@ -147,20 +150,15 @@ internal sealed class TomQueryTraceSink : IDisposable
         }
         catch (Exception ex)
         {
-            // Best-effort, exactly like RefreshTraceSink: tracing needs admin rights and is not
-            // available on shared-capacity Power BI. Warn once and let the query run without timings.
-            Warn($"query trace unavailable: {ex.Message}");
+            // Best-effort, exactly like RefreshTraceSink: tracing needs write access and is not
+            // available on shared-capacity Power BI. Let the query run without timings.
+            unavailableReason = TomModelQueryExecutor.ServerReason(ex.Message);
             if (sink is not null)
                 sink.Dispose();
             else
                 try { server?.Dispose(); } catch { }
             return null;
         }
-    }
-
-    internal static void Warn(string message)
-    {
-        try { Console.Error.WriteLine($"[tomix] {message}"); } catch { }
     }
 
     /// <summary>

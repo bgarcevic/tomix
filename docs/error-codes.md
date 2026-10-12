@@ -206,15 +206,20 @@ Returned by `tx mcp` as the result of a failed tool call (`isError: true`, a JSO
 | `TOMIX_QUERY_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_QUERY_OUTPUT_FORMAT` | 2 | `-o`/`--output-file` could not resolve a json or csv format (pass `--output-format json\|csv` or use a `.json`/`.csv` extension). |
 | `TOMIX_QUERY_INVALID` | 2 | The query does not start with `EVALUATE`, `DEFINE`, or `SELECT`; bypass with `--no-validate`. |
+| `TOMIX_QUERY_UNKNOWN_REFERENCE` | 2 | The query names a table, column, or measure the model does not have; found before the query is sent, one error per reference (JSON carries the first), with the closest name as a hint. Bypass with `--no-validate`. |
+| `TOMIX_QUERY_PREFLIGHT_SKIPPED` | 0 | Warning, not a failure. The reference check could not read the model's metadata, so the query was sent unchecked. |
+| `TOMIX_QUERY_TRACE_UNAVAILABLE` | 0 | Warning, not a failure. `--trace` could not capture server timings for some or all runs (the trace could not be started, or a run's events never arrived), so `timings` is `null` there. Tracing needs write access to the model (workspace Admin, Member or Contributor). |
+| `TOMIX_QUERY_COLD_UNAVAILABLE` | 0 | Warning, not a failure. `--cold` could not clear the cache, so every run was warm (labelled `warm` in the benchmark). Clearing the cache needs write access to the model (workspace Admin, Member or Contributor). |
 | `TOMIX_QUERY_NO_REMOTE_TARGET` | 2 | `query` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
 | `TOMIX_QUERY_UNSUPPORTED` | 2 | The provider session does not implement `IModelQuerySession` (e.g. a local TMDL/BIM model). |
 | `TOMIX_QUERY_FAILED` | 1 | The query was rejected or failed on the server (DAX error, no permissions, timeout, etc.). |
 
-The performance options are **best-effort** and do not have dedicated error codes: `--trace` and
-`--cold` require admin rights on the endpoint (and are unavailable on shared-capacity Power BI).
-When they cannot be honored, `tx query` prints a one-line warning to stderr, still returns the
-rowset, and exits `0`. When `--trace` was requested, a `null` `timings` field is always accompanied
-by such a warning.
+The performance options are **best-effort**: `--trace` and `--cold` need write access to the
+model (workspace Admin, Member or Contributor; read access with Build permission is not enough)
+and are unavailable on shared-capacity Power BI. When they cannot be honored, `tx query` still
+returns the rowset and exits `0`, with a warning: `TOMIX_QUERY_COLD_UNAVAILABLE` or
+`TOMIX_QUERY_TRACE_UNAVAILABLE`. When `--trace` was requested, a `null` `timings` field is always
+accompanied by `TOMIX_QUERY_TRACE_UNAVAILABLE`.
 
 ## Regression Test Codes (`TOMIX_TEST_*`)
 
@@ -337,6 +342,7 @@ come from structural integrity checks.
 | `TOMIX_INTERACTIVE_REQUIRED` | 1 | An interactive-only flow (`connect --remote`, a valueless `-w`) was invoked without a TTY (e.g. `--non-interactive`, `--quiet`, redirected input, or json/csv output). Pass the workspace/model explicitly. |
 | `TOMIX_REMOTE_LIST_FAILED` | 1 | Listing workspaces or models failed (Power BI REST or XMLA error) during an interactive `connect` or `connect <server> --list`. |
 | `TOMIX_DATABASE_NOT_FOUND` | 1 | The database/model name was not found on the server. |
+| `TOMIX_METADATA_ACCESS_DENIED` | 1 | The model can be queried but its metadata cannot be read: the caller has read access (Build permission) only, and reading metadata needs write access (workspace Admin, Member or Contributor). `tx query` still works. |
 | `TOMIX_DESKTOP_NOT_RUNNING` | 1 | Nothing listens on the `localhost:<port>` Power BI Desktop endpoint: the report was closed, or Desktop restarted on another port. Open it again, then run `tx connect --local` to pick its new port. |
 | `TOMIX_DATABASE_REQUIRED` | 2 | The endpoint hosts more than one database/model and none was named. List them with `tx connect <server> --list`, then pass one with `-d/--database`. |
 | `TOMIX_DEPS_PATH_REQUIRED` | 2 | `get --deps` (or `deps`) called without an object path. |

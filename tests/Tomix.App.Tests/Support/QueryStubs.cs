@@ -46,6 +46,12 @@ public static class QueryStubs
 
         public IReadOnlyList<QueryRun>? Runs { get; init; }
 
+        /// <summary>The model metadata the query pre-flight checks against; empty by default, which skips it.</summary>
+        public ModelSnapshot Snapshot { get; init; } = new("stub", 1601, []);
+
+        /// <summary>Thrown from <see cref="GetSnapshotAsync"/>, for the pre-flight's degrade path.</summary>
+        public Exception? SnapshotThrow { get; init; }
+
         public ModelQueryRequest? LastRequest { get; private set; }
 
         public TextWriter? LastTraceWriter { get; private set; }
@@ -56,7 +62,7 @@ public static class QueryStubs
             => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
 
         public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
-            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
+            => SnapshotThrow is not null ? throw SnapshotThrow : Task.FromResult(Snapshot);
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -104,6 +110,20 @@ public static class QueryStubs
             => Task.FromResult(new ModelSnapshot("stub", 1601, []));
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// A caller with read (Build) permission only: a full session fails with
+    /// <see cref="ModelConnectionFailureKind.MetadataUnavailable"/>, the query-only one answers.
+    /// </summary>
+    public sealed class ReadOnlyProvider(Session session) : IModelProvider, IQueryOnlyModelProvider
+    {
+        public bool CanOpen(ModelReference reference) => reference.IsRemote;
+
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
+            => throw new ModelConnectionException(ModelConnectionFailureKind.MetadataUnavailable, "metadata closed");
+
+        public IModelQuerySession OpenQueryOnly(ModelReference reference) => session;
     }
 
     /// <summary>Claims remote references, then fails at open — a connection that cannot be made.</summary>

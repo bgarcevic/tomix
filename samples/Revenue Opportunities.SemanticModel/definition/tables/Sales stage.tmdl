@@ -41,7 +41,5 @@ table 'Sales stage'
 				in
 				    #"Changed Type"
 
-	changedProperty = Name
-
 	annotation PBI_ResultType = Table
 

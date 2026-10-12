@@ -3,6 +3,7 @@ using Tomix.App.Deps;
 using Tomix.App.Get;
 using Tomix.App.ModelObjects;
 using Tomix.App.Models;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Paths;
 using Tomix.Core.Properties;
@@ -276,32 +277,9 @@ public sealed class GetModelHandler
 
     private static string PropertyHint(string query, IReadOnlyList<string> keys)
     {
-        var closest = keys
-            .Select(key => (Key: key, Distance: EditDistance(query.ToLowerInvariant(), key.ToLowerInvariant())))
-            .Where(candidate => candidate.Distance <= Math.Max(2, query.Length / 3))
-            .OrderBy(candidate => candidate.Distance)
-            .Select(candidate => candidate.Key)
-            .FirstOrDefault();
+        var closest = NameSuggestion.Closest(query, keys, NameSuggestion.ScaledLimit(query));
         return closest is null
             ? $"Properties: {string.Join(", ", keys)}."
             : $"Did you mean '{closest}'?";
     }
-
-    private static int EditDistance(string a, string b)
-    {
-        var previous = Enumerable.Range(0, b.Length + 1).ToArray();
-        for (var i = 1; i <= a.Length; i++)
-        {
-            var current = new int[b.Length + 1];
-            current[0] = i;
-            for (var j = 1; j <= b.Length; j++)
-                current[j] = Math.Min(
-                    Math.Min(current[j - 1] + 1, previous[j] + 1),
-                    previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
-            previous = current;
-        }
-
-        return previous[b.Length];
-    }
-
 }

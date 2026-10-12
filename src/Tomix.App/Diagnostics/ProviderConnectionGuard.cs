@@ -7,7 +7,7 @@ namespace Tomix.App.Diagnostics;
 /// <summary>
 /// Converts provider connection failures into the uniform diagnostics every model-opening
 /// handler must emit (<c>TOMIX_DATABASE_NOT_FOUND</c>, <c>TOMIX_DATABASE_REQUIRED</c>, <c>TOMIX_AUTH_REQUIRED</c>,
-/// <c>TOMIX_CONNECT_FAILED</c>). Handlers wrap their open-and-work body in
+/// <c>TOMIX_METADATA_ACCESS_DENIED</c>, <c>TOMIX_CONNECT_FAILED</c>). Handlers wrap their open-and-work body in
 /// <see cref="RunAsync{T}"/> instead of copying these catch blocks; handler-specific
 /// exceptions should be caught inside the body so they keep their own diagnostics.
 /// </summary>
@@ -50,6 +50,10 @@ public static class ProviderConnectionGuard
     public const string DesktopNotRunningHint =
         "Open the report in Power BI Desktop again, then run 'tx connect --local' to pick its new port.";
 
+    /// <summary>The hint for <c>TOMIX_METADATA_ACCESS_DENIED</c>.</summary>
+    public const string MetadataAccessHint =
+        "Reading a model's metadata needs write access to it (workspace Admin, Member or Contributor). With Build permission only, 'tx query' works.";
+
     public static TomixResult<T> ConnectionFailure<T>(ModelReference? model, ModelConnectionException ex)
         => ex.Kind switch
         {
@@ -62,6 +66,8 @@ public static class ProviderConnectionGuard
                     : $"List the models on the endpoint: tx connect \"{model.Value}\" --list"),
             ModelConnectionFailureKind.LocalInstanceGone => TomixResult<T>.Fail(
                 "TOMIX_DESKTOP_NOT_RUNNING", ex.Message, exitCode: 1, hint: DesktopNotRunningHint),
+            ModelConnectionFailureKind.MetadataUnavailable => TomixResult<T>.Fail(
+                "TOMIX_METADATA_ACCESS_DENIED", ex.Message, exitCode: 1, hint: MetadataAccessHint),
             _ => TomixResult<T>.Fail("TOMIX_DATABASE_NOT_FOUND", ex.Message, exitCode: 1)
         };
 }

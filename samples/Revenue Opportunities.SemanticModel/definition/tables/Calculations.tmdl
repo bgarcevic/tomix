@@ -132,18 +132,14 @@ table Calculations
 		annotation PBI_FormatHint = {"currencyCulture":"en-US"}
 
 	column 'Create Date'
-		dataType: dateTime
+		dataType: int64
 		isHidden
-		formatString: Short Date
+		formatString: 0
 		lineageTag: 62167b85-36b8-40ed-97e1-f563d75cde33
-		summarizeBy: none
+		summarizeBy: sum
 		sourceColumn: Create Date
 
-		changedProperty = DataType
-
 		annotation SummarizationSetBy = Automatic
-
-		annotation UnderlyingDateTimeDataType = Date
 
 	column 'Opportunity Days'
 		dataType: int64
@@ -204,8 +200,6 @@ table Calculations
 				    Source = Table.Combine({#"Fact A", #"Fact B"})
 				in
 				    Source
-
-	changedProperty = Name
 
 	annotation PBI_ResultType = Table
 

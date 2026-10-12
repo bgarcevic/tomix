@@ -260,6 +260,21 @@ piped on stdin) — exactly one of the three. `-q` is the global `--quiet`
 flag and is never query text; `query -q "EVALUATE …"` fails with
 `TOMIX_QUIET_COLLISION` naming the mix-up.
 
+Before a DAX query is sent, every table, column and measure it names is
+checked against the model's metadata (already loaded with the connection, so
+no extra round trip). A typo fails at once with `TOMIX_QUERY_UNKNOWN_REFERENCE`
+and the closest name — `Did you mean 'Amount'?` — or, when nothing is close,
+the table's columns or the model's tables. Names the query defines itself
+(`DEFINE MEASURE`, `COLUMN`, `TABLE`, and columns built with
+`SUMMARIZECOLUMNS`/`ADDCOLUMNS`) are understood. `--no-validate` skips the
+check.
+
+Querying needs only read access: the Viewer role with Build permission on the
+model is enough, for `query` and for `test`. Reading the model's metadata needs write access (workspace
+Admin, Member or Contributor), so with Build permission only the reference
+check is skipped and the query is sent unchecked, and the commands that read
+metadata (`ls`, `get`, `deps`, ...) fail with `TOMIX_METADATA_ACCESS_DENIED`.
+
 | Option | Description |
 |--------|-------------|
 | `--query <text>` | Inline query (`-` = stdin). |
@@ -267,10 +282,10 @@ flag and is never query text; `query -q "EVALUATE …"` fails with
 | `--param <name=value>` | Query parameter, referenced as `@name` in DAX. Repeatable. |
 | `--limit <n>` | Maximum rows to return. |
 | `-o, --output-file <file>` | Write results to a file as json or csv. |
-| `--trace [path]` | Server timings (formula vs storage engine); optional path dumps raw trace events. Needs admin rights. |
-| `--cold` | Clear the model cache (and run a warm-up query) before each run. Needs admin rights. On Power BI / Fabric this empties the query caches but does not evict column data already in memory, so only the first run pays that load cost. |
+| `--trace [path]` | Server timings (formula vs storage engine); optional path dumps raw trace events. Needs write access to the model. |
+| `--cold` | Clear the model cache (and run a warm-up query) before each run. Needs write access to the model; without it every run stays warm and `TOMIX_QUERY_COLD_UNAVAILABLE` says so. On Power BI / Fabric this empties the query caches but does not evict column data already in memory, so only the first run pays that load cost. |
 | `--runs <n>` | Execute N times and report Avg/Min/Max/StdDev. |
-| `--no-validate` | Skip the EVALUATE/DEFINE/SELECT keyword pre-check. |
+| `--no-validate` | Skip the pre-flight checks: the EVALUATE/DEFINE/SELECT keyword check and the check that every table, column and measure the query names exists in the model. |
 
 ```sh
 tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace

@@ -18,7 +18,7 @@ namespace Tomix.Provider.Tom;
 /// server timings; with <c>ClearCache</c> the model cache is flushed (and warmed)
 /// before each run; with <c>Runs &gt; 1</c> the query is repeated for benchmarking. All perf
 /// features are best-effort — the rowset is always returned even when tracing/clear-cache is
-/// unavailable (they need admin rights on the endpoint).
+/// unavailable (they need write access to the model).
 /// </para>
 /// </summary>
 public static class TomModelQueryExecutor
@@ -95,25 +95,29 @@ public static class TomModelQueryExecutor
                 command.Connection = connection;
 
                 // Attach a trace only when timings are requested. Best-effort: a null sink
-                // (no admin rights) means the query still runs, just without server timings.
+                // (no write access) means the query still runs, just without server timings.
+                string? traceError = null;
                 using var sink = traced
-                    ? TomQueryTraceSink.Attach(connection, connectionString, applicationName, tokenFactory, traceWriter)
+                    ? TomQueryTraceSink.Attach(connection, connectionString, applicationName, tokenFactory, traceWriter, out traceError)
                     : null;
 
                 List<QueryColumn> columns = [];
                 List<IReadOnlyList<object?>> rows = [];
                 var truncated = false;
                 var runResults = new List<QueryRun>(runs);
-                var coldWarned = false;
-                var timingsWarned = false;
+                string? cacheClearError = null;
 
                 for (var run = 1; run <= runs; run++)
                 {
-                    // A run is only "cold" if the cache actually cleared; a best-effort clear that
-                    // failed (no admin rights / shared capacity) leaves the cache warm.
+                    // A run is only "cold" if the cache actually cleared. A clear that failed (no
+                    // write access, shared capacity) leaves the cache warm, and the result says why.
                     var cold = false;
                     if (request.ClearCache)
-                        (cold, coldWarned) = ClearCache(connection, databaseId, coldWarned);
+                    {
+                        var error = ClearCache(connection, databaseId);
+                        cold = error is null;
+                        cacheClearError ??= error;
+                    }
 
                     sink?.StartRun();
                     var runStopwatch = Stopwatch.StartNew();
@@ -141,18 +145,17 @@ public static class TomModelQueryExecutor
 
                     var timings = sink is { Active: true }
                         // After one miss the trace is evidently not delivering; don't stall every run.
-                        ? sink.WaitForRun(timingsWarned ? TimeSpan.FromSeconds(2) : RunEventTimeout)
+                        ? sink.WaitForRun(traceError is not null ? TimeSpan.FromSeconds(2) : RunEventTimeout)
                         : null;
-                    if (sink is { Active: true } && timings is null && !timingsWarned)
+                    if (sink is { Active: true } && timings is null && traceError is null)
                     {
                         // The trace is live but this run's QueryEnd never arrived: say so rather
                         // than leave the timings silently null.
-                        timingsWarned = true;
-                        TomQueryTraceSink.Warn(
-                            $"no QueryEnd trace event arrived for run {run}; server timings are unavailable" +
+                        traceError =
+                            $"no QueryEnd trace event arrived for run {run}" +
                             (sink.ForeignEventCount > 0
                                 ? $" ({sink.ForeignEventCount} trace event(s) from other sessions were ignored)."
-                                : "."));
+                                : ".");
                     }
                     runResults.Add(new QueryRun(run, cold, runStopwatch.ElapsedMilliseconds, timings));
                 }
@@ -164,7 +167,9 @@ public static class TomModelQueryExecutor
                     rows,
                     truncated,
                     runResults[0].ClientMs,
-                    runResults);
+                    runResults,
+                    cacheClearError,
+                    traceError);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (AdomdException ex) when (cancellationToken.IsCancellationRequested)
@@ -182,11 +187,10 @@ public static class TomModelQueryExecutor
     /// <summary>
     /// Clears the model cache (database-scoped) then runs a marked warm-up query so the calculation
     /// script re-evaluates and the following cold run isn't polluted by one-time init. Best-effort:
-    /// clearing the cache needs admin rights, so a failure warns once and leaves the cache warm.
-    /// Returns whether the cache was actually cleared (so the run can be labeled cold) and the
-    /// updated "already warned" flag.
+    /// clearing the cache needs write access to the model, so a failure leaves the cache warm.
+    /// Returns null when the cache was cleared (so the run can be labeled cold), else why not.
     /// </summary>
-    private static (bool Cleared, bool Warned) ClearCache(AdomdConnection connection, string databaseId, bool alreadyWarned)
+    private static string? ClearCache(AdomdConnection connection, string databaseId)
     {
         try
         {
@@ -201,16 +205,61 @@ public static class TomModelQueryExecutor
             using var warmup = new AdomdCommand(
                 $"EVALUATE /* {TomQueryTraceSink.InternalMarker} */ ROW(\"tomix\", 0)", connection);
             warmup.ExecuteNonQuery();
-            return (true, alreadyWarned);
+            return null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            if (!alreadyWarned)
+            return ServerReason(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// The first line of a server error, without the <c>&lt;euii&gt;</c> markers Power BI wraps
+    /// identities in or the "Technical Details" block that follows.
+    /// </summary>
+    internal static string ServerReason(string message)
+    {
+        var line = message.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault() ?? "";
+        return line.Replace("<euii>", "", StringComparison.Ordinal).Replace("</euii>", "", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Whether the database named in <paramref name="connectionString"/> answers a query. A caller
+    /// with read (Build) permission only can query a database that AMO does not list, because
+    /// listing databases needs write access; this tells that caller apart from a wrong name.
+    /// </summary>
+    internal static async Task<bool> CanQueryAsync(
+        string connectionString,
+        ModelReference reference,
+        IAccessTokenProvider? tokenProvider,
+        CancellationToken cancellationToken)
+    {
+        using var connection = new AdomdConnection(connectionString);
+        if (reference.RequiresAccessToken)
+        {
+            if (tokenProvider is null)
+                return false;
+
+            var token = await tokenProvider.GetTokenAsync(ModelReference.DataSourceOf(reference.Value), cancellationToken).ConfigureAwait(false);
+            connection.AccessToken = new AsAccessToken(token.Token, token.ExpiresOn.UtcDateTime);
+        }
+
+        try
+        {
+            return await Task.Run(() =>
             {
-                try { Console.Error.WriteLine($"[tomix] --cold clear-cache failed (need admin rights?): {ex.Message}"); }
-                catch { /* ignore */ }
-            }
-            return (false, true);
+                connection.Open();
+                using var probe = new AdomdCommand($"EVALUATE /* {TomQueryTraceSink.InternalMarker} */ ROW(\"tomix\", 0)", connection);
+                probe.ExecuteNonQuery();
+                return true;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        // A database that does not exist fails in several ways (an ADOMD error, or an HTTP 404
+        // from the Power BI endpoint); any of them means it cannot be queried.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return false;
         }
     }
 
