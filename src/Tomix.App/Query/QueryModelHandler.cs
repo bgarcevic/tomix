@@ -2,6 +2,7 @@ using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.State;
 using Tomix.Core.Authentication;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -11,7 +12,8 @@ namespace Tomix.App.Query;
 /// Resolves the query target (primary if remote, else the remote workspace-mode secondary),
 /// opens a query-capable session, and executes the DAX/DMV query.
 /// Mirrors <see cref="Refresh.RefreshModelHandler"/>. Validation is a leading-keyword
-/// pre-check only (EVALUATE/DEFINE/SELECT); the server remains the authority on syntax.
+/// pre-check (EVALUATE/DEFINE/SELECT) and, once the session is open, the reference pre-flight
+/// (<see cref="QueryPreflight"/>); the server remains the authority on syntax.
 /// </summary>
 public sealed class QueryModelHandler
 {
@@ -79,6 +81,15 @@ public sealed class QueryModelHandler
                     exitCode: 2,
                     hint: "Queries are only supported on live models connected via XMLA (-s <workspace> -d <model>).");
 
+            IReadOnlyList<TomixDiagnostic> warnings = [];
+            if (!request.NoValidate)
+            {
+                var preflight = await PreflightAsync(session, request.Query, cancellationToken).ConfigureAwait(false);
+                if (preflight.Misses.Count > 0)
+                    return Blocked(preflight.Misses);
+                warnings = preflight.Warnings;
+            }
+
             var result = await querySession.ExecuteQueryAsync(
                 new ModelQueryRequest(
                     request.Query,
@@ -99,7 +110,8 @@ public sealed class QueryModelHandler
                 result.Truncated,
                 result.DurationMs,
                 Timings: result.Runs is { Count: > 0 } ? result.Runs[0].Timings : null,
-                Benchmark: QueryBenchmark.Compute(result.Runs)));
+                Benchmark: QueryBenchmark.Compute(result.Runs)),
+                diagnostics: warnings);
         }
         catch (ModelConnectionException ex)
         {
@@ -129,6 +141,52 @@ public sealed class QueryModelHandler
                 $"Query against '{target.Database ?? target.Value}' failed: {msg}",
                 exitCode: 1);
         }
+    }
+
+    private sealed record PreflightOutcome(
+        IReadOnlyList<QueryPreflight.Miss> Misses,
+        IReadOnlyList<TomixDiagnostic> Warnings);
+
+    /// <summary>
+    /// Runs <see cref="QueryPreflight"/> against the open session's metadata. The check only
+    /// guards the query: when it cannot run, the query is sent anyway with a warning.
+    /// </summary>
+    private static async Task<PreflightOutcome> PreflightAsync(
+        IModelSession session,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var snapshot = await session.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            return new PreflightOutcome(QueryPreflight.Check(query, snapshot), []);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new PreflightOutcome([],
+            [
+                new TomixDiagnostic(
+                    Code: "TOMIX_QUERY_PREFLIGHT_SKIPPED",
+                    Severity: DiagnosticSeverity.Warning,
+                    Message: $"Reference check skipped, the query was sent unchecked: {ex.Message}",
+                    Hint: null)
+            ]);
+        }
+    }
+
+    /// <summary>One error per unknown reference, each with its own did-you-mean.</summary>
+    private static TomixResult<QueryModelResult> Blocked(IReadOnlyList<QueryPreflight.Miss> misses)
+    {
+        const string Escape = "Use --no-validate to send the query as-is.";
+        var diagnostics = misses
+            .Select(miss => new TomixDiagnostic(
+                Code: "TOMIX_QUERY_UNKNOWN_REFERENCE",
+                Severity: DiagnosticSeverity.Error,
+                Message: $"Line {miss.Line}: {miss.Message}",
+                Hint: miss.Hint is null ? Escape : $"{miss.Hint} {Escape}",
+                Line: miss.Line))
+            .ToList();
+        return new TomixResult<QueryModelResult>(Success: false, Data: null, diagnostics, ExitCode: 2);
     }
 
     /// <summary>

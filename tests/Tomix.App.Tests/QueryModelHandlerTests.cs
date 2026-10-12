@@ -121,6 +121,62 @@ public sealed class QueryModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_BlocksUnknownReference_BeforeSendingTheQuery()
+    {
+        var session = new QueryStubs.Session { Snapshot = QueryPreflightTests.Model() };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
+        var result = await handler.HandleAsync(
+            Request(query: "EVALUATE ROW(\"x\", SUM(Sales[Amout]), \"y\", [Total Sale])"),
+            null,
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Null(session.LastRequest);
+        Assert.Collection(result.Diagnostics,
+            d =>
+            {
+                Assert.Equal("TOMIX_QUERY_UNKNOWN_REFERENCE", d.Code);
+                Assert.Equal(1, d.Line);
+                Assert.Contains("Did you mean 'Amount'?", d.Hint);
+                Assert.Contains("--no-validate", d.Hint);
+            },
+            d => Assert.Contains("Did you mean 'Total Sales'?", d.Hint));
+    }
+
+    [Theory]
+    [InlineData("EVALUATE ROW(\"x\", SUM(Sales[Amount]))", false)]
+    [InlineData("EVALUATE ROW(\"x\", SUM(Sales[Amout]))", true)]
+    public async Task HandleAsync_SendsTheQuery_WhenReferencesResolveOrValidationIsOff(string query, bool noValidate)
+    {
+        var session = new QueryStubs.Session { Snapshot = QueryPreflightTests.Model() };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
+        var result = await handler.HandleAsync(Request(query: query, noValidate: noValidate), null, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(query, session.LastRequest!.Query);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SendsTheQueryWithAWarning_WhenTheReferenceCheckFails()
+    {
+        var session = new QueryStubs.Session { SnapshotThrow = new InvalidOperationException("metadata unavailable") };
+        var handler = new QueryModelHandler([new QueryStubs.Provider(session)], RemoteState);
+        var result = await handler.HandleAsync(
+            Request(query: "EVALUATE ROW(\"x\", SUM(Sales[Amout]))"),
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(session.LastRequest);
+        var warning = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_QUERY_PREFLIGHT_SKIPPED", warning.Code);
+        Assert.Equal(Tomix.Core.Diagnostics.DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("metadata unavailable", warning.Message);
+    }
+
+    [Fact]
     public async Task HandleAsync_ReturnsNoRemoteTarget_WhenConnectionIsLocal()
     {
         var handler = new QueryModelHandler([new QueryStubs.Provider(new QueryStubs.Session())], LocalState);

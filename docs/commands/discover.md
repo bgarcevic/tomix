@@ -260,6 +260,15 @@ piped on stdin) — exactly one of the three. `-q` is the global `--quiet`
 flag and is never query text; `query -q "EVALUATE …"` fails with
 `TOMIX_QUIET_COLLISION` naming the mix-up.
 
+Before a DAX query is sent, every table, column and measure it names is
+checked against the model's metadata (already loaded with the connection, so
+no extra round trip). A typo fails at once with `TOMIX_QUERY_UNKNOWN_REFERENCE`
+and the closest name — `Did you mean 'Amount'?` — or, when nothing is close,
+the table's columns or the model's tables. Names the query defines itself
+(`DEFINE MEASURE`, `COLUMN`, `TABLE`, and columns built with
+`SUMMARIZECOLUMNS`/`ADDCOLUMNS`) are understood. `--no-validate` skips the
+check.
+
 | Option | Description |
 |--------|-------------|
 | `--query <text>` | Inline query (`-` = stdin). |
@@ -270,7 +279,7 @@ flag and is never query text; `query -q "EVALUATE …"` fails with
 | `--trace [path]` | Server timings (formula vs storage engine); optional path dumps raw trace events. Needs admin rights. |
 | `--cold` | Clear the model cache (and run a warm-up query) before each run. Needs admin rights. On Power BI / Fabric this empties the query caches but does not evict column data already in memory, so only the first run pays that load cost. |
 | `--runs <n>` | Execute N times and report Avg/Min/Max/StdDev. |
-| `--no-validate` | Skip the EVALUATE/DEFINE/SELECT keyword pre-check. |
+| `--no-validate` | Skip the pre-flight checks: the EVALUATE/DEFINE/SELECT keyword check and the check that every table, column and measure the query names exists in the model. |
 
 ```sh
 tx query 'EVALUATE ROW("Sales", [Total Sales])' --trace

@@ -46,6 +46,12 @@ public static class QueryStubs
 
         public IReadOnlyList<QueryRun>? Runs { get; init; }
 
+        /// <summary>The model metadata the query pre-flight checks against; empty by default, which skips it.</summary>
+        public ModelSnapshot Snapshot { get; init; } = new("stub", 1601, []);
+
+        /// <summary>Thrown from <see cref="GetSnapshotAsync"/>, for the pre-flight's degrade path.</summary>
+        public Exception? SnapshotThrow { get; init; }
+
         public ModelQueryRequest? LastRequest { get; private set; }
 
         public TextWriter? LastTraceWriter { get; private set; }
@@ -56,7 +62,7 @@ public static class QueryStubs
             => Task.FromResult(new ModelSummary("stub", 1601, 0, 0, 0, 0, 0));
 
         public Task<ModelSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
-            => Task.FromResult(new ModelSnapshot("stub", 1601, []));
+            => SnapshotThrow is not null ? throw SnapshotThrow : Task.FromResult(Snapshot);
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 

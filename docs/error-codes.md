@@ -206,6 +206,8 @@ Returned by `tx mcp` as the result of a failed tool call (`isError: true`, a JSO
 | `TOMIX_QUERY_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_QUERY_OUTPUT_FORMAT` | 2 | `-o`/`--output-file` could not resolve a json or csv format (pass `--output-format json\|csv` or use a `.json`/`.csv` extension). |
 | `TOMIX_QUERY_INVALID` | 2 | The query does not start with `EVALUATE`, `DEFINE`, or `SELECT`; bypass with `--no-validate`. |
+| `TOMIX_QUERY_UNKNOWN_REFERENCE` | 2 | The query names a table, column, or measure the model does not have; found before the query is sent, one error per reference (JSON carries the first), with the closest name as a hint. Bypass with `--no-validate`. |
+| `TOMIX_QUERY_PREFLIGHT_SKIPPED` | 0 | Warning, not a failure. The reference check could not read the model's metadata, so the query was sent unchecked. |
 | `TOMIX_QUERY_NO_REMOTE_TARGET` | 2 | `query` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
 | `TOMIX_QUERY_UNSUPPORTED` | 2 | The provider session does not implement `IModelQuerySession` (e.g. a local TMDL/BIM model). |
 | `TOMIX_QUERY_FAILED` | 1 | The query was rejected or failed on the server (DAX error, no permissions, timeout, etc.). |

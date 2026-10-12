@@ -69,7 +69,7 @@ internal sealed class QueryCommand : ICommandModule
 
         var noValidateOption = new Option<bool>("--no-validate")
         {
-            Description = "Skip the EVALUATE/DEFINE/SELECT keyword pre-check and send the text as-is"
+            Description = "Skip the pre-flight checks (leading keyword, unknown tables/columns/measures) and send the text as-is"
         };
 
         var traceOption = new Option<string?>("--trace")
@@ -223,6 +223,8 @@ internal sealed class QueryCommand : ICommandModule
                 }
 
                 QueryResultRenderer.WriteFile(result.Data, outputFile!, fileFormat);
+                if (result.Diagnostics.Count > 0)
+                    ErrorOutput.Write(result.Diagnostics, errorFormat);
                 if (!quiet)
                     StdErr.MarkupLine(Styling.Success($"Wrote {result.Data.RowCount} row(s) to {outputFile}"));
                 exitCode = result.ExitCode;
