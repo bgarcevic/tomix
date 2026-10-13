@@ -30,7 +30,7 @@ public sealed class GetFragmentCommandTests
             		formatString: #,0
             		displayFolder: KPIs
 
-            """,
+            """.ReplaceLineEndings("\n"),
             stdout.ReplaceLineEndings("\n"));
     }
 

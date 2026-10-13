@@ -10,6 +10,16 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Changed
+
+- `tx get <object> --output-format tmdl|bim|tmsl` prints the object through the model's own
+  serializer instead of a hand-built skeleton, so fragments keep descriptions, format strings,
+  display folders, lineage tags, annotations and child objects. A TMDL table child is wrapped in
+  `ref table <name>` and pastes into its table's `.tmdl` file as is. Relationships, roles,
+  hierarchies, functions and the other kinds print as fragments instead of the property view,
+  and `tx get .` prints the whole model. A model source without a serializer fails with
+  `TOMIX_SCRIPT_UNSUPPORTED` (#243).
+
 ## [0.11.0] - 2026-10-12
 
 ### Added
