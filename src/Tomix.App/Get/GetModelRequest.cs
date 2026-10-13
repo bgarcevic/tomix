@@ -14,6 +14,8 @@ namespace Tomix.App.Get;
 /// <param name="Deep">With <see cref="GetMode.Deps"/>: walk the chain recursively.</param>
 /// <param name="MaxDepth">With <paramref name="Deep"/>: how far to walk.</param>
 /// <param name="HiddenOnly">With <see cref="GetMode.Unused"/>: only hidden objects.</param>
+/// <param name="Script">With <see cref="GetMode.Object"/> and no <paramref name="Query"/>: also emit
+/// the object in this model file format, through the provider's serializer.</param>
 public sealed record GetModelRequest(
     ModelReference Model,
     string? Path,
@@ -24,7 +26,8 @@ public sealed record GetModelRequest(
     DepsDirection Direction = DepsDirection.Both,
     bool Deep = false,
     int MaxDepth = 10,
-    bool HiddenOnly = false);
+    bool HiddenOnly = false,
+    ObjectScriptFormat? Script = null);
 
 public enum GetMode
 {

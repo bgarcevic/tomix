@@ -91,7 +91,8 @@ internal static class GetPipeline
         var quiet = parseResult.GetValue(GlobalOptions.Quiet);
         var request = new GetModelRequest(
             reference, path, invocation.Query, type, mode, filters,
-            invocation.Direction, invocation.Deep, invocation.MaxDepth, invocation.HiddenOnly);
+            invocation.Direction, invocation.Deep, invocation.MaxDepth, invocation.HiddenOnly,
+            ScriptFormat(formatValue));
         var tracesDeps = mode is GetMode.Deps or GetMode.Unused;
 
         var result = await CliSpinner.RunAsync(
@@ -144,6 +145,14 @@ internal static class GetPipeline
         ErrorOutput.Write([new TomixDiagnostic(code, DiagnosticSeverity.Error, message, hint)], errorFormat);
         return 2;
     }
+
+    /// <summary>The model file format a single-object read emits, or null for a property view.</summary>
+    private static ObjectScriptFormat? ScriptFormat(string format) => format switch
+    {
+        OutputFormats.Tmdl => ObjectScriptFormat.Tmdl,
+        OutputFormats.Bim or OutputFormats.Tmsl => ObjectScriptFormat.Json,
+        _ => null
+    };
 
     private static string[] SupportedFormats(GetMode mode) => mode switch
     {

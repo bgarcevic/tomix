@@ -6,7 +6,7 @@ using Tomix.Provider.Tom;
 namespace Tomix.Provider.Tmdl;
 
 public sealed class TmdlModelSession : IModelSession, IModelExportSession, IModelMutationSession,
-    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession
+    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IObjectScriptSession
 {
     private readonly string _path;
     private readonly IAccessTokenProvider? _tokenProvider;
@@ -51,6 +51,9 @@ public sealed class TmdlModelSession : IModelSession, IModelExportSession, IMode
             : request;
         return TomModelExporter.ExportAsync(GetDatabase(), effective, cancellationToken);
     }
+
+    public string ScriptObject(string path, ModelObjectKind kind, ObjectScriptFormat format)
+        => TomObjectScripter.Script(GetDatabase(), path, kind, format);
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request)
         => new TomModelMutator(GetDatabase()).AddObject(request);

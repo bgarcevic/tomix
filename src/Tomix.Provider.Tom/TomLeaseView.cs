@@ -10,7 +10,7 @@ namespace Tomix.Provider.Tom;
 /// <see cref="Database"/> from the journal on every call, since a rollback can replace it.
 /// </summary>
 internal class TomLeaseView : IModelSession, IModelExportSession, IModelMutationSession,
-    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IExternalChangeSession
+    IExpressionRewriteSession, IObjectMoveSession, IRefreshPolicyMutationSession, IModelDeploySession, IExternalChangeSession, IObjectScriptSession
 {
     private readonly TomLiveModelSession _session;
     private readonly TomLiveModelSession.Lease _lease;
@@ -59,6 +59,9 @@ internal class TomLeaseView : IModelSession, IModelExportSession, IModelMutation
 
     public Task<ModelExportResult> ExportAsync(ModelExportRequest request, CancellationToken cancellationToken)
         => Source.ExportAsync(Database, request, cancellationToken);
+
+    public string ScriptObject(string path, ModelObjectKind kind, ObjectScriptFormat format)
+        => TomObjectScripter.Script(Database, path, kind, format);
 
     public ModelObjectMutationResult AddObject(ModelObjectAddRequest request) => Mutator().AddObject(request);
 

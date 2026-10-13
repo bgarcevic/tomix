@@ -156,7 +156,16 @@ tx get "Relationships/rel-customers"
 tx get "Expressions/Environment" --query expression   # a shared M parameter's value
 tx get . --query culture                         # a model-level scalar
 tx get Sales --output-format tmdl    # the object as TMDL
+tx get "Sales/Total Sales" --output-format bim   # the measure as it appears in model.bim
 ```
+
+`tmdl`, `bim` and `tmsl` print the object through the model's own serializer, with
+everything a model file carries: descriptions, format strings, display folders,
+lineage tags, annotations, and child objects (a table's columns and measures, a
+measure's KPI, a hierarchy's levels). A TMDL table child comes wrapped in
+`ref table <name>`, so the fragment pastes into its table's `.tmdl` file as is.
+`bim` and `tmsl` print the same JSON object, the one a `model.bim` holds. `tx get .`
+prints the whole model.
 
 `-q` is the global `--quiet` flag, not a property shortcut — always pass the
 property through `--query`. A `--query` that names no property of the object

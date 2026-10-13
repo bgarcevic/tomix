@@ -86,7 +86,7 @@ public sealed class GetModelHandler
                     Downstream: [],
                     Unused: DependencyGraph.FromSnapshot(snapshot).Unused(request.HiddenOnly))),
                 GetMode.Deps => Single(snapshot, request.Path!, request.Type, target => Deps(snapshot, target, request)),
-                _ => Read(snapshot, request)
+                _ => Read(session, snapshot, request)
             };
         }, cancellationToken);
     }
@@ -134,17 +134,52 @@ public sealed class GetModelHandler
         GetDepsResult? deps = null)
         => TomixResult<GetModelResult>.Ok(new GetModelResult(mode, obj, list, deps));
 
-    private static TomixResult<GetModelResult> Read(ModelSnapshot snapshot, GetModelRequest request)
+    private static TomixResult<GetModelResult> Read(IModelSession session, ModelSnapshot snapshot, GetModelRequest request)
     {
         var measureNames = DaxModelNames.MeasureNames(snapshot);
+        var script = string.IsNullOrWhiteSpace(request.Query) ? request.Script : null;
 
         // The model root is not a snapshot object: "." synthesizes one from the
         // snapshot's model-level properties so get can read back what set accepts
         // on the root (culture, compatibility level, and friends).
         if (request.Path!.Trim().Trim('/') == ".")
-            return Project(ModelRoot(snapshot), request.Query, measureNames);
+            return WithScript(session, Project(ModelRoot(snapshot), request.Query, measureNames), script);
 
-        return Single(snapshot, request.Path, request.Type, obj => Project(obj, request.Query, measureNames));
+        return Single(snapshot, request.Path, request.Type,
+            obj => WithScript(session, Project(obj, request.Query, measureNames), script));
+    }
+
+    /// <summary>
+    /// Adds the object in a model file format to a successful read. Only the provider's own
+    /// serializer is faithful, so a session that has none fails rather than emit a lossy fragment.
+    /// </summary>
+    private static TomixResult<GetModelResult> WithScript(
+        IModelSession session,
+        TomixResult<GetModelResult> read,
+        ObjectScriptFormat? format)
+    {
+        if (format is null || read is not { Success: true, Data.Object: { } obj })
+            return read;
+
+        if (session is not IObjectScriptSession scripter)
+            return TomixResult<GetModelResult>.Fail(
+                code: "TOMIX_SCRIPT_UNSUPPORTED",
+                message: $"This model source cannot emit {(format == ObjectScriptFormat.Tmdl ? "TMDL" : "BIM/TMSL")}.",
+                exitCode: 2,
+                hint: "Use --output-format json for the object's properties.");
+
+        string script;
+        try
+        {
+            script = scripter.ScriptObject(obj.Object.Path, obj.Object.Kind, format.Value);
+        }
+        catch (ObjectNotFoundException ex)
+        {
+            return TomixResult<GetModelResult>.Fail(
+                code: "TOMIX_OBJECT_NOT_FOUND", message: ex.Message, exitCode: 1, hint: ex.Hint ?? NotFoundHint);
+        }
+
+        return Ok(GetMode.Object, obj: obj with { Script = script });
     }
 
     /// <summary>Resolves a path that must name exactly one object, then hands it on.</summary>
