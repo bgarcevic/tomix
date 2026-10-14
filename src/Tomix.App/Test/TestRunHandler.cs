@@ -121,6 +121,13 @@ public sealed class TestRunHandler
                 continue;
             }
 
+            var compare = (request.Compare ?? TestCompareOptions.Exact).WithDirectives(query, out var directiveError);
+            if (compare is null)
+            {
+                results.Add(Case(test, TestOutcome.Error, watch, directiveError));
+                continue;
+            }
+
             var keyword = QueryModelHandler.FirstSignificantToken(query);
             if (!ValidLeadingKeywords.Contains(keyword, StringComparer.OrdinalIgnoreCase))
             {
@@ -167,7 +174,7 @@ public sealed class TestRunHandler
             }
             else
             {
-                results.Add(CompareSnapshot(test, actual, queryHash, watch));
+                results.Add(CompareSnapshot(test, actual, queryHash, compare, watch));
             }
         }
 
@@ -191,6 +198,7 @@ public sealed class TestRunHandler
         DiscoveredTest test,
         ModelQueryResult actual,
         string queryHash,
+        TestCompareOptions compare,
         Stopwatch watch)
     {
         if (!File.Exists(test.ExpectedPath))
@@ -201,7 +209,7 @@ public sealed class TestRunHandler
         if (snapshot is null)
             return Case(test, TestOutcome.Error, watch, loadError);
 
-        var comparison = TestResultComparer.Compare(snapshot, actual);
+        var comparison = TestResultComparer.Compare(snapshot, actual, compare);
         if (comparison.Passed)
             return Case(test, TestOutcome.Passed, watch);
 

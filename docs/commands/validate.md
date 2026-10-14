@@ -444,6 +444,8 @@ single test file or a directory searched recursively for `.dax` files
 | `--filter <pattern>` | Run only tests whose name matches a `*` wildcard pattern (case-insensitive). |
 | `--param <name=value>` | Query parameter applied to every test, referenced as `@name` in DAX. Repeatable. |
 | `--max-rows <n>` | Per-query row cap; a query exceeding it fails as an error (default: `10000`). |
+| `--tolerance <value>` | Accept numeric cells within this difference: absolute (`0.01`) or relative to the larger value (`0.1%`). Applies to every test unless it sets its own. |
+| `--ignore-row-order` | Sort rows by their values before comparing, so queries need no `ORDER BY`. |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr so failures annotate the PR. |
 | `--trx <path>` | Write results to a `.trx` test-run file. |
 
@@ -484,14 +486,41 @@ used to hint when a failing test's query changed since recording:
 }
 ```
 
-Rows compare **in order** — always end test queries with `ORDER BY` so
-results are deterministic. Keep rowsets small and stable (aggregates,
-`TOPN` over ordered sets); one `EVALUATE` rowset per file.
+Rows compare **in order** — end test queries with `ORDER BY` so results are
+deterministic, or pass `--ignore-row-order`. Keep rowsets small and stable
+(aggregates, `TOPN` over ordered sets); one `EVALUATE` rowset per file.
+
+**Comparison.** Cells compare exactly by default. Averages, ratios and other
+floating-point measures can differ in their last digits between engine
+versions or refreshes; `--tolerance` accepts a numeric cell (`int64`,
+`double`, `decimal` columns) when it is within an absolute difference
+(`--tolerance 0.001`) or a percentage of the larger value
+(`--tolerance 0.1%`). `BLANK()` never matches a number, and text, date and
+boolean cells always compare exactly. With `--ignore-row-order`, both sides
+are sorted before comparing — text and date columns first, then numbers by
+value — and difference row numbers refer to that sorted order.
+
+**Per-test settings.** A test sets its own comparison in `tx:` comment lines
+before the query; these override the command-line options for that test:
+
+```dax
+// Average order value by region
+// tx: tolerance=0.01% ignore-row-order
+EVALUATE
+SUMMARIZECOLUMNS ( Sales[Region], "Avg", [Avg Order Value] )
+```
+
+Directives are `tolerance=<value>` (`tolerance=0` compares exactly) and
+`ignore-row-order` (`ignore-row-order=false` turns a command-line
+`--ignore-row-order` off). Only `//` or `--` lines before the first
+statement are read. An unknown directive or a bad value fails the test as
+`ERR`, so a typo never silently compares exactly.
 
 ```sh
 tx test ./tests
 tx test ./tests/totals/sales.dax --update
 tx test ./tests --filter "totals/*" --trx results.trx --ci vsts
+tx test ./tests --tolerance 0.01% --ignore-row-order
 ```
 
 ## `vertipaq` — storage statistics

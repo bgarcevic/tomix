@@ -50,9 +50,11 @@ public sealed class TestRunHandlerTests : IDisposable
         => new([new QueryStubs.Provider(session)], state ?? RemoteState);
 
     private TestRunRequest Request(bool update = false, string? filter = null,
-        IReadOnlyDictionary<string, string>? parameters = null, int maxRows = 10000, string? path = null)
+        IReadOnlyDictionary<string, string>? parameters = null, int maxRows = 10000, string? path = null,
+        TestCompareOptions? compare = null)
         => new(Model: null, Server: null, Database: null, Auth: null,
-            Path: path ?? _dir, Update: update, Filter: filter, Parameters: parameters, MaxRows: maxRows);
+            Path: path ?? _dir, Update: update, Filter: filter, Parameters: parameters, MaxRows: maxRows,
+            Compare: compare);
 
     // ── Pre-condition failures ──────────────────────────────────────────────
 
@@ -239,6 +241,63 @@ public sealed class TestRunHandlerTests : IDisposable
         var test = Assert.Single(result.Data!.Tests);
         Assert.Equal(TestOutcome.Failed, test.Outcome);
         Assert.Contains("query changed", test.Message);
+    }
+
+    // ── Comparison options ──────────────────────────────────────────────────
+
+    /// <summary>Records <paramref name="recorded"/> as the snapshot, then compares a run returning <paramref name="actual"/>.</summary>
+    private async Task<TestCaseResult> RecordThenCompare(double recorded, double actual, TestCompareOptions? compare = null)
+    {
+        await Handler(NewSession(_ => Rowset(recorded))).HandleAsync(Request(update: true), CancellationToken.None);
+        var result = await Handler(NewSession(_ => Rowset(actual))).HandleAsync(Request(compare: compare), CancellationToken.None);
+        return Assert.Single(result.Data!.Tests);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AppliesRunTolerance()
+    {
+        WriteDax("avg");
+
+        var test = await RecordThenCompare(0.3, 0.30000000000000004,
+            new TestCompareOptions(new TestTolerance(1e-9, Relative: false)));
+
+        Assert.Equal(TestOutcome.Passed, test.Outcome);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TestDirectiveOverridesRunOptions()
+    {
+        WriteDax("avg", "// tx: tolerance=0\nEVALUATE ROW(\"Avg\", 0.3)");
+
+        var test = await RecordThenCompare(0.3, 0.30000000000000004,
+            new TestCompareOptions(new TestTolerance(1e-9, Relative: false)));
+
+        Assert.Equal(TestOutcome.Failed, test.Outcome);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TestDirectiveAppliesWithoutRunOptions()
+    {
+        WriteDax("avg", "// tx: tolerance=0.1%\nEVALUATE ROW(\"Avg\", 100)");
+
+        var test = await RecordThenCompare(100, 100.05);
+
+        Assert.Equal(TestOutcome.Passed, test.Outcome);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReportsError_ForAnInvalidDirective()
+    {
+        WriteDax("avg", "// tx: tolerence=0.1\nEVALUATE ROW(\"Avg\", 1)");
+        var session = NewSession();
+
+        var result = await Handler(session).HandleAsync(Request(update: true), CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        var test = Assert.Single(result.Data!.Tests);
+        Assert.Equal(TestOutcome.Error, test.Outcome);
+        Assert.Contains("tolerence", test.Message);
+        Assert.Null(session.LastRequest);              // the query never runs
     }
 
     // ── Per-test errors ─────────────────────────────────────────────────────

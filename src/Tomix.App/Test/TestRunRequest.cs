@@ -5,6 +5,7 @@ namespace Tomix.App.Test;
 /// <param name="Filter">Optional <c>*</c>/<c>?</c> wildcard on test names.</param>
 /// <param name="Parameters">Query parameters applied to every test, referenced as <c>@name</c> in DAX.</param>
 /// <param name="MaxRows">Per-query row cap; a query exceeding it is a per-test error, not a truncated comparison.</param>
+/// <param name="Compare">Run-wide comparison defaults; a test's own <c>tx:</c> directives override them.</param>
 public sealed record TestRunRequest(
     string? Model,
     string? Server,
@@ -14,4 +15,5 @@ public sealed record TestRunRequest(
     bool Update = false,
     string? Filter = null,
     IReadOnlyDictionary<string, string>? Parameters = null,
-    int MaxRows = 10000);
+    int MaxRows = 10000,
+    TestCompareOptions? Compare = null);

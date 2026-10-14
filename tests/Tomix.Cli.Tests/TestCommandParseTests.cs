@@ -36,6 +36,8 @@ public sealed class TestCommandParseTests
             "--filter", "totals/*",
             "--param", "a=1", "--param", "b=2",
             "--max-rows", "500",
+            "--tolerance", "0.1%",
+            "--ignore-row-order",
             "--trx", "results.trx",
             "--ci", "vsts");
 
@@ -45,6 +47,8 @@ public sealed class TestCommandParseTests
         Assert.Equal("totals/*", result.GetValue<string?>("--filter"));
         Assert.Equal(["a=1", "b=2"], result.GetValue<string[]>("--param")!);
         Assert.Equal(500, result.GetValue<int?>("--max-rows"));
+        Assert.Equal("0.1%", result.GetValue<string?>("--tolerance"));
+        Assert.True(result.GetValue<bool>("--ignore-row-order"));
         Assert.Equal("results.trx", result.GetValue<string?>("--trx"));
         Assert.Equal("vsts", result.GetValue<string?>("--ci"));
     }
@@ -57,5 +61,16 @@ public sealed class TestCommandParseTests
         var result = Parse("test", "--max-rows", maxRows);
 
         Assert.Contains(result.Errors, e => e.Message.Contains("--max-rows must be at least 1"));
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("-1")]
+    [InlineData("1,5")]
+    public void Test_InvalidTolerance_FailsAtParseTime(string tolerance)
+    {
+        var result = Parse("test", "--tolerance", tolerance);
+
+        Assert.Contains(result.Errors, e => e.Message.Contains($"Invalid tolerance '{tolerance}'"));
     }
 }

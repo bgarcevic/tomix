@@ -167,6 +167,30 @@ public sealed class TestSnapshotTests : IDisposable
     public void ComputeQueryHash_NormalizesLineEndingsAndOuterWhitespace(string a, string b)
         => Assert.Equal(TestSnapshotFile.ComputeQueryHash(a), TestSnapshotFile.ComputeQueryHash(b));
 
+    [Theory]
+    [InlineData("// tx: tolerance=0.1%\nEVALUATE 'Sales'")]
+    [InlineData("// Sales\n-- tx: ignore-row-order\nEVALUATE 'Sales'", "// Sales\nEVALUATE 'Sales'")]
+    [InlineData("// tx: tolerance=0.1%\r\n// tx: ignore-row-order\r\n\r\nEVALUATE 'Sales'")]
+    public void ComputeQueryHash_IgnoresDirectiveLines(string withDirectives, string without = "EVALUATE 'Sales'")
+        => Assert.Equal(TestSnapshotFile.ComputeQueryHash(without), TestSnapshotFile.ComputeQueryHash(withDirectives));
+
+    [Fact]
+    public void ComputeQueryHash_StillCountsOrdinaryComments()
+        => Assert.NotEqual(
+            TestSnapshotFile.ComputeQueryHash("EVALUATE 'Sales'"),
+            TestSnapshotFile.ComputeQueryHash("// Sales by region\nEVALUATE 'Sales'"));
+
+    [Fact]
+    public void ComputeQueryHash_IsUnchangedForQueriesWithoutDirectives()
+    {
+        // Snapshots recorded before directives existed must keep matching their query's hash.
+        const string query = "// Sales\r\nEVALUATE 'Sales'\r\n";
+        var legacy = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            Encoding.UTF8.GetBytes(query.ReplaceLineEndings("\n").Trim())));
+
+        Assert.Equal(legacy, TestSnapshotFile.ComputeQueryHash(query));
+    }
+
     [Fact]
     public void ComputeQueryHash_DiffersForDifferentQueries()
         => Assert.NotEqual(
