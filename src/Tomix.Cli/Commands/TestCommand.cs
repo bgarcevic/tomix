@@ -36,7 +36,12 @@ internal sealed class TestCommand : ICommandModule
 
         var updateOption = new Option<bool>("--update")
         {
-            Description = "Record mode: run each query and (re)write its .expected.json snapshot from the actual result"
+            Description = "Record mode: run each query and (re)write its .expected.json snapshot from the actual result, listing what changed"
+        };
+
+        var updateMissingOption = new Option<bool>("--update-missing")
+        {
+            Description = "Record snapshots only for tests that have none yet; compare all other tests as usual"
         };
 
         var filterOption = new Option<string?>("--filter")
@@ -89,6 +94,7 @@ internal sealed class TestCommand : ICommandModule
         {
             pathArgument,
             updateOption,
+            updateMissingOption,
             filterOption,
             paramOption,
             maxRowsOption,
@@ -97,6 +103,12 @@ internal sealed class TestCommand : ICommandModule
             ciOption,
             trxOption
         };
+
+        command.Validators.Add(result =>
+        {
+            if (result.GetValue(updateOption) && result.GetValue(updateMissingOption))
+                result.AddError("--update and --update-missing cannot be combined; choose one.");
+        });
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -132,7 +144,8 @@ internal sealed class TestCommand : ICommandModule
                 Filter: parseResult.GetValue(filterOption),
                 Parameters: parameters.Count > 0 ? parameters : null,
                 MaxRows: parseResult.GetValue(maxRowsOption) ?? 10000,
-                Compare: CompareOptions(parseResult.GetValue(toleranceOption), parseResult.GetValue(ignoreRowOrderOption)));
+                Compare: CompareOptions(parseResult.GetValue(toleranceOption), parseResult.GetValue(ignoreRowOrderOption)),
+                UpdateMissing: parseResult.GetValue(updateMissingOption));
 
             // Name the session-resolved target on stderr before the model opens; an explicit
             // model/--server target is the user's own and stays silent.

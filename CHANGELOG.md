@@ -20,6 +20,11 @@ and the API surface that major versions protect.
   longer fails a test. `--ignore-row-order` sorts both rowsets before comparing, so test queries
   need no `ORDER BY`. A test overrides either option in a `// tx:` comment line before its query
   (`// tx: tolerance=0.01% ignore-row-order`); an unknown directive fails the test.
+- `tx test --update-missing` records snapshots only for tests that have none yet and compares the
+  rest, so adding a test no longer means re-accepting the whole suite. `tx test --update` now lists
+  what it accepted: each rewritten snapshot shows a Before/After table of the cells that changed
+  (`differences` in JSON). Snapshots left behind by a deleted or renamed test are reported as
+  orphans (`orphans` in JSON) without failing the run (#451).
 
 ### Changed
 

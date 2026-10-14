@@ -2,6 +2,7 @@ namespace Tomix.App.Test;
 
 /// <param name="Path">Test file or directory (recursive <c>*.dax</c> discovery).</param>
 /// <param name="Update">Record mode: (re)write each <c>.expected.json</c> from actual results instead of comparing.</param>
+/// <param name="UpdateMissing">Record only tests that have no snapshot yet; compare the rest. Excludes <paramref name="Update"/>.</param>
 /// <param name="Filter">Optional <c>*</c>/<c>?</c> wildcard on test names.</param>
 /// <param name="Parameters">Query parameters applied to every test, referenced as <c>@name</c> in DAX.</param>
 /// <param name="MaxRows">Per-query row cap; a query exceeding it is a per-test error, not a truncated comparison.</param>
@@ -16,4 +17,5 @@ public sealed record TestRunRequest(
     string? Filter = null,
     IReadOnlyDictionary<string, string>? Parameters = null,
     int MaxRows = 10000,
-    TestCompareOptions? Compare = null);
+    TestCompareOptions? Compare = null,
+    bool UpdateMissing = false);

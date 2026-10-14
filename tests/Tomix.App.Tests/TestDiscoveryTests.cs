@@ -71,4 +71,48 @@ public sealed class TestDiscoveryTests : IDisposable
     [InlineData("totals/sales", "other/*", false)]
     public void MatchesFilter_SupportsWildcards(string name, string? pattern, bool expected)
         => Assert.Equal(expected, TestDiscovery.MatchesFilter(name, pattern));
+
+    [Fact]
+    public void Orphans_AreSnapshotsNoTestPairsWith()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "suite");
+        string At(string relative) => Path.Combine(root, relative);
+
+        var orphans = TestDiscovery.Orphans(
+            root,
+            [At("sales.expected.json"), At(Path.Combine("totals", "old.expected.json")), At("b.expected.json")],
+            [At("sales.dax"), At(Path.Combine("totals", "new.dax"))]);
+
+        Assert.Equal(["b", "totals/old"], orphans.Select(o => o.Name));
+        Assert.Equal(At(Path.Combine("totals", "old.expected.json")), orphans[1].File);
+    }
+
+    [Fact]
+    public void Orphans_IsEmpty_WhenEverySnapshotHasATest()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "suite");
+
+        Assert.Empty(TestDiscovery.Orphans(
+            root, [Path.Combine(root, "sales.expected.json")], [Path.Combine(root, "sales.dax"), Path.Combine(root, "new.dax")]));
+    }
+
+    [Fact]
+    public void FindOrphans_FindsTheSnapshotOfARenamedTest()
+    {
+        WriteFile("totals/new-name.dax");
+        WriteFile("totals/new-name.expected.json", "{}");
+        WriteFile("totals/old-name.expected.json", "{}");
+
+        var orphan = Assert.Single(TestDiscovery.FindOrphans(_dir));
+        Assert.Equal("totals/old-name", orphan.Name);
+    }
+
+    [Fact]
+    public void FindOrphans_IsEmpty_ForASingleTestFile()
+    {
+        var daxPath = WriteFile("sales.dax");
+        WriteFile("old.expected.json", "{}");
+
+        Assert.Empty(TestDiscovery.FindOrphans(daxPath));
+    }
 }

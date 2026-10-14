@@ -4,8 +4,8 @@ using Tomix.App.Test;
 namespace Tomix.Cli.Output;
 
 /// <summary>
-/// Rendering for <c>tx test</c>: one status line per test, a difference table for failures,
-/// a counts summary, plus the TRX (<c>--trx</c>) and CI annotation (<c>--ci</c>) projections.
+/// Rendering for <c>tx test</c>: one status line per test, a difference table for failures and
+/// for re-recorded snapshots, a counts summary, an orphaned-snapshot warning, plus the TRX (<c>--trx</c>) and CI annotation (<c>--ci</c>) projections.
 /// The JSON projection is the <see cref="TestRunResult"/> record itself.
 /// </summary>
 internal static class TestRunRenderer
@@ -35,23 +35,33 @@ internal static class TestRunRenderer
                 Styling.MarkupEscape(test.Name),
                 Styling.Muted($"({test.DurationMs} ms)"));
 
-            if (!passing && !string.IsNullOrEmpty(test.Message))
+            if ((!passing || test.Outcome == TestOutcome.Updated) && !string.IsNullOrEmpty(test.Message))
                 AnsiConsole.MarkupLine("        {0}", Styling.Muted(test.Message));
 
             if (test.Differences is { Count: > 0 } differences)
-                RenderDifferences(differences, test.TotalDifferences);
+                RenderDifferences(differences, test.TotalDifferences, updated: test.Outcome == TestOutcome.Updated);
         }
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("  " + Summary(result));
 
+        if (result.Orphans is { Count: > 0 } orphans)
+        {
+            StdErr.MarkupLine(Styling.Warning($"  {orphans.Count} snapshot(s) have no .dax test (deleted or renamed?):"));
+            foreach (var orphan in orphans)
+                StdErr.MarkupLine(Styling.Muted($"    {orphan.Name}.expected.json"));
+        }
+
         if (result.Missing > 0)
-            StdErr.MarkupLine(Styling.Guidance("  Run  tx test --update  to record missing snapshots."));
+            StdErr.MarkupLine(Styling.Guidance("  Run  tx test --update-missing  to record missing snapshots."));
     }
 
-    private static void RenderDifferences(IReadOnlyList<TestDifference> differences, int total)
+    // A re-recorded snapshot's differences run from the old snapshot to the new one.
+    private static void RenderDifferences(IReadOnlyList<TestDifference> differences, int total, bool updated)
     {
-        var table = Styling.NewTable("Kind", "Row", "Column", "Expected", "Actual");
+        var table = updated
+            ? Styling.NewTable("Kind", "Row", "Column", "Before", "After")
+            : Styling.NewTable("Kind", "Row", "Column", "Expected", "Actual");
         foreach (var difference in differences)
             table.AddRow(
                 Styling.MarkupEscape(difference.Kind),
