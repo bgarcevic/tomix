@@ -28,6 +28,9 @@ and the API surface that major versions protect.
 
 ### Changed
 
+- `tx test` snapshots (`.expected.json`) are written with one column and one row per line, so a
+  changed value diffs as its whole row instead of a bare value. Existing snapshots still load;
+  the next `--update` rewrites them in the new layout without changing their content.
 - `tx get <object> --output-format tmdl|bim|tmsl` prints the object through the model's own
   serializer instead of a hand-built skeleton, so fragments keep descriptions, format strings,
   display folders, lineage tags, annotations and child objects. A TMDL table child is wrapped in

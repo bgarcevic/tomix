@@ -499,6 +499,11 @@ used to hint when a failing test's query changed since recording:
 }
 ```
 
+Each column and each row is written on one line, so a changed value shows in
+the git diff as its whole row. Snapshots recorded by earlier versions, with
+one cell per line, still load; the next `--update` rewrites them in this
+layout (`UPDATED`, "Same results; rewrote the snapshot file's formatting.").
+
 Rows compare **in order** — end test queries with `ORDER BY` so results are
 deterministic, or pass `--ignore-row-order`. Keep rowsets small and stable
 (aggregates, `TOPN` over ordered sets); one `EVALUATE` rowset per file.

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Tomix.App.Test;
 using Tomix.Core.Models;
 
@@ -85,6 +86,82 @@ public sealed class TestSnapshotTests : IDisposable
         Assert.Contains("\"rows\":", json);
         Assert.Contains("\"name\": \"Sales[Region]\"", json);
         Assert.Contains("\"type\": \"string\"", json);
+    }
+
+    [Fact]
+    public void Serialize_WritesOneColumnAndOneRowPerLine()
+        => Assert.Equal(
+            """
+            {
+              "version": 1,
+              "querySha256": "abc",
+              "columns": [
+                { "name": "Sales[Region]", "type": "string" },
+                { "name": "[Total]", "type": "decimal" }
+              ],
+              "rows": [
+                ["East", "1234.50"],
+                ["West", null]
+              ]
+            }
+
+            """.ReplaceLineEndings("\n"),
+            TestSnapshotFile.Serialize(TestSnapshotFile.FromResult(Result(), "abc")));
+
+    [Fact]
+    public void Serialize_WritesEmptyListsInline()
+    {
+        var empty = new TestSnapshot(1, "abc", [], []);
+
+        var json = TestSnapshotFile.Serialize(empty);
+
+        Assert.Contains("\"columns\": [],\n", json);
+        Assert.Contains("\"rows\": []\n}", json);
+        Assert.Equal(0, JsonDocument.Parse(json).RootElement.GetProperty("rows").GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData("Område", "\"Område\"")]
+    [InlineData("say \"hi\"", "\"say \\\"hi\\\"\"")]
+    [InlineData("a\\b", "\"a\\\\b\"")]
+    [InlineData("line\nbreak", "\"line\\nbreak\"")]
+    [InlineData("O'Brien", "\"O'Brien\"")]
+    public void Serialize_EscapesOnlyWhatJsonRequires(string cell, string expected)
+    {
+        var snapshot = new TestSnapshot(1, "abc", [new QueryColumn("[A]", "string")], [[cell]]);
+
+        var json = TestSnapshotFile.Serialize(snapshot);
+
+        Assert.Contains($"[{expected}]", json);
+        var path = SnapshotPath();
+        File.WriteAllText(path, json, new UTF8Encoding(false));
+        Assert.Equal(cell, TestSnapshotFile.Load(path, out _)!.Rows[0][0]);
+    }
+
+    [Fact]
+    public void Load_ReadsTheOneCellPerLineLayout()
+    {
+        // Snapshots recorded before the one-row-per-line layout must still load.
+        var path = SnapshotPath();
+        File.WriteAllText(path, """
+            {
+              "version": 1,
+              "querySha256": "abc",
+              "columns": [
+                {
+                  "name": "[Total]",
+                  "type": "decimal"
+                }
+              ],
+              "rows": [
+                [
+                  "1234.50"
+                ]
+              ]
+            }
+            """, new UTF8Encoding(false));
+
+        Assert.Equal("1234.50", TestSnapshotFile.Load(path, out _)!.Rows[0][0]);
     }
 
     [Fact]
