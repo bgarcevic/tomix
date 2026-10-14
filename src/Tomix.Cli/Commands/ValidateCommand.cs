@@ -53,8 +53,12 @@ internal sealed class ValidateCommand : ICommandModule
         {
             Description = "Only show errors reported by the connected server"
         };
+        var noMOption = new Option<bool>("--no-m")
+        {
+            Description = "Skip the Power Query (M) syntax check"
+        };
 
-        var command = new Command("validate", "Check DAX expressions and relationship integrity")
+        var command = new Command("validate", "Check DAX and Power Query expressions and model integrity")
         {
             modelArgument,
             ciOption,
@@ -62,7 +66,8 @@ internal sealed class ValidateCommand : ICommandModule
             errorsOnlyOption,
             noWarningsOption,
             noMultilineOption,
-            serverOnlyOption
+            serverOnlyOption,
+            noMOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -90,7 +95,8 @@ internal sealed class ValidateCommand : ICommandModule
                         model,
                         errorsOnly,
                         parseResult.GetValue(noWarningsOption) || errorsOnly,
-                        parseResult.GetValue(serverOnlyOption)),
+                        parseResult.GetValue(serverOnlyOption),
+                        SkipM: parseResult.GetValue(noMOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 

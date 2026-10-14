@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Tomix.App.Format.M;
 using Tomix.App.Models;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
@@ -9,6 +10,7 @@ namespace Tomix.App.Validate;
 public sealed class ValidateModelHandler
 {
     private readonly IModelSessionSource _sessions;
+    private readonly PowerQueryEngine? _mEngine;
 
     public ValidateModelHandler(IEnumerable<IModelProvider> providers)
         : this(new OneShotSessionSource(providers, noProviderHint: null))
@@ -18,6 +20,10 @@ public sealed class ValidateModelHandler
     public ValidateModelHandler(IModelSessionSource sessions)
         => _sessions = sessions;
 
+    internal ValidateModelHandler(IEnumerable<IModelProvider> providers, PowerQueryEngine mEngine)
+        : this(new OneShotSessionSource(providers, noProviderHint: null))
+        => _mEngine = mEngine;
+
     public async Task<TomixResult<ValidateModelResult>> HandleAsync(
         ValidateModelRequest request,
         CancellationToken cancellationToken)
@@ -25,15 +31,28 @@ public sealed class ValidateModelHandler
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            return await ModelSessionRunner.RunAsync(_sessions, request.Model, async session =>
-            {
-                var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            var opened = await ModelSessionRunner.RunAsync(
+                _sessions,
+                request.Model,
+                async session => TomixResult<ModelSnapshot>.Ok(await session.GetSnapshotAsync(cancellationToken)),
+                cancellationToken);
+            if (opened.Data is not { } snapshot)
+                return new TomixResult<ValidateModelResult>(false, null, opened.Diagnostics, opened.ExitCode);
 
-                var findings = request.ServerOnly
-                    ? new ModelValidation.Findings([], null)
-                    : ModelValidation.Analyze(snapshot);
-                return Complete(request, stopwatch, findings, snapshot.Name);
-            }, cancellationToken);
+            // The analysis runs on the snapshot after the session is released: parsing M can take
+            // seconds on a large model, and a live session must not stay leased meanwhile.
+            if (request.ServerOnly)
+                return Complete(request, stopwatch, new ModelValidation.Findings([], null), snapshot.Name);
+
+            var findings = ModelValidation.Analyze(snapshot);
+            if (!request.SkipM)
+            {
+                var mIssues = await MSyntaxValidation.AnalyzeAsync(
+                    snapshot, _mEngine ?? PowerQueryEngine.Shared, cancellationToken);
+                findings = findings with { Issues = [.. findings.Issues, .. mIssues] };
+            }
+
+            return Complete(request, stopwatch, findings, snapshot.Name);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

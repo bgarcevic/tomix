@@ -69,7 +69,7 @@ For multi-step edits, stage mutations and commit them as a batch — see
 ```sh
 tx bpa run              # Best Practice Analyzer
 tx bpa run --fix        # auto-fix what can be fixed
-tx validate             # DAX and relationship integrity
+tx validate             # DAX, Power Query and model integrity
 ```
 
 ## 6. Deploy it

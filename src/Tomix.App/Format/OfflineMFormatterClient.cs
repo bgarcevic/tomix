@@ -16,10 +16,6 @@ public sealed class OfflineMFormatterClient : IExpressionFormatterClient
     private const int DefaultWidth = 40;
     private const int LongWidth = 120;
 
-    // One engine per process, created on first use: the bundle is evaluated only when M is
-    // actually formatted, and the cost is paid once however many expressions follow.
-    private static readonly Lazy<PowerQueryEngine> SharedEngine = new(() => new PowerQueryEngine());
-
     private readonly PowerQueryEngine? _engine;
 
     public OfflineMFormatterClient()
@@ -37,7 +33,7 @@ public sealed class OfflineMFormatterClient : IExpressionFormatterClient
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var engine = _engine ?? SharedEngine.Value;
+        var engine = _engine ?? PowerQueryEngine.Shared;
         var result = await engine.FormatAsync(
             request.Expression,
             new PowerQueryFormatOptions(Indentation, Newline, request.Long ? LongWidth : DefaultWidth),

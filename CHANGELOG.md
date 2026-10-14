@@ -12,6 +12,9 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx validate` checks Power Query (M) partition sources and shared expressions offline with
+  the bundled M parser, and reports each one that does not parse as an `M0001` error with its
+  line and column. `--no-m` (MCP: `"m": false`) skips the check (#453).
 - `tx test --tolerance <value>` accepts numeric cells within an absolute difference (`0.001`) or a
   percentage of the larger value (`0.1%`), so floating-point noise in averages and ratios no
   longer fails a test. `--ignore-row-order` sorts both rowsets before comparing, so test queries

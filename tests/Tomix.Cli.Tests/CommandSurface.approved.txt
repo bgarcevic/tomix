@@ -557,7 +557,7 @@ Update tx to the latest release
   opt --output-format <format>  Format for data written to stdout: text, json, csv, tmsl (alias: bim), or tmdl (default: text). Availability varies by command.
 
 # tx validate
-Check DAX expressions and relationship integrity
+Check DAX and Power Query expressions and model integrity
   arg [model]  Optional path to the model; defaults to the active connection
   opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --trx <file>  Write results to a .trx test-run file at this path
@@ -565,6 +565,7 @@ Check DAX expressions and relationship integrity
   opt --no-warnings  Leave out analyzer warnings
   opt --no-multiline  Show multi-line cell content on one line. Applies to text output.
   opt --server-only  Only show errors reported by the connected server
+  opt --no-m  Skip the Power Query (M) syntax check
 
 # tx vertipaq
 Report VertiPaq storage statistics for a semantic model
