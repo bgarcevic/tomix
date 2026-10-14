@@ -60,6 +60,21 @@ internal sealed class TestCommand : ICommandModule
                 result.AddError("--max-rows must be at least 1.");
         });
 
+        var toleranceOption = new Option<string?>("--tolerance")
+        {
+            Description = "Accept numeric cells within this difference: absolute (0.01) or relative to the larger value (0.1%)"
+        };
+        toleranceOption.Validators.Add(result =>
+        {
+            if (!TestTolerance.TryParse(result.GetValueOrDefault<string?>(), out _, out var error))
+                result.AddError(error!);
+        });
+
+        var ignoreRowOrderOption = new Option<bool>("--ignore-row-order")
+        {
+            Description = "Sort rows by their values before comparing, so queries need no ORDER BY"
+        };
+
         var ciOption = new Option<string?>("--ci")
         {
             Description = "Print CI log-group commands to stderr for the given system: vsts or github"
@@ -77,6 +92,8 @@ internal sealed class TestCommand : ICommandModule
             filterOption,
             paramOption,
             maxRowsOption,
+            toleranceOption,
+            ignoreRowOrderOption,
             ciOption,
             trxOption
         };
@@ -114,7 +131,8 @@ internal sealed class TestCommand : ICommandModule
                 Update: parseResult.GetValue(updateOption),
                 Filter: parseResult.GetValue(filterOption),
                 Parameters: parameters.Count > 0 ? parameters : null,
-                MaxRows: parseResult.GetValue(maxRowsOption) ?? 10000);
+                MaxRows: parseResult.GetValue(maxRowsOption) ?? 10000,
+                Compare: CompareOptions(parseResult.GetValue(toleranceOption), parseResult.GetValue(ignoreRowOrderOption)));
 
             // Name the session-resolved target on stderr before the model opens; an explicit
             // model/--server target is the user's own and stays silent.
@@ -150,4 +168,10 @@ internal sealed class TestCommand : ICommandModule
 
         return command;
     }
+
+    // The option validator has already rejected a malformed tolerance; zero means exact.
+    private static TestCompareOptions CompareOptions(string? tolerance, bool ignoreRowOrder)
+        => new(
+            Tolerance: TestTolerance.TryParse(tolerance, out var parsed, out _) && parsed!.Value > 0 ? parsed : null,
+            IgnoreRowOrder: ignoreRowOrder);
 }

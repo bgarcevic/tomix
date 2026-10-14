@@ -537,6 +537,8 @@ Run DAX regression tests against a live model
   opt --filter <pattern>  Run only tests whose name matches a * wildcard pattern (case-insensitive)
   opt --param <name=value>  Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.
   opt --max-rows <n>  Per-query row cap; a query exceeding it fails as an error (default: 10000)
+  opt --tolerance <value>  Accept numeric cells within this difference: absolute (0.01) or relative to the larger value (0.1%)
+  opt --ignore-row-order  Sort rows by their values before comparing, so queries need no ORDER BY
   opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --trx <file>  Write results to a .trx test-run file at this path
 

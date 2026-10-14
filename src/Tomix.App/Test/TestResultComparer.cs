@@ -1,3 +1,4 @@
+using System.Globalization;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Test;
@@ -26,18 +27,23 @@ public sealed record TestComparison(
 /// Pure comparison of an expected snapshot against an actual rowset. Columns compare first
 /// (count, then name and type per index) and any column difference short-circuits row
 /// comparison — cell diffs against a different shape are noise. Rows then compare in order
-/// (ordering is significant; test queries should use ORDER BY), cells by ordinal equality of
-/// their <see cref="TestValueFormatter"/> canonical strings.
+/// (ordering is significant unless <see cref="TestCompareOptions.IgnoreRowOrder"/> sorts both
+/// sides first), cells by ordinal equality of their <see cref="TestValueFormatter"/> canonical
+/// strings, or within <see cref="TestCompareOptions.Tolerance"/> for numeric columns.
 /// </summary>
 public static class TestResultComparer
 {
     public const int DefaultMaxDifferences = 10;
 
+    private static readonly HashSet<string> NumericTypes = new(StringComparer.Ordinal) { "int64", "double", "decimal" };
+
     public static TestComparison Compare(
         TestSnapshot expected,
         ModelQueryResult actual,
+        TestCompareOptions? options = null,
         int maxDifferences = DefaultMaxDifferences)
     {
+        options ??= TestCompareOptions.Exact;
         var differences = new List<TestDifference>();
         var total = 0;
 
@@ -81,15 +87,28 @@ public static class TestResultComparer
                 Expected: $"{expected.Rows.Count} row(s)",
                 Actual: $"{actual.Rows.Count} row(s)"));
 
+        var numeric = expected.Columns.Select(column => NumericTypes.Contains(column.Type)).ToArray();
+        IReadOnlyList<IReadOnlyList<string?>> expectedRows = expected.Rows;
+        IReadOnlyList<IReadOnlyList<string?>> actualRows = actual.Rows
+            .Select(row => (IReadOnlyList<string?>)row.Select(TestValueFormatter.Format).ToList())
+            .ToList();
+
+        if (options.IgnoreRowOrder)
+        {
+            var rowComparer = new RowComparer(numeric);
+            expectedRows = expectedRows.Order(rowComparer).ToList();
+            actualRows = actualRows.Order(rowComparer).ToList();
+        }
+
         // Still cell-compare the overlapping prefix so the report shows what diverged.
-        var rowOverlap = Math.Min(expected.Rows.Count, actual.Rows.Count);
+        var rowOverlap = Math.Min(expectedRows.Count, actualRows.Count);
         for (var r = 0; r < rowOverlap; r++)
         {
             for (var c = 0; c < expected.Columns.Count; c++)
             {
-                var expectedCell = expected.Rows[r][c];
-                var actualCell = TestValueFormatter.Format(actual.Rows[r][c]);
-                if (!string.Equals(expectedCell, actualCell, StringComparison.Ordinal))
+                var expectedCell = expectedRows[r][c];
+                var actualCell = actualRows[r][c];
+                if (!CellsMatch(expectedCell, actualCell, numeric[c] ? options.Tolerance : null))
                     Add(new TestDifference(
                         "cell",
                         Row: r + 1,
@@ -100,5 +119,55 @@ public static class TestResultComparer
         }
 
         return new TestComparison(total == 0, differences, total);
+    }
+
+    private static bool CellsMatch(string? expected, string? actual, TestTolerance? tolerance)
+    {
+        if (string.Equals(expected, actual, StringComparison.Ordinal))
+            return true;
+
+        // BLANK never matches a number, however close; only two numbers compare within tolerance.
+        return tolerance is not null
+            && TryParseNumber(expected, out var expectedNumber)
+            && TryParseNumber(actual, out var actualNumber)
+            && tolerance.Accepts(expectedNumber, actualNumber);
+    }
+
+    private static bool TryParseNumber(string? cell, out double value)
+    {
+        value = 0;
+        return cell is not null
+            && double.TryParse(cell, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
+    /// <summary>
+    /// Orders rows for <see cref="TestCompareOptions.IgnoreRowOrder"/>: non-numeric columns first
+    /// (ordinal), then numeric columns by value, so tolerance-sized noise in a measure cannot
+    /// reorder rows that a dimension column already separates. BLANK sorts first.
+    /// </summary>
+    private sealed class RowComparer(bool[] numeric) : IComparer<IReadOnlyList<string?>>
+    {
+        public int Compare(IReadOnlyList<string?>? x, IReadOnlyList<string?>? y)
+        {
+            foreach (var pass in (bool[])[false, true])
+            {
+                for (var c = 0; c < numeric.Length; c++)
+                {
+                    if (numeric[c] != pass)
+                        continue;
+
+                    var order = pass ? CompareNumbers(x![c], y![c]) : string.CompareOrdinal(x![c], y![c]);
+                    if (order != 0)
+                        return order;
+                }
+            }
+
+            return 0;
+        }
+
+        private static int CompareNumbers(string? x, string? y)
+            => TryParseNumber(x, out var a) && TryParseNumber(y, out var b)
+                ? a.CompareTo(b)
+                : string.CompareOrdinal(x, y);
     }
 }

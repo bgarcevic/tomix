@@ -36,9 +36,13 @@ public static partial class TestSnapshotFile
             result.Columns,
             result.Rows.Select(row => (IReadOnlyList<string?>)row.Select(TestValueFormatter.Format).ToList()).ToList());
 
-    /// <summary>SHA-256 (lowercase hex) of the query text with line endings and outer whitespace normalized.</summary>
+    /// <summary>
+    /// SHA-256 (lowercase hex) of the query text with line endings and outer whitespace
+    /// normalized and <c>tx:</c> directive lines removed, so changing a test's settings is not
+    /// reported as a query change.
+    /// </summary>
     public static string ComputeQueryHash(string query)
-        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(query.ReplaceLineEndings("\n").Trim())));
+        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(TestCompareOptions.WithoutDirectives(query).Trim())));
 
     public static string Serialize(TestSnapshot snapshot)
         => JsonSerializer.Serialize(snapshot, SnapshotJsonContext.Default.TestSnapshot) + "\n";

@@ -87,6 +87,7 @@ internal static class HelpPlaceholders
         ["--source-type"] = "protocol",
         ["--table"] = "name",
         ["--tenant"] = "id",
+        ["--tolerance"] = "value",
         ["--top"] = "n",
         ["--trace"] = "file",
         ["--trx"] = "file",

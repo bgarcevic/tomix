@@ -102,6 +102,115 @@ public sealed class TestResultComparerTests
         Assert.Equal("0", difference.Actual);
     }
 
+    // ── Tolerance and row order ──────────────────────────────────────────────
+
+    private static readonly IReadOnlyList<QueryColumn> MeasureColumns =
+        [new QueryColumn("Sales[Region]", "string"), new QueryColumn("[Avg]", "double")];
+
+    private static TestComparison CompareAvg(string expected, double actual, string? tolerance)
+    {
+        TestTolerance? parsed = null;
+        if (tolerance is not null)
+            Assert.True(TestTolerance.TryParse(tolerance, out parsed, out _));
+
+        return TestResultComparer.Compare(
+            new TestSnapshot(1, "hash", MeasureColumns, [["East", expected]]),
+            Actual(MeasureColumns, ["East", actual]),
+            new TestCompareOptions(Tolerance: parsed));
+    }
+
+    [Theory]
+    [InlineData("0.3", 0.30000000000000004, null, false)]  // exact: float noise fails
+    [InlineData("0.3", 0.30000000000000004, "1e-9", true)]
+    [InlineData("100", 100.4, "0.5", true)]
+    [InlineData("100", 100.6, "0.5", false)]
+    [InlineData("1000", 1009, "1%", true)]                 // relative to the larger value
+    [InlineData("1000", 1011, "1%", false)]
+    public void Compare_NumericTolerance(string expected, double actual, string? tolerance, bool passes)
+        => Assert.Equal(passes, CompareAvg(expected, actual, tolerance).Passed);
+
+    [Fact]
+    public void Compare_Tolerance_ReportsTheActualValueWhenOutside()
+    {
+        var difference = Assert.Single(CompareAvg("100", 100.6, "0.5").Differences);
+
+        Assert.Equal("100", difference.Expected);
+        Assert.Equal("100.6", difference.Actual);
+    }
+
+    [Fact]
+    public void Compare_Tolerance_DoesNotApplyToTextColumns()
+    {
+        var comparison = TestResultComparer.Compare(
+            Snapshot(["1", "5"]),
+            Actual(rows: [["1.001", 5m]]),
+            new TestCompareOptions(Tolerance: new TestTolerance(0.1, Relative: false)));
+
+        Assert.False(comparison.Passed);
+        Assert.Equal("Sales[Region]", Assert.Single(comparison.Differences).Column);
+    }
+
+    [Fact]
+    public void Compare_Tolerance_NeverMatchesBlankToANumber()
+    {
+        var comparison = TestResultComparer.Compare(
+            Snapshot(["East", null]),
+            Actual(rows: [["East", 0m]]),
+            new TestCompareOptions(Tolerance: new TestTolerance(1, Relative: false)));
+
+        Assert.False(comparison.Passed);
+    }
+
+    [Fact]
+    public void Compare_RowOrderMatters_ByDefault()
+    {
+        var comparison = TestResultComparer.Compare(
+            Snapshot(["East", "1"], ["West", "2"]),
+            Actual(rows: [["West", 2m], ["East", 1m]]));
+
+        Assert.False(comparison.Passed);
+    }
+
+    [Fact]
+    public void Compare_IgnoreRowOrder_PassesForTheSameRowsInAnotherOrder()
+    {
+        var comparison = TestResultComparer.Compare(
+            Snapshot(["East", "1"], ["West", "2"], ["North", null]),
+            Actual(rows: [["West", 2m], ["North", null], ["East", 1m]]),
+            new TestCompareOptions(IgnoreRowOrder: true));
+
+        Assert.True(comparison.Passed);
+    }
+
+    [Fact]
+    public void Compare_IgnoreRowOrder_StillReportsAChangedRow()
+    {
+        var comparison = TestResultComparer.Compare(
+            Snapshot(["East", "1"], ["West", "2"]),
+            Actual(rows: [["West", 3m], ["East", 1m]]),
+            new TestCompareOptions(IgnoreRowOrder: true));
+
+        Assert.False(comparison.Passed);
+        var difference = Assert.Single(comparison.Differences);
+        Assert.Equal("2", difference.Expected);
+        Assert.Equal("3", difference.Actual);
+    }
+
+    [Fact]
+    public void Compare_IgnoreRowOrder_SortsByDimensionsBeforeMeasures()
+    {
+        // The measure is the first column. Sorting whole rows as text would order the actual
+        // side B, A (2 < 2.0000001) against the expected A, B; dimensions sort first, so
+        // tolerance-sized noise cannot reorder rows.
+        IReadOnlyList<QueryColumn> columns = [new QueryColumn("[Avg]", "double"), new QueryColumn("Sales[Region]", "string")];
+        var comparison = TestResultComparer.Compare(
+            new TestSnapshot(1, "hash", columns, [["2", "A"], ["2", "B"]]),
+            Actual(columns, [2.0000001, "A"], [2.0, "B"]),
+            new TestCompareOptions(new TestTolerance(1e-3, Relative: false), IgnoreRowOrder: true));
+
+        Assert.True(comparison.Passed);
+    }
+
     // ── Canonical value formatting ──────────────────────────────────────────
 
     [Fact]
