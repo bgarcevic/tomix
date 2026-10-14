@@ -363,7 +363,7 @@ The gate never applies
 destructive `Delete()` fixes — those are only available via
 `bpa run --fix --allow-delete`.
 
-## `validate` — DAX and relationship integrity
+## `validate` — DAX, Power Query and model integrity
 
 ```
 tx validate [model] [options]
@@ -382,6 +382,13 @@ reference checks are skipped, since a never-closed bracket makes everything
 after it read wrong. Syntactically valid expressions then get the offline
 reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).
 
+Power Query (M) partition sources and shared expressions, including M
+parameters, are lexed and parsed by the same offline engine `tx format` uses
+for M. Each one that does not parse is reported as an `M0001` warning with
+its line and column. The check needs no network and no Power BI Desktop; the
+engine starts only when the model has M, and adds roughly 20–100 ms per
+expression. `--no-m` skips it.
+
 In text output each finding shows the offending expression line under its
 message, syntax-highlighted when it came from DAX; `--no-multiline` collapses
 the cell back to one line. Every issue carries a severity: `--output-format
@@ -397,6 +404,7 @@ severity to its test outcome.
 | `--errors-only` | Only show errors. |
 | `--no-warnings` | Leave out analyzer warnings. |
 | `--server-only` | Only show errors reported by the connected server. |
+| `--no-m` | Skip the Power Query (M) syntax check (`M0001`). |
 | `--no-multiline` | Show multi-line cell content on one line. Text output only. |
 
 ```sh

@@ -29,6 +29,8 @@ internal sealed class PowerQueryEngine : IDisposable
 
     private const int EngineThreadStackSize = 256 * 1024 * 1024;
 
+    private static readonly Lazy<PowerQueryEngine> SharedEngine = new(() => new PowerQueryEngine());
+
     private readonly Func<string> _loadBundle;
     private readonly TimeSpan _timeout;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -38,6 +40,12 @@ internal sealed class PowerQueryEngine : IDisposable
         : this(PowerQueryEngineBundle.Load, timeout)
     {
     }
+
+    /// <summary>
+    /// The process-wide engine, created on first use: the bundle is evaluated only when M is
+    /// actually formatted or checked, and the cost is paid once however many expressions follow.
+    /// </summary>
+    public static PowerQueryEngine Shared => SharedEngine.Value;
 
     internal PowerQueryEngine(Func<string> loadBundle, TimeSpan? timeout = null)
     {
