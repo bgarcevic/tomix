@@ -247,6 +247,10 @@
         "serverOnly": {
           "type": "boolean",
           "description": "Only show errors reported by the connected server"
+        },
+        "m": {
+          "type": "boolean",
+          "description": "Default: true. false: Skip the Power Query (M) syntax check"
         }
       },
       "additionalProperties": false

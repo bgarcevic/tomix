@@ -10,6 +10,12 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx validate` checks Power Query (M) partition sources and shared expressions offline with
+  the bundled M parser, and reports each one that does not parse as an `M0001` error with its
+  line and column. `--no-m` (MCP: `"m": false`) skips the check (#453).
+
 ### Changed
 
 - `tx get <object> --output-format tmdl|bim|tmsl` prints the object through the model's own

@@ -32,6 +32,7 @@ public static class ValidationRules
     public const string DocsUrl = "https://bgarcevic.github.io/tomix-cli/error-codes/#validate-issue-codes";
 
     private const string DaxCategory = "DAX Expressions";
+    private const string MCategory = "Power Query Expressions";
     private const string IntegrityCategory = "Model Integrity";
 
     /// <summary>Every object kind that carries DAX (see <c>DaxExpressions.Sites</c>).</summary>
@@ -74,6 +75,10 @@ public static class ValidationRules
         "DAX0009", "Incomplete VAR block", DaxCategory, RuleSeverity.Error, DaxScope,
         "A VAR has no '=' after its name, or a VAR block has no RETURN.");
 
+    public static readonly ValidationRule MSyntax = new(
+        "M0001", "Power Query syntax error", MCategory, RuleSeverity.Error, ["Partition", "Expression"],
+        "A Power Query (M) partition source or shared expression does not lex or parse.");
+
     public static readonly ValidationRule BrokenRelationship = new(
         "TOMIX_BROKEN_RELATIONSHIP", "Broken relationship", IntegrityCategory, RuleSeverity.Error, ["Relationship"],
         "A relationship endpoint refers to a missing column.");
@@ -102,6 +107,7 @@ public static class ValidationRules
         UnexpectedToken,
         MissingOperand,
         IncompleteVarBlock,
+        MSyntax,
         BrokenRelationship,
         BrokenSortBy,
         BrokenLevel,
