@@ -440,7 +440,8 @@ single test file or a directory searched recursively for `.dax` files
 
 | Option | Description |
 |--------|-------------|
-| `--update` | Record mode: run each query and (re)write its `.expected.json` from the actual result. Byte-identical snapshots are left untouched. |
+| `--update` | Record mode: run each query and (re)write its `.expected.json` from the actual result, listing what each rewrite changed. Byte-identical snapshots are left untouched. |
+| `--update-missing` | Record snapshots only for tests that have none yet, and compare every other test as usual. Cannot be combined with `--update`. |
 | `--filter <pattern>` | Run only tests whose name matches a `*` wildcard pattern (case-insensitive). |
 | `--param <name=value>` | Query parameter applied to every test, referenced as `@name` in DAX. Repeatable. |
 | `--max-rows <n>` | Per-query row cap; a query exceeding it fails as an error (default: `10000`). |
@@ -458,14 +459,26 @@ with Build permission on the model.
 then record its snapshot:
 
 ```sh
-tx test ./tests --update -s MyWorkspace -d MyModel   # record snapshots
-tx test ./tests -s MyWorkspace -d MyModel            # verify: all PASS, exit 0
+tx test ./tests --update-missing -s MyWorkspace -d MyModel   # record new snapshots
+tx test ./tests -s MyWorkspace -d MyModel                    # verify: all PASS, exit 0
 ```
 
 A test without a snapshot fails the run as `MISS` (a new test must not
 silently pass); a result that drifts from its snapshot fails as `FAIL` with a
-difference table. Accept an intentional change by re-running `--update` and
-committing the snapshot diff — the git diff *is* the review artifact.
+difference table. `--update-missing` records only the `MISS` tests and still
+compares the rest, so it never accepts a failing test and its exit code still
+reports regressions.
+
+Accept an intentional change by re-running with `--update` and committing the
+snapshot diff — the git diff *is* the review artifact. `--update` rewrites
+every snapshot, failing ones included, so it lists what it accepted: each
+rewritten snapshot shows as `UPDATED` with a Before/After table of the cells
+that changed (in JSON, the same `differences` and `totalDifferences` fields as
+a failed test).
+
+A snapshot whose `.dax` file was deleted or renamed is reported after the
+summary as an orphan (in JSON, an `orphans` array of `name` and `file`). An
+orphan never fails the run; delete it, or rename it to match its test.
 
 The snapshot stores column names/types and all cell values as canonical
 invariant strings (`null` = DAX `BLANK()`), plus a hash of the query text
@@ -485,6 +498,11 @@ used to hint when a failing test's query changed since recording:
   ]
 }
 ```
+
+Each column and each row is written on one line, so a changed value shows in
+the git diff as its whole row. Snapshots recorded by earlier versions, with
+one cell per line, still load; the next `--update` rewrites them in this
+layout (`UPDATED`, "Same results; rewrote the snapshot file's formatting.").
 
 Rows compare **in order** — end test queries with `ORDER BY` so results are
 deterministic, or pass `--ignore-row-order`. Keep rowsets small and stable
@@ -519,6 +537,7 @@ statement are read. An unknown directive or a bad value fails the test as
 ```sh
 tx test ./tests
 tx test ./tests/totals/sales.dax --update
+tx test ./tests --update-missing
 tx test ./tests --filter "totals/*" --trx results.trx --ci vsts
 tx test ./tests --tolerance 0.01% --ignore-row-order
 ```

@@ -533,7 +533,8 @@ Commit staged mutations to the source and workspace mirror
 # tx test
 Run DAX regression tests against a live model
   arg [path]  Test file or directory searched recursively for .dax tests (default: current directory)
-  opt --update  Record mode: run each query and (re)write its .expected.json snapshot from the actual result
+  opt --update  Record mode: run each query and (re)write its .expected.json snapshot from the actual result, listing what changed
+  opt --update-missing  Record snapshots only for tests that have none yet; compare all other tests as usual
   opt --filter <pattern>  Run only tests whose name matches a * wildcard pattern (case-insensitive)
   opt --param <name=value>  Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.
   opt --max-rows <n>  Per-query row cap; a query exceeding it fails as an error (default: 10000)

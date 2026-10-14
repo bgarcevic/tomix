@@ -73,4 +73,21 @@ public sealed class TestCommandParseTests
 
         Assert.Contains(result.Errors, e => e.Message.Contains($"Invalid tolerance '{tolerance}'"));
     }
+
+    [Fact]
+    public void Test_UpdateMissingBinds()
+    {
+        var result = Parse("test", "--update-missing");
+
+        Assert.Empty(result.Errors);
+        Assert.True(result.GetValue<bool>("--update-missing"));
+    }
+
+    [Fact]
+    public void Test_UpdateWithUpdateMissing_FailsAtParseTime()
+    {
+        var result = Parse("test", "--update", "--update-missing");
+
+        Assert.Contains(result.Errors, e => e.Message.Contains("--update and --update-missing cannot be combined"));
+    }
 }

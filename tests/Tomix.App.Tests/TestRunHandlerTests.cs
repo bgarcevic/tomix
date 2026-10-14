@@ -51,10 +51,12 @@ public sealed class TestRunHandlerTests : IDisposable
 
     private TestRunRequest Request(bool update = false, string? filter = null,
         IReadOnlyDictionary<string, string>? parameters = null, int maxRows = 10000, string? path = null,
-        TestCompareOptions? compare = null)
+        TestCompareOptions? compare = null, bool updateMissing = false)
         => new(Model: null, Server: null, Database: null, Auth: null,
             Path: path ?? _dir, Update: update, Filter: filter, Parameters: parameters, MaxRows: maxRows,
-            Compare: compare);
+            Compare: compare, UpdateMissing: updateMissing);
+
+    private string SnapshotPath(string name) => Path.Combine(_dir, name + ".expected.json");
 
     // ── Pre-condition failures ──────────────────────────────────────────────
 
@@ -89,6 +91,21 @@ public sealed class TestRunHandlerTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal("TOMIX_TEST_NONE_FOUND", result.Diagnostics[0].Code);
         Assert.Contains("other-*", result.Diagnostics[0].Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsUpdateWithUpdateMissing()
+    {
+        WriteDax("sales");
+        var session = NewSession();
+        var result = await Handler(session).HandleAsync(
+            Request(update: true, updateMissing: true), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("TOMIX_TEST_CONFLICTING_OPTIONS", result.Diagnostics[0].Code);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Null(session.LastRequest);
+        Assert.False(File.Exists(SnapshotPath("sales")));
     }
 
     [Fact]
@@ -173,6 +190,140 @@ public sealed class TestRunHandlerTests : IDisposable
         Assert.Equal(0, second.ExitCode);
     }
 
+    [Fact]
+    public async Task HandleAsync_Update_ReportsDifferencesFromThePreviousSnapshot()
+    {
+        WriteDax("sales");
+        await Handler(NewSession(_ => Rowset(1L))).HandleAsync(Request(update: true), CancellationToken.None);
+
+        var result = await Handler(NewSession(_ => Rowset(2L))).HandleAsync(Request(update: true), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var test = Assert.Single(result.Data!.Tests);
+        Assert.Equal(TestOutcome.Updated, test.Outcome);
+        Assert.Contains("Accepted 1 difference", test.Message);
+        Assert.Equal(1, test.TotalDifferences);
+        var difference = Assert.Single(test.Differences!);
+        Assert.Equal(("cell", "1", "2"), (difference.Kind, difference.Expected, difference.Actual));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Update_ComparesExactly_WhateverTheRunTolerance()
+    {
+        WriteDax("sales");
+        await Handler(NewSession(_ => Rowset(100.0))).HandleAsync(Request(update: true), CancellationToken.None);
+
+        var result = await Handler(NewSession(_ => Rowset(100.5))).HandleAsync(
+            Request(update: true, compare: new TestCompareOptions(new TestTolerance(1, Relative: false))),
+            CancellationToken.None);
+
+        Assert.Single(Assert.Single(result.Data!.Tests).Differences!);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Update_SaysRecorded_ForANewSnapshot()
+    {
+        WriteDax("sales");
+        var result = await Handler(NewSession()).HandleAsync(Request(update: true), CancellationToken.None);
+
+        var test = Assert.Single(result.Data!.Tests);
+        Assert.Equal("Recorded a new snapshot.", test.Message);
+        Assert.Null(test.Differences);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Update_SaysSameResults_WhenOnlyTheQueryChanged()
+    {
+        var daxPath = WriteDax("sales");
+        var handler = Handler(NewSession());
+        await handler.HandleAsync(Request(update: true), CancellationToken.None);
+
+        File.WriteAllText(daxPath, "EVALUATE ROW(\"Value\", 1)");
+        var result = await handler.HandleAsync(Request(update: true), CancellationToken.None);
+
+        var test = Assert.Single(result.Data!.Tests);
+        Assert.Equal(TestOutcome.Updated, test.Outcome);
+        Assert.Contains("changed query", test.Message);
+        Assert.Null(test.Differences);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Update_ReplacesAnUnreadableSnapshot()
+    {
+        WriteDax("sales");
+        File.WriteAllText(SnapshotPath("sales"), "{ not json");
+
+        var result = await Handler(NewSession()).HandleAsync(Request(update: true), CancellationToken.None);
+
+        var test = Assert.Single(result.Data!.Tests);
+        Assert.Equal(TestOutcome.Updated, test.Outcome);
+        Assert.Contains("unreadable", test.Message);
+        Assert.NotNull(TestSnapshotFile.Load(SnapshotPath("sales"), out _));
+    }
+
+    [Fact]
+    public async Task HandleAsync_UpdateMissing_RecordsOnlyMissingTests_AndStillFailsARedTest()
+    {
+        WriteDax("new", "EVALUATE 'New'");
+        WriteDax("red", "EVALUATE 'Red'");
+        await Handler(NewSession(_ => Rowset(1L))).HandleAsync(
+            Request(update: true, filter: "red"), CancellationToken.None);
+
+        var result = await Handler(NewSession(_ => Rowset(2L))).HandleAsync(
+            Request(updateMissing: true), CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(
+            [("new", TestOutcome.Updated), ("red", TestOutcome.Failed)],
+            result.Data!.Tests.Select(t => (t.Name, t.Outcome)));
+        Assert.Equal("2", TestSnapshotFile.Load(SnapshotPath("new"), out _)!.Rows[0][0]);
+        Assert.Equal("1", TestSnapshotFile.Load(SnapshotPath("red"), out _)!.Rows[0][0]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_UpdateMissing_ExitsZero_WhenEveryOtherTestPasses()
+    {
+        WriteDax("new", "EVALUATE 'New'");
+        WriteDax("old", "EVALUATE 'Old'");
+        var handler = Handler(NewSession());
+        await handler.HandleAsync(Request(update: true, filter: "old"), CancellationToken.None);
+
+        var result = await handler.HandleAsync(Request(updateMissing: true), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal([TestOutcome.Updated, TestOutcome.Passed], result.Data!.Tests.Select(t => t.Outcome));
+    }
+
+    // ── Orphaned snapshots ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_ReportsOrphanedSnapshots_WithoutFailing()
+    {
+        WriteDax("sales");
+        var handler = Handler(NewSession());
+        await handler.HandleAsync(Request(update: true), CancellationToken.None);
+        File.WriteAllText(SnapshotPath("renamed"), "{}");
+
+        var result = await handler.HandleAsync(Request(), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var orphan = Assert.Single(result.Data!.Orphans!);
+        Assert.Equal("renamed", orphan.Name);
+        Assert.Equal(SnapshotPath("renamed"), orphan.File);
+    }
+
+    [Fact]
+    public async Task HandleAsync_FiltersOrphansLikeTests()
+    {
+        WriteDax("totals/sales");
+        File.WriteAllText(SnapshotPath("old"), "{}");
+
+        var result = await Handler(NewSession()).HandleAsync(
+            Request(update: true, filter: "totals/*"), CancellationToken.None);
+
+        Assert.Empty(result.Data!.Orphans!);
+    }
+
     // ── Compare mode ────────────────────────────────────────────────────────
 
     [Fact]
@@ -222,7 +373,7 @@ public sealed class TestRunHandlerTests : IDisposable
         Assert.Equal(1, result.ExitCode);
         var test = Assert.Single(result.Data!.Tests);
         Assert.Equal(TestOutcome.Missing, test.Outcome);
-        Assert.Contains("--update", test.Message);
+        Assert.Contains("--update-missing", test.Message);
         Assert.Equal(1, result.Data.Missing);
     }
 

@@ -36,7 +36,8 @@ public sealed class TestRunJsonContractTests
         Missing: 0,
         Errored: 0,
         Updated: 0,
-        DurationMs: 27);
+        DurationMs: 27,
+        Orphans: [new OrphanedSnapshot("totals/old", "/tests/totals/old.expected.json")]);
 
     [Fact]
     public void Json_UsesDocumentedFieldNames()
@@ -89,5 +90,30 @@ public sealed class TestRunJsonContractTests
 
         Assert.Equal(JsonValueKind.Null, test.GetProperty("message").ValueKind);
         Assert.Equal(JsonValueKind.Null, test.GetProperty("differences").ValueKind);
+    }
+
+    [Fact]
+    public void Json_Orphans_UseDocumentedFieldNames()
+    {
+        var orphan = JsonDocument.Parse(JsonOutput.Serialize(SampleResult())).RootElement.GetProperty("orphans")[0];
+
+        Assert.Equal("totals/old", orphan.GetProperty("name").GetString());
+        Assert.Equal("/tests/totals/old.expected.json", orphan.GetProperty("file").GetString());
+    }
+
+    [Fact]
+    public void Json_UpdatedTest_CarriesDifferences()
+    {
+        var updated = new TestCaseResult(
+            "totals/sales", "/tests/totals/sales.dax", TestOutcome.Updated, DurationMs: 3,
+            Message: "Accepted 1 difference(s) from the previous snapshot.",
+            Differences: [new TestDifference("cell", Row: 1, Column: "[Total]", Expected: "1", Actual: "2")],
+            TotalDifferences: 1);
+        var test = JsonDocument.Parse(JsonOutput.Serialize(SampleResult() with { Tests = [updated] }))
+            .RootElement.GetProperty("tests")[0];
+
+        Assert.Equal("Updated", test.GetProperty("outcome").GetString());
+        Assert.Equal(1, test.GetProperty("totalDifferences").GetInt32());
+        Assert.Equal("2", test.GetProperty("differences")[0].GetProperty("actual").GetString());
     }
 }

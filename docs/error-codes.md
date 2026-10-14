@@ -229,6 +229,7 @@ Emitted by `test` (DAX regression tests against a live model).
 |------|------|---------|
 | `TOMIX_TEST_PATH_NOT_FOUND` | 2 | The path argument does not exist. |
 | `TOMIX_TEST_NONE_FOUND` | 2 | No `.dax` test files were found under the path (or none match `--filter`). |
+| `TOMIX_TEST_CONFLICTING_OPTIONS` | 2 | `--update` and `--update-missing` were both passed. |
 | `TOMIX_TEST_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_TEST_NO_REMOTE_TARGET` | 2 | `test` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
 | `TOMIX_TEST_UNSUPPORTED` | 2 | The provider session does not support queries (e.g. a local TMDL/BIM model). |

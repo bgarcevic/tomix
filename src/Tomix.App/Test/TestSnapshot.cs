@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Tomix.Core.Models;
@@ -22,8 +24,9 @@ public sealed record TestSnapshot(
 
 /// <summary>
 /// Reads and writes <see cref="TestSnapshot"/> files. Serialization is byte-deterministic
-/// (indented camelCase, "\n" line endings, BOM-less UTF-8, trailing newline) so an unchanged
-/// re-record is a no-op write and snapshot diffs are minimal.
+/// (camelCase, one row per line, "\n" line endings, BOM-less UTF-8, trailing newline) so an
+/// unchanged re-record is a no-op write and snapshot diffs are minimal. Reading accepts any JSON
+/// layout, so snapshots written in the older one-cell-per-line layout still load.
 /// </summary>
 public static partial class TestSnapshotFile
 {
@@ -44,8 +47,39 @@ public static partial class TestSnapshotFile
     public static string ComputeQueryHash(string query)
         => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(TestCompareOptions.WithoutDirectives(query).Trim())));
 
+    /// <summary>
+    /// Indented JSON with one column and one row per line, so a changed cell diffs as its whole
+    /// row (<c>-["East", "1200.00"]</c> / <c>+["East", "1234.50"]</c>) instead of a bare value.
+    /// Strings use relaxed escaping so non-ASCII names stay readable in the file.
+    /// </summary>
     public static string Serialize(TestSnapshot snapshot)
-        => JsonSerializer.Serialize(snapshot, SnapshotJsonContext.Default.TestSnapshot) + "\n";
+    {
+        var json = new StringBuilder();
+        json.Append("{\n");
+        json.Append("  \"version\": ").Append(snapshot.Version.ToString(CultureInfo.InvariantCulture)).Append(",\n");
+        json.Append("  \"querySha256\": ").Append(Quote(snapshot.QuerySha256)).Append(",\n");
+        AppendLines(json, "columns", snapshot.Columns.Select(c => $"{{ \"name\": {Quote(c.Name)}, \"type\": {Quote(c.Type)} }}"));
+        json.Append(",\n");
+        AppendLines(json, "rows", snapshot.Rows.Select(row => "[" + string.Join(", ", row.Select(Quote)) + "]"));
+        json.Append("\n}\n");
+        return json.ToString();
+    }
+
+    private static void AppendLines(StringBuilder json, string name, IEnumerable<string> items)
+    {
+        var lines = items.ToList();
+        json.Append("  \"").Append(name).Append("\": ");
+        if (lines.Count == 0)
+        {
+            json.Append("[]");
+            return;
+        }
+
+        json.Append("[\n    ").Append(string.Join(",\n    ", lines)).Append("\n  ]");
+    }
+
+    private static string Quote(string? value)
+        => value is null ? "null" : $"\"{JsonEncodedText.Encode(value, JavaScriptEncoder.UnsafeRelaxedJsonEscaping)}\"";
 
     /// <summary>
     /// Loads a snapshot; null with a non-null <paramref name="error"/> when the file is
@@ -112,9 +146,8 @@ public static partial class TestSnapshotFile
         return true;
     }
 
+    // Reading only; Serialize writes the file layout itself.
     [JsonSourceGenerationOptions(
-        WriteIndented = true,
-        NewLine = "\n",
         PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true)]
     [JsonSerializable(typeof(TestSnapshot))]

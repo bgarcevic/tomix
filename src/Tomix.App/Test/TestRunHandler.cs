@@ -12,7 +12,9 @@ namespace Tomix.App.Test;
 /// <summary>
 /// Runs DAX regression tests: discovers <c>.dax</c> files, executes each against the resolved
 /// live model (same target resolution as <see cref="QueryModelHandler"/>), and either compares
-/// the rowset to the paired <c>.expected.json</c> snapshot or re-records it (<c>--update</c>).
+/// the rowset to the paired <c>.expected.json</c> snapshot or re-records it (<c>--update</c>, or
+/// <c>--update-missing</c> for tests without one). A re-recorded snapshot reports what it changed,
+/// and snapshots whose test is gone are reported as orphans.
 /// Per-test problems are result data (like BPA violations) so the run continues and the full
 /// report renders; only authentication failures abort. Any non-passing test yields exit code 1
 /// via the Ok-with-exit-code pattern from <see cref="Bpa.BpaRunHandler"/>.
@@ -32,6 +34,13 @@ public sealed class TestRunHandler
 
     public async Task<TomixResult<TestRunResult>> HandleAsync(TestRunRequest request, CancellationToken cancellationToken)
     {
+        if (request.Update && request.UpdateMissing)
+            return TomixResult<TestRunResult>.Fail(
+                "TOMIX_TEST_CONFLICTING_OPTIONS",
+                "--update and --update-missing cannot be combined; choose one.",
+                exitCode: 2,
+                hint: "--update-missing records only tests without a snapshot; --update re-records every snapshot.");
+
         if (!File.Exists(request.Path) && !Directory.Exists(request.Path))
             return TomixResult<TestRunResult>.Fail(
                 "TOMIX_TEST_PATH_NOT_FOUND",
@@ -49,7 +58,11 @@ public sealed class TestRunHandler
                     ? $"No .dax test files found under: {request.Path}"
                     : $"No .dax test files match --filter {request.Filter} under: {request.Path}",
                 exitCode: 2,
-                hint: "Each test is a .dax file with a sibling .expected.json snapshot (record with 'tx test --update').");
+                hint: "Each test is a .dax file with a sibling .expected.json snapshot (record with 'tx test --update-missing').");
+
+        var orphans = TestDiscovery.FindOrphans(request.Path)
+            .Where(orphan => TestDiscovery.MatchesFilter(orphan.Name, request.Filter))
+            .ToList();
 
         var target = QueryModelHandler.ResolveTarget(
             request.Model, request.Database, request.Server, new ActiveModelResolver(_resolveSession));
@@ -77,7 +90,7 @@ public sealed class TestRunHandler
                     exitCode: 2,
                     hint: "Tests run only on live models connected via XMLA (-s <workspace> -d <model>).");
 
-            return await RunTestsAsync(request, target, connection.Queries, tests, cancellationToken).ConfigureAwait(false);
+            return await RunTestsAsync(request, target, connection.Queries, tests, orphans, cancellationToken).ConfigureAwait(false);
         }
         catch (ModelConnectionException ex)
         {
@@ -98,6 +111,7 @@ public sealed class TestRunHandler
         ModelReference target,
         IModelQuerySession querySession,
         IReadOnlyList<DiscoveredTest> tests,
+        IReadOnlyList<OrphanedSnapshot> orphans,
         CancellationToken cancellationToken)
     {
         var maxRows = Math.Max(1, request.MaxRows);
@@ -163,7 +177,7 @@ public sealed class TestRunHandler
             }
 
             var queryHash = TestSnapshotFile.ComputeQueryHash(query);
-            if (request.Update)
+            if (request.Update || (request.UpdateMissing && !File.Exists(test.ExpectedPath)))
             {
                 results.Add(UpdateSnapshot(test, actual, queryHash, watch, out var writeError));
                 if (writeError is not null)
@@ -188,7 +202,8 @@ public sealed class TestRunHandler
             Missing: results.Count(r => r.Outcome == TestOutcome.Missing),
             Errored: results.Count(r => r.Outcome == TestOutcome.Error),
             Updated: results.Count(r => r.Outcome == TestOutcome.Updated),
-            DurationMs: runWatch.ElapsedMilliseconds);
+            DurationMs: runWatch.ElapsedMilliseconds,
+            Orphans: orphans);
 
         var anyNotPassed = results.Any(r => r.Outcome is TestOutcome.Failed or TestOutcome.Missing or TestOutcome.Error);
         return TomixResult<TestRunResult>.Ok(runResult, exitCode: anyNotPassed ? 1 : 0);
@@ -203,7 +218,7 @@ public sealed class TestRunHandler
     {
         if (!File.Exists(test.ExpectedPath))
             return Case(test, TestOutcome.Missing, watch,
-                "No snapshot recorded. Run 'tx test --update' to record it.");
+                "No snapshot recorded. Run 'tx test --update-missing' to record it.");
 
         var snapshot = TestSnapshotFile.Load(test.ExpectedPath, out var loadError);
         if (snapshot is null)
@@ -231,9 +246,28 @@ public sealed class TestRunHandler
         writeError = null;
         try
         {
-            return TestSnapshotFile.Save(test.ExpectedPath, TestSnapshotFile.FromResult(actual, queryHash))
-                ? Case(test, TestOutcome.Updated, watch)
-                : Case(test, TestOutcome.Unchanged, watch);
+            var existed = File.Exists(test.ExpectedPath);
+            string? previousError = null;
+            var previous = existed ? TestSnapshotFile.Load(test.ExpectedPath, out previousError) : null;
+            if (!TestSnapshotFile.Save(test.ExpectedPath, TestSnapshotFile.FromResult(actual, queryHash)))
+                return Case(test, TestOutcome.Unchanged, watch);
+
+            if (!existed)
+                return Case(test, TestOutcome.Updated, watch, "Recorded a new snapshot.");
+            if (previous is null)
+                return Case(test, TestOutcome.Updated, watch, $"Replaced an unreadable snapshot. {previousError}");
+
+            // Exact, whatever the run's tolerance: this is what the rewrite changed in the file.
+            var changes = TestResultComparer.Compare(previous, actual, TestCompareOptions.Exact);
+            if (changes.Passed)
+                return Case(test, TestOutcome.Updated, watch,
+                    string.Equals(previous.QuerySha256, queryHash, StringComparison.Ordinal)
+                        ? "Same results; rewrote the snapshot file's formatting."
+                        : "Same results; recorded the changed query.");
+
+            return Case(test, TestOutcome.Updated, watch,
+                $"Accepted {changes.TotalDifferences} difference(s) from the previous snapshot.",
+                changes.Differences, changes.TotalDifferences);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
