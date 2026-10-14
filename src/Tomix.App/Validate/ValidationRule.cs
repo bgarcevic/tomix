@@ -76,7 +76,7 @@ public static class ValidationRules
         "A VAR has no '=' after its name, or a VAR block has no RETURN.");
 
     public static readonly ValidationRule MSyntax = new(
-        "M0001", "Power Query syntax error", MCategory, RuleSeverity.Warning, ["Partition", "Expression"],
+        "M0001", "Power Query syntax error", MCategory, RuleSeverity.Error, ["Partition", "Expression"],
         "A Power Query (M) partition source or shared expression does not lex or parse.");
 
     public static readonly ValidationRule BrokenRelationship = new(

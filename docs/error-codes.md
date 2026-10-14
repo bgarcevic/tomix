@@ -325,7 +325,7 @@ come from structural integrity checks.
 | `DAX0007` | Error | The DAX parser found a token where a comma, a closing bracket, or the end of the expression belongs: a missing comma between arguments (`SUM(a b)`), or text left over after a complete expression. The expression's reference checks are skipped. |
 | `DAX0008` | Error | The DAX parser found an operator, a closing bracket, or the end of the expression where an operand belongs (`1 +`, `1 * * 2`, `f(x + )`). The expression's reference checks are skipped. |
 | `DAX0009` | Error | A `VAR` has no `=` after its name, or a `VAR` block has no `RETURN`. The expression's reference checks are skipped. |
-| `M0001` | Warning | A Power Query (M) partition source or shared expression (including M parameters) does not lex or parse: an unterminated string, a missing `in`, an unbalanced bracket. The message names the column; the line is shown under it. Calculated-table partitions are DAX and are not parsed as M. Skipped with `--no-m`. |
+| `M0001` | Error | A Power Query (M) partition source or shared expression (including M parameters) does not lex or parse: an unterminated string, a missing `in`, an unbalanced bracket. The message names the column; the line is shown under it. Calculated-table partitions are DAX and are not parsed as M. Skipped with `--no-m`. |
 | `TOMIX_BROKEN_RELATIONSHIP` | Error | A relationship endpoint refers to a missing column. |
 | `TOMIX_BROKEN_SORT_BY` | Error | A column's sort-by column does not exist on its table. |
 | `TOMIX_BROKEN_LEVEL` | Error | A hierarchy level is bound to a column that does not exist on its table. |

@@ -13,7 +13,7 @@ and the API surface that major versions protect.
 ### Added
 
 - `tx validate` checks Power Query (M) partition sources and shared expressions offline with
-  the bundled M parser, and reports each one that does not parse as an `M0001` warning with its
+  the bundled M parser, and reports each one that does not parse as an `M0001` error with its
   line and column. `--no-m` (MCP: `"m": false`) skips the check (#453).
 
 ### Changed

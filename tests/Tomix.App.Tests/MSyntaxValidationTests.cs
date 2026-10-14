@@ -32,14 +32,15 @@ public sealed class MSyntaxValidationTests
     ];
 
     [Fact]
-    public async Task BrokenPartition_IsAWarningWithItsLine()
+    public async Task BrokenPartition_IsAnErrorWithItsLine()
     {
         var result = await ValidateAsync(Snapshot(Partition("m", "let\n    Source = \"abc\nin\n    Source")));
 
-        Assert.True(result.Data!.Valid);
-        var issue = Assert.Single(result.Data.Warnings);
+        Assert.False(result.Data!.Valid);
+        Assert.Equal(1, result.ExitCode);
+        var issue = Assert.Single(result.Data.Errors);
         Assert.Equal("M0001", issue.Code);
-        Assert.Equal(RuleSeverity.Warning, issue.Severity);
+        Assert.Equal(RuleSeverity.Error, issue.Severity);
         Assert.Equal("Sales/Part", issue.ObjectName);
         Assert.Equal("2", issue.Expression);
         Assert.Equal("    Source = \"abc", issue.ExpressionLine);
@@ -55,7 +56,7 @@ public sealed class MSyntaxValidationTests
 
         var result = await ValidateAsync(Snapshot() with { Objects = [.. Snapshot().Objects, expression] });
 
-        var issue = Assert.Single(result.Data!.Warnings);
+        var issue = Assert.Single(result.Data!.Errors);
         Assert.Equal("M0001", issue.Code);
         Assert.Equal("Expressions/Environment", issue.ObjectName);
     }
@@ -65,8 +66,7 @@ public sealed class MSyntaxValidationTests
     {
         var result = await ValidateAsync(Snapshot(Partition("m", "let\n    Source = Sql.Database(\"s\", \"d\")\nin\n    Source")));
 
-        Assert.Empty(result.Data!.Warnings);
-        Assert.Empty(result.Data.Errors);
+        Assert.Empty(Findings(result));
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class MSyntaxValidationTests
         // Valid DAX, broken M: the partition carries DAX, so M0001 must not fire.
         var result = await ValidateAsync(Snapshot(Partition("calculated", "VAR x = 1 RETURN { x }")));
 
-        Assert.DoesNotContain(result.Data!.Warnings, issue => issue.Code == "M0001");
+        Assert.DoesNotContain(Findings(result), issue => issue.Code == "M0001");
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class MSyntaxValidationTests
     {
         var result = await ValidateAsync(Snapshot(Partition("m", "let x = 1")), skipM: true);
 
-        Assert.Empty(result.Data!.Warnings);
+        Assert.Empty(Findings(result));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class MSyntaxValidationTests
         var result = await handler.HandleAsync(Request(skipM: false), CancellationToken.None);
 
         Assert.True(result.Data!.Valid);
-        Assert.Empty(result.Data.Warnings);
+        Assert.Empty(Findings(result));
     }
 
     [Theory]
@@ -106,11 +106,14 @@ public sealed class MSyntaxValidationTests
             new ValidateModelRequest(new ModelReference(SampleModel.Locate(sample)), ErrorsOnly: false, NoWarnings: false, ServerOnly: false),
             CancellationToken.None);
 
-        Assert.DoesNotContain(result.Data!.Warnings, issue => issue.Code == "M0001");
+        Assert.DoesNotContain(Findings(result), issue => issue.Code == "M0001");
     }
 
     private static Task<TomixResult<ValidateModelResult>> ValidateAsync(ModelSnapshot snapshot, bool skipM = false)
         => new ValidateModelHandler([new MutationStubs.Provider(new MutationStubs.SnapshotSession(snapshot))]).HandleAsync(Request(skipM), CancellationToken.None);
+
+    private static IEnumerable<ValidationIssue> Findings(TomixResult<ValidateModelResult> result)
+        => [.. result.Data!.Errors, .. result.Data.Warnings];
 
     private static ValidateModelRequest Request(bool skipM)
         => new(new ModelReference("any"), ErrorsOnly: false, NoWarnings: false, ServerOnly: false, SkipM: skipM);

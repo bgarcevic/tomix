@@ -384,7 +384,7 @@ reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).
 
 Power Query (M) partition sources and shared expressions, including M
 parameters, are lexed and parsed by the same offline engine `tx format` uses
-for M. Each one that does not parse is reported as an `M0001` warning with
+for M. Each one that does not parse is reported as an `M0001` error with
 its line and column. The check needs no network and no Power BI Desktop; the
 engine starts only when the model has M, and adds roughly 20–100 ms per
 expression. `--no-m` skips it.
