@@ -12,6 +12,15 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx rm` removes several objects as one change: pass several paths, or `--from <file|->` with
+  JSON Lines (`{"type", "table"?, "name"}` or `{"path"}`) or plain paths. Every kind `rm`
+  supports can be mixed. All targets resolve before anything changes, the dependency guard
+  judges the whole set regardless of order, targets inside another target are folded into it,
+  and cascades onto surviving objects need `--cascade`. One validation, one save, one undo step.
+  New error codes `TOMIX_RM_NEEDS_CASCADE` and `TOMIX_RM_INPUT_INVALID`.
+- `tx rm` refuses to remove a shared expression that surviving Power Query (M) still reads (M
+  partitions, other shared expressions, refresh policy queries), using the bundled M parser.
+  JSON adds `brokenMReferences`; `--force` overrides.
 - `tx validate` checks Power Query (M) partition sources and shared expressions offline with
   the bundled M parser, and reports each one that does not parse as an `M0001` error with its
   line and column. `--no-m` (MCP: `"m": false`) skips the check (#453).
