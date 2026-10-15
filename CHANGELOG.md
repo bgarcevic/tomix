@@ -52,6 +52,14 @@ and the API surface that major versions protect.
   fast on large models. A dataset that the list hides but that exists (read-only access) is still
   reported instead of being treated as a new mirror (#142).
 
+### Fixed
+
+- A lone `[Col]` in DAX resolves against the expression's own table, as DAX does, instead of the
+  first table with a column of that name. `tx rm` no longer refuses to remove `Sales[Date]`
+  because `DateTableTemplate`'s `YEAR([Date])` reads its own `Date`, and `tx deps` and rename
+  fixups follow the right column. When the own table has no such column, every table's column of
+  that name still counts, so a removal blocks rather than breaking a reference.
+
 ## [0.11.0] - 2026-10-12
 
 ### Added

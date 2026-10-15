@@ -244,6 +244,19 @@ public sealed class RemoveBatchHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task A_lone_column_reference_is_judged_against_its_own_table()
+    {
+        // Legacy/IdText is FORMAT([Id]): it reads Legacy/Id, never Stage/Id of the same name.
+        var other = await HandleAsync(["Stage/Id", "Sales/Lonely"], save: false);
+        Assert.True(other.Success, Describe(other));
+        Assert.Null(other.Data!.BrokenReferences);
+
+        var own = await HandleAsync(["Legacy/Id", "Sales/Lonely"], save: false);
+        Assert.True(own.Data is not null, Describe(own));
+        Assert.Equal(["Legacy/IdText"], own.Data.BrokenReferences);
+    }
+
+    [Fact]
     public async Task A_target_inside_another_target_is_subsumed()
     {
         var result = await HandleAsync(["Sales/Amount", "Sales", "Sales/Rev/KPI"], save: false, cascade: true);
@@ -479,6 +492,8 @@ public sealed class RemoveBatchHandlerTests : IDisposable
 
         var legacy = new Table { Name = "Legacy" };
         legacy.Columns.Add(new DataColumn { Name = "Id", DataType = DataType.Int64, SourceColumn = "Id" });
+        // A lone [Id] is Legacy's own column, not Stage's (which comes first in the model).
+        legacy.Columns.Add(new CalculatedColumn { Name = "IdText", DataType = DataType.String, Expression = "FORMAT ( [Id], \"0\" )" });
         legacy.Partitions.Add(new Partition
         {
             Name = "Legacy",

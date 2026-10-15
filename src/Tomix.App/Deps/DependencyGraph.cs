@@ -26,6 +26,8 @@ internal sealed class DependencyGraph
     private readonly Dictionary<string, List<ModelObject>> _forward = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ModelObject>> _reverse = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _sortByTargets = new(StringComparer.OrdinalIgnoreCase);
+    // Each table's descendants (columns, measures, KPIs, calculation items, ...) to that table.
+    private readonly Dictionary<string, ModelObject> _ownTable = new(StringComparer.OrdinalIgnoreCase);
 
     public DependencyGraph(IReadOnlyList<ModelObject> objects)
     {
@@ -76,7 +78,7 @@ internal sealed class DependencyGraph
             foreach (var site in DaxExpressions.Sites(obj))
             {
                 var references = DaxReferenceExtractor.Extract(site.Expression, includeFunctionCalls: true)
-                    .Where(r => keyed.Any(t => ReferencesTarget(r, t.Target, t.Key)))
+                    .Where(r => keyed.Any(t => ReferencesTarget(r, obj, t.Target, t.Key)))
                     .ToList();
 
                 if (references.Count > 0)
@@ -88,7 +90,7 @@ internal sealed class DependencyGraph
     }
 
     private bool ReferencesTarget(
-        DaxReferenceExtractor.DaxReference reference, ModelObject target, string targetKey)
+        DaxReferenceExtractor.DaxReference reference, ModelObject source, ModelObject target, string targetKey)
     {
         // A qualified reference ('Region'[Amount]) resolves to the child object, but its table
         // part references the table by name too — a table rename must rewrite it even when the
@@ -104,7 +106,7 @@ internal sealed class DependencyGraph
             && string.Equals(reference.Table, target.Name, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        return Resolve(reference) is { } resolved && Eq(Key(resolved), targetKey);
+        return Candidates(reference, source).Any(candidate => Eq(Key(candidate), targetKey));
     }
 
     /// <summary>Whether a table named <paramref name="name"/> exists (case-insensitive, like DAX).</summary>
@@ -188,7 +190,10 @@ internal sealed class DependencyGraph
             _byPath[Key(obj)] = obj;
 
             if (obj.Kind == ModelObjectKind.Table)
+            {
                 _tableByName.TryAdd(obj.Name, obj);
+                IndexOwner(obj, obj.Children);
+            }
             else if (obj.Kind == ModelObjectKind.Measure)
                 _measureByName.TryAdd(obj.Name, obj);
             else if (obj.Kind == ModelObjectKind.Function)
@@ -218,7 +223,7 @@ internal sealed class DependencyGraph
             {
                 foreach (var reference in DaxReferenceExtractor.Extract(expression, includeFunctionCalls: true))
                 {
-                    var resolved = Resolve(reference);
+                    var resolved = Resolve(reference, obj);
                     if (resolved is not null && !Eq(Key(resolved), Key(obj)))
                         targets.Add(Key(resolved));
                 }
@@ -251,7 +256,63 @@ internal sealed class DependencyGraph
             dependents.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
     }
 
-    private ModelObject? Resolve(DaxReferenceExtractor.DaxReference reference)
+    private void IndexOwner(ModelObject table, IEnumerable<ModelObject> descendants)
+    {
+        foreach (var obj in descendants)
+        {
+            _ownTable[Key(obj)] = table;
+            IndexOwner(table, obj.Children);
+        }
+    }
+
+    /// <summary>
+    /// The table a lone <c>[Col]</c> in <paramref name="source"/>'s DAX resolves against: the
+    /// table itself, the table an object belongs to, or the table a role's filter applies to.
+    /// </summary>
+    private ModelObject? OwnTable(ModelObject source) => source.Kind switch
+    {
+        ModelObjectKind.Table => source,
+        ModelObjectKind.TablePermission => _tableByName.GetValueOrDefault(source.Name),
+        _ => _ownTable.GetValueOrDefault(Key(source)),
+    };
+
+    /// <summary>
+    /// What <paramref name="reference"/> in <paramref name="source"/>'s DAX may mean. A lone
+    /// <c>[X]</c> is a measure first (measures are referenced unqualified), else the column of
+    /// the expression's own table, as DAX resolves it. When that table has no such column the
+    /// meaning is unknown, so every table's column of that name is a candidate.
+    /// </summary>
+    private IEnumerable<ModelObject> Candidates(DaxReferenceExtractor.DaxReference reference, ModelObject? source)
+    {
+        if (reference.Shape is not DaxReferenceShape.Unqualified)
+        {
+            if (Resolve(reference, source) is { } resolved)
+                yield return resolved;
+            yield break;
+        }
+
+        if (_measureByName.TryGetValue(reference.Object!, out var measure))
+        {
+            yield return measure;
+            yield break;
+        }
+
+        if (!_columnsByName.TryGetValue(reference.Object!, out var columns))
+            yield break;
+
+        var own = source is null ? null : OwnTable(source);
+        if (own is not null
+            && columns.FirstOrDefault(c => _ownTable.GetValueOrDefault(Key(c)) is { } table && ReferenceEquals(table, own)) is { } ownColumn)
+        {
+            yield return ownColumn;
+            yield break;
+        }
+
+        foreach (var column in columns)
+            yield return column;
+    }
+
+    private ModelObject? Resolve(DaxReferenceExtractor.DaxReference reference, ModelObject? source)
     {
         switch (reference.Shape)
         {
@@ -271,13 +332,10 @@ internal sealed class DependencyGraph
             case DaxReferenceShape.FunctionCall:
                 return _functionByName.GetValueOrDefault(reference.Object!);
 
-            default:
-                // A lone [X] is a measure first (measures are referenced unqualified), else a column.
-                if (_measureByName.TryGetValue(reference.Object!, out var measure))
-                    return measure;
-                if (_columnsByName.TryGetValue(reference.Object!, out var columns) && columns.Count > 0)
-                    return columns[0];
+            case DaxReferenceShape.Unqualified:
+                return Candidates(reference, source).FirstOrDefault();
 
+            default:
                 return null;
         }
     }
