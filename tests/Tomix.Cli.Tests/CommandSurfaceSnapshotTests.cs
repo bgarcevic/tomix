@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Tomix.App.Format;
 using Tomix.Cli.Output;
 
@@ -65,6 +66,51 @@ public sealed class CommandSurfaceSnapshotTests
         Assert.True(missing.Count == 0,
             "Commands not mentioned anywhere in docs/commands/*.md — document them on the appropriate page:" +
             Environment.NewLine + string.Join(Environment.NewLine, missing));
+    }
+
+    /// <summary>
+    /// The path-level gate above let shipped options go undocumented (<c>format --type</c>,
+    /// <c>save --no-sync</c>, the <c>bpa run</c> save flags), so every visible option must also
+    /// appear on its command's page: inside the top-level command's <c>## `name`</c> section
+    /// (which includes its subcommands' <c>###</c> parts), or in the page's intro, where shared
+    /// flags such as the mutation lifecycle on modify.md are documented once.
+    /// </summary>
+    [Fact]
+    public void EveryOption_IsMentionedInItsCommandSection()
+    {
+        var sections = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var file in Directory.GetFiles(RepoPaths.Combine("docs", "commands"), "*.md"))
+        {
+            var text = File.ReadAllText(file).Replace("\r\n", "\n");
+            var parts = Regex.Split(text, @"^(?=## )", RegexOptions.Multiline);
+            var intro = parts[0];
+            foreach (var part in parts.Skip(1))
+            {
+                if (Regex.Match(part, @"^## `([a-z-]+)`") is { Success: true } heading)
+                    sections[heading.Groups[1].Value] = intro + "\n" + part;
+            }
+        }
+
+        var missing = new List<string>();
+        foreach (var (command, path) in CommandPaths(TestRoot.Full(), "tx"))
+        {
+            var topLevel = path.Split(' ')[1];
+            if (!sections.TryGetValue(topLevel, out var section))
+            {
+                missing.Add($"{path}: no '## `{topLevel}`' section in docs/commands/*.md");
+                continue;
+            }
+
+            foreach (var option in command.Options.Where(o => !o.Hidden))
+            {
+                if (!Regex.IsMatch(section, $@"(?<![\w-]){Regex.Escape(option.Name)}(?![\w-])"))
+                    missing.Add($"{path} {option.Name}");
+            }
+        }
+
+        Assert.True(missing.Count == 0,
+            "Options not mentioned in their command's section of docs/commands/*.md — document them there:" +
+            Environment.NewLine + string.Join(Environment.NewLine, missing.Distinct()));
     }
 
     /// <summary>

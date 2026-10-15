@@ -59,7 +59,7 @@ internal static class CliSpinner
         => MutationProgress.Use(message => ctx.Status(Styling.MarkupEscape(message)));
 
     /// <summary>
-    /// A terminal that cannot animate (stdin piped, as in <c>$secret | tx auth login -p -</c>):
+    /// A terminal that cannot animate (stdin piped, as in <c>$secret | tx auth login --password -</c>):
     /// Spectre's fallback would print the label as plain text on stdout, so print it, and each
     /// progress phase, once as dim commentary on stderr instead.
     /// </summary>

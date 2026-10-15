@@ -81,7 +81,7 @@ tx init [output-path] [options]
 | `--name <name>` | Name of the new model (default: the directory's name). |
 | `--serialization <tmdl\|bim\|pbip>` | On-disk format (default: `tmdl`). |
 | `--compatibility-mode <mode>` | `PowerBI` (default) or `AnalysisServices`. |
-| `--compat <level>` | Compatibility level (default: 1702 for PowerBI, 1500 otherwise). |
+| `--compat, --compatibility-level <level>` | Compatibility level (default: 1702 for PowerBI, 1500 otherwise). |
 | `--overwrite` | Replace anything already at the target path. |
 
 ```sh

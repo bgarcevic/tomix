@@ -100,6 +100,9 @@ tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save
 | `--fix` | Fix violations whose rules provide a fix expression. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
 | `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. Without these (or `--stage`), `--fix` only previews. |
+| `--stage` / `--revert` | Stage the fixes instead of saving them (commit with `tx stage commit`), or discard this model's staged changes. |
+| `--serialization <tmdl\|bim>` | On-disk format when saving (defaults to the loaded model's). |
+| `--no-sync` | Skip the workspace mirror when workspace mode is active. |
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
 | `--no-multiline` | Show each rule's guidance on one line. Text output only. |
 | `--no-model-rules` / `--no-defaults` | Skip rules embedded in the model / leave the selected standard ruleset out. |
@@ -562,6 +565,7 @@ export/import for offline analysis.
 | `--import <file.vpax>` | Analyze a previously exported `.vpax` offline (no connection needed). |
 | `--obfuscate` | Mask names and expressions in the export; a private `.dict` dictionary keeps the mapping. |
 | `--annotate` | Write statistics into the model as `Vertipaq_*` annotations (preview unless `--save`). |
+| `--save` | With `--annotate`, write the annotations to the model. |
 | `--force` | With `--annotate --save`, write despite newly introduced validation errors and report them. |
 
 ```sh
@@ -612,6 +616,7 @@ The replacement schema and release timing will be decided in that later work.
 ```
 tx doctor
 tx doctor --show-details
+tx doctor --output-format json
 ```
 
 Checks whether the local tomix environment is ready. When filing a bug,

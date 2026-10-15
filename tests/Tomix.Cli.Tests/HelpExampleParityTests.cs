@@ -26,6 +26,24 @@ public sealed class HelpExampleParityTests
             $"CommandExamples keys with no matching registered command: {string.Join(", ", stale)}");
     }
 
+    /// <summary>
+    /// Examples are looked up by the full command path, so a parent's examples never show on its
+    /// subcommands' help (<c>tx stage commit --help</c> had none). Every visible leaf command —
+    /// the ones users actually run — needs its own entry.
+    /// </summary>
+    [Fact]
+    public void EveryLeafCommand_HasExamples()
+    {
+        var missing = TestRoot.Descendants(TestRoot.Full(), includeHidden: false)
+            .Where(entry => !entry.Command.Subcommands.Any(sc => !sc.Hidden))
+            .Select(entry => string.Join(' ', entry.Path))
+            .Where(path => !SpectreHelpAction.CommandExamples.ContainsKey(path))
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            $"Commands without help examples — add a CommandExamples entry: {string.Join(", ", missing)}");
+    }
+
     [Fact]
     public void EveryExample_ParsesWithoutErrors()
     {
