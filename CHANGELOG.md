@@ -25,6 +25,9 @@ and the API surface that major versions protect.
   what it accepted: each rewritten snapshot shows a Before/After table of the cells that changed
   (`differences` in JSON). Snapshots left behind by a deleted or renamed test are reported as
   orphans (`orphans` in JSON) without failing the run (#451).
+- A BPA fix expression can assign a quoted string literal as written, with `\"` and `\\`
+  escapes, so a model-provided rule can set DAX (`Expression = "DIVIDE([A], [B])"`). An
+  unquoted value with `(` or `[` is still an unsupported fix expression (#208).
 
 ### Changed
 
@@ -38,6 +41,9 @@ and the API surface that major versions protect.
   hierarchies, functions and the other kinds print as fragments instead of the property view,
   and `tx get .` prints the whole model. A model source without a serializer fails with
   `TOMIX_SCRIPT_UNSUPPORTED` (#243).
+- The `tx bpa run --fix` preview shows an expression fix as full Before/After blocks,
+  DAX syntax-highlighted in a terminal and plain when piped, capped at 12 lines each, instead of
+  one line cut at 60 characters. Property fixes keep their one-line form; JSON is unchanged (#208).
 
 ## [0.11.0] - 2026-10-12
 
