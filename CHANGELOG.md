@@ -38,6 +38,10 @@ and the API surface that major versions protect.
   hierarchies, functions and the other kinds print as fragments instead of the property view,
   and `tx get .` prints the whole model. A model source without a serializer fails with
   `TOMIX_SCRIPT_UNSUPPORTED` (#243).
+- `tx connect -w` checks whether the workspace target already exists by listing the workspace's
+  models instead of downloading the target's whole model, so the step after the model picker is
+  fast on large models. A dataset that the list hides but that exists (read-only access) is still
+  reported instead of being treated as a new mirror (#142).
 
 ## [0.11.0] - 2026-10-12
 
