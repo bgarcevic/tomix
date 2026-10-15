@@ -251,6 +251,13 @@ public sealed partial class BpaFixer
 
     private readonly record struct DaxSite(string Path, ModelObjectKind Kind, string Property, string Expression);
 
+    /// <summary>
+    /// Parses <c>Property = value</c>. The value is a quoted string literal (<c>\"</c> and
+    /// <c>\\</c> escape a quote and a backslash), so a DAX expression such as
+    /// <c>Expression = "DIVIDE([A], [B])"</c> can be assigned; a boolean; an enum member
+    /// (<c>DataType.Decimal</c>); or a bare word. An unquoted value with <c>(</c> or <c>[</c>
+    /// is C# code (<c>string.Concat(...)</c>, <c>it.Name</c>) the fixer cannot evaluate.
+    /// </summary>
     public static bool TryParseSimpleAssignment(
         string fixExpression,
         out IReadOnlyList<ModelPropertyAssignment> assignments)
@@ -263,20 +270,50 @@ public sealed partial class BpaFixer
         var prop = match.Groups["prop"].Value;
         var rawValue = match.Groups["value"].Value.Trim();
 
-        if (rawValue.Contains('(') || rawValue.Contains('['))
+        string value;
+        if (rawValue.StartsWith('"'))
+        {
+            if (TryParseStringLiteral(rawValue) is not { } literal)
+                return false;
+            value = literal;
+        }
+        else if (rawValue.Contains('(') || rawValue.Contains('['))
             return false;
-
-        var value = ParseValue(rawValue);
+        else
+            value = ParseValue(rawValue);
 
         assignments = [new ModelPropertyAssignment(prop, value)];
         return true;
     }
 
+    /// <summary>
+    /// The content of a whole-value string literal, or null when <paramref name="rawValue"/> is
+    /// not exactly one literal (unterminated, or followed by more code such as
+    /// <c>"a" + it.Name</c>).
+    /// </summary>
+    private static string? TryParseStringLiteral(string rawValue)
+    {
+        var text = new System.Text.StringBuilder(rawValue.Length);
+        for (var i = 1; i < rawValue.Length; i++)
+        {
+            var c = rawValue[i];
+            if (c == '\\' && i + 1 < rawValue.Length && rawValue[i + 1] is '"' or '\\')
+            {
+                text.Append(rawValue[++i]);
+                continue;
+            }
+
+            if (c == '"')
+                return i == rawValue.Length - 1 ? text.ToString() : null;
+
+            text.Append(c);
+        }
+
+        return null;
+    }
+
     private static string ParseValue(string rawValue)
     {
-        if (rawValue.StartsWith('"') && rawValue.EndsWith('"') && rawValue.Length >= 2)
-            return rawValue[1..^1];
-
         if (bool.TryParse(rawValue, out _))
             return rawValue.ToLowerInvariant();
 

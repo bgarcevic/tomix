@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Tomix.App.Mutations;
 using Tomix.Core.Bpa;
 using Tomix.Core.Rules;
@@ -50,6 +51,13 @@ public sealed record BpaRunResult(
     /// values for property sets. Empty when no fix ran.
     /// </summary>
     public IReadOnlyList<BpaFixChange> FixChanges { get; init; } = [];
+
+    /// <summary>
+    /// The model's measure names, so human output highlights measure references in
+    /// <see cref="FixChanges"/> DAX apart from columns. Set when fixes ran; render-only.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlySet<string>? MeasureNames { get; init; }
 
     /// <summary>
     /// <c>--fix</c> without <c>--save</c>/<c>--stage</c>: the fixes were evaluated on an in-memory copy and discarded.

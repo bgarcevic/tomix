@@ -29,6 +29,32 @@ fix errors instead. For example, a column name that exists in more than one tabl
 name that also appears as a string literal (a column the expression builds with
 `ADDCOLUMNS`), or a measure qualified with a table it does not belong to.
 
+A property assignment takes a quoted string, a boolean, or an enum member. A quoted
+string is taken literally, so a model-provided rule can assign DAX; escape an inner
+quote as `\"`:
+
+```
+Expression = "DIVIDE([Sales], [Cost])"
+FilterExpression = "'Region'[Name] = \"EU\""
+```
+
+An unquoted value with `(` or `[` is code the fixer cannot evaluate (for example
+`string.Concat(...)`); such a rule is reported as an unsupported fix expression.
+
+`--fix` without `--save` or `--stage` previews every pending fix and changes nothing.
+A property fix shows on one line (`FormatString: "" → "#,##0"`). A fix that changes
+an expression shows its full before and after text, DAX syntax-highlighted in a
+terminal and plain when piped, capped at 12 lines each:
+
+```
+  Would fix: Measure 'Sales/Margin %' — DAX_COLUMNS_FULLY_QUALIFIED
+    Expression:
+      Before:
+        DIVIDE([Margin], SUM([Amount]))
+      After:
+        DIVIDE([Margin], SUM('Sales'[Amount]))
+```
+
 ![tx bpa run --fix --save: findings before the fix, then two of three fixed and saved](../assets/media/bpa.png)
 
 When fixes or rule-ignore changes are saved, the shared validation gate blocks

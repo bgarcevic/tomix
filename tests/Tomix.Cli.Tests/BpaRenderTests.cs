@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
+using Tomix.Core.Models;
 using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
@@ -218,6 +219,45 @@ public class BpaRenderTests
         Assert.StartsWith("Expression: (unset) → \"VAR x = 1 RETURN xxx", change);
         Assert.EndsWith("…\"", change);
         Assert.DoesNotContain('\n', change!);
+    }
+
+    [Theory]
+    [InlineData("Expression", ModelObjectKind.Measure, "Dax")]
+    [InlineData("Expression", ModelObjectKind.CalculatedColumn, "Dax")]
+    [InlineData("Expression", ModelObjectKind.Table, "Dax")] // calculated-table partition
+    [InlineData("Expression", ModelObjectKind.Expression, "M")]
+    [InlineData("Expression", ModelObjectKind.Partition, "Plain")]
+    [InlineData("FilterExpression", ModelObjectKind.TablePermission, "Dax")]
+    [InlineData("FormatStringExpression", ModelObjectKind.Measure, "Dax")]
+    public void FixExpressionLanguage_ClassifiesExpressionProperties(
+        string property, ModelObjectKind kind, string expected)
+        => Assert.Equal(Enum.Parse<ExpressionLanguage>(expected), BpaRunView.FixExpressionLanguage(
+            new BpaFixChange("R", "X", "p", BpaFixAction.Set, property, "a", "b") { ObjectKind = kind }));
+
+    [Theory]
+    [InlineData("FormatString", BpaFixAction.Set)]
+    [InlineData("IsHidden", BpaFixAction.Set)]
+    [InlineData(null, BpaFixAction.Delete)]
+    public void FixExpressionLanguage_ScalarOrDelete_IsNull(string? property, BpaFixAction action)
+        => Assert.Null(BpaRunView.FixExpressionLanguage(
+            new BpaFixChange("R", "Measure", "p", action, property) { ObjectKind = ModelObjectKind.Measure }));
+
+    [Fact]
+    public void FixExpressionLines_NormalizesAndCaps()
+    {
+        var (lines, hidden) = BpaRunView.FixExpressionLines("VAR x =\r\n    1\rRETURN\n    x\n\n", cap: 3);
+
+        Assert.Equal(["VAR x =", "    1", "RETURN"], lines);
+        Assert.Equal(1, hidden);
+    }
+
+    [Fact]
+    public void FixExpressionLines_UnderCap_KeepsEveryLine()
+    {
+        var (lines, hidden) = BpaRunView.FixExpressionLines("SUM('Sales'[Amount])");
+
+        Assert.Equal(["SUM('Sales'[Amount])"], lines);
+        Assert.Equal(0, hidden);
     }
 
     [Theory]

@@ -1,6 +1,8 @@
 using Tomix.App.Bpa;
+using Tomix.App.Dax;
 using Tomix.Core.Bpa;
 using Tomix.Core.Configuration;
+using Tomix.Core.Models;
 using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Output;
@@ -342,6 +344,53 @@ internal static class BpaRunView
             return (headline, null);
 
         return (headline, $"{change.Property}: {FixValue(change.Before, glyphs)}{glyphs.Arrow}{FixValue(change.After, glyphs)}");
+    }
+
+    internal const int FixExpressionLineCap = 12;
+
+    private static readonly HashSet<string> DaxOnlyProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        DaxExpressions.FilterExpressionProperty, "DetailRowsExpression", "FormatStringExpression",
+    };
+
+    /// <summary>
+    /// The language of a pending fix's values when they are an expression the preview shows as a
+    /// before/after block, or null for a scalar property (shown on one line by
+    /// <see cref="PendingFix"/>). <c>Expression</c> is DAX on DAX-bearing objects (a calculated
+    /// table's comes from its calculated partition), M on shared expressions, and plain on a
+    /// partition, whose source may be either.
+    /// </summary>
+    internal static ExpressionLanguage? FixExpressionLanguage(BpaFixChange change)
+    {
+        if (change.Action != BpaFixAction.Set || change.Property is null)
+            return null;
+
+        if (DaxOnlyProperties.Contains(change.Property))
+            return ExpressionLanguage.Dax;
+
+        if (!string.Equals(change.Property, "Expression", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return change.ObjectKind switch
+        {
+            ModelObjectKind.Table => ExpressionLanguage.Dax,
+            { } kind when DaxExpressions.IsDaxExpression(kind, null) => ExpressionLanguage.Dax,
+            ModelObjectKind.Expression => ExpressionLanguage.M,
+            _ => ExpressionLanguage.Plain,
+        };
+    }
+
+    /// <summary>
+    /// An expression's lines for the preview block, capped at <paramref name="cap"/> lines;
+    /// <c>Hidden</c> counts the lines cut. Line endings are normalized and trailing blank lines
+    /// dropped; indentation is kept so the expression reads as written.
+    /// </summary>
+    internal static (IReadOnlyList<string> Lines, int Hidden) FixExpressionLines(string value, int cap = FixExpressionLineCap)
+    {
+        var lines = value.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd().Split('\n');
+        return lines.Length <= cap
+            ? (lines, 0)
+            : (lines[..cap], lines.Length - cap);
     }
 
     private static string FixValue(string? value, Glyphs glyphs)

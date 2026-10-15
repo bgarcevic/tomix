@@ -214,7 +214,9 @@ internal static class BpaRunRenderer
         {
             var (headline, detail) = BpaRunView.PendingFix(change, Styling.Glyphs);
             AnsiConsole.MarkupLine($"  {Styling.MarkupEscape(headline)}");
-            if (detail is not null)
+            if (BpaRunView.FixExpressionLanguage(change) is { } language)
+                RenderExpressionChange(change, language, result.MeasureNames);
+            else if (detail is not null)
                 AnsiConsole.MarkupLine($"    {Styling.Muted(detail)}");
         }
 
@@ -251,6 +253,38 @@ internal static class BpaRunRenderer
                     result.FixChanges.Any(c => c.Action == BpaFixAction.Delete)
                         ? ["--fix", "--allow-delete", "--save"]
                         : ["--fix", "--save"])));
+    }
+
+    /// <summary>
+    /// An expression fix in the preview: the property, then its before and after text as
+    /// indented, highlighted blocks capped at <see cref="BpaRunView.FixExpressionLineCap"/>
+    /// lines. The expression lines carry no prefix, so they copy-paste as written.
+    /// </summary>
+    private static void RenderExpressionChange(
+        BpaFixChange change, ExpressionLanguage language, IReadOnlySet<string>? measureNames)
+    {
+        AnsiConsole.MarkupLine($"    {Styling.Muted($"{change.Property}:")}");
+        RenderExpressionValue("Before:", change.Before, language, measureNames);
+        RenderExpressionValue("After:", change.After, language, measureNames);
+    }
+
+    private static void RenderExpressionValue(
+        string label, string? value, ExpressionLanguage language, IReadOnlySet<string>? measureNames)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            AnsiConsole.MarkupLine($"      {Styling.Bold(label)} {Styling.Muted("(unset)")}");
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"      {Styling.Bold(label)}");
+        var (lines, hidden) = BpaRunView.FixExpressionLines(value);
+        // Highlight the block as one text so a multi-line string or comment keeps its color.
+        const string indent = "        ";
+        AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
+            language, string.Join('\n', lines.Select(l => indent + l)), measureNames));
+        if (hidden > 0)
+            AnsiConsole.MarkupLine(indent + Styling.Muted($"{Styling.Glyphs.Ellipsis} (+{hidden} {(hidden == 1 ? "line" : "lines")})"));
     }
 
     /// <summary>Copy-pasteable next steps, on stderr so piped output stays results-only.</summary>

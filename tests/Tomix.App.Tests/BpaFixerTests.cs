@@ -81,6 +81,55 @@ public sealed class BpaFixerTests
         Assert.False(ok);
     }
 
+    [Theory]
+    // #208: a quoted literal is taken whole, so DAX with ( and [ can be assigned.
+    [InlineData("Expression = \"DIVIDE([A], [B])\"", "Expression", "DIVIDE([A], [B])")]
+    [InlineData("FilterExpression = \"'Sales'[Region] = \\\"EU\\\"\"", "FilterExpression", "'Sales'[Region] = \"EU\"")]
+    [InlineData("FormatString = \"0 (x)\"", "FormatString", "0 (x)")]
+    [InlineData("Expression = \"a\\\\b\"", "Expression", "a\\b")]
+    [InlineData("Expression = \"\"", "Expression", "")]
+    public void TryParseSimpleAssignment_QuotedLiteral_AllowsDax(string fix, string property, string value)
+    {
+        Assert.True(BpaFixer.TryParseSimpleAssignment(fix, out var assignments));
+        var assignment = Assert.Single(assignments);
+        Assert.Equal(property, assignment.Property);
+        Assert.Equal(value, assignment.Value);
+    }
+
+    [Theory]
+    [InlineData("Expression = DIVIDE([A], [B])")]
+    [InlineData("Name = \"a\" + it.Name")]
+    [InlineData("Expression = \"SUM([A])")]
+    [InlineData("Partitions[0].Name = it.Name")]
+    public void TryParseSimpleAssignment_CodeOrMalformedLiteral_NotParsed(string fix)
+        => Assert.False(BpaFixer.TryParseSimpleAssignment(fix, out _));
+
+    [Fact]
+    public void ApplyFixes_QuotedDaxAssignment_SetsExpression()
+    {
+        var session = new StubMutationSession();
+        var rules = new List<BpaRule>
+        {
+            new("SAFE_DIVIDE", "Use DIVIDE", "DAX", RuleSeverity.Warning,
+                ["Measure"], FixExpression: "Expression = \"DIVIDE([A], [B])\"")
+        };
+        var violations = new List<BpaViolation>
+        {
+            new("SAFE_DIVIDE", "Use DIVIDE", "DAX", RuleSeverity.Warning,
+                "Measure", "[Ratio]", "Sales/Ratio",
+                CanFix: true, ObjectKind: ModelObjectKind.Measure)
+        };
+
+        var result = new BpaFixer().ApplyFixes(session, violations, rules);
+
+        Assert.Equal(1, result.FixesApplied);
+        Assert.Empty(result.Errors);
+        Assert.Equal("Expression", session.LastSetAssignments?[0].Property);
+        Assert.Equal("DIVIDE([A], [B])", session.LastSetAssignments?[0].Value);
+        var change = Assert.Single(result.Changes);
+        Assert.Equal(ModelObjectKind.Measure, change.ObjectKind);
+    }
+
     [Fact]
     public void ApplyFixes_SimplePropertyChange()
     {

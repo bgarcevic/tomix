@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Tomix.App.Dax;
 using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.Mutations;
@@ -167,6 +168,7 @@ public sealed class BpaRunHandler
                 {
                     FixesApplied = preview ? 0 : fixResult.FixesApplied,
                     FixChanges = BpaFixer.WithBefore(fixResult.Changes, snapshot),
+                    MeasureNames = DaxModelNames.MeasureNames(snapshot),
                     Preview = preview,
                     FixesSkipped = fixResult.FixesSkipped,
                     DestructiveFixesSkipped = fixResult.DestructiveFixesSkipped,
