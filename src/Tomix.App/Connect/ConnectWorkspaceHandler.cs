@@ -1,7 +1,8 @@
-using Tomix.App.Info;
+using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
+using Tomix.Core.Results;
 
 namespace Tomix.App.Connect;
 
@@ -19,32 +20,77 @@ public sealed class ConnectWorkspaceHandler
         => _providers = providers.ToList();
 
     /// <summary>
-    /// Opens the remote mirror target to classify it. <see cref="ConnectWorkspaceProbeStatus.Exists"/>
-    /// carries the canonical dataset name so the stored mirror matches exactly (Power BI rejects
-    /// XMLA deploys that change a dataset's name, even casing). A <c>TOMIX_DATABASE_NOT_FOUND</c>
-    /// failure means the server is reachable but the database does not exist yet — OK for a new mirror.
+    /// Classifies the remote mirror target from the workspace's database list — one connect, which
+    /// still proves the XMLA endpoint works, without downloading the target's model tree.
+    /// <see cref="ConnectWorkspaceProbeStatus.Exists"/> carries the canonical dataset name so the
+    /// stored mirror matches exactly (Power BI rejects XMLA deploys that change a dataset's name,
+    /// even casing). A name the list does not show is confirmed by opening it: only
+    /// <c>TOMIX_DATABASE_NOT_FOUND</c> means the database does not exist yet — OK for a new mirror —
+    /// while a dataset hidden from the list (read-only permission) must not pass as missing.
     /// </summary>
     public async Task<ConnectWorkspaceProbeResult> ProbeAsync(
         ConnectWorkspaceProbeRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await new InfoModelHandler(_providers).HandleAsync(
-            new InfoModelRequest(ModelReference.Remote(request.Workspace, request.Database)),
-            cancellationToken);
+        var endpoint = ModelReference.Remote(request.Workspace);
+        var catalog = _providers.OfType<IServerCatalog>().FirstOrDefault(c => c.CanList(endpoint));
+        if (catalog is not null)
+        {
+            var listed = await ProviderConnectionGuard.RunAsync(endpoint, async () =>
+                TomixResult<IReadOnlyList<ServerDatabaseInfo>>.Ok(
+                    await catalog.ListDatabasesAsync(endpoint, cancellationToken).ConfigureAwait(false)));
+
+            if (!listed.Success)
+                return new ConnectWorkspaceProbeResult(
+                    ConnectWorkspaceProbeStatus.Unreachable, null, listed.Diagnostics, listed.ExitCode);
+
+            var canonical = CanonicalName(listed.Data!, request.Database);
+            if (canonical is not null)
+                return new ConnectWorkspaceProbeResult(
+                    ConnectWorkspaceProbeStatus.Exists,
+                    ConnectPlanHandler.ResolveWorkspaceDatabase(request.Database, canonical),
+                    listed.Diagnostics,
+                    listed.ExitCode);
+        }
+
+        return await ProbeByOpeningAsync(request, cancellationToken);
+    }
+
+    /// <summary>The listed spelling of <paramref name="requested"/>: an exact match first, then
+    /// a case-insensitive one. Null when the list does not have it.</summary>
+    private static string? CanonicalName(IReadOnlyList<ServerDatabaseInfo> databases, string requested)
+        => databases.FirstOrDefault(d => string.Equals(d.Name, requested, StringComparison.Ordinal))?.Name
+            ?? databases.FirstOrDefault(d => string.Equals(d.Name, requested, StringComparison.OrdinalIgnoreCase))?.Name;
+
+    /// <summary>
+    /// Opens the target without reading its model, for a name the list does not show (or when no
+    /// provider can list the endpoint). The provider tells a missing database from one the caller
+    /// cannot read; the session is closed again at once.
+    /// </summary>
+    private async Task<ConnectWorkspaceProbeResult> ProbeByOpeningAsync(
+        ConnectWorkspaceProbeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var target = ModelReference.Remote(request.Workspace, request.Database);
+        var result = await ProviderConnectionGuard.RunAsync(target, async () =>
+        {
+            var provider = _providers.ResolveSingleProvider(target);
+            if (provider is null)
+                return TomixResult<bool>.Fail(
+                    "TOMIX_NO_PROVIDER", $"No provider can open '{target.Value}'.", exitCode: 2);
+
+            await using var session = await provider.OpenAsync(target, cancellationToken).ConfigureAwait(false);
+            return TomixResult<bool>.Ok(true);
+        });
 
         if (result.Success)
             return new ConnectWorkspaceProbeResult(
-                ConnectWorkspaceProbeStatus.Exists,
-                ConnectPlanHandler.ResolveWorkspaceDatabase(request.Database, result.Data!.Summary.DatabaseName),
-                result.Diagnostics,
-                result.ExitCode);
+                ConnectWorkspaceProbeStatus.Exists, request.Database, result.Diagnostics, result.ExitCode);
 
-        if (result.Diagnostics.Any(d => d.Code == "TOMIX_DATABASE_NOT_FOUND"))
-            return new ConnectWorkspaceProbeResult(
-                ConnectWorkspaceProbeStatus.Missing, null, result.Diagnostics, result.ExitCode);
-
-        return new ConnectWorkspaceProbeResult(
-            ConnectWorkspaceProbeStatus.Unreachable, null, result.Diagnostics, result.ExitCode);
+        var status = result.Diagnostics.Any(d => d.Code == "TOMIX_DATABASE_NOT_FOUND")
+            ? ConnectWorkspaceProbeStatus.Missing
+            : ConnectWorkspaceProbeStatus.Unreachable;
+        return new ConnectWorkspaceProbeResult(status, null, result.Diagnostics, result.ExitCode);
     }
 
     /// <summary>

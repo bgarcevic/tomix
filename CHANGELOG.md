@@ -44,6 +44,10 @@ and the API surface that major versions protect.
 - The `tx bpa run --fix` preview shows an expression fix as full Before/After blocks,
   DAX syntax-highlighted in a terminal and plain when piped, capped at 12 lines each, instead of
   one line cut at 60 characters. Property fixes keep their one-line form; JSON is unchanged (#208).
+- `tx connect -w` checks whether the workspace target already exists by listing the workspace's
+  models instead of downloading the target's whole model, so the step after the model picker is
+  fast on large models. A dataset that the list hides but that exists (read-only access) is still
+  reported instead of being treated as a new mirror (#142).
 
 ## [0.11.0] - 2026-10-12
 
