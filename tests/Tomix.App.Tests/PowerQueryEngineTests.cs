@@ -159,6 +159,39 @@ public sealed class PowerQueryEngineTests(PowerQueryEngineTests.SharedEngine sha
         Assert.True(next.Ok, next.Error?.Message);
     }
 
+    [Theory]
+    [InlineData("Sales", "Sales")]
+    [InlineData("#\"Sales Rows\"", "Sales Rows")]
+    [InlineData("#\"Say \"\"hi\"\"\"", "Say \"hi\"")]
+    [InlineData("Table.SelectRows(Source, each [Region] = Region)", "Region,Source,Table.SelectRows")]
+    [InlineData("if Env = \"PROD\" then 1 else 2", "Env")]
+    [InlineData("let Source = Sales, r = [a = 1, b = a] in r[b]", "Sales")]
+    [InlineData("let f = (x) => x + Offset, g = each _ + 1 in f(1)", "Offset")]
+    [InlineData("[Amount]", "")]
+    [InlineData("#table({\"a\"}, {{1}})", "")]
+    public async Task References_ReturnsTheFreeNames(string text, string expected)
+    {
+        var result = Assert.Single(await _engine.ReferencesAsync([text], CancellationToken.None));
+
+        Assert.True(result.Ok, result.Error?.Message);
+        Assert.Equal(expected, string.Join(",", result.Names!));
+    }
+
+    [Fact]
+    public async Task References_ReportsEachTextSeparately_AcrossChunks()
+    {
+        // More texts than one engine call takes, with a broken one in the middle.
+        var texts = Enumerable.Range(0, 120).Select(i => i == 60 ? "let x = 1," : $"Query{i}").ToList();
+
+        var results = await _engine.ReferencesAsync(texts, CancellationToken.None);
+
+        Assert.Equal(120, results.Count);
+        Assert.Equal(["Query0"], results[0].Names);
+        Assert.Equal(["Query119"], results[119].Names);
+        Assert.False(results[60].Ok);
+        Assert.Equal(PowerQueryErrorKind.Parse, results[60].Error!.Kind);
+    }
+
     [Fact]
     public async Task Format_PreCancelledToken_Throws()
     {

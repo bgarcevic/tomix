@@ -44,19 +44,24 @@ public sealed class RemoveModelObjectHandler
                 // DAX still referencing it blocks the removal; --force removes anyway and
                 // reports the referencing objects as broken. A preview (no --save/--stage) reports
                 // the block instead of failing: discovering the need for --force is the preview's job.
+                // M referring to a removed shared expression breaks the same way.
                 var referencing = await RemoveGuard.ReferencingPathsAsync(
                     session, request.Path, request.Type, cancellationToken);
-                if (referencing.Count > 0 && !request.Force)
+                var mReferencing = await MReferenceGuard.ReferencingPathsAsync(
+                    session, request.Path, request.Type, cancellationToken);
+                if (referencing.Count + mReferencing.Count > 0 && !request.Force)
                 {
                     if (context.KeepsEdit)
-                        throw new RemoveBrokenReferencesException(RemoveGuard.BlockedMessage(referencing));
+                        throw new RemoveBrokenReferencesException(
+                            RemoveGuard.BlockedMessage("this object", referencing, mReferencing));
 
                     // Guarded preview: report the would-be breakage without touching the model.
                     return (true, $"rm {request.Path}",
                         outcome => new RemoveModelObjectResult(
                             request.Path,
                             "would_block",
-                            BrokenReferences: referencing)
+                            BrokenReferences: referencing.Count > 0 ? referencing : null,
+                            BrokenMReferences: mReferencing.Count > 0 ? mReferencing : null)
                         { Outcome = outcome });
                 }
 
@@ -70,6 +75,7 @@ public sealed class RemoveModelObjectHandler
                         mutation.Path,
                         mutation.Changed ? null : mutation.Reason,
                         BrokenReferences: mutation.Changed && referencing.Count > 0 ? referencing : null,
+                        BrokenMReferences: mutation.Changed && mReferencing.Count > 0 ? mReferencing : null,
                         CascadeRemoved: mutation.CascadeRemoved,
                         RemainingPolicyPartitions: mutation.RemainingPolicyPartitions)
                     { Outcome = outcome });

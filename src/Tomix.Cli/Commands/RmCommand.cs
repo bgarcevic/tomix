@@ -241,6 +241,10 @@ internal sealed class RmCommand : ICommandModule
                     + $"{string.Join(", ", wouldBreak.Select(Styling.MarkupEscape))}."));
             }
 
+            if (result.BrokenMReferences is { Count: > 0 } wouldBreakM)
+                AnsiConsole.MarkupLine(Styling.Warning(
+                    $"Would break {wouldBreakM.Count} Power Query (M) reference(s) in: {string.Join(", ", wouldBreakM)}."));
+
             // Blocked: --force alone still only previews and --save alone fails the guard, so
             // give the one command that removes it instead of two half-steps.
             if (result.Reason == "would_block")
@@ -259,6 +263,10 @@ internal sealed class RmCommand : ICommandModule
             AnsiConsole.MarkupLine(Styling.Warning(
                 $"Warning: {broken.Count} DAX reference(s) to the removed object are now broken: "
                 + $"{string.Join(", ", broken)}. Update them with 'tx replace' or inspect with 'tx deps'."));
+
+        if (result.BrokenMReferences is { Count: > 0 } brokenM)
+            AnsiConsole.MarkupLine(Styling.Warning(
+                $"Warning: {brokenM.Count} Power Query (M) reference(s) to the removed object are now broken: {string.Join(", ", brokenM)}."));
 
         MutationOutput.RenderPersistence(result.Outcome);
     }
@@ -304,6 +312,11 @@ internal sealed class RmCommand : ICommandModule
                 (preview ? $"Would break {broken.Count} DAX reference(s) in: " : $"Warning: {broken.Count} DAX reference(s) are now broken in: ")
                 + string.Join(", ", broken) + "."));
 
+        if (result.BrokenMReferences is { Count: > 0 } brokenM)
+            AnsiConsole.MarkupLine(Styling.Warning(
+                (preview ? $"Would break {brokenM.Count} Power Query (M) reference(s) in: " : $"Warning: {brokenM.Count} Power Query (M) reference(s) are now broken in: ")
+                + string.Join(", ", brokenM) + "."));
+
         if (result.BoundPartitions is { Count: > 0 } bound)
             AnsiConsole.MarkupLine(Styling.Warning(
                 $"A data source is still bound to partition(s): {string.Join(", ", bound)}."));
@@ -314,7 +327,7 @@ internal sealed class RmCommand : ICommandModule
                 StdErr.MarkupLine(Styling.Guidance("Add the bound partitions to the batch, or repoint them, before removing the data source."));
 
             var flags = new List<string>();
-            if (blockedBy.Contains(RemoveBatchResult.BlockedByReferences))
+            if (blockedBy.Contains(RemoveBatchResult.BlockedByReferences) || blockedBy.Contains(RemoveBatchResult.BlockedByMReferences))
                 flags.Add("--force");
             if (blockedBy.Contains(RemoveBatchResult.BlockedByCascade))
                 flags.Add("--cascade");

@@ -19,7 +19,9 @@ public sealed record RemoveModelObjectResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyList<string>? CascadeRemoved = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? RemainingPolicyPartitions = null) : MutationResult
+    IReadOnlyList<string>? RemainingPolicyPartitions = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? BrokenMReferences = null) : MutationResult
 {
     [JsonPropertyOrder(-2)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

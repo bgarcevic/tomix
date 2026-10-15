@@ -125,8 +125,18 @@ internal static class RemoveGuard
             or ModelObjectKind.CalculatedColumn or ModelObjectKind.Function or ModelObjectKind.Calendar;
 
     public static string BlockedMessage(IReadOnlyList<string> references)
-        => $"Removing this object breaks {references.Count} DAX reference(s) in: "
-           + $"{string.Join(", ", references)}.";
+        => BlockedMessage("this object", references, []);
+
+    /// <summary>The block message for DAX and Power Query (M) references to removed objects.</summary>
+    public static string BlockedMessage(string subject, IReadOnlyList<string> dax, IReadOnlyList<string> m)
+    {
+        var parts = new List<string>();
+        if (dax.Count > 0)
+            parts.Add($"{dax.Count} DAX reference(s) in: {string.Join(", ", dax)}");
+        if (m.Count > 0)
+            parts.Add($"{m.Count} Power Query (M) reference(s) in: {string.Join(", ", m)}");
+        return $"Removing {subject} breaks {string.Join("; and ", parts)}.";
+    }
 
     private static bool IsWithin(string path, string tablePath)
         => path.StartsWith($"{tablePath}/", StringComparison.OrdinalIgnoreCase);

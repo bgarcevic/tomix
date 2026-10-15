@@ -344,7 +344,13 @@ discover that `--force` is needed. `rm --save`,
 `--save-to`, `--stage`, and `--revert` ask for confirmation; pass `--yes`
 to skip the prompt in scripts.
 
-Removal is blocked while DAX still references the object; structural
+Removal is blocked while DAX or Power Query (M) still references the object;
+a shared expression is referenced when an M partition, another M shared
+expression, or a refresh policy's source or polling query names it (read
+with the bundled M parser, so field access like `[Sales]` and names a query
+binds itself do not count; a query the parser cannot read counts if it
+contains the name). The preview lists these under `Would break N Power
+Query (M) reference(s) in: ...`, and `--force` removes anyway. Structural
 references (relationships, sort-by, hierarchy levels, perspectives, role
 permissions) cascade-remove instead. Every object kind a mutation path can
 address is removable: tables, measures, columns, hierarchies, levels,
@@ -405,7 +411,8 @@ are listed in:
 - References between targets are fine: a table and its columns, a measure
   and the measures it calls, a column and the relationship that uses it, a
   data source and the partitions bound to it.
-- DAX in an object that survives the batch blocks it unless `--force`.
+- DAX or Power Query (M) in an object that survives the batch blocks it
+  unless `--force`.
 - A partition that survives and is bound to a data-source target blocks it,
   `--force` or not: repoint the partition or add it to the batch.
 - Structural changes to objects that survive (a relationship removed, a
@@ -455,8 +462,9 @@ under `cascades`, and what blocks a preview:
 | `targets[].type` | The resolved kind, as a `--type` value |
 | `cascades[]` | `target` caused it; `path` and `type` name the object changed; `requiresCascade` is false only for translations |
 | `brokenReferences` | Surviving objects whose DAX references a target |
+| `brokenMReferences` | Surviving objects whose Power Query (M) references a shared-expression target (also on a single-object `rm`) |
 | `boundPartitions` | Surviving partitions bound to a data-source target |
-| `blockedBy` | On a blocked preview: `brokenReferences`, `cascade`, `boundPartitions` |
+| `blockedBy` | On a blocked preview: `brokenReferences`, `brokenMReferences`, `cascade`, `boundPartitions` |
 
 ## `replace` — find and replace
 

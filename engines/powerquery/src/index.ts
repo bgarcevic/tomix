@@ -36,6 +36,13 @@ interface DiagnoseRequest {
     readonly text: string;
 }
 
+interface ReferencesRequest {
+    readonly texts: ReadonlyArray<string>;
+}
+
+// One entry per requested text: the free names it refers to, or why it could not be read.
+type ReferencesResult = { readonly ok: true; readonly names: ReadonlyArray<string> } | { readonly ok: false; readonly error: EngineError };
+
 const version = JSON.stringify({
     formatter: __FORMATTER_VERSION__,
     parser: __PARSER_VERSION__,
@@ -69,6 +76,110 @@ async function diagnose(requestJson: string): Promise<string> {
     } catch (error) {
         return JSON.stringify({ errors: [toEngineError(error)] });
     }
+}
+
+// The names each text refers to that it does not bind itself: what a query, parameter, or
+// function outside the text would have to supply. Bindings follow M's scoping: let variables and
+// record fields see each other, function parameters and each's `_` are local to their body.
+// Field access ([Amount]) and record keys are generalized identifiers, never references.
+// Quoted identifiers come back unquoted (#"Sales Rows" -> Sales Rows). One call takes many texts
+// so the host pays one engine round trip per model, not per partition.
+async function references(requestJson: string): Promise<string> {
+    let request: ReferencesRequest;
+    try {
+        request = JSON.parse(requestJson) as ReferencesRequest;
+    } catch (error) {
+        return JSON.stringify({ results: [], error: toEngineError(error) });
+    }
+
+    const results: ReferencesResult[] = [];
+    for (const text of request.texts ?? []) {
+        try {
+            const task = await PQP.TaskUtils.tryLexParse(PQP.DefaultSettings, text);
+            if (PQP.TaskUtils.isError(task)) {
+                results.push({ ok: false, error: toEngineError(task.error, text) });
+                continue;
+            }
+
+            const names = new Set<string>();
+            collectFree(task.ast, [], names);
+            results.push({ ok: true, names: [...names].sort() });
+        } catch (error) {
+            results.push({ ok: false, error: toEngineError(error, text) });
+        }
+    }
+
+    return JSON.stringify({ results });
+}
+
+type AstNode = { readonly kind: string; readonly [key: string]: unknown };
+
+function collectFree(node: unknown, scopes: ReadonlyArray<ReadonlySet<string>>, names: Set<string>): void {
+    if (Array.isArray(node)) {
+        for (const item of node) collectFree(item, scopes, names);
+        return;
+    }
+
+    if (!isNode(node)) return;
+    const Kind = PQP.Language.Ast.NodeKind;
+    switch (node.kind) {
+        case Kind.IdentifierExpression: {
+            const literal = (node.identifier as { literal: string }).literal;
+            // #table, #date, #shared, ...: built-ins, never a query.
+            if (literal.startsWith("#") && !literal.startsWith('#"')) return;
+            const name = unquote(literal);
+            if (!scopes.some(scope => scope.has(name))) names.add(name);
+            return;
+        }
+        case Kind.LetExpression: {
+            const pairs = csvNodes(node.variableList) as AstNode[];
+            const inner = [...scopes, new Set(pairs.map(pair => unquote((pair.key as { literal: string }).literal)))];
+            for (const pair of pairs) collectFree(pair.value, inner, names);
+            collectFree(node.expression, inner, names);
+            return;
+        }
+        case Kind.RecordExpression: {
+            const pairs = csvNodes(node.content) as AstNode[];
+            const inner = [...scopes, new Set(pairs.map(pair => unquote((pair.key as { literal: string }).literal)))];
+            for (const pair of pairs) collectFree(pair.value, inner, names);
+            return;
+        }
+        case Kind.Section: {
+            const members = ((node.sectionMembers as { elements: AstNode[] }).elements ?? [])
+                .map(member => member.namePairedExpression as AstNode);
+            const inner = [...scopes, new Set(members.map(pair => unquote((pair.key as { literal: string }).literal)))];
+            for (const pair of members) collectFree(pair.value, inner, names);
+            return;
+        }
+        case Kind.FunctionExpression: {
+            const parameters = csvNodes((node.parameters as AstNode).content) as AstNode[];
+            const inner = [...scopes, new Set(parameters.map(parameter => unquote((parameter.name as { literal: string }).literal)))];
+            collectFree(node.expression, inner, names);
+            return;
+        }
+        case Kind.EachExpression:
+            collectFree(node.paired, [...scopes, new Set(["_"])], names);
+            return;
+        default:
+            for (const [key, value] of Object.entries(node)) {
+                if (key !== "tokenRange" && value !== null && typeof value === "object") collectFree(value, scopes, names);
+            }
+    }
+}
+
+function isNode(value: unknown): value is AstNode {
+    return value !== null && typeof value === "object" && typeof (value as { kind?: unknown }).kind === "string";
+}
+
+// The nodes of a comma-separated array wrapper.
+function csvNodes(wrapper: unknown): unknown[] {
+    const elements = (wrapper as { elements?: ReadonlyArray<{ node: unknown }> } | undefined)?.elements ?? [];
+    return elements.map(element => element.node);
+}
+
+// #"Sales Rows" -> Sales Rows (with "" unescaped); a regular identifier as written.
+function unquote(literal: string): string {
+    return literal.startsWith('#"') && literal.endsWith('"') ? literal.slice(2, -1).replaceAll('""', '"') : literal;
 }
 
 function toEngineError(error: unknown, text?: string): EngineError {
@@ -248,4 +359,4 @@ function graphemeOf(value: unknown): Position | undefined {
         : undefined;
 }
 
-(globalThis as Record<string, unknown>).TomixM = Object.freeze({ version, format, diagnose });
+(globalThis as Record<string, unknown>).TomixM = Object.freeze({ version, format, diagnose, references });

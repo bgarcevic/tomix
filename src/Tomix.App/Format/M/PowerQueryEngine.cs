@@ -86,6 +86,38 @@ internal sealed class PowerQueryEngine : IDisposable
             : new PowerQueryDiagnoseResult([UnexpectedResponse(json!)]);
     }
 
+    /// <summary>
+    /// The free names of each text: what it refers to without binding it itself (queries,
+    /// parameters, library functions), with quoted identifiers unquoted. One result per text, in
+    /// order; a text that does not parse, or a failed call, comes back as an error for that text.
+    /// Texts go to the engine in chunks so each call stays well inside the time budget.
+    /// </summary>
+    public async Task<IReadOnlyList<PowerQueryReferencesResult>> ReferencesAsync(
+        IReadOnlyList<string> texts,
+        CancellationToken cancellationToken)
+    {
+        const int ChunkSize = 50;
+        var results = new List<PowerQueryReferencesResult>(texts.Count);
+        foreach (var chunk in texts.Chunk(ChunkSize))
+        {
+            var request = JsonSerializer.Serialize(new PowerQueryReferencesRequest(chunk), PowerQueryJsonContext.Default.PowerQueryReferencesRequest);
+            var (json, failure) = await CallAsync(runtime => runtime.Invoke(runtime.References, request), cancellationToken);
+            var response = failure is null
+                ? JsonSerializer.Deserialize(json!, PowerQueryJsonContext.Default.PowerQueryReferencesResponse)
+                : null;
+            if (response?.Results is { } chunkResults && chunkResults.Count == chunk.Length)
+            {
+                results.AddRange(chunkResults);
+                continue;
+            }
+
+            var error = failure ?? response?.Error ?? UnexpectedResponse(json!);
+            results.AddRange(chunk.Select(_ => new PowerQueryReferencesResult(false, null, error)));
+        }
+
+        return results;
+    }
+
     /// <summary>The bundled formatter and parser versions, or <see langword="null"/> if the engine fails to load.</summary>
     public async Task<PowerQueryEngineVersion?> GetVersionAsync(CancellationToken cancellationToken)
     {
@@ -218,6 +250,8 @@ internal sealed class PowerQueryEngine : IDisposable
 
         public JsValue Diagnose { get; private set; } = JsValue.Undefined;
 
+        public JsValue References { get; private set; } = JsValue.Undefined;
+
         public string Version { get; private set; } = "";
 
         public void Load(string bundle)
@@ -231,6 +265,7 @@ internal sealed class PowerQueryEngine : IDisposable
             var api = global.AsObject();
             Format = api.Get("format");
             Diagnose = api.Get("diagnose");
+            References = api.Get("references");
             Version = api.Get("version").AsString();
             IsLoaded = true;
         }
@@ -275,11 +310,18 @@ internal sealed record PowerQueryFormatResult(bool Ok, string? Text, PowerQueryE
 /// <summary>Empty <see cref="Errors"/> means the text lexes and parses.</summary>
 internal sealed record PowerQueryDiagnoseResult(IReadOnlyList<PowerQueryEngineError> Errors);
 
+/// <summary><see cref="Names"/> (sorted, ordinal) is set when <see cref="Ok"/>; otherwise <see cref="Error"/> is.</summary>
+internal sealed record PowerQueryReferencesResult(bool Ok, IReadOnlyList<string>? Names, PowerQueryEngineError? Error);
+
+internal sealed record PowerQueryReferencesResponse(IReadOnlyList<PowerQueryReferencesResult>? Results, PowerQueryEngineError? Error);
+
 internal sealed record PowerQueryEngineVersion(string Formatter, string Parser);
 
 internal sealed record PowerQueryFormatRequest(string Text, string IndentationLiteral, string NewlineLiteral, int MaxWidth);
 
 internal sealed record PowerQueryDiagnoseRequest(string Text);
+
+internal sealed record PowerQueryReferencesRequest(IReadOnlyList<string> Texts);
 
 /// <summary>
 /// Source-generated JSON metadata for the engine's request and response shapes, so the
@@ -290,5 +332,7 @@ internal sealed record PowerQueryDiagnoseRequest(string Text);
 [JsonSerializable(typeof(PowerQueryDiagnoseRequest))]
 [JsonSerializable(typeof(PowerQueryFormatResult))]
 [JsonSerializable(typeof(PowerQueryDiagnoseResult))]
+[JsonSerializable(typeof(PowerQueryReferencesRequest))]
+[JsonSerializable(typeof(PowerQueryReferencesResponse))]
 [JsonSerializable(typeof(PowerQueryEngineVersion))]
 internal sealed partial class PowerQueryJsonContext : JsonSerializerContext;

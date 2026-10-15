@@ -178,6 +178,72 @@ public sealed class RemoveBatchHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Power_query_from_a_survivor_blocks_and_force_removes()
+    {
+        // Staging reads Server; Broken mentions Server but does not parse, so it counts too.
+        var files = Files();
+
+        var blocked = await HandleAsync(["Expressions/Server", "Sales/Lonely"], save: true);
+        Assert.False(blocked.Success);
+        Assert.Equal("TOMIX_RM_BREAKS_REFS", blocked.Diagnostics[0].Code);
+        Assert.Contains("Power Query (M) reference(s) in: Expressions/Staging", blocked.Diagnostics[0].Message);
+        Assert.Equal(files, Files());
+
+        var preview = await HandleAsync(["Expressions/Server", "Sales/Lonely"], save: false);
+        Assert.Equal([RemoveBatchResult.BlockedByMReferences], preview.Data!.BlockedBy);
+        Assert.Equal(["Expressions/Broken", "Expressions/Staging"], preview.Data.BrokenMReferences!.Order());
+        Assert.Null(preview.Data.BrokenReferences);
+
+        var forced = await HandleAsync(["Expressions/Server", "Sales/Lonely"], save: true, force: true);
+        Assert.True(forced.Success, Describe(forced));
+        Assert.DoesNotContain(await PathsAsync(), p => p.Path == "Expressions/Server");
+    }
+
+    [Theory]
+    [InlineData("Expressions/Staging", "Stage")]
+    [InlineData("Stage", "Expressions/Staging")]
+    public async Task Power_query_between_targets_does_not_block_in_either_order(string first, string second)
+    {
+        // Stage's partition reads Staging; alone, Staging would break it.
+        var alone = await HandleAsync(["Expressions/Staging", "Sales/Lonely"], save: false);
+        Assert.Equal(["Stage/Stage"], alone.Data!.BrokenMReferences);
+
+        var result = await HandleAsync([first, second], save: true);
+
+        Assert.True(result.Success, Describe(result));
+        Assert.Null(result.Data!.BrokenMReferences);
+    }
+
+    [Fact]
+    public async Task Field_access_and_local_bindings_are_not_power_query_references()
+    {
+        // Product's partition binds its own Shadowed and reads a [Shadowed] field: neither is the query.
+        var result = await HandleAsync(["Expressions/Shadowed", "Sales/Lonely"], save: true);
+
+        Assert.True(result.Success, Describe(result));
+        Assert.Null(result.Data!.BrokenMReferences);
+    }
+
+    [Fact]
+    public async Task Single_rm_guards_power_query_too()
+    {
+        var handler = new RemoveModelObjectHandler([new TmdlModelProvider()], _config.Stores);
+        RemoveModelObjectRequest Single(bool save) => new(
+            new ModelReference(_dir.Path), "Expressions/Staging", null, IfExists: false, save, SaveTo: null,
+            Serialization: "", Force: false);
+
+        var preview = await handler.HandleAsync(Single(save: false), None);
+        Assert.Equal("would_block", preview.Data!.Reason);
+        Assert.Equal(["Stage/Stage"], preview.Data.BrokenMReferences);
+        Assert.Null(preview.Data.BrokenReferences);
+
+        var saved = await handler.HandleAsync(Single(save: true), None);
+        Assert.False(saved.Success);
+        Assert.Equal("TOMIX_RM_BREAKS_REFS", saved.Diagnostics[0].Code);
+        Assert.Contains("Stage/Stage", saved.Diagnostics[0].Message);
+    }
+
+    [Fact]
     public async Task A_target_inside_another_target_is_subsumed()
     {
         var result = await HandleAsync(["Sales/Amount", "Sales", "Sales/Rev/KPI"], save: false, cascade: true);
@@ -334,7 +400,9 @@ public sealed class RemoveBatchHandlerTests : IDisposable
 
     /// <summary>One of every removable kind, plus measures that call each other (Derived calls
     /// Base), a relationship on Sales[Key], a column sorted by another (Label by SortKey), a role
-    /// filtering Region in DAX, and a table whose partition is bound to DS2.</summary>
+    /// filtering Region in DAX, a table whose partition is bound to DS2, and shared expressions
+    /// read from M: Staging reads Server, Stage's partition reads Staging, Broken (unparsable)
+    /// mentions Server, and Product's partition shadows Shadowed.</summary>
     private static async Task WriteFixture(string path)
     {
         var db = new Database { Name = "M", ID = "M", CompatibilityLevel = 1702, Model = new Model { Name = "Model" } };
@@ -358,12 +426,18 @@ public sealed class RemoveBatchHandlerTests : IDisposable
 
         var product = new Table { Name = "Product" };
         product.Columns.Add(new DataColumn { Name = "Key", DataType = DataType.Double, SourceColumn = "Key" });
-        product.Partitions.Add(MPartition("Product"));
+        product.Partitions.Add(MPartition("Product",
+            "let Shadowed = #table({\"Shadowed\"}, {{1}}) in Table.AddColumn(Shadowed, \"Copy\", each [Shadowed])"));
         db.Model.Tables.Add(product);
 
         var cg = new Table { Name = "CG", CalculationGroup = new CalculationGroup() };
         cg.Columns.Add(new DataColumn { Name = "Name", DataType = DataType.String, SourceColumn = "Name" });
         db.Model.Tables.Add(cg);
+
+        var stage = new Table { Name = "Stage" };
+        stage.Columns.Add(new DataColumn { Name = "Id", DataType = DataType.Int64, SourceColumn = "Id" });
+        stage.Partitions.Add(MPartition("Stage", "let Source = Staging in Source"));
+        db.Model.Tables.Add(stage);
 
         var region = new Table { Name = "Region" };
         region.Columns.Add(new DataColumn { Name = "Code", DataType = DataType.String, SourceColumn = "Code" });
@@ -385,6 +459,10 @@ public sealed class RemoveBatchHandlerTests : IDisposable
             ("Sales/Rev", "KPI", "0"),
             ("Sales/P2", "Partition", "let Source = #table({},{}) in Source"),
             ("Expr1", "Expression", "1 meta [IsParameterQuery=false]"),
+            ("Server", "Expression", "\"sql.contoso.com\" meta [IsParameterQuery=true, Type=\"Text\"]"),
+            ("Staging", "Expression", "let Source = Sql.Database(Server, \"staging\") in Source"),
+            ("Broken", "Expression", "let Source = Server,"),
+            ("Shadowed", "Expression", "1"),
             ("Func1", "Function", "() => 1"),
             ("Persp1", "Perspective", null),
             ("fr-FR", "Culture", null),
@@ -413,10 +491,10 @@ public sealed class RemoveBatchHandlerTests : IDisposable
             db, new ModelExportRequest(path, "tmdl", Overwrite: true, SupportingFiles: false), None);
     }
 
-    private static Partition MPartition(string name) => new()
+    private static Partition MPartition(string name, string expression = "let Source = #table({}, {}) in Source") => new()
     {
         Name = name,
         Mode = ModeType.Import,
-        Source = new MPartitionSource { Expression = "let Source = #table({}, {}) in Source" }
+        Source = new MPartitionSource { Expression = expression }
     };
 }

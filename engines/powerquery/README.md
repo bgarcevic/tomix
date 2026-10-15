@@ -36,6 +36,14 @@ come back as JSON.
 | `version` | (a JSON string, not a function) | `{"formatter":"1.0.1","parser":"2.0.0"}` |
 | `format(json)` | `{"text", "indentationLiteral"?, "newlineLiteral"?, "maxWidth"?}` | `{"ok":true,"text"}` or `{"ok":false,"error"}` |
 | `diagnose(json)` | `{"text"}` | `{"errors":[error, ...]}` (empty when the text lexes and parses) |
+| `references(json)` | `{"texts":[text, ...]}` | `{"results":[{"ok":true,"names"} or {"ok":false,"error"}, ...]}`, one per text |
+
+`references` returns each text's free names, sorted: what it refers to without binding it itself
+(queries, parameters, library functions such as `Table.SelectRows`). Let variables and record
+fields see each other, function parameters and `each`'s `_` are local, field access and record keys
+are never references, `#table`-style built-ins are skipped, and quoted identifiers come back
+unquoted (`#"Sales Rows"` is `Sales Rows`). `tx rm` uses it to find queries that read a shared
+expression.
 
 `error` is `{"kind":"lex"|"parse"|"internal","message","line","column"}` with 1-based `line` and
 `column`, both `null` when the error has no position (for example, empty input). `newlineLiteral`

@@ -10,8 +10,8 @@ namespace Tomix.App.Rm;
 /// session one journal entry (one undo step). Every target is resolved, and the guards evaluated
 /// against the whole deletion set, before anything changes:
 /// <list type="bullet">
-/// <item>DAX in a surviving object that references a target blocks unless <c>--force</c>;
-/// references between targets never do, whatever the input order.</item>
+/// <item>DAX or Power Query (M) in a surviving object that references a target blocks unless
+/// <c>--force</c>; references between targets never do, whatever the input order.</item>
 /// <item>A surviving partition bound to a data-source target blocks, <c>--force</c> or not.</item>
 /// <item>Structural cascades onto surviving objects (relationships, sort-by, hierarchy levels,
 /// perspectives, role permissions) block unless <c>--cascade</c>.</item>
@@ -60,6 +60,7 @@ public sealed class RemoveBatchHandler
                 var snapshot = await session.GetSnapshotAsync(cancellationToken);
                 var plan = RemoveBatchPlan.Resolve(snapshot, request.Targets, request.IfExists);
                 var broken = plan.BrokenReferences();
+                var brokenM = await plan.BrokenMReferencesAsync(cancellationToken);
                 var bound = plan.BoundPartitions();
 
                 if (bound.Count > 0 && context.KeepsEdit)
@@ -67,9 +68,8 @@ public sealed class RemoveBatchHandler
                         string.Join(" ", bound.Select(b =>
                             $"Cannot remove data source '{b.Key.Name}'; it is used by partition(s): {string.Join(", ", b.Value)}."))
                         + " Add those partitions to the batch, or repoint them first.");
-                if (broken.Count > 0 && !request.Force && context.KeepsEdit)
-                    throw new RemoveBrokenReferencesException(
-                        $"Removing these objects breaks {broken.Count} DAX reference(s) in: {string.Join(", ", broken)}.");
+                if (broken.Count + brokenM.Count > 0 && !request.Force && context.KeepsEdit)
+                    throw new RemoveBrokenReferencesException(RemoveGuard.BlockedMessage("these objects", broken, brokenM));
 
                 var cascades = new List<RemoveBatchCascade>();
                 var removedAny = false;
@@ -106,6 +106,8 @@ public sealed class RemoveBatchHandler
                 var blockedBy = new List<string>();
                 if (broken.Count > 0 && !request.Force)
                     blockedBy.Add(RemoveBatchResult.BlockedByReferences);
+                if (brokenM.Count > 0 && !request.Force)
+                    blockedBy.Add(RemoveBatchResult.BlockedByMReferences);
                 if (survivorCascades.Count > 0 && !request.Cascade)
                     blockedBy.Add(RemoveBatchResult.BlockedByCascade);
                 if (bound.Count > 0)
@@ -120,7 +122,8 @@ public sealed class RemoveBatchHandler
                         broken.Count > 0 ? broken : null,
                         bound.Count > 0 ? bound.Values.SelectMany(v => v).ToList() : null,
                         blockedBy.Count > 0 ? "would_block" : null,
-                        blockedBy.Count > 0 ? blockedBy : null)
+                        blockedBy.Count > 0 ? blockedBy : null,
+                        brokenM.Count > 0 ? brokenM : null)
                     { Outcome = outcome });
             },
             outcome => new RemoveBatchResult([]) { Outcome = outcome },

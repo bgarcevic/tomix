@@ -124,6 +124,11 @@ internal sealed class RemoveBatchPlan
     public IReadOnlyList<string> BrokenReferences()
         => RemoveGuard.ReferencingPaths(Flattened, Targets.Where(t => t.Removes).Select(t => t.Object!), IsRemoved);
 
+    /// <summary>Surviving objects whose Power Query (M) refers to a shared-expression target.</summary>
+    public Task<IReadOnlyList<string>> BrokenMReferencesAsync(CancellationToken cancellationToken)
+        => MReferenceGuard.ReferencingPathsAsync(
+            Flattened, Targets.Where(t => t.Removes).Select(t => t.Object!), IsRemoved, cancellationToken);
+
     /// <summary>Surviving partitions bound to a data-source target. Unlike DAX, a binding cannot
     /// dangle: the data source is not removable while one survives, <c>--force</c> or not.</summary>
     public IReadOnlyDictionary<ModelObject, IReadOnlyList<string>> BoundPartitions()

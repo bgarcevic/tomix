@@ -21,9 +21,12 @@ public sealed record RemoveBatchResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? Reason = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? BlockedBy = null) : MutationResult
+    IReadOnlyList<string>? BlockedBy = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? BrokenMReferences = null) : MutationResult
 {
     public const string BlockedByReferences = "brokenReferences";
+    public const string BlockedByMReferences = "brokenMReferences";
     public const string BlockedByCascade = "cascade";
     public const string BlockedByBoundPartitions = "boundPartitions";
 
