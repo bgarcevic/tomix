@@ -49,8 +49,7 @@ public sealed partial class BpaFixPreviewRenderTests
     {
         var output = Render([Rewrite], plain: true);
 
-        // Scoped to the preview block: Console is process-global, so a test outside
-        // ConsoleStateCollection can write its own colored output into this capture.
+        // The exact preview block: no escape codes, ASCII glyphs, expression lines as written.
         var block = Regex.Match(output, @"  Would fix: .*?(?=\nWould fix \d)", RegexOptions.Singleline).Value;
         Assert.Equal(
             "  Would fix: Measure 'Sales/Total' - QUALIFY_COLUMNS\n"
@@ -93,12 +92,14 @@ public sealed partial class BpaFixPreviewRenderTests
                 if (plain)
                 {
                     // What a pipe gets: no ANSI support (Spectre's detection on a redirected
-                    // stream), then the CLI's own redirected-output switch.
+                    // stream), then the CLI's own redirected-output switch. Default enrichers
+                    // are off: on GitHub Actions they turn ANSI back on for CI logs.
                     AnsiConsole.Console = AnsiConsole.Create(new AnsiConsoleSettings
                     {
                         Out = new AnsiConsoleOutput(Console.Out),
                         Ansi = AnsiSupport.No,
                         ColorSystem = ColorSystemSupport.NoColors,
+                        Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
                     });
                     StdOut.PlainWhenRedirected(AnsiConsole.Console);
                 }
