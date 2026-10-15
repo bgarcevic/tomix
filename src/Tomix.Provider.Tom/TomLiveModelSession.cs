@@ -37,6 +37,9 @@ public sealed class TomLiveModelSession : ILiveModelSession
     /// so a checkout or a save that writes many files is checked once.</summary>
     internal static readonly TimeSpan SourceSettleDelay = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>Lease requests queued behind the current holder (tests wait on this).</summary>
+    internal int QueuedLeases => _gate.Waiting;
+
     private readonly TomModelSource _source;
     private readonly LeaseGate _gate = new();
     private readonly AsyncLocal<LeaseFlow?> _flow = new();
