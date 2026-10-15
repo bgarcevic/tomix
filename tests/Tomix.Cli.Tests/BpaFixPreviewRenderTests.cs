@@ -9,9 +9,10 @@ using Tomix.Core.Rules;
 namespace Tomix.Cli.Tests;
 
 /// <summary>
-/// The <c>bpa run --fix</c> preview (#208): an expression fix shows its whole before/after DAX as
-/// highlighted, indented blocks, while scalar fixes keep their one-line <c>Prop: "a" → "b"</c>
-/// form. Redirected output carries no escape codes and the expression lines copy-paste as written.
+/// The <c>bpa run --fix</c> preview (#208): fixes are grouped by rule, scalar fixes batched by
+/// identical one-line change (<c>Prop: a → b</c>) over their objects, and an expression fix shows
+/// its whole before/after DAX as highlighted, indented blocks. Redirected output carries no escape
+/// codes and the expression lines copy-paste as written.
 /// </summary>
 [Collection(ConsoleStateCollection.Name)]
 public sealed partial class BpaFixPreviewRenderTests
@@ -38,9 +39,9 @@ public sealed partial class BpaFixPreviewRenderTests
         Assert.Contains(Reference + "[Margin]", output);
 
         var text = StripAnsi(output);
-        Assert.Contains("    Expression:", text);
-        Assert.Matches(@"(?m)^      Before:\s*\n        SUM\(\[Amount\]\) \+ \[Margin\]$", text);
-        Assert.Matches(@"(?m)^      After:\s*\n        SUM\('Sales'\[Amount\]\) \+ \[Margin\]$", text);
+        Assert.Contains("      Expression:", text);
+        Assert.Matches(@"(?m)^        Before:\s*\n          SUM\(\[Amount\]\) \+ \[Margin\]$", text);
+        Assert.Matches(@"(?m)^        After:\s*\n          SUM\('Sales'\[Amount\]\) \+ \[Margin\]$", text);
         Assert.DoesNotContain("Expression: \"", text);
     }
 
@@ -50,15 +51,48 @@ public sealed partial class BpaFixPreviewRenderTests
         var output = Render([Rewrite], plain: true);
 
         // The exact preview block: no escape codes, ASCII glyphs, expression lines as written.
-        var block = Regex.Match(output, @"  Would fix: .*?(?=\nWould fix \d)", RegexOptions.Singleline).Value;
         Assert.Equal(
-            "  Would fix: Measure 'Sales/Total' - QUALIFY_COLUMNS\n"
-            + "    Expression:\n"
-            + "      Before:\n"
-            + "        SUM([Amount]) + [Margin]\n"
-            + "      After:\n"
-            + "        SUM('Sales'[Amount]) + [Margin]\n",
-            block);
+            "Pending fixes:\n"
+            + "  QUALIFY_COLUMNS  1 measure\n"
+            + "    Sales/Total\n"
+            + "      Expression:\n"
+            + "        Before:\n"
+            + "          SUM([Amount]) + [Margin]\n"
+            + "        After:\n"
+            + "          SUM('Sales'[Amount]) + [Margin]\n",
+            PreviewBlock(output));
+    }
+
+    [Fact]
+    public void ScalarFixes_AreGroupedByRuleAndChange()
+    {
+        BpaFixChange Hide(string path) => new(
+            "HIDE_KEYS", "Column", path, BpaFixAction.Set, "IsHidden", Before: "false", After: "true");
+
+        var output = Render([Hide("Sales/A"), Format, Hide("Sales/B")], plain: true);
+
+        Assert.Equal(
+            "Pending fixes:\n"
+            + "  HIDE_KEYS  2 columns\n"
+            + "    IsHidden: false -> true\n"
+            + "      Sales/A\n"
+            + "      Sales/B\n"
+            + "  FORMAT_RULE  1 measure\n"
+            + "    FormatString: \"\" -> \"#,##0\"\n"
+            + "      Sales/Total\n",
+            PreviewBlock(output));
+    }
+
+    [Fact]
+    public void UnsupportedFixes_AreListedOncePerRule()
+    {
+        var output = Render([Format], plain: true, unsupported: [new("CSHARP_FIX", "Partitions[0].Name = it.Name", 8)]);
+
+        Assert.Contains(
+            "  8 findings not fixable by tx - the rule's fix expression is not supported:\n"
+            + "    CSHARP_FIX (8) - Partitions[0].Name = it.Name\n",
+            output);
+        Assert.DoesNotContain("Fix errors", output);
     }
 
     [Fact]
@@ -70,7 +104,7 @@ public sealed partial class BpaFixPreviewRenderTests
         var text = Render([change], plain: true);
 
         Assert.Contains("Before: (unset)", text);
-        Assert.Contains($"        + {BpaRunView.FixExpressionLineCap}\n", text.Replace("\r\n", "\n"));
+        Assert.Contains($"          + {BpaRunView.FixExpressionLineCap}\n", text);
         Assert.DoesNotContain($"+ {BpaRunView.FixExpressionLineCap + 1}", text);
         Assert.Contains("... (+2 lines)", text);
     }
@@ -84,7 +118,12 @@ public sealed partial class BpaFixPreviewRenderTests
         Assert.DoesNotContain("Before:", text);
     }
 
-    private static string Render(IReadOnlyList<BpaFixChange> changes, bool plain)
+    /// <summary>From the "Pending fixes:" heading through the last fix, before the summary line.</summary>
+    private static string PreviewBlock(string output)
+        => Regex.Match(output, @"Pending fixes:\n.*?(?=\nWould fix \d)", RegexOptions.Singleline).Value;
+
+    private static string Render(
+        IReadOnlyList<BpaFixChange> changes, bool plain, IReadOnlyList<BpaUnsupportedFix>? unsupported = null)
     {
         var captured = ConsoleCapture.Run(
             () =>
@@ -104,7 +143,7 @@ public sealed partial class BpaFixPreviewRenderTests
                     StdOut.PlainWhenRedirected(AnsiConsole.Console);
                 }
                 BpaRunRenderer.Render(
-                    Result(changes),
+                    Result(changes) with { UnsupportedFixes = unsupported ?? [] },
                     new BpaRunView.RunOptions(NoMultiline: false, Full: false, Details: false, Errors: false, Warnings: false, Info: false));
                 return 0;
             },

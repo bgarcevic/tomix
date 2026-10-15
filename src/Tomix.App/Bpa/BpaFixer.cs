@@ -10,6 +10,22 @@ namespace Tomix.App.Bpa;
 
 public sealed partial class BpaFixer
 {
+    /// <summary>
+    /// Whether the fixer can apply <paramref name="fixExpression"/>: <c>Delete()</c>, a DAX
+    /// rewrite intrinsic, or a simple property assignment. Anything else (C# such as
+    /// <c>Partitions[0].Name = it.Name</c>) is a fix the rule declares but tx cannot run.
+    /// </summary>
+    public static bool IsSupported(string? fixExpression)
+    {
+        if (string.IsNullOrWhiteSpace(fixExpression))
+            return false;
+
+        var fix = fixExpression.Trim();
+        return fix.Equals("Delete()", StringComparison.OrdinalIgnoreCase)
+            || BpaDaxRewriter.TryParse(fix, out _)
+            || TryParseSimpleAssignment(fix, out _);
+    }
+
     /// <param name="snapshot">
     /// The model the violations were found in. DAX-rewrite fixes (<see cref="BpaDaxRewrite"/>)
     /// resolve references against it; without it they fail with a per-object fix error.

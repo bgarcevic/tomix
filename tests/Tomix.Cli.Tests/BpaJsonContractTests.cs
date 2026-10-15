@@ -50,6 +50,19 @@ public sealed class BpaJsonContractTests
     { FixOutcome = new MutationOutcome(MutationStatus.Saved, "C:/model", PersistenceKind.File, SyncOutcome.NotConfigured) };
 
     [Fact]
+    public void RunJson_ListsUnsupportedFixesOncePerRule()
+    {
+        var result = SampleRunResult() with { UnsupportedFixes = [new("CSHARP_FIX", "Partitions[0].Name = it.Name", 8)] };
+
+        var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(result))).RootElement;
+
+        var fix = Assert.Single(root.GetProperty("unsupportedFixes").EnumerateArray());
+        Assert.Equal("CSHARP_FIX", fix.GetProperty("ruleId").GetString());
+        Assert.Equal("Partitions[0].Name = it.Name", fix.GetProperty("fixExpression").GetString());
+        Assert.Equal(8, fix.GetProperty("findings").GetInt32());
+    }
+
+    [Fact]
     public void RunJson_UsesDocumentedFieldNames()
     {
         var root = JsonDocument.Parse(JsonOutput.Serialize(BpaRunRenderer.ToJson(SampleRunResult()))).RootElement;

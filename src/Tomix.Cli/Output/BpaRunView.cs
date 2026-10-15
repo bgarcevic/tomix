@@ -330,20 +330,87 @@ internal static class BpaRunView
     private const int FixValueWidth = 60;
 
     /// <summary>
-    /// One pending fix for the <c>--fix</c> preview: the headline
-    /// (<c>Would fix: Column 'Sales/Amount' — RULE_ID</c>, or <c>Would delete:</c>) and, for
-    /// a property set, the change (<c>FormatString: "" → "#,##0"</c>). Values stay on one line
-    /// and are cut at a fixed width, so a rewritten expression cannot flood the preview.
+    /// The pending fixes of one rule in the <c>--fix</c> preview: its ID, how many objects it
+    /// fixes (<c>7 columns</c>), and the fixes batched by identical change.
     /// </summary>
-    internal static (string Headline, string? Change) PendingFix(BpaFixChange change, Glyphs? glyphs = null)
+    internal sealed record PendingRule(string RuleId, string Objects, IReadOnlyList<PendingBatch> Batches);
+
+    /// <summary>
+    /// Fixes that make the same change: <paramref name="Change"/> is the one-line summary
+    /// (<c>DataType: Double → Decimal</c>, or <c>Delete</c>), shown once over every object it
+    /// applies to. An expression fix is a batch of one with no summary and its
+    /// <paramref name="Language"/> set, since each object's text differs.
+    /// </summary>
+    internal sealed record PendingBatch(string? Change, ExpressionLanguage? Language, IReadOnlyList<BpaFixChange> Changes);
+
+    /// <summary>
+    /// Groups pending fixes by rule (in the order the fixer produced them), then by identical
+    /// change, so twenty-two columns getting <c>IsAvailableInMDX: true → false</c> read as one
+    /// change over a list instead of twenty-two repeated lines.
+    /// </summary>
+    internal static IReadOnlyList<PendingRule> PendingRules(IReadOnlyList<BpaFixChange> changes, Glyphs? glyphs = null)
     {
         glyphs ??= Glyphs.Unicode;
-        var verb = change.Action == BpaFixAction.Delete ? "Would delete:" : "Would fix:";
-        var headline = $"{verb} {change.ObjectType} '{change.ObjectPath}'{glyphs.Dash}{change.RuleId}";
-        if (change.Action == BpaFixAction.Delete || change.Property is null)
-            return (headline, null);
+        return changes
+            .GroupBy(c => c.RuleId, StringComparer.OrdinalIgnoreCase)
+            .Select(rule => new PendingRule(rule.Key, ObjectCount(rule.ToList()), Batches(rule, glyphs)))
+            .ToList();
+    }
 
-        return (headline, $"{change.Property}: {FixValue(change.Before, glyphs)}{glyphs.Arrow}{FixValue(change.After, glyphs)}");
+    private static IReadOnlyList<PendingBatch> Batches(IEnumerable<BpaFixChange> changes, Glyphs glyphs)
+    {
+        var batches = new List<PendingBatch>();
+        var byChange = new Dictionary<string, List<BpaFixChange>>(StringComparer.Ordinal);
+        foreach (var change in changes)
+        {
+            if (FixExpressionLanguage(change) is { } language)
+            {
+                batches.Add(new PendingBatch(null, language, [change]));
+                continue;
+            }
+
+            var summary = ChangeSummary(change, glyphs);
+            if (byChange.TryGetValue(summary, out var batch))
+            {
+                batch.Add(change);
+                continue;
+            }
+
+            batch = [change];
+            byChange[summary] = batch;
+            batches.Add(new PendingBatch(summary, null, batch));
+        }
+
+        return batches;
+    }
+
+    /// <summary>
+    /// A fix's change on one line: <c>Delete</c>, or <c>Property: before → after</c> with values
+    /// cut at a fixed width so a long one cannot flood the preview.
+    /// </summary>
+    internal static string ChangeSummary(BpaFixChange change, Glyphs? glyphs = null)
+    {
+        glyphs ??= Glyphs.Unicode;
+        if (change.Action == BpaFixAction.Delete || change.Property is null)
+            return "Delete";
+
+        return $"{change.Property}: {FixValue(change.Property, change.Before, glyphs)}{glyphs.Arrow}{FixValue(change.Property, change.After, glyphs)}";
+    }
+
+    /// <summary><c>7 columns</c> when every object is one type, otherwise <c>3 objects</c>.</summary>
+    private static string ObjectCount(IReadOnlyList<BpaFixChange> changes)
+    {
+        var types = changes.Select(c => c.ObjectType).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (types.Count != 1 || string.IsNullOrWhiteSpace(types[0]))
+            return Count(changes.Count, "object");
+
+        var noun = types[0].ToLowerInvariant();
+        if (changes.Count == 1)
+            return $"1 {noun}";
+
+        return noun.EndsWith('y') && !noun.EndsWith("ey", StringComparison.Ordinal)
+            ? $"{changes.Count} {noun[..^1]}ies"
+            : $"{changes.Count} {noun}s";
     }
 
     internal const int FixExpressionLineCap = 12;
@@ -356,7 +423,7 @@ internal static class BpaRunView
     /// <summary>
     /// The language of a pending fix's values when they are an expression the preview shows as a
     /// before/after block, or null for a scalar property (shown on one line by
-    /// <see cref="PendingFix"/>). <c>Expression</c> is DAX on DAX-bearing objects (a calculated
+    /// <see cref="ChangeSummary"/>). <c>Expression</c> is DAX on DAX-bearing objects (a calculated
     /// table's comes from its calculated partition), M on shared expressions, and plain on a
     /// partition, whose source may be either.
     /// </summary>
@@ -393,7 +460,18 @@ internal static class BpaRunView
             : (lines[..cap], lines.Length - cap);
     }
 
-    private static string FixValue(string? value, Glyphs glyphs)
+    /// <summary>Properties whose value is free text, so it stays quoted even when it is one word.</summary>
+    private static readonly HashSet<string> TextProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "FormatString", "Name", "Description", "DisplayFolder", "Expression", "SourceColumn",
+    };
+
+    /// <summary>
+    /// A value for a one-line change. Booleans, numbers and enum members (<c>true</c>,
+    /// <c>Decimal</c>) read bare; text is quoted so an empty or space-padded value shows
+    /// (<c>"" → "#,##0"</c>).
+    /// </summary>
+    private static string FixValue(string property, string? value, Glyphs glyphs)
     {
         if (value is null)
             return "(unset)";
@@ -401,7 +479,12 @@ internal static class BpaRunView
         var flat = string.Join(" ", value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()));
         if (flat.Length > FixValueWidth)
             flat = flat[..(FixValueWidth - glyphs.Ellipsis.Length)] + glyphs.Ellipsis;
-        return $"\"{flat}\"";
+
+        var bare = !TextProperties.Contains(property)
+            && flat.Length > 0
+            && (double.TryParse(flat, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)
+                || (char.IsLetter(flat[0]) && flat.All(c => char.IsLetterOrDigit(c) || c == '_')));
+        return bare ? flat : $"\"{flat}\"";
     }
 
     private static string Count(int n, string noun) => $"{n} {Plural(n, noun)}";

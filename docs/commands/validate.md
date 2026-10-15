@@ -39,21 +39,32 @@ FilterExpression = "'Region'[Name] = \"EU\""
 ```
 
 An unquoted value with `(` or `[` is code the fixer cannot evaluate (for example
-`string.Concat(...)`); such a rule is reported as an unsupported fix expression.
+`string.Concat(...)` or `Partitions[0].Name = it.Name`). Findings of such a rule are not
+marked fixable; `--fix` lists the rule once with its finding count
+(`unsupportedFixes` in JSON) and leaves them for you to fix.
 
 `--fix` without `--save` or `--stage` previews every pending fix and changes nothing.
-A property fix shows on one line (`FormatString: "" → "#,##0"`). A fix that changes
-an expression shows its full before and after text, DAX syntax-highlighted in a
-terminal and plain when piped, capped at 12 lines each:
+Fixes are grouped by rule. A property fix shows its change once over every object
+that gets it; text values are quoted, booleans and enum values are not. A fix that
+changes an expression shows its full before and after text per object,
+DAX syntax-highlighted in a terminal and plain when piped, capped at 12 lines each:
 
 ```
-  Would fix: Measure 'Sales/Margin %' — DAX_COLUMNS_FULLY_QUALIFIED
-    Expression:
-      Before:
-        DIVIDE([Margin], SUM([Amount]))
-      After:
-        DIVIDE([Margin], SUM('Sales'[Amount]))
+Pending fixes:
+  HIDE_FOREIGN_KEYS  2 columns
+    IsHidden: false → true
+      Product/Category
+      Category/Category
+  DAX_COLUMNS_FULLY_QUALIFIED  1 measure
+    Sales/Margin %
+      Expression:
+        Before:
+          DIVIDE([Margin], SUM([Amount]))
+        After:
+          DIVIDE([Margin], SUM('Sales'[Amount]))
 ```
+
+A batch lists up to 10 objects; add `--full` to list them all.
 
 ![tx bpa run --fix --save: findings before the fix, then two of three fixed and saved](../assets/media/bpa.png)
 

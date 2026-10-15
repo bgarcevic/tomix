@@ -262,7 +262,7 @@ public sealed class BpaEngine
             ReferenceObjectName(obj),
             obj.Path,
             rule.Description,
-            !string.IsNullOrWhiteSpace(rule.FixExpression),
+            BpaFixer.IsSupported(rule.FixExpression),
             obj.Kind);
 
     private static string ReferenceObjectType(ModelObject obj)

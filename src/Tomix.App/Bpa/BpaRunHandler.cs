@@ -150,6 +150,9 @@ public sealed class BpaRunHandler
                 RuleLoadDiagnostics = loadDiagnostics.Count > 0 ? loadDiagnostics : null
             };
 
+            if (request.Fix)
+                runResult = runResult with { UnsupportedFixes = UnsupportedFixes(runResult.Violations, rules) };
+
             if (request.Fix && runResult.Violations.Any(v => v.CanFix))
             {
                 if (session is not IModelMutationSession mutationSession)
@@ -225,6 +228,25 @@ public sealed class BpaRunHandler
 
             return TomixResult<BpaRunResult>.Ok(runResult, exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0);
         }
+    }
+
+    /// <summary>
+    /// Each violated rule that declares a fix the fixer cannot run, in finding order, with its
+    /// finding count — reported once per rule instead of one error per object.
+    /// </summary>
+    private static IReadOnlyList<BpaUnsupportedFix> UnsupportedFixes(
+        IReadOnlyList<BpaViolation> violations, IReadOnlyList<BpaRule> rules)
+    {
+        var fixes = rules
+            .Where(r => !string.IsNullOrWhiteSpace(r.FixExpression) && !BpaFixer.IsSupported(r.FixExpression))
+            .GroupBy(r => r.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().FixExpression!.Trim(), StringComparer.OrdinalIgnoreCase);
+
+        return violations
+            .Where(v => !v.CanFix && fixes.ContainsKey(v.RuleId))
+            .GroupBy(v => v.RuleId, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new BpaUnsupportedFix(g.Key, fixes[g.Key], g.Count()))
+            .ToList();
     }
 
     /// <summary>

@@ -104,6 +104,19 @@ public sealed class BpaFixerTests
     public void TryParseSimpleAssignment_CodeOrMalformedLiteral_NotParsed(string fix)
         => Assert.False(BpaFixer.TryParseSimpleAssignment(fix, out _));
 
+    [Theory]
+    [InlineData("Delete()", true)]
+    [InlineData("  delete()  ", true)]
+    [InlineData("QualifyColumnReferences()", true)]
+    [InlineData("IsHidden = true", true)]
+    [InlineData("Expression = \"DIVIDE([A], [B])\"", true)]
+    [InlineData("Partitions[0].Name = it.Name", false)]
+    [InlineData("Name = string.Concat(it.Name.ToCharArray())", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsSupported_MatchesWhatTheFixerCanApply(string? fix, bool expected)
+        => Assert.Equal(expected, BpaFixer.IsSupported(fix));
+
     [Fact]
     public void ApplyFixes_QuotedDaxAssignment_SetsExpression()
     {
