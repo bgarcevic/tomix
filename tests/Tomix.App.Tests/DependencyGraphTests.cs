@@ -22,6 +22,30 @@ public sealed class DependencyGraphTests
         Assert.DoesNotContain(other, Upstream(graph, source));
     }
 
+    // Inside an iterator a lone [Col] used as a value reads the iterated table's column, even when
+    // the expression's own table has one too (measured on a live model); passed where a column is
+    // expected (SUM([Col])) it reads the own table's. Which of the two it is takes function
+    // signatures, so both count — a removal of either must block.
+    [Theory]
+    [InlineData("Calculations/Iterated", new[] { "Sales/FactoredProductRevenue", "Calculations/FactoredProductRevenue" }, new string[0])]
+    [InlineData("Calculations/IteratedGeo", new[] { "Geo/Region" }, new[] { "Sales/Region" })]
+    [InlineData("Calculations/Earlier", new[] { "Geo/Region", "Sales/Region" }, new string[0])]
+    public void A_lone_column_inside_an_iterator_counts_for_the_iterated_table(string source, string[] read, string[] notRead)
+    {
+        var graph = new DependencyGraph(Model());
+
+        foreach (var column in read)
+        {
+            Assert.Contains(graph.SitesReferencing(Find(column)), s => s.Source.Path == source);
+            Assert.Contains(column, Upstream(graph, source));
+        }
+        foreach (var column in notRead)
+        {
+            Assert.DoesNotContain(graph.SitesReferencing(Find(column)), s => s.Source.Path == source);
+            Assert.DoesNotContain(column, Upstream(graph, source));
+        }
+    }
+
     [Fact]
     public void A_lone_column_its_table_lacks_still_counts_for_every_table_that_has_it()
     {
@@ -71,7 +95,10 @@ public sealed class DependencyGraphTests
             Column("Calculations", "FactoredProductRevenue"),
             Measure("Calculations", "Revenue", "SUM([FactoredProductRevenue])"),
             Measure("Calculations", "ByRegion", "DISTINCTCOUNT([Region])"),
-            Measure("Calculations", "UsesTotal", "[Total] * 2"));
+            Measure("Calculations", "UsesTotal", "[Total] * 2"),
+            Measure("Calculations", "Iterated", "SUMX(Sales, [FactoredProductRevenue])"),
+            Measure("Calculations", "IteratedGeo", "SUMX(Geo, LEN([Region]))"),
+            Measure("Calculations", "Earlier", "SUMX(Geo, SUMX(Sales, LEN(EARLIER([Region]))))"));
         var template = Table("DateTableTemplate",
             Column("DateTableTemplate", "Date"),
             Column("DateTableTemplate", "Year", "YEAR([Date])")) with

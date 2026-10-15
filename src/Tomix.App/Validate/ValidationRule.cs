@@ -49,7 +49,7 @@ public static class ValidationRules
 
     public static readonly ValidationRule UnresolvedReference = new(
         "DAX0003", "Unresolved reference", DaxCategory, RuleSeverity.Warning, DaxScope,
-        "An unqualified reference resolves to no measure or column, or to a column the expression builds itself used outside its table.");
+        "An unqualified reference resolves to no measure or column, to a column of neither its own table nor a table iterated around it, or to a column the expression builds itself used outside its table.");
 
     public static readonly ValidationRule InvalidSyntax = new(
         "DAX0004", "Invalid character or unbalanced group", DaxCategory, RuleSeverity.Error, DaxScope,

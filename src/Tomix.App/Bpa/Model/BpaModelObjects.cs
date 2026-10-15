@@ -264,10 +264,10 @@ public sealed class BpaReference
     public string? Table { get; internal set; }
 
     /// <summary>
-    /// The table the reference resolves to: the qualifier, or for a lone column reference the
-    /// expression's own table when it has that column; null when unknown. Not exposed to rules.
+    /// The tables a column reference may resolve to: the qualifier, or for a lone column
+    /// reference every table DAX may bind it to. Not exposed to rules.
     /// </summary>
-    internal string? ResolvedTable { get; set; }
+    internal IReadOnlyList<string>? ResolvedTables { get; set; }
 }
 
 /// <summary>Inverse of <see cref="BpaObject"/> dependencies: who references this object.</summary>

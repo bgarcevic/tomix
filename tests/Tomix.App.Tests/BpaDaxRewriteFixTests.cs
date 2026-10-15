@@ -36,7 +36,7 @@ public sealed class BpaDaxRewriteFixTests
     }
 
     [Theory]
-    [InlineData("QualifyColumnReferences()", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))", "column [CustomerID] exists in tables")]
+    [InlineData("QualifyColumnReferences()", "DISTINCTCOUNT([CustomerID])", "column [CustomerID] exists in tables")]
     [InlineData("QualifyColumnReferences()", "SUMX(ADDCOLUMNS(Sales, \"Amount\", 1), [Amount])", "[Amount] may name a query-scoped column")]
     [InlineData("UnqualifyMeasureReferences()", "'Customers'[Total Sales]", "measure [Total Sales] is qualified with 'Customers' but lives in 'Sales'")]
     public void Rewrite_AmbiguousReference_FailsWithoutRewriting(string fix, string before, string reason)
@@ -49,12 +49,16 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Contains(reason, error);
     }
 
-    // CustomerID is in Sales and Customers: in an expression of either table, the lone reference
-    // means that table's own column, as DAX resolves it. Elsewhere it stays ambiguous.
+    // CustomerID is in Sales and Customers. Inside an iterator a lone reference reads the
+    // iterated table's column; outside every iterator, the expression's own table's (both
+    // measured on a live model).
     [Theory]
+    [InlineData(null, "COUNTROWS(FILTER(Sales, [CustomerID] > 0))", "COUNTROWS(FILTER(Sales, 'Sales'[CustomerID] > 0))")]
+    [InlineData("Products", "COUNTROWS(FILTER(Customers, [CustomerID] > 0))", "COUNTROWS(FILTER(Customers, 'Customers'[CustomerID] > 0))")]
+    [InlineData("Products", "VAR c = FILTER(Customers, TRUE()) RETURN SUMX(TOPN(5, c, 1), [CustomerID])", "VAR c = FILTER(Customers, TRUE()) RETURN SUMX(TOPN(5, c, 1), 'Customers'[CustomerID])")]
     [InlineData("Customers", "COUNTROWS(FILTER(Customers, [CustomerID] > 0))", "COUNTROWS(FILTER(Customers, 'Customers'[CustomerID] > 0))")]
     [InlineData("Sales", "DISTINCTCOUNT([CustomerID])", "DISTINCTCOUNT('Sales'[CustomerID])")]
-    public void Rewrite_QualifiesALoneColumnWithItsOwnTable(string ownTable, string before, string expected)
+    public void Rewrite_QualifiesALoneColumnWhereDaxBindsIt(string? ownTable, string before, string expected)
     {
         var (text, error) = BpaDaxRewriter.Rewrite(before, BpaDaxRewrite.QualifyColumnReferences, Names(), ownTable);
 
@@ -62,11 +66,16 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Equal(expected, text);
     }
 
-    [Fact]
-    public void Rewrite_ALoneColumnItsOwnTableLacks_StaysAmbiguous()
+    // Unsettled: the own table lacks the column and nothing iterates it; an iterator over another
+    // table that has it while the own table does too (a value there reads the iterated table,
+    // SUM([X]) the own table); a table expression the analysis has no rule for.
+    [Theory]
+    [InlineData("Products", "DISTINCTCOUNT([CustomerID])")]
+    [InlineData("Sales", "SUMX(Customers, [CustomerID])")]
+    [InlineData("Products", "SUMX(TREATAS(VALUES(Sales[CustomerID]), Customers[CustomerID]), [CustomerID])")]
+    public void Rewrite_ALoneColumnDaxMayBindToSeveralTables_StaysAmbiguous(string ownTable, string before)
     {
-        var (text, error) = BpaDaxRewriter.Rewrite(
-            "DISTINCTCOUNT([CustomerID])", BpaDaxRewrite.QualifyColumnReferences, Names(), ownTable: "Products");
+        var (text, error) = BpaDaxRewriter.Rewrite(before, BpaDaxRewrite.QualifyColumnReferences, Names(), ownTable);
 
         Assert.Null(text);
         Assert.Contains("column [CustomerID] exists in tables", error);
@@ -110,9 +119,10 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Empty(second.Data.FixChanges);
     }
 
-    // Products has no CustomerID, so a lone [CustomerID] there could mean Sales' or Customers'.
+    // Products has no CustomerID and nothing iterates one, so which table a lone [CustomerID]
+    // there means is unknown.
     [Theory]
-    [InlineData("DAX_COLUMNS_FULLY_QUALIFIED", "Products", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))", "column [CustomerID] exists in tables")]
+    [InlineData("DAX_COLUMNS_FULLY_QUALIFIED", "Products", "DISTINCTCOUNT([CustomerID])", "column [CustomerID] exists in tables")]
     [InlineData("DAX_MEASURES_UNQUALIFIED", "Sales", "'Customers'[Total Sales]", "is qualified with 'Customers' but lives in 'Sales'")]
     public async Task Fix_AmbiguousReference_ReportsFixErrorAndLeavesDaxUntouched(string ruleId, string table, string dax, string reason)
     {
@@ -132,19 +142,21 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Equal(dax, await ExpressionAsync(model, "Ambiguous", table));
     }
 
-    [Fact]
-    public async Task Fix_ALoneColumnOfTheMeasuresOwnTable_IsQualifiedWithIt()
+    // CustomerID is in Sales and Customers; DAX reads the iterated table's column.
+    [Theory]
+    [InlineData("Sales", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))", "COUNTROWS(FILTER(Sales, 'Sales'[CustomerID] > 0))")]
+    [InlineData("Products", "COUNTROWS(FILTER(Customers, [CustomerID] > 0))", "COUNTROWS(FILTER(Customers, 'Customers'[CustomerID] > 0))")]
+    public async Task Fix_ALoneColumnOfTheIteratedTable_IsQualifiedWithIt(string table, string dax, string expected)
     {
-        // CustomerID is in Sales and Customers; in a Sales measure DAX reads Sales' own.
         using var config = new TempConfigDir();
         using var root = new TempDir();
-        var model = ModelWithMeasure(root, "Own", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))");
+        var model = ModelWithMeasure(root, "Bound", dax, table);
 
         var result = await RunAsync(config, model, "DAX_COLUMNS_FULLY_QUALIFIED", save: true);
 
         Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
         Assert.Equal(1, result.Data!.FixesApplied);
-        Assert.Equal("COUNTROWS(FILTER(Sales, 'Sales'[CustomerID] > 0))", await ExpressionAsync(model, "Own"));
+        Assert.Equal(expected, await ExpressionAsync(model, "Bound", table));
     }
 
     [Fact]

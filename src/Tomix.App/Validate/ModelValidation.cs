@@ -63,6 +63,13 @@ internal static class ModelValidation
         }
 
         IReadOnlyDictionary<int, DaxQueryColumnScope>? queryColumns = null;
+        var ownTable = OwnTable(obj, site);
+        var lone = new LoneColumnResolver(
+            site.Expression,
+            ownTable,
+            name => [.. index.TableColumns.Where(t => t.Value.Contains(name)).Select(t => t.Key)],
+            // A table whose columns are unknown offline cannot rule a column out.
+            table => index.TableColumns.ContainsKey(table) && !index.UnknownColumnTables.Contains(table));
         foreach (var reference in DaxReferenceExtractor.Extract(site.Expression))
         {
             // A direct reference to the expression's own measure or calculated column is a
@@ -117,13 +124,29 @@ internal static class ModelValidation
                 // (ADDCOLUMNS, GENERATESERIES, ...): fine where a row of that table is in context,
                 // suspect outside it. Offline analysis can't be certain either way — warn, don't fail.
                 case DaxReferenceShape.Unqualified:
-                    if (index.MeasureNames.Contains(reference.Object!) || index.ColumnNames.Contains(reference.Object!))
+                    if (index.MeasureNames.Contains(reference.Object!))
                         break;
 
                     queryColumns ??= DaxQueryColumns.Analyze(site.Expression);
                     var scope = queryColumns.GetValueOrDefault(reference.Start, DaxQueryColumnScope.NotDefined);
                     if (scope == DaxQueryColumnScope.InScope)
                         break;
+
+                    // A model column must be on a table DAX can bind it to: one the expression
+                    // iterates around it, or its own table (SUM([X]), a calculated column's row).
+                    if (index.ColumnNames.Contains(reference.Object!))
+                    {
+                        if (ownTable is not null
+                            && !index.UnknownColumnTables.Contains(ownTable)
+                            && lone.Resolve(reference.Start, reference.Object!) is { Certain: true, Unresolved: true, Tables: var elsewhere })
+                            issues.Add(ValidationRules.UnresolvedReference.Issue(
+                                $"Column [{reference.Object}] is not on table '{ownTable}' or on a table iterated around it; "
+                                + $"qualify it ({string.Join(", ", elsewhere.Select(t => $"'{t}'[{reference.Object}]"))}).",
+                                obj.Path,
+                                Line(site.Expression, reference.Start),
+                                LineText(site.Expression, reference.Start)));
+                        break;
+                    }
 
                     issues.Add(ValidationRules.UnresolvedReference.Issue(
                         scope == DaxQueryColumnScope.OutOfScope
@@ -228,6 +251,19 @@ internal static class ModelValidation
         var text = lines[line].TrimEnd();
         return text.Length > MaxExpressionLine ? text[..(MaxExpressionLine - 3)] + "..." : text;
     }
+
+    /// <summary>
+    /// The table a lone <c>[Col]</c> in <paramref name="site"/> binds to when no row context
+    /// provides it: the object's table, or the table a role filter applies to. Null where DAX
+    /// gives no such table (a calculated table's own DAX, a function) — those are not judged.
+    /// </summary>
+    private static string? OwnTable(ModelObject obj, DaxSite site) => obj.Kind switch
+    {
+        ModelObjectKind.Measure or ModelObjectKind.CalculatedColumn or ModelObjectKind.CalculationItem
+            or ModelObjectKind.Column => OwningTable(obj.Path),
+        ModelObjectKind.TablePermission => obj.Name,
+        _ => null,
+    };
 
     private static string OwningTable(string path)
     {

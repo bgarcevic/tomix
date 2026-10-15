@@ -148,18 +148,26 @@ public static class BpaModelBuilder
         var columnsByTable = columns
             .GroupBy(c => c.Table.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
-        HashSet<string>? Own(string? table) => table is null ? null : columnsByTable.GetValueOrDefault(table);
+        var tableNames = tables.Select(t => t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<string> ColumnTables(string name)
+            => [.. columnsByTable.Where(t => t.Value.Contains(name)).Select(t => t.Key)];
+        IReadOnlyList<BpaDependsOnEntry> DependsOn(string? expression, string? ownTable)
+            => string.IsNullOrWhiteSpace(expression)
+                ? []
+                : ComputeDependsOn(expression, measureNames, columnNames,
+                    new LoneColumnResolver(expression, ownTable, ColumnTables, tableNames.Contains));
 
         foreach (var measure in measures)
-            measure.DependsOn = ComputeDependsOn(measure.Expression, measureNames, columnNames, measure.Table.Name, Own(measure.Table.Name));
+            measure.DependsOn = DependsOn(measure.Expression, measure.Table.Name);
         foreach (var column in columns)
-            column.DependsOn = ComputeDependsOn(column.Source.Expression, measureNames, columnNames, column.Table.Name, Own(column.Table.Name));
+            column.DependsOn = DependsOn(column.Source.Expression, column.Table.Name);
         foreach (var item in calculationItems)
-            item.DependsOn = ComputeDependsOn(item.Expression, measureNames, columnNames, itemTables.GetValueOrDefault(item), Own(itemTables.GetValueOrDefault(item)));
+            item.DependsOn = DependsOn(item.Expression, itemTables.GetValueOrDefault(item));
         foreach (var permission in tablePermissions)
-            permission.DependsOn = ComputeDependsOn(permission.Expression, measureNames, columnNames, permission.Table?.Name, Own(permission.Table?.Name));
+            permission.DependsOn = DependsOn(permission.Expression, permission.Table?.Name);
+        // A calculated table cannot read its own columns: a lone [Col] there binds to a row context.
         foreach (var table in tables)
-            table.DependsOn = ComputeDependsOn(CalculatedTableExpression(table), measureNames, columnNames, table.Name, Own(table.Name));
+            table.DependsOn = DependsOn(CalculatedTableExpression(table), null);
 
         AssignSortByUsage(tables);
         AssignRelationshipParticipation(tables, columns, relationships);
@@ -323,18 +331,14 @@ public static class BpaModelBuilder
     /// Groups the references in a DAX expression by referenced object type, tagging each with
     /// whether it was written fully-qualified. A qualified reference is resolved to a column
     /// first (a table qualifier implies a column); a lone reference to a measure first. A lone
-    /// column reference resolves to <paramref name="ownTable"/>'s column when it has one, as DAX
-    /// resolves it.
+    /// column reference resolves to every table it may bind to (<see cref="LoneColumnResolver"/>).
     /// </summary>
     private static IReadOnlyList<BpaDependsOnEntry> ComputeDependsOn(
-        string? expression,
+        string expression,
         HashSet<string> measureNames,
         HashSet<string> columnNames,
-        string? ownTable,
-        HashSet<string>? ownColumns)
+        LoneColumnResolver lone)
     {
-        if (string.IsNullOrWhiteSpace(expression))
-            return [];
 
         var byType = new Dictionary<string, List<BpaReference>>(StringComparer.OrdinalIgnoreCase);
 
@@ -362,8 +366,8 @@ public static class BpaModelBuilder
                 ObjectType = objectType,
                 Name = reference.Object,
                 Table = reference.Table,
-                ResolvedTable = reference.FullyQualified ? reference.Table
-                    : objectType == "Column" && ownColumns?.Contains(name) == true ? ownTable : null,
+                ResolvedTables = reference.FullyQualified ? [reference.Table!]
+                    : objectType == "Column" ? lone.Resolve(reference.Start, name).Tables : null,
             });
         }
 
@@ -422,7 +426,7 @@ public static class BpaModelBuilder
             // collapse: a qualified 'Table'[Col] counts only for that table's column. Dedup per
             // source object by composite key.
             var keys = new HashSet<string>(
-                dependsOn.SelectMany(e => e.Value).Select(ReferenceKey),
+                dependsOn.SelectMany(e => e.Value).SelectMany(ReferenceKeys),
                 StringComparer.OrdinalIgnoreCase);
 
             foreach (var key in keys)
@@ -444,23 +448,19 @@ public static class BpaModelBuilder
 
         foreach (var measure in measures)
             measure.ReferencedBy = MakeReferencedBy([MeasureKey(measure.Name)], measuresByRef, countByRef);
-        // A column is referenced by refs resolved to its exact table[name] (qualified, or a lone
-        // [name] in an expression of its own table), plus lone [name] refs whose own table has no
-        // such column (which table they mean is unknown, so they count for every one).
+        // A column is referenced by refs that may resolve to its exact table[name]: qualified, or
+        // a lone [name] that a row context or the own table may bind there.
         foreach (var column in columns)
-            column.ReferencedBy = MakeReferencedBy([ColumnKey(column.Table.Name, column.Name), ColumnWildcardKey(column.Name)], measuresByRef, countByRef);
+            column.ReferencedBy = MakeReferencedBy([ColumnKey(column.Table.Name, column.Name)], measuresByRef, countByRef);
     }
 
     private static string MeasureKey(string name) => "M\0" + name;
     private static string ColumnKey(string table, string name) => "C\0" + table + "\0" + name;
-    private static string ColumnWildcardKey(string name) => "C\0*\0" + name;
 
-    private static string ReferenceKey(BpaReference reference)
+    private static IEnumerable<string> ReferenceKeys(BpaReference reference)
         => reference.ObjectType.Equals("Measure", StringComparison.OrdinalIgnoreCase)
-            ? MeasureKey(reference.Name)
-            : !string.IsNullOrEmpty(reference.ResolvedTable)
-                ? ColumnKey(reference.ResolvedTable!, reference.Name)
-                : ColumnWildcardKey(reference.Name);
+            ? [MeasureKey(reference.Name)]
+            : (reference.ResolvedTables ?? []).Select(table => ColumnKey(table, reference.Name));
 
     private static void AssignDataSourceUsage(List<BpaDataSource> dataSources, List<BpaPartition> partitions)
     {

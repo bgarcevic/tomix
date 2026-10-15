@@ -77,8 +77,9 @@ internal sealed class DependencyGraph
 
             foreach (var site in DaxExpressions.Sites(obj))
             {
+                var lone = LoneColumns(site.Expression, obj);
                 var references = DaxReferenceExtractor.Extract(site.Expression, includeFunctionCalls: true)
-                    .Where(r => keyed.Any(t => ReferencesTarget(r, obj, t.Target, t.Key)))
+                    .Where(r => keyed.Any(t => ReferencesTarget(r, lone, t.Target, t.Key)))
                     .ToList();
 
                 if (references.Count > 0)
@@ -90,7 +91,7 @@ internal sealed class DependencyGraph
     }
 
     private bool ReferencesTarget(
-        DaxReferenceExtractor.DaxReference reference, ModelObject source, ModelObject target, string targetKey)
+        DaxReferenceExtractor.DaxReference reference, LoneColumnResolver lone, ModelObject target, string targetKey)
     {
         // A qualified reference ('Region'[Amount]) resolves to the child object, but its table
         // part references the table by name too — a table rename must rewrite it even when the
@@ -106,7 +107,7 @@ internal sealed class DependencyGraph
             && string.Equals(reference.Table, target.Name, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        return Candidates(reference, source).Any(candidate => Eq(Key(candidate), targetKey));
+        return Candidates(reference, lone).Any(candidate => Eq(Key(candidate), targetKey));
     }
 
     /// <summary>Whether a table named <paramref name="name"/> exists (case-insensitive, like DAX).</summary>
@@ -211,6 +212,15 @@ internal sealed class DependencyGraph
                     _sortByTargets.Add(Key(SiblingPath(obj.Path, sortBy!)));
             }
         }
+
+        // A flat object list (no table children) still names the table in each path.
+        foreach (var obj in _objects)
+        {
+            var slash = obj.Path.IndexOf('/');
+            if (slash > 0 && !_ownTable.ContainsKey(Key(obj))
+                && _tableByName.GetValueOrDefault(obj.Path[..slash]) is { } table)
+                _ownTable[Key(obj)] = table;
+        }
     }
 
     private void BuildEdges()
@@ -221,11 +231,13 @@ internal sealed class DependencyGraph
 
             foreach (var expression in DaxExpressions.ForObject(obj))
             {
+                var lone = LoneColumns(expression, obj);
                 foreach (var reference in DaxReferenceExtractor.Extract(expression, includeFunctionCalls: true))
                 {
-                    var resolved = Resolve(reference, obj);
-                    if (resolved is not null && !Eq(Key(resolved), Key(obj)))
-                        targets.Add(Key(resolved));
+                    // Every table a lone [Col] may read is upstream: a removal must not miss one.
+                    foreach (var resolved in Candidates(reference, lone))
+                        if (!Eq(Key(resolved), Key(obj)))
+                            targets.Add(Key(resolved));
                 }
             }
 
@@ -266,27 +278,36 @@ internal sealed class DependencyGraph
     }
 
     /// <summary>
-    /// The table a lone <c>[Col]</c> in <paramref name="source"/>'s DAX resolves against: the
-    /// table itself, the table an object belongs to, or the table a role's filter applies to.
+    /// The table a lone <c>[Col]</c> passed as a column in <paramref name="source"/>'s DAX binds
+    /// to: the table itself, the table an object belongs to, or the table a role's filter applies
+    /// to. A calculated table's DAX (on its partition) has none: it cannot read its own columns.
     /// </summary>
     private ModelObject? OwnTable(ModelObject source) => source.Kind switch
     {
         ModelObjectKind.Table => source,
         ModelObjectKind.TablePermission => _tableByName.GetValueOrDefault(source.Name),
+        ModelObjectKind.Partition => null,
         _ => _ownTable.GetValueOrDefault(Key(source)),
     };
 
+    private LoneColumnResolver LoneColumns(string expression, ModelObject source)
+        => new(expression, OwnTable(source)?.Name, ColumnTables, _tableByName.ContainsKey);
+
+    private IReadOnlyList<string> ColumnTables(string column)
+        => _columnsByName.TryGetValue(column, out var columns)
+            ? [.. columns.Select(c => _ownTable.GetValueOrDefault(Key(c))?.Name).OfType<string>()]
+            : [];
+
     /// <summary>
-    /// What <paramref name="reference"/> in <paramref name="source"/>'s DAX may mean. A lone
-    /// <c>[X]</c> is a measure first (measures are referenced unqualified), else the column of
-    /// the expression's own table, as DAX resolves it. When that table has no such column the
-    /// meaning is unknown, so every table's column of that name is a candidate.
+    /// What <paramref name="reference"/> may mean. A lone <c>[X]</c> is a measure first
+    /// (measures are referenced unqualified), else the column of every table it may bind to
+    /// (<see cref="LoneColumnResolver"/>): the innermost row context that has it and the own table.
     /// </summary>
-    private IEnumerable<ModelObject> Candidates(DaxReferenceExtractor.DaxReference reference, ModelObject? source)
+    private IEnumerable<ModelObject> Candidates(DaxReferenceExtractor.DaxReference reference, LoneColumnResolver lone)
     {
         if (reference.Shape is not DaxReferenceShape.Unqualified)
         {
-            if (Resolve(reference, source) is { } resolved)
+            if (Resolve(reference) is { } resolved)
                 yield return resolved;
             yield break;
         }
@@ -300,19 +321,13 @@ internal sealed class DependencyGraph
         if (!_columnsByName.TryGetValue(reference.Object!, out var columns))
             yield break;
 
-        var own = source is null ? null : OwnTable(source);
-        if (own is not null
-            && columns.FirstOrDefault(c => _ownTable.GetValueOrDefault(Key(c)) is { } table && ReferenceEquals(table, own)) is { } ownColumn)
-        {
-            yield return ownColumn;
-            yield break;
-        }
-
+        var tables = lone.Resolve(reference.Start, reference.Object!).Tables;
         foreach (var column in columns)
-            yield return column;
+            if (_ownTable.GetValueOrDefault(Key(column)) is { } table && tables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
+                yield return column;
     }
 
-    private ModelObject? Resolve(DaxReferenceExtractor.DaxReference reference, ModelObject? source)
+    private ModelObject? Resolve(DaxReferenceExtractor.DaxReference reference)
     {
         switch (reference.Shape)
         {
@@ -331,9 +346,6 @@ internal sealed class DependencyGraph
             // Only model functions (UDFs) resolve; built-ins like SUM( never match.
             case DaxReferenceShape.FunctionCall:
                 return _functionByName.GetValueOrDefault(reference.Object!);
-
-            case DaxReferenceShape.Unqualified:
-                return Candidates(reference, source).FirstOrDefault();
 
             default:
                 return null;

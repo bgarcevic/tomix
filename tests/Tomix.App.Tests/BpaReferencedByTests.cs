@@ -52,9 +52,9 @@ public sealed class BpaReferencedByTests
     }
 
     [Fact]
-    public void UnqualifiedReference_CountsTowardEverySameNamedColumn()
+    public void UnqualifiedReference_InsideAnIterator_CountsForTheIteratedTable()
     {
-        // An unqualified [Dup] cannot be disambiguated, so it conservatively counts for both columns.
+        // DAX binds a lone [Dup] in SUMX ( A, ... ) to A's column, not B's.
         var snapshot = new ModelSnapshot("M", 1601,
         [
             Table("A", Column("Dup", "A")),
@@ -65,20 +65,58 @@ public sealed class BpaReferencedByTests
         var model = BpaModelBuilder.Build(snapshot);
 
         Assert.True(Col(model, "A", "Dup").ReferencedBy.Count > 0);
+        Assert.Equal(0, Col(model, "B", "Dup").ReferencedBy.Count);
+    }
+
+    [Fact]
+    public void UnqualifiedReference_NothingBinds_CountsTowardEverySameNamedColumn()
+    {
+        // Facts has no [Dup] and nothing iterates one: which table it means is unknown, so it
+        // conservatively counts for both columns.
+        var snapshot = new ModelSnapshot("M", 1601,
+        [
+            Table("A", Column("Dup", "A")),
+            Table("B", Column("Dup", "B")),
+            Table("Facts", Measure("Total", "Facts", "DISTINCTCOUNT ( [Dup] )"))
+        ]);
+
+        var model = BpaModelBuilder.Build(snapshot);
+
+        Assert.True(Col(model, "A", "Dup").ReferencedBy.Count > 0);
         Assert.True(Col(model, "B", "Dup").ReferencedBy.Count > 0);
+    }
+
+    [Fact]
+    public void UnqualifiedReference_IteratingAnotherTableFromItsOwn_CountsForBoth()
+    {
+        // In A's measure, SUMX ( B, [Dup] ) reads B[Dup] where [Dup] is a value but A[Dup] where
+        // a column is expected (SUM ( [Dup] )); without function signatures both count.
+        var snapshot = new ModelSnapshot("M", 1601,
+        [
+            Table("A", Column("Dup", "A"), Measure("Total", "A", "SUMX ( B, [Dup] )")),
+            Table("B", Column("Dup", "B")),
+            Table("C", Column("Dup", "C"))
+        ]);
+
+        var model = BpaModelBuilder.Build(snapshot);
+
+        Assert.True(Col(model, "A", "Dup").ReferencedBy.Count > 0);
+        Assert.True(Col(model, "B", "Dup").ReferencedBy.Count > 0);
+        Assert.Equal(0, Col(model, "C", "Dup").ReferencedBy.Count);
     }
 
     [Fact]
     public void UnqualifiedReference_ResolvesToTheExpressionsOwnTable()
     {
-        // DAX resolves a lone [Col] against the expression's own table: A's measure reads A[Dup],
-        // and DateTableTemplate's calculated column reads its own [Date], never Sales[Date].
+        // Outside every iterator DAX resolves a lone [Col] against the expression's own table:
+        // A's measure reads A[Dup], and DateTableTemplate's calculated column reads its own
+        // [Date], never Sales[Date].
         var year = new ModelObject("Year", ModelObjectKind.CalculatedColumn, "DateTableTemplate/Year",
             Detail: null, Expression: "YEAR ( [Date] )", Description: null, Hidden: true, SourceColumn: null,
             Children: [], Properties: new Dictionary<string, string> { ["ObjectType"] = "CalculatedColumn" });
         var snapshot = new ModelSnapshot("M", 1601,
         [
-            Table("A", Column("Dup", "A"), Measure("Total", "A", "SUMX ( A, [Dup] )")),
+            Table("A", Column("Dup", "A"), Measure("Total", "A", "SUM ( [Dup] )")),
             Table("B", Column("Dup", "B")),
             Table("Sales", Column("Date", "Sales")),
             Table("DateTableTemplate", Column("Date", "DateTableTemplate"), year)

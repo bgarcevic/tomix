@@ -66,15 +66,23 @@ and the API surface that major versions protect.
 
 ### Fixed
 
-- A lone `[Col]` in DAX resolves against the expression's own table, as DAX does, instead of the
-  first table with a column of that name. `tx rm` no longer refuses to remove `Sales[Date]`
-  because `DateTableTemplate`'s `YEAR([Date])` reads its own `Date`, and `tx deps` and rename
-  fixups follow the right column. When the own table has no such column, every table's column of
-  that name still counts, so a removal blocks rather than breaking a reference.
-- BPA follows the same rule: `ReferencedBy` counts a lone `[Col]` only for the expression's own
-  table's column, so a dead `Sales[Date]` is no longer kept alive by `DateTableTemplate`'s
-  `YEAR([Date])`, and the `DAX_COLUMNS_FULLY_QUALIFIED` fix qualifies such a reference with its own
-  table instead of refusing because other tables share the name.
+- A lone `[Col]` in DAX resolves to the tables DAX can bind it to, instead of the first table
+  with a column of that name: the innermost table iterated around it that has the column
+  (`SUMX('Fact A', [Revenue])` reads `'Fact A'[Revenue]`, even in a measure of a table with its
+  own `[Revenue]`), and the expression's own table (`SUM([Revenue])`, a calculated column's row).
+  `tx rm` no longer refuses to remove `Sales[Date]` because `DateTableTemplate`'s `YEAR([Date])`
+  reads its own `Date`, and `tx deps` and rename fixups follow the right columns. Where the
+  binding is unknown (a table expression without a rule, `EARLIER`), every table's column of that
+  name still counts, so a removal blocks rather than breaking a reference.
+- BPA follows the same rule: `ReferencedBy` counts a lone `[Col]` only for the tables it may bind
+  to, so a dead `Sales[Date]` is no longer kept alive by `DateTableTemplate`'s `YEAR([Date])`, and
+  the `DAX_COLUMNS_FULLY_QUALIFIED` fix qualifies such a reference with the one table DAX binds it
+  to instead of refusing because other tables share the name. It still refuses when two tables
+  remain possible.
+- `tx validate` warns (`DAX0003`) on a lone `[Col]` that is on neither the expression's own table
+  nor a table iterated around it, such as `DISTINCTCOUNT([Region])` in a `Sales` measure when only
+  `Geo` has `Region`, which DAX rejects. It used to pass if any table had the column. The warning
+  names the qualified columns to use instead.
 - Help for subcommands such as `tx stage commit`, `tx auth login`, `tx config set` and
   `tx skills install` now shows an `Examples:` block. The `tx auth login` service-principal example
   uses `-u` for the app id instead of `--client-id`. The reference docs list every shipped option,

@@ -41,8 +41,9 @@ internal static class BpaDaxRewriter
     /// <summary>
     /// The rewritten expression, unchanged text when nothing needed rewriting, or an error naming
     /// every reference that could not be rewritten safely (the expression is then left alone).
-    /// <paramref name="ownTable"/> is the table the expression belongs to: DAX resolves a lone
-    /// <c>[Col]</c> against it, so its own column is the one to qualify with.
+    /// <paramref name="ownTable"/> is the table the expression belongs to. A lone <c>[Col]</c>
+    /// whose name several tables share is qualified only when its row contexts and that table
+    /// settle which one DAX binds it to (<see cref="LoneColumnResolver"/>).
     /// </summary>
     public static (string? Text, string? Error) Rewrite(
         string expression, BpaDaxRewrite rewrite, BpaDaxNames names, string? ownTable = null)
@@ -55,6 +56,7 @@ internal static class BpaDaxRewriter
             StringComparer.OrdinalIgnoreCase);
         var edits = new List<(int Start, int End, string Text)>();
         var errors = new List<string>();
+        var lone = new LoneColumnResolver(expression, ownTable, name => names.ColumnTables(name) ?? [], names.IsTable);
 
         foreach (var reference in DaxReferenceExtractor.Extract(expression))
         {
@@ -68,14 +70,16 @@ internal static class BpaDaxRewriter
                     || names.ColumnTables(name) is not { Count: > 0 } tables)
                     continue;
 
-                var own = ownTable is null ? null : tables.FirstOrDefault(t => string.Equals(t, ownTable, StringComparison.OrdinalIgnoreCase));
-                if (own is null && tables.Count > 1)
+                var table = tables.Count == 1 ? tables[0]
+                    : lone.Resolve(reference.Start, name) is { Certain: true, Unresolved: false, Tables: [var bound] } ? bound
+                    : null;
+                if (table is null)
                     errors.Add($"column [{name}] exists in tables {string.Join(", ", tables.Select(RenameFixup.QuoteTable))}");
                 else if (literals.Contains(name))
                     errors.Add($"[{name}] may name a query-scoped column (\"{name}\" is also a string literal)");
                 else
                     edits.Add((reference.Start, reference.End,
-                        RenameFixup.QuoteTable(own ?? tables[0]) + expression[reference.Start..(reference.End + 1)]));
+                        RenameFixup.QuoteTable(table) + expression[reference.Start..(reference.End + 1)]));
             }
             else
             {
@@ -116,12 +120,14 @@ internal sealed class BpaDaxNames
 {
     private readonly Dictionary<string, string> _measureTables = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<string>> _columnTables = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _tables = new(StringComparer.OrdinalIgnoreCase);
 
     public static BpaDaxNames FromSnapshot(ModelSnapshot snapshot)
     {
         var names = new BpaDaxNames();
         foreach (var table in snapshot.Objects.Where(o => o.Kind == ModelObjectKind.Table))
         {
+            names._tables.Add(table.Name);
             foreach (var child in table.Children)
             {
                 switch (child.Kind)
@@ -144,6 +150,8 @@ internal sealed class BpaDaxNames
     }
 
     public bool IsMeasure(string name) => _measureTables.ContainsKey(name);
+
+    public bool IsTable(string name) => _tables.Contains(name);
 
     /// <summary>The table holding measure <paramref name="name"/> (measure names are model-unique).</summary>
     public string? MeasureTable(string name) => _measureTables.GetValueOrDefault(name);
