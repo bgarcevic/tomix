@@ -185,9 +185,11 @@ internal sealed class LiveCommandRoute(
             return model.Tokens[0];
 
         // rm takes several paths, the last of which may be the model (RmCommand.SplitModelArgument).
+        var fromGiven = Symbols(parseResult).OfType<OptionResult>()
+            .Any(option => option.Option.Name == "--from" && option.Parent is CommandResult { Command.Name: "rm" } && option.Tokens.Count > 0);
         return arguments.FirstOrDefault(argument => argument.Argument.Name == "path" && argument.Parent is CommandResult { Command.Name: "rm" })
-            is { Tokens.Count: >= 2 } paths
-            && RmCommand.SplitModelArgument([.. paths.Tokens.Select(t => t.Value)], modelOptionGiven: false).Model is not null
+            is { Tokens.Count: > 0 } paths
+            && RmCommand.SplitModelArgument([.. paths.Tokens.Select(t => t.Value)], modelOptionGiven: false, fromGiven).Model is not null
                 ? paths.Tokens[^1]
                 : null;
     }

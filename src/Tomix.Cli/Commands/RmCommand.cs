@@ -103,9 +103,9 @@ internal sealed class RmCommand : ICommandModule
                 type = parsed;
             }
 
-            var (paths, modelPath) = SplitModelArgument(
-                parseResult.GetValue(pathArgument) ?? [], GlobalOptions.ModelValue(parseResult) is not null);
             var from = parseResult.GetValue(fromOption);
+            var (paths, modelPath) = SplitModelArgument(
+                parseResult.GetValue(pathArgument) ?? [], GlobalOptions.ModelValue(parseResult) is not null, from is not null);
             var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, formatValue);
             var batch = from is not null || paths.Count > 1;
             var targets = paths.Select(p => new RemoveTarget(p, type, p)).ToList();
@@ -341,13 +341,16 @@ internal sealed class RmCommand : ICommandModule
 
     /// <summary>
     /// Splits the positional values into object paths and the optional trailing model. The last
-    /// value is the model only when there are several, <c>--model</c> was not given, and it names
-    /// a folder or file that exists — object paths do not — so <c>tx rm Sales/Old ./model</c>
-    /// keeps working beside <c>tx rm Sales/Old Sales/Older</c>.
+    /// value is the model only when there are several (or one, with <c>--from</c>), <c>--model</c>
+    /// was not given, and it names a folder or file that exists — object paths do not — so
+    /// <c>tx rm Sales/Old ./model</c> and <c>tx rm --from x.jsonl ./model</c> keep working beside
+    /// <c>tx rm Sales/Old Sales/Older</c>.
     /// </summary>
-    internal static (IReadOnlyList<string> Paths, string? Model) SplitModelArgument(IReadOnlyList<string> values, bool modelOptionGiven)
+    internal static (IReadOnlyList<string> Paths, string? Model) SplitModelArgument(
+        IReadOnlyList<string> values, bool modelOptionGiven, bool fromGiven = false)
     {
-        if (values.Count >= 2 && !modelOptionGiven && (Directory.Exists(values[^1]) || File.Exists(values[^1])))
+        // With --from the targets come from the list, so a lone existing path is the model.
+        if (values.Count >= (fromGiven ? 1 : 2) && !modelOptionGiven && (Directory.Exists(values[^1]) || File.Exists(values[^1])))
             return (values.Take(values.Count - 1).ToList(), values[^1]);
 
         return (values, null);

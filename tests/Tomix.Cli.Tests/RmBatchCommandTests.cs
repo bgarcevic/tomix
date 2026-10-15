@@ -73,7 +73,7 @@ public sealed partial class RmBatchCommandTests
             "Sales/Distinct Customers",
             """{"type":"column","path":"Products/Category"}"""));
 
-        var data = Json(["rm", "--from", list, "-m", model.Path, "--save", "--yes"]);
+        var data = Json(["rm", "--from", list, model.Path, "--save", "--yes"]); // the documented trailing model
 
         Assert.Equal("saved", data.GetProperty("status").GetString());
         Assert.Equal(
@@ -181,10 +181,14 @@ public sealed partial class RmBatchCommandTests
         Assert.Equal($"A -> {dir.Path}", Split(["A", dir.Path], modelOptionGiven: false));
         Assert.Equal($"A|{dir.Path} ->", Split(["A", dir.Path], modelOptionGiven: true));
         Assert.Equal($"{dir.Path} ->", Split([dir.Path], modelOptionGiven: false));
+        // With --from the targets come from the list, so a lone existing path is the model.
+        Assert.Equal($" -> {dir.Path}", Split([dir.Path], modelOptionGiven: false, fromGiven: true));
+        Assert.Equal("A ->", Split(["A"], modelOptionGiven: false, fromGiven: true));
+        Assert.Equal($"{dir.Path} ->", Split([dir.Path], modelOptionGiven: true, fromGiven: true));
 
-        static string Split(string[] values, bool modelOptionGiven)
+        static string Split(string[] values, bool modelOptionGiven, bool fromGiven = false)
         {
-            var (paths, model) = RmCommand.SplitModelArgument(values, modelOptionGiven);
+            var (paths, model) = RmCommand.SplitModelArgument(values, modelOptionGiven, fromGiven);
             return $"{string.Join("|", paths)} ->{(model is null ? "" : " " + model)}";
         }
     }

@@ -648,6 +648,22 @@ public sealed class SharedSessionTests
     }
 
     [Theory]
+    [InlineData("rm", "Sales/A", "Sales/B")]
+    [InlineData("rm", "--from", "-")]
+    public async Task ARemoveNamingTheModelLast_RoutesToItsSession(params string[] args)
+    {
+        await using var shared = await Shared.StartAsync();
+        var full = Path.GetFullPath(shared.ModelPath);
+
+        var routed = shared.Plan([.. args, shared.ModelPath]);
+
+        // The trailing value is read as the model, so no --model from the active connection is added.
+        Assert.NotNull(routed);
+        Assert.DoesNotContain("--model", routed.Args);
+        Assert.Equal(full, routed.Args[^1]);
+    }
+
+    [Theory]
     [InlineData("diff")]
     [InlineData("bpa", "rules", "list")]
     [InlineData("summary", "--recent", "1")]
