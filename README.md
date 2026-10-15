@@ -147,7 +147,7 @@ environment when something seems off.
 Secrets never travel on the command line or in environment variables.
 `tx auth login` takes a service-principal secret from a masked prompt, a file
 (`--password-file`), or stdin — in CI:
-`printf '%s' "$SECRET" | tx auth login -u $APP_ID -t $TENANT --password -`.
+`printf '%s' "$SECRET" | tx auth login -u $APP_ID --tenant $TENANT --password -`.
 Saved credentials renew silently on Windows, macOS, and Linux.
 
 ## Scripting

@@ -29,6 +29,43 @@ fix errors instead. For example, a column name that exists in more than one tabl
 name that also appears as a string literal (a column the expression builds with
 `ADDCOLUMNS`), or a measure qualified with a table it does not belong to.
 
+A property assignment takes a quoted string, a boolean, or an enum member. A quoted
+string is taken literally, so a model-provided rule can assign DAX; escape an inner
+quote as `\"`:
+
+```
+Expression = "DIVIDE([Sales], [Cost])"
+FilterExpression = "'Region'[Name] = \"EU\""
+```
+
+An unquoted value with `(` or `[` is code the fixer cannot evaluate (for example
+`string.Concat(...)` or `Partitions[0].Name = it.Name`). Findings of such a rule are not
+marked fixable; `--fix` lists the rule once with its finding count
+(`unsupportedFixes` in JSON) and leaves them for you to fix.
+
+`--fix` without `--save` or `--stage` previews every pending fix and changes nothing.
+Fixes are grouped by rule. A property fix shows its change once over every object
+that gets it; text values are quoted, booleans and enum values are not. A fix that
+changes an expression shows its full before and after text per object,
+DAX syntax-highlighted in a terminal and plain when piped, capped at 12 lines each:
+
+```
+Pending fixes:
+  HIDE_FOREIGN_KEYS  2 columns
+    IsHidden: false → true
+      Product/Category
+      Category/Category
+  DAX_COLUMNS_FULLY_QUALIFIED  1 measure
+    Sales/Margin %
+      Expression:
+        Before:
+          DIVIDE([Margin], SUM([Amount]))
+        After:
+          DIVIDE([Margin], SUM('Sales'[Amount]))
+```
+
+A batch lists up to 10 objects; add `--full` to list them all.
+
 ![tx bpa run --fix --save: findings before the fix, then two of three fixed and saved](../assets/media/bpa.png)
 
 When fixes or rule-ignore changes are saved, the shared validation gate blocks
@@ -100,6 +137,9 @@ tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save
 | `--fix` | Fix violations whose rules provide a fix expression. Destructive `Delete()` fixes are skipped unless `--allow-delete` is set. |
 | `--allow-delete` | With `--fix`: also apply destructive `Delete()` fixes that remove model objects. Reference tracking cannot see report visuals or external consumers, so review staged changes before deploying. |
 | `--save` / `--save-to <path>` | Persist the model after applying fixes. Without these (or `--stage`), `--fix` only previews. |
+| `--stage` / `--revert` | Stage the fixes instead of saving them (commit with `tx stage commit`), or discard this model's staged changes. |
+| `--serialization <tmdl\|bim>` | On-disk format when saving (defaults to the loaded model's). |
+| `--no-sync` | Skip the workspace mirror when workspace mode is active. |
 | `--details` / `--full` | Show full guidance per rule / list every affected object. |
 | `--no-multiline` | Show each rule's guidance on one line. Text output only. |
 | `--no-model-rules` / `--no-defaults` | Skip rules embedded in the model / leave the selected standard ruleset out. |
@@ -562,6 +602,7 @@ export/import for offline analysis.
 | `--import <file.vpax>` | Analyze a previously exported `.vpax` offline (no connection needed). |
 | `--obfuscate` | Mask names and expressions in the export; a private `.dict` dictionary keeps the mapping. |
 | `--annotate` | Write statistics into the model as `Vertipaq_*` annotations (preview unless `--save`). |
+| `--save` | With `--annotate`, write the annotations to the model. |
 | `--force` | With `--annotate --save`, write despite newly introduced validation errors and report them. |
 
 ```sh
@@ -612,6 +653,7 @@ The replacement schema and release timing will be decided in that later work.
 ```
 tx doctor
 tx doctor --show-details
+tx doctor --output-format json
 ```
 
 Checks whether the local tomix environment is ready. When filing a bug,

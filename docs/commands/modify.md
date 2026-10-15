@@ -5,9 +5,9 @@ in [Editing & staging](../guides/editing.md): **preview by default**, persist
 with `--save`, batch with `--stage`, or write elsewhere with
 `--save-to <path>` (which implies `--save`). `--serialization tmdl|bim`
 controls the on-disk format, `--force` (alias `-f`) saves despite newly
-introduced validation errors, `--overwrite` lets `--save-to` replace an existing target, and
-`--no-sync` skips the workspace mirror. Without `--save`, `--save-to`, or
-`--stage`, the change is applied to the in-memory model and rendered, but
+introduced validation errors, `--overwrite` lets `--save-to` replace an existing target,
+`--no-sync` skips the workspace mirror, and `--revert` discards the model's
+staged changes. Without `--save`, `--save-to`, or `--stage`, the change is applied to the in-memory model and rendered, but
 nothing is written.
 
 Before `--save` or `--save-to` writes anything, tx runs the same validation as
@@ -292,7 +292,7 @@ their table (nested folders as deeper segments). A destination ending in
 path names them — a plain rename never touches the folder the object is
 in; to move an object out of its folder, write the folder-qualified
 source. A 3-segment path that matches a hierarchy level keeps its level
-meaning — use `-t` when a level and a folder path could collide. Folder
+meaning — use `-t, --type` when a level and a folder path could collide. Folder
 changes never affect DAX, so no reference fixup runs for them.
 
 Measures can also move to another table (optionally renaming and picking
@@ -573,6 +573,7 @@ copy back into a model.
 | `--path <path>` | Format the expression on one object. |
 | `--lang <dax\|m>` | Expression language. |
 | `--long` | Prefer long lines when formatting M (120 columns instead of 40). |
+| `-t, --type <type>` | Disambiguate `--path` when it matches several objects under a table. |
 
 ```sh
 tx format -e "CALCULATE(sum(sales[amt]))"

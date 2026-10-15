@@ -147,6 +147,48 @@ public sealed class BpaRunHandlerTests
         Assert.Equal(before, HashFiles(model));
     }
 
+    private const string UnsupportedFixRuleJson =
+        "{\"ID\":\"CSHARP_FIX\",\"Name\":\"csharp fix\",\"Category\":\"c\",\"Severity\":2,\"Scope\":\"Table\",\"Expression\":\"true\",\"FixExpression\":\"Partitions[0].Name = it.Name\",\"CompatibilityLevel\":1200}";
+
+    [Fact]
+    public async Task HandleAsync_FixWithUnsupportedFixExpression_ReportsItOncePerRuleNotAsErrors()
+    {
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+        var rulesPath = root.WriteFile("rules.json", $"[{FixableRuleJson},{UnsupportedFixRuleJson}]");
+
+        var result = await RunAsync(config, model, r => r with { RulesFiles = [rulesPath], NoDefaults = true, Fix = true });
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        var data = result.Data!;
+        var findings = data.Violations.Where(v => v.RuleId == "CSHARP_FIX").ToList();
+        Assert.NotEmpty(findings);
+        Assert.All(findings, v => Assert.False(v.CanFix));
+        var unsupported = Assert.Single(data.UnsupportedFixes);
+        Assert.Equal("CSHARP_FIX", unsupported.RuleId);
+        Assert.Equal("Partitions[0].Name = it.Name", unsupported.FixExpression);
+        Assert.Equal(findings.Count, unsupported.Findings);
+        Assert.Null(data.FixErrors);
+        Assert.Equal(0, data.FixesSkipped);
+        Assert.All(data.FixChanges, c => Assert.Equal("FIXABLE", c.RuleId));
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithoutFix_LeavesUnsupportedFixesEmpty()
+    {
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = SampleModel.CopyTo(root, "model");
+        var rulesPath = root.WriteFile("rules.json", $"[{UnsupportedFixRuleJson}]");
+
+        var result = await RunAsync(config, model, r => r with { RulesFiles = [rulesPath], NoDefaults = true });
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.All(result.Data!.Violations, v => Assert.False(v.CanFix));
+        Assert.Empty(result.Data.UnsupportedFixes);
+    }
+
     private static Dictionary<string, string> HashFiles(string folder)
         => Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
             .ToDictionary(
