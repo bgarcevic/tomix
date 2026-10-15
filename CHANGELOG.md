@@ -79,10 +79,12 @@ and the API surface that major versions protect.
   the `DAX_COLUMNS_FULLY_QUALIFIED` fix qualifies such a reference with the one table DAX binds it
   to instead of refusing because other tables share the name. It still refuses when two tables
   remain possible.
-- `tx validate` warns (`DAX0003`) on a lone `[Col]` that is on neither the expression's own table
-  nor a table iterated around it, such as `DISTINCTCOUNT([Region])` in a `Sales` measure when only
-  `Geo` has `Region`, which DAX rejects. It used to pass if any table had the column. The warning
-  names the qualified columns to use instead.
+- `tx validate` judges a lone `[Col]` by the tables DAX can bind it to; it used to pass if any
+  table had the column. Outside every iterator, in a measure, calculated column or role filter, a
+  column only another table has is a new `DAX0010` error (`DISTINCTCOUNT([Region])` in a `Sales`
+  measure when only `Geo` has `Region`), which DAX rejects too. Inside an iterator that does not
+  provide it, it is a `DAX0003` warning. Window functions' `ORDERBY`/`PARTITIONBY` columns count
+  as rows of their relation. Both messages name the qualified columns to use instead.
 - Help for subcommands such as `tx stage commit`, `tx auth login`, `tx config set` and
   `tx skills install` now shows an `Examples:` block. The `tx auth login` service-principal example
   uses `-u` for the app id instead of `--client-id`. The reference docs list every shipped option,

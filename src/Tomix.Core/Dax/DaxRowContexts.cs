@@ -83,6 +83,22 @@ public static class DaxRowContexts
         ["SAMPLE"] = 1,
     };
 
+    /// <summary>Window functions and the index of their relation argument.</summary>
+    private static readonly Dictionary<string, int> WindowRelations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["OFFSET"] = 1,
+        ["INDEX"] = 1,
+        ["WINDOW"] = 4,
+        ["RANK"] = 1,
+        ["ROWNUMBER"] = 0,
+    };
+
+    private static bool IsWindowClause(DaxNode node)
+        => node is DaxCall { FunctionName: var name }
+           && (name.Equals("ORDERBY", StringComparison.OrdinalIgnoreCase)
+               || name.Equals("PARTITIONBY", StringComparison.OrdinalIgnoreCase)
+               || name.Equals("MATCHBY", StringComparison.OrdinalIgnoreCase));
+
     private static readonly IReadOnlySet<string> None = new HashSet<string>();
 
     /// <summary>What a row of the table <paramref name="node"/> evaluates to carries.</summary>
@@ -334,6 +350,24 @@ public static class DaxRowContexts
                     IReadOnlyList<DaxRowContext> inner = [Rows(call.Arguments[tableIndex], variables), .. stack];
                     for (var i = 0; i < call.Arguments.Count; i++)
                         Visit(call.Arguments[i], i > tableIndex ? inner : stack, variables);
+                    return;
+
+                // OFFSET(-1, ALL(T[Year]), ORDERBY([Year])): the ORDERBY, PARTITIONBY and MATCHBY
+                // columns are columns of the relation (measured live). Without a relation the
+                // columns come from the filter context, which is not tracked.
+                case DaxCall call when WindowRelations.TryGetValue(call.FunctionName, out var relationIndex):
+                    var relation = relationIndex < call.Arguments.Count && !IsWindowClause(call.Arguments[relationIndex])
+                        ? Rows(call.Arguments[relationIndex], variables)
+                        : DaxRowContext.Anything;
+                    IReadOnlyList<DaxRowContext> rows = [relation, .. stack];
+                    foreach (var argument in call.Arguments)
+                    {
+                        if (IsWindowClause(argument))
+                            foreach (var column in ((DaxCall)argument).Arguments)
+                                Visit(column, rows, variables);
+                        else
+                            Visit(argument, stack, variables);
+                    }
                     return;
 
                 // EARLIER([X]) reads an outer row context; which one is not tracked.

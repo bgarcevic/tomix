@@ -27,6 +27,12 @@ public sealed class DaxRowContextsTests
     [InlineData("SUMX(SELECTCOLUMNS(Sales, \"@A\", 1), [@A])", "[@A]", "+@A")]
     [InlineData("SUMX(CROSSJOIN(VALUES(Sales[Year]), Customers), [Year])", "[Year]", "Sales[Year],Customers")]
     [InlineData("SUMX(GENERATESERIES(1, 3), [Value])", "[Value]", "+Value")]
+    // Window functions: ORDERBY/PARTITIONBY/MATCHBY columns come from the relation.
+    [InlineData("OFFSET(-1, ALL(Dates[Year]), ORDERBY([Year]))", "[Year]", "Dates[Year]")]
+    [InlineData("WINDOW(1, ABS, 3, ABS, Dates, ORDERBY([Year]), , PARTITIONBY([Month]))", "[Month]", "Dates")]
+    [InlineData("ROWNUMBER(Dates, ORDERBY([Year] * 2, DESC))", "[Year]", "Dates")]
+    [InlineData("OFFSET(-1, ORDERBY([Year]))", "[Year]", "?")]
+    [InlineData("SUMX(Sales, RANK(DENSE, ALL(Dates[Year]), ORDERBY([Year])))", "[Year]", "Dates[Year] / Sales")]
     // EARLIER reads an outer row context; which one is not tracked.
     [InlineData("SUMX(Sales, EARLIER([Amount]))", "[Amount]", "? / Sales")]
     // No rule for the table expression.

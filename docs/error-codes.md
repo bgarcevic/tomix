@@ -310,8 +310,8 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 ## Validate Issue Codes
 
 Codes carried on the issues inside a `validate` result (not top-level diagnostics; the
-command exits `1` when any error-severity issue is present). `DAX0001`–`DAX0003` and
-`DAX0006` come from the offline DAX reference scan, `DAX0004`/`DAX0005` from the offline DAX syntax check's
+command exits `1` when any error-severity issue is present). `DAX0001`–`DAX0003`,
+`DAX0006` and `DAX0010` come from the offline DAX reference scan, `DAX0004`/`DAX0005` from the offline DAX syntax check's
 token pass, and `DAX0007`–`DAX0009` from its grammar pass (the first grammar error only, and
 only when the tokens are sound). The syntax check runs first — a broken expression reports
 only its syntax issues; `M0001` comes from the offline Power Query (M) parser; `TOMIX_*` codes
@@ -321,13 +321,14 @@ come from structural integrity checks.
 |------|----------|---------|
 | `DAX0001` | Error | A DAX expression references a table that does not exist in the model. |
 | `DAX0002` | Error | A DAX expression references a column that does not exist on the named table (and no measure by that name exists). |
-| `DAX0003` | Warning | An unqualified `[X]` reference resolves to no measure or column anywhere in the model; names a column that is on neither the expression's own table nor a table iterated around it (`DISTINCTCOUNT([Region])` in a `Sales` measure when only `Geo` has `Region`; inside `SUMX(Geo, ...)` it is fine); or is a column the expression builds itself (`ADDCOLUMNS`, `SUMMARIZE`, `GENERATESERIES`, ...) used outside the table that has it. Columns the expression builds are not reported where a row of their table is in context (inside `FILTER`, `SUMX`, and other iterators over it, including through a `VAR`). Warning-severity because offline analysis cannot be certain. |
+| `DAX0003` | Warning | An unqualified `[X]` reference resolves to no measure or column anywhere in the model; names a column that is on neither the expression's own table nor a table iterated around it, inside an iterator (`SUMX(Sales, LEN([Region]))` in a `Sales` measure when only `Geo` has `Region`) or in auxiliary DAX such as a format string expression (outside every iterator in a main expression this is `DAX0010`); or is a column the expression builds itself (`ADDCOLUMNS`, `SUMMARIZE`, `GENERATESERIES`, ...) used outside the table that has it. Columns the expression builds are not reported where a row of their table is in context (inside `FILTER`, `SUMX`, and other iterators over it, including through a `VAR`). Warning-severity because offline analysis cannot be certain. |
 | `DAX0004` | Error | A DAX expression contains a character that starts no DAX token, or an unbalanced parenthesis/brace. The expression's reference checks are skipped. |
 | `DAX0005` | Error | A DAX expression contains an unterminated string, table name, column reference, or block comment. The expression's reference checks are skipped. |
 | `DAX0006` | Error | A measure or calculated column expression directly references itself. |
 | `DAX0007` | Error | The DAX parser found a token where a comma, a closing bracket, or the end of the expression belongs: a missing comma between arguments (`SUM(a b)`), or text left over after a complete expression. The expression's reference checks are skipped. |
 | `DAX0008` | Error | The DAX parser found an operator, a closing bracket, or the end of the expression where an operand belongs (`1 +`, `1 * * 2`, `f(x + )`). The expression's reference checks are skipped. |
 | `DAX0009` | Error | A `VAR` has no `=` after its name, or a `VAR` block has no `RETURN`. The expression's reference checks are skipped. |
+| `DAX0010` | Error | A measure, calculated column or role filter uses an unqualified `[X]` outside every iterator, and `X` is a column of another table only: `DISTINCTCOUNT([Region])` in a `Sales` measure when only `Geo` has `Region`. Outside an iterator DAX reads a lone column from the expression's own table, so it rejects the expression. Qualify the column (`'Geo'[Region]`) or iterate its table (`SUMX(Geo, ...)`); window functions' `ORDERBY`/`PARTITIONBY` columns count as iterated over their relation. |
 | `M0001` | Error | A Power Query (M) partition source or shared expression (including M parameters) does not lex or parse: an unterminated string, a missing `in`, an unbalanced bracket. The message names the column; the line is shown under it. Calculated-table partitions are DAX and are not parsed as M. Skipped with `--no-m`. |
 | `TOMIX_BROKEN_RELATIONSHIP` | Error | A relationship endpoint refers to a missing column. |
 | `TOMIX_BROKEN_SORT_BY` | Error | A column's sort-by column does not exist on its table. |

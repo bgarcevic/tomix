@@ -13,7 +13,8 @@ namespace Tomix.App.Dax;
 /// where DAX binds it, and <paramref name="Unresolved"/> means DAX cannot bind it at all.
 /// </param>
 /// <param name="Unresolved">No row context around the reference has the column, and neither does the own table.</param>
-internal sealed record LoneColumnBinding(IReadOnlyList<string> Tables, bool Certain, bool Unresolved);
+/// <param name="InRowContext">An iterator or window function puts rows around the reference.</param>
+internal sealed record LoneColumnBinding(IReadOnlyList<string> Tables, bool Certain, bool Unresolved, bool InRowContext = false);
 
 /// <summary>
 /// Resolves lone <c>[Col]</c> references in one expression as DAX does: a column used as a value
@@ -42,7 +43,7 @@ internal sealed class LoneColumnResolver(
 
         // Not a lone column to the parser (a hierarchy level: Product[Category].[Subcategory]).
         if (!_contexts.TryGetValue(start, out var contexts))
-            return new LoneColumnBinding(all, Certain: false, Unresolved: false);
+            return new LoneColumnBinding(all, Certain: false, Unresolved: false, InRowContext: true);
 
         var tables = new List<string>();
         var built = false;
@@ -50,7 +51,7 @@ internal sealed class LoneColumnResolver(
         foreach (var context in contexts)
         {
             if (context.Unknown || context.Sources.Any(s => !isTable(s.Table)))
-                return new LoneColumnBinding(all, Certain: false, Unresolved: false);
+                return new LoneColumnBinding(all, Certain: false, Unresolved: false, InRowContext: true);
 
             var hit = false;
             foreach (var source in context.Sources)
@@ -73,12 +74,13 @@ internal sealed class LoneColumnResolver(
             Add(tables, own);
 
         // A column the expression builds itself (ADDCOLUMNS) is no model column at all.
+        var inRows = contexts.Count > 0;
         if (tables.Count == 0 && built)
-            return new LoneColumnBinding([], Certain: true, Unresolved: false);
+            return new LoneColumnBinding([], Certain: true, Unresolved: false, inRows);
 
         return tables.Count == 0
-            ? new LoneColumnBinding(all, Certain: true, Unresolved: true)
-            : new LoneColumnBinding(tables, Certain: true, Unresolved: false);
+            ? new LoneColumnBinding(all, Certain: true, Unresolved: true, inRows)
+            : new LoneColumnBinding(tables, Certain: true, Unresolved: false, inRows);
     }
 
     private static void Add(List<string> tables, string table)

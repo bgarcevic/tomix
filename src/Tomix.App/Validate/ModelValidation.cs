@@ -138,13 +138,24 @@ internal static class ModelValidation
                     {
                         if (ownTable is not null
                             && !index.UnknownColumnTables.Contains(ownTable)
-                            && lone.Resolve(reference.Start, reference.Object!) is { Certain: true, Unresolved: true, Tables: var elsewhere })
-                            issues.Add(ValidationRules.UnresolvedReference.Issue(
-                                $"Column [{reference.Object}] is not on table '{ownTable}' or on a table iterated around it; "
-                                + $"qualify it ({string.Join(", ", elsewhere.Select(t => $"'{t}'[{reference.Object}]"))}).",
-                                obj.Path,
-                                Line(site.Expression, reference.Start),
-                                LineText(site.Expression, reference.Start)));
+                            && lone.Resolve(reference.Start, reference.Object!) is { Certain: true, Unresolved: true } binding)
+                        {
+                            var qualified = string.Join(", ", binding.Tables.Select(t => $"'{t}'[{reference.Object}]"));
+                            // Outside every iterator DAX binds it to the own table alone and
+                            // rejects the expression (measured live); inside one, a function the
+                            // analysis has no rule for could still supply the row.
+                            issues.Add(!binding.InRowContext && IsMainExpression(obj, site)
+                                ? ValidationRules.UnboundColumn.Issue(
+                                    $"Column [{reference.Object}] is not on table '{ownTable}', and no iterator around it supplies one; qualify it ({qualified}).",
+                                    obj.Path,
+                                    Line(site.Expression, reference.Start),
+                                    LineText(site.Expression, reference.Start))
+                                : ValidationRules.UnresolvedReference.Issue(
+                                    $"Column [{reference.Object}] is not on table '{ownTable}' or on a table iterated around it; qualify it ({qualified}).",
+                                    obj.Path,
+                                    Line(site.Expression, reference.Start),
+                                    LineText(site.Expression, reference.Start)));
+                        }
                         break;
                     }
 
@@ -263,6 +274,18 @@ internal static class ModelValidation
             or ModelObjectKind.Column => OwningTable(obj.Path),
         ModelObjectKind.TablePermission => obj.Name,
         _ => null,
+    };
+
+    /// <summary>
+    /// A measure's or calculated column's own expression, or a role filter — where a column out
+    /// of reach is certainly an error. Auxiliary DAX (format strings, detail rows, KPIs) and
+    /// calculation items are only warned about.
+    /// </summary>
+    private static bool IsMainExpression(ModelObject obj, DaxSite site) => obj.Kind switch
+    {
+        ModelObjectKind.Measure or ModelObjectKind.CalculatedColumn => site.Property == "Expression",
+        ModelObjectKind.TablePermission => true,
+        _ => false,
     };
 
     private static string OwningTable(string path)
