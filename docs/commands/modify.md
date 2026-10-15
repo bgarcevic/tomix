@@ -323,13 +323,16 @@ asks for confirmation; pass `--yes` to skip the prompt in scripts.
 Alias: `remove`.
 
 ```
-tx rm <path> [model] [options]
+tx rm <path>... [model] [options]
+tx rm --from <file|-> [model] [options]
 ```
 
 | Option | Description |
 |--------|-------------|
+| `--from <file\|->` | Read the objects to remove from a file, or `-` for stdin (see [Batch removal](#batch-removal)). |
+| `--cascade` | Let a batch also change objects it leaves behind (relationships, sort-by, hierarchy levels, perspectives, role permissions). |
 | `--force` | Remove even if the object has DAX dependents (reports the now-broken references). |
-| `--if-exists` | Exit 0 when the object is already gone. |
+| `--if-exists` | Exit 0 when the object is already gone; in a batch, skip missing objects. |
 | `-t, --type <type>` | Type to pick when the path matches several objects under a table. |
 
 Without `--save` or `--stage`, `rm` previews: it prints
@@ -359,6 +362,101 @@ tx rm "Sales/Obsolete"            # preview
 tx rm tables/Staging --save
 tx rm "Sales[CustomerID] -> Customers[CustomerID]" --save
 ```
+
+### Batch removal
+
+Give several paths, or list them with `--from`, to remove objects of any
+kinds as **one change**: one validation, one save, and in a live session one
+undo step. The last argument is still read as the model when it names a
+folder or file that exists, so `tx rm Sales/Old ./model` keeps working.
+
+`--from` takes one object per line. A line is either a tomix object path or
+a JSON object (JSON Lines):
+
+| Shape | Example |
+|-------|---------|
+| Path | `Sales/Old Ratio` |
+| `{type, table?, name}` | `{"type": "measure", "table": "Sales", "name": "Old Ratio"}` |
+| `{type?, path}` | `{"type": "column", "path": "Sales/Legacy Key"}` |
+
+`type` takes any `--type` value plus common spellings such as
+`calculatedTable`, `calculation group`, `calculatedColumn`, and
+`namedExpression`. `table` is required for table children (measures,
+columns, hierarchies, partitions, calculation items, calendars, KPIs);
+levels add `hierarchy`, and role members and table permissions add `role`.
+Unknown fields are ignored, so a scanner's own output can be piped in as is.
+Blank lines and lines starting with `#` are skipped.
+
+```sh
+tx rm Sales/Old "Sales/Old Ratio" Staging --save
+tx rm --from unused.jsonl                    # preview the whole set
+scanner --json | tx rm --from - --cascade --save --yes
+```
+
+Every target is resolved before anything changes. A missing or ambiguous
+target fails the whole batch and the error names all of them;
+`--if-exists` skips missing ones instead. A target inside another target (a
+column whose table is also removed, a KPI whose measure is) is reported as
+`subsumed` and goes with its parent.
+
+The guards judge the **whole deletion set**, whatever order the targets
+are listed in:
+
+- References between targets are fine: a table and its columns, a measure
+  and the measures it calls, a column and the relationship that uses it, a
+  data source and the partitions bound to it.
+- DAX in an object that survives the batch blocks it unless `--force`.
+- A partition that survives and is bound to a data-source target blocks it,
+  `--force` or not: repoint the partition or add it to the batch.
+- Structural changes to objects that survive (a relationship removed, a
+  sort-by cleared, a hierarchy level or perspective entry or role permission
+  dropped) are listed under `Would also change:` and need `--cascade`
+  (`TOMIX_RM_NEEDS_CASCADE` otherwise). The removed objects' own
+  translations go with them without asking.
+
+A blocked preview prints the command that removes the set anyway, with
+the flags it needs (`--force`, `--cascade`).
+
+The JSON result lists the removed paths under `removed` (or `wouldRemove`),
+then every input under `targets`, every structural change outside the batch
+under `cascades`, and what blocks a preview:
+
+```json
+{
+  "data": {
+    "wouldRemove": ["Sales/CustomerID", "Sales/Order Count"],
+    "targets": [
+      { "input": "Sales/CustomerID", "path": "Sales/CustomerID", "type": "column", "action": "remove" },
+      { "input": "Sales/Order Count", "path": "Sales/Order Count", "type": "measure", "action": "remove" }
+    ],
+    "cascades": [
+      {
+        "target": "Sales/CustomerID",
+        "path": "Relationships/rel-customers",
+        "type": "relationship",
+        "description": "relationship 'Sales'[CustomerID] -> 'Customers'[CustomerID]",
+        "requiresCascade": true
+      }
+    ],
+    "brokenReferences": ["Sales/Distinct Customers"],
+    "reason": "would_block",
+    "blockedBy": ["brokenReferences", "cascade"],
+    "status": "preview",
+    "saved": false,
+    "sync": { "status": "notAttempted" }
+  },
+  "diagnostics": []
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `targets[].action` | `remove`, `subsumed` (goes with `subsumedBy`), or `notFound` (skipped under `--if-exists`) |
+| `targets[].type` | The resolved kind, as a `--type` value |
+| `cascades[]` | `target` caused it; `path` and `type` name the object changed; `requiresCascade` is false only for translations |
+| `brokenReferences` | Surviving objects whose DAX references a target |
+| `boundPartitions` | Surviving partitions bound to a data-source target |
+| `blockedBy` | On a blocked preview: `brokenReferences`, `cascade`, `boundPartitions` |
 
 ## `replace` — find and replace
 

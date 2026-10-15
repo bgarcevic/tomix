@@ -514,7 +514,15 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Object path to remove"
+          "description": "Object paths to remove, together as one change, optionally followed by the model (an existing folder or file; defaults to the active connection)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Read objects to remove from a file, or '-' for stdin: one path per line, or JSON Lines of {\"type\", \"table\", \"name\"} or {\"type\", \"path\"} (unknown fields are ignored)"
+        },
+        "cascade": {
+          "type": "boolean",
+          "description": "Let a batch also change objects it leaves behind: relationships, sort-by, hierarchy levels, perspectives, and role permissions pointing at removed objects are removed or cleared"
         },
         "force": {
           "type": "boolean",
@@ -529,10 +537,7 @@
           "description": "Type to pick when the path matches several objects under a table"
         }
       },
-      "additionalProperties": false,
-      "required": [
-        "path"
-      ]
+      "additionalProperties": false
     },
     "annotations": {
       "readOnlyHint": false,

@@ -18,6 +18,19 @@ public sealed class RemoveBrokenReferencesException : Exception
 }
 
 /// <summary>
+/// Thrown when a batch removal would cascade onto objects that survive it (relationships, sort-by,
+/// hierarchy levels, perspectives, role permissions) and <c>--cascade</c> was not given. Mapped to
+/// <c>TOMIX_RM_NEEDS_CASCADE</c> by <see cref="MutationRunner"/>.
+/// </summary>
+public sealed class RemoveCascadeRequiredException : Exception
+{
+    public RemoveCascadeRequiredException(string message)
+        : base(message)
+    {
+    }
+}
+
+/// <summary>
 /// The DAX impact of removing an object. Unlike a rename there is nothing to rewrite — a
 /// reference to a deleted object cannot be fixed — so downstream references block the removal
 /// unless <c>--force</c>. Structural references (relationships, sort-by, hierarchy levels,
@@ -38,8 +51,7 @@ internal static class RemoveGuard
         // Only DAX-named kinds leave text references behind, so filter to them BEFORE the
         // uniqueness test (same partition-shares-path guard as the rename fixup).
         var matches = ModelObjectLookup.Find(snapshot, DaxObjectForm.Normalize(path), type)
-            .Where(o => o.Kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
-                or ModelObjectKind.CalculatedColumn or ModelObjectKind.Function or ModelObjectKind.Calendar)
+            .Where(o => IsDaxNamed(o.Kind))
             .ToList();
         if (matches.Count != 1)
             return []; // not-found/ambiguous is the mutator's error to raise
@@ -69,6 +81,48 @@ internal static class RemoveGuard
 
         return paths;
     }
+
+    /// <summary>
+    /// The DAX objects outside a removal set that reference anything in it — the batch form of
+    /// <see cref="ReferencingPathsAsync"/>. <paramref name="roots"/> are the removed objects
+    /// (a table stands for its measures, columns, and calendars too); <paramref name="isRemoved"/>
+    /// says whether a referencing object goes with the set, so references between targets never
+    /// block, whatever order the targets were given in. <paramref name="flattened"/> must hold the
+    /// same instances as <paramref name="roots"/>.
+    /// </summary>
+    public static IReadOnlyList<string> ReferencingPaths(
+        IReadOnlyList<ModelObject> flattened,
+        IEnumerable<ModelObject> roots,
+        Func<ModelObject, bool> isRemoved)
+    {
+        var targets = new List<ModelObject>();
+        foreach (var root in roots)
+        {
+            if (IsDaxNamed(root.Kind))
+                targets.Add(root);
+            if (root.Kind == ModelObjectKind.Table)
+                targets.AddRange(root.Children.Where(c => c.Kind is ModelObjectKind.Measure or ModelObjectKind.Column
+                    or ModelObjectKind.CalculatedColumn or ModelObjectKind.Calendar));
+        }
+
+        if (targets.Count == 0)
+            return [];
+
+        var paths = new List<string>();
+        foreach (var site in new DependencyGraph(flattened).SitesReferencingAny(targets))
+        {
+            if (isRemoved(site.Source))
+                continue;
+            if (!paths.Contains(site.Source.Path, StringComparer.OrdinalIgnoreCase))
+                paths.Add(site.Source.Path);
+        }
+
+        return paths;
+    }
+
+    private static bool IsDaxNamed(ModelObjectKind kind)
+        => kind is ModelObjectKind.Table or ModelObjectKind.Measure or ModelObjectKind.Column
+            or ModelObjectKind.CalculatedColumn or ModelObjectKind.Function or ModelObjectKind.Calendar;
 
     public static string BlockedMessage(IReadOnlyList<string> references)
         => $"Removing this object breaks {references.Count} DAX reference(s) in: "
