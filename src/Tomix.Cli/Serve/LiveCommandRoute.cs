@@ -33,7 +33,7 @@ internal sealed class LiveCommandRoute(
     /// <summary>The options and arguments whose values are local paths, read relative to the folder tx runs in.</summary>
     private static readonly HashSet<string> PathSymbols = new(StringComparer.Ordinal)
     {
-        "model", "--model", "--file", "--save-to", "--output-file", "--trx", "--rules", "--bpa-rules"
+        "model", "--model", "--file", "--from", "--save-to", "--output-file", "--trx", "--rules", "--bpa-rules"
     };
 
     private readonly Func<LiveEntry, CancellationToken, Task<WebSocket>> _connect = connect ?? ServeRelay.ConnectAsync;
@@ -67,6 +67,8 @@ internal sealed class LiveCommandRoute(
             return null;
 
         var paths = PathTokens(parseResult);
+        if (modelToken is not null)
+            paths.Add(modelToken);
         var args = new List<string>();
         foreach (var token in parseResult.Tokens)
             args.Add(paths.Contains(token) ? Absolute(token.Value) : token.Value);
@@ -178,7 +180,18 @@ internal sealed class LiveCommandRoute(
                 return option.Tokens[^1];
         }
 
-        return Symbols(parseResult).OfType<ArgumentResult>().FirstOrDefault(argument => argument.Argument.Name == "model" && argument.Tokens.Count > 0)?.Tokens[0];
+        var arguments = Symbols(parseResult).OfType<ArgumentResult>().ToList();
+        if (arguments.FirstOrDefault(argument => argument.Argument.Name == "model" && argument.Tokens.Count > 0) is { } model)
+            return model.Tokens[0];
+
+        // rm takes several paths, the last of which may be the model (RmCommand.SplitModelArgument).
+        var fromGiven = Symbols(parseResult).OfType<OptionResult>()
+            .Any(option => option.Option.Name == "--from" && option.Parent is CommandResult { Command.Name: "rm" } && option.Tokens.Count > 0);
+        return arguments.FirstOrDefault(argument => argument.Argument.Name == "path" && argument.Parent is CommandResult { Command.Name: "rm" })
+            is { Tokens.Count: > 0 } paths
+            && RmCommand.SplitModelArgument([.. paths.Tokens.Select(t => t.Value)], modelOptionGiven: false, fromGiven).Model is not null
+                ? paths.Tokens[^1]
+                : null;
     }
 
     /// <summary>The tokens that are values of <see cref="PathSymbols"/>, by reference.</summary>

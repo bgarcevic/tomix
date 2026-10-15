@@ -444,8 +444,9 @@ Replace text across model objects
 
 # tx rm (aliases: remove)
 Delete an object from the model
-  arg <path>  Object path to remove
-  arg [model]  Optional path to the model; defaults to the active connection
+  arg [path]  Object paths to remove, together as one change, optionally followed by the model (an existing folder or file; defaults to the active connection)
+  opt --from <file|->  Read objects to remove from a file, or '-' for stdin: one path per line, or JSON Lines of {"type", "table", "name"} or {"type", "path"} (unknown fields are ignored)
+  opt --cascade  Let a batch also change objects it leaves behind: relationships, sort-by, hierarchy levels, perspectives, and role permissions pointing at removed objects are removed or cleared
   opt --force, -f  Remove even if DAX still references the object, and save even if the change adds validation errors
   opt --overwrite  Allow --save-to to overwrite an existing target
   opt --if-exists  Exit 0 when the object is already gone

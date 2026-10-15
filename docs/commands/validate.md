@@ -420,7 +420,7 @@ grammar error: a missing comma or leftover text (`DAX0007`), a missing operand
 (`DAX0008`), or a `VAR` without `=` or `RETURN` (`DAX0009`). When an expression's syntax is broken, its
 reference checks are skipped, since a never-closed bracket makes everything
 after it read wrong. Syntactically valid expressions then get the offline
-reference checks (`DAX0001`–`DAX0003`, see [error codes](../error-codes.md)).
+reference checks (`DAX0001`–`DAX0003` and `DAX0010`, see [error codes](../error-codes.md)).
 
 Power Query (M) partition sources and shared expressions, including M
 parameters, are lexed and parsed by the same offline engine `tx format` uses

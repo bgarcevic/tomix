@@ -69,6 +69,26 @@ assert.equal(eof.errors[0].column, 9);
 
 assert.deepEqual(await diagnose("let x = 1 in x"), { errors: [] });
 
+// Free names: references a query or parameter outside the text must supply. Let variables,
+// record fields, function parameters and each's `_` are bound; field access is not a reference.
+const references = async (texts) => JSON.parse(await engine.references(JSON.stringify({ texts }))).results;
+const [free, unreadable] = await references([
+    `let
+    Source = #"Sales Rows",
+    r = [a = 1, b = a],
+    f = (x) => x + Env,
+    Filtered = Table.SelectRows(Source, each [Region] = Region and _ <> null)
+in
+    if Env = "PROD" then Filtered else r[b]`,
+    "let x = 1,",
+]);
+const [builtins] = await references(['#table({"a"}, {{1}})']);
+assert.deepEqual(builtins, { ok: true, names: [] });
+assert.deepEqual(free, { ok: true, names: ["Env", "Region", "Sales Rows", "Table.SelectRows"] });
+assert.equal(unreadable.ok, false);
+assert.equal(unreadable.error.kind, "parse");
+assert.deepEqual(await references([]), []);
+
 // Invalid request JSON is reported, not thrown.
 const invalid = JSON.parse(await engine.format("{"));
 assert.equal(invalid.ok, false);

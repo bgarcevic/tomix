@@ -12,6 +12,16 @@ internal sealed class LeaseGate
     private readonly Queue<TaskCompletionSource> _idle = new();
     private bool _held;
 
+    /// <summary>How many <see cref="WaitAsync"/> callers are queued, not yet granted.</summary>
+    internal int Waiting
+    {
+        get
+        {
+            lock (_lock)
+                return _waiters.Count;
+        }
+    }
+
     /// <summary>
     /// Waits for the gate behind every waiter of <see cref="WaitAsync"/>, including those that
     /// ask later: background work that must not delay a request (#423). Not cancellable.

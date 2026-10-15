@@ -161,12 +161,12 @@ public sealed class TomLiveModelSessionTests
         var first = await session.LeaseAsync(Shell, CancellationToken.None);
 
         var second = OtherClient(() => Take("second"));
-        await WaitUntilQueued();
+        await WaitUntilQueued(session, 1);
         using var cancel = new CancellationTokenSource();
         var cancelled = OtherClient(() => session.LeaseAsync(Shell, cancel.Token));
-        await WaitUntilQueued();
+        await WaitUntilQueued(session, 2);
         var third = OtherClient(() => Take("third"));
-        await WaitUntilQueued();
+        await WaitUntilQueued(session, 3);
 
         await cancel.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
@@ -323,8 +323,17 @@ public sealed class TomLiveModelSessionTests
             return Task.Run(request);
     }
 
-    /// <summary>Gives a request started on another thread time to reach the gate's queue.</summary>
-    private static Task WaitUntilQueued() => Task.Delay(100);
+    /// <summary>Waits until requests started on other threads have reached the gate's queue.</summary>
+    private static async Task WaitUntilQueued(ILiveModelSession live, int count)
+    {
+        var session = (TomLiveModelSession)live;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (session.QueuedLeases < count)
+        {
+            Assert.True(DateTime.UtcNow < deadline, $"Expected {count} queued lease requests, saw {session.QueuedLeases}.");
+            await Task.Delay(5);
+        }
+    }
 
     internal static TempDir CopyOfBasicTmdl()
     {

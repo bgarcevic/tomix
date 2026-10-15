@@ -12,6 +12,15 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx rm` removes several objects as one change: pass several paths, or `--from <file|->` with
+  JSON Lines (`{"type", "table"?, "name"}` or `{"path"}`) or plain paths. Every kind `rm`
+  supports can be mixed. All targets resolve before anything changes, the dependency guard
+  judges the whole set regardless of order, targets inside another target are folded into it,
+  and cascades onto surviving objects need `--cascade`. One validation, one save, one undo step.
+  New error codes `TOMIX_RM_NEEDS_CASCADE` and `TOMIX_RM_INPUT_INVALID`.
+- `tx rm` refuses to remove a shared expression that surviving Power Query (M) still reads (M
+  partitions, other shared expressions, refresh policy queries), using the bundled M parser.
+  JSON adds `brokenMReferences`; `--force` overrides.
 - `tx validate` checks Power Query (M) partition sources and shared expressions offline with
   the bundled M parser, and reports each one that does not parse as an `M0001` error with its
   line and column. `--no-m` (MCP: `"m": false`) skips the check (#453).
@@ -57,6 +66,25 @@ and the API surface that major versions protect.
 
 ### Fixed
 
+- A lone `[Col]` in DAX resolves to the tables DAX can bind it to, instead of the first table
+  with a column of that name: the innermost table iterated around it that has the column
+  (`SUMX('Fact A', [Revenue])` reads `'Fact A'[Revenue]`, even in a measure of a table with its
+  own `[Revenue]`), and the expression's own table (`SUM([Revenue])`, a calculated column's row).
+  `tx rm` no longer refuses to remove `Sales[Date]` because `DateTableTemplate`'s `YEAR([Date])`
+  reads its own `Date`, and `tx deps` and rename fixups follow the right columns. Where the
+  binding is unknown (a table expression without a rule, `EARLIER`), every table's column of that
+  name still counts, so a removal blocks rather than breaking a reference.
+- BPA follows the same rule: `ReferencedBy` counts a lone `[Col]` only for the tables it may bind
+  to, so a dead `Sales[Date]` is no longer kept alive by `DateTableTemplate`'s `YEAR([Date])`, and
+  the `DAX_COLUMNS_FULLY_QUALIFIED` fix qualifies such a reference with the one table DAX binds it
+  to instead of refusing because other tables share the name. It still refuses when two tables
+  remain possible.
+- `tx validate` judges a lone `[Col]` by the tables DAX can bind it to; it used to pass if any
+  table had the column. Outside every iterator, in a measure, calculated column or role filter, a
+  column only another table has is a new `DAX0010` error (`DISTINCTCOUNT([Region])` in a `Sales`
+  measure when only `Geo` has `Region`), which DAX rejects too. Inside an iterator that does not
+  provide it, it is a `DAX0003` warning. Window functions' `ORDERBY`/`PARTITIONBY` columns count
+  as rows of their relation. Both messages name the qualified columns to use instead.
 - Help for subcommands such as `tx stage commit`, `tx auth login`, `tx config set` and
   `tx skills install` now shows an `Examples:` block. The `tx auth login` service-principal example
   uses `-u` for the app id instead of `--client-id`. The reference docs list every shipped option,

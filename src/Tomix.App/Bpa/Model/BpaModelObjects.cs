@@ -262,6 +262,12 @@ public sealed class BpaReference
 
     /// <summary>The table qualifier when the reference was written <c>'Table'[X]</c>, else null.</summary>
     public string? Table { get; internal set; }
+
+    /// <summary>
+    /// The tables a column reference may resolve to: the qualifier, or for a lone column
+    /// reference every table DAX may bind it to. Not exposed to rules.
+    /// </summary>
+    internal IReadOnlyList<string>? ResolvedTables { get; set; }
 }
 
 /// <summary>Inverse of <see cref="BpaObject"/> dependencies: who references this object.</summary>

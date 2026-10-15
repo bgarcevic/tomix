@@ -122,6 +122,8 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["rm"] = [
             "tx rm Sales/Obsolete",
             "tx rm Staging --save",
+            "tx rm Sales/Old \"Sales/Old Ratio\" --save",
+            "tx rm --from unused.jsonl --cascade --save",
         ],
         ["replace"] = [
             "tx replace \"[OrderDate]\" \"[ShipDate]\"",

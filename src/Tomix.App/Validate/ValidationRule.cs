@@ -49,7 +49,7 @@ public static class ValidationRules
 
     public static readonly ValidationRule UnresolvedReference = new(
         "DAX0003", "Unresolved reference", DaxCategory, RuleSeverity.Warning, DaxScope,
-        "An unqualified reference resolves to no measure or column, or to a column the expression builds itself used outside its table.");
+        "An unqualified reference resolves to no measure or column, to a column of neither its own table nor a table iterated around it (inside an iterator, or in auxiliary DAX), or to a column the expression builds itself used outside its table.");
 
     public static readonly ValidationRule InvalidSyntax = new(
         "DAX0004", "Invalid character or unbalanced group", DaxCategory, RuleSeverity.Error, DaxScope,
@@ -74,6 +74,10 @@ public static class ValidationRules
     public static readonly ValidationRule IncompleteVarBlock = new(
         "DAX0009", "Incomplete VAR block", DaxCategory, RuleSeverity.Error, DaxScope,
         "A VAR has no '=' after its name, or a VAR block has no RETURN.");
+
+    public static readonly ValidationRule UnboundColumn = new(
+        "DAX0010", "Column out of reach", DaxCategory, RuleSeverity.Error, ["Measure", "CalculatedColumn", "ModelRole"],
+        "A lone [Col] outside every iterator names a column its own table does not have.");
 
     public static readonly ValidationRule MSyntax = new(
         "M0001", "Power Query syntax error", MCategory, RuleSeverity.Error, ["Partition", "Expression"],
@@ -107,6 +111,7 @@ public static class ValidationRules
         UnexpectedToken,
         MissingOperand,
         IncompleteVarBlock,
+        UnboundColumn,
         MSyntax,
         BrokenRelationship,
         BrokenSortBy,

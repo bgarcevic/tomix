@@ -74,7 +74,9 @@ public sealed record ModelPropertyAssignment(
 
 /// <summary><paramref name="CascadeRemoved"/> describes structural artifacts a removal took
 /// with it (relationships, hierarchy levels, perspective and translation entries, ...) so the
-/// CLI can report them.</summary>
+/// CLI can report them; <paramref name="Cascades"/> carries the same entries with the object
+/// each one changed, so a batch can tell cascades onto other targets from cascades onto
+/// objects that survive.</summary>
 public sealed record ModelObjectMutationResult(
     string Path,
     bool Changed,
@@ -84,7 +86,19 @@ public sealed record ModelObjectMutationResult(
     IReadOnlyList<string>? CascadeRemoved = null,
     IReadOnlyList<string>? RemainingPolicyPartitions = null,
     RefreshPolicyInfo? Policy = null,
-    IReadOnlyList<string>? CreatedExpressions = null);
+    IReadOnlyList<string>? CreatedExpressions = null,
+    IReadOnlyList<ModelRemoveCascade>? Cascades = null);
+
+/// <summary>One structural change a removal made to another object. <paramref name="Path"/> and
+/// <paramref name="Kind"/> name the object it changed or removed, as <see cref="ModelObject.Path"/>
+/// spells it: a relationship, a column whose sort-by was cleared, a level, a perspective, a table
+/// permission, a culture. <paramref name="Owned"/> marks an entry that belonged to the removed
+/// object itself (its translations): the object holding it loses nothing it referenced.</summary>
+public sealed record ModelRemoveCascade(
+    string Description,
+    string Path,
+    ModelObjectKind Kind,
+    bool Owned = false);
 
 public sealed record ModelReplaceResult(
     int ChangeCount,

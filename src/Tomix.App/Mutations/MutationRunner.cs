@@ -143,6 +143,12 @@ public static class MutationRunner
                 "TOMIX_RM_BREAKS_REFS", ex.Message,
                 hint: "Inspect with 'tx deps', update with 'tx replace', or re-run with --force to remove anyway.");
         }
+        catch (RemoveCascadeRequiredException ex)
+        {
+            return TomixResult<TResult>.Fail(
+                "TOMIX_RM_NEEDS_CASCADE", ex.Message,
+                hint: "Preview without --save to see every cascade, add those objects to the batch, or re-run with --cascade.");
+        }
         catch (RefreshPolicyValidationException ex)
         {
             return TomixResult<TResult>.Fail(

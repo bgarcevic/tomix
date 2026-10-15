@@ -182,13 +182,14 @@ public sealed class TomModelMutator
         var cascade = RemoveResolvedObject(target);
         return new ModelObjectMutationResult(
             target.Display, Changed: true,
-            CascadeRemoved: cascade.Count > 0 ? cascade : null);
+            CascadeRemoved: cascade.Count > 0 ? cascade.Select(c => c.Description).ToList() : null,
+            Cascades: cascade.Count > 0 ? cascade : null);
     }
 
     public ModelReplaceResult ReplaceText(ModelReplaceRequest request)
         => _replacer.Replace(request);
 
-    private IReadOnlyList<string> RemoveResolvedObject(TomResolvedObject resolved)
+    private IReadOnlyList<ModelRemoveCascade> RemoveResolvedObject(TomResolvedObject resolved)
     {
         switch (resolved.Target)
         {
@@ -241,15 +242,15 @@ public sealed class TomModelMutator
 
             case Level level when resolved.Parent is Hierarchy hierarchy:
                 {
-                    var cascade = new List<string>();
+                    var cascade = new List<ModelRemoveCascade>();
                     cascade.AddRange(TomRemoveCascade.ForLevel(_writer, level));
                     _writer.Detach(hierarchy.Levels, level);
                     if (hierarchy.Levels.Count == 0)
                     {
                         var table = hierarchy.Table;
                         cascade.AddRange(TomRemoveCascade.ForHierarchy(_writer, hierarchy));
+                        cascade.Add(TomRemoveCascade.EmptiedHierarchy(hierarchy));
                         _writer.Detach(table.Hierarchies, hierarchy);
-                        cascade.Add($"hierarchy '{table.Name}'[{hierarchy.Name}] (no levels left)");
                     }
 
                     return cascade;

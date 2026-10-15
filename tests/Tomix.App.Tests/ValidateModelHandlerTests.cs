@@ -258,6 +258,82 @@ public sealed class ValidateModelHandlerTests
         Assert.Contains(result.Data.Warnings, w => w.Code == "DAX0003" && w.Message.Contains("No Such Measure"));
     }
 
+    // A lone column must be on a table DAX can bind it to: one iterated around it, or the
+    // expression's own table. Region is only on Geo; Sales has none. Outside every iterator DAX
+    // rejects it (measured live), so it is an error.
+    [Theory]
+    [InlineData("DISTINCTCOUNT([Region])")]
+    [InlineData("CALCULATE(COUNTROWS(Geo), [Region] = \"EU\")")]
+    [InlineData("LEN([Region])")]
+    public async Task HandleAsync_FailsOnALoneColumnOutsideEveryIteratorItsTableLacks(string expression)
+    {
+        var result = await ValidateAsync(SalesAndGeoSnapshot(Measure("Total", expression)));
+
+        Assert.False(result.Data!.Valid);
+        var error = Assert.Single(result.Data.Errors);
+        Assert.Equal("DAX0010", error.Code);
+        Assert.Equal(RuleSeverity.Error, error.Severity);
+        Assert.Contains("Column [Region] is not on table 'Sales'", error.Message);
+        Assert.Contains("'Geo'[Region]", error.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_FailsOnACalculatedColumnReadingAnotherTablesColumnLoneHanded()
+    {
+        var column = new ModelObject("Copy", ModelObjectKind.CalculatedColumn, "Sales/Copy",
+            Detail: "string", Expression: "[Region]", Description: null, Hidden: false, SourceColumn: null, Children: []);
+
+        var result = await ValidateAsync(SalesAndGeoSnapshot(column));
+
+        Assert.Equal("DAX0010", Assert.Single(result.Data!.Errors).Code);
+    }
+
+    // Inside an iterator a function the analysis has no rule for could still supply the row.
+    [Theory]
+    [InlineData("SUMX(Sales, LEN([Region]))")]
+    [InlineData("SUMX(VALUES(Geo[Code]), LEN([Region]))")]
+    public async Task HandleAsync_WarnsOnALoneColumnNoIteratedTableHas(string expression)
+    {
+        var result = await ValidateAsync(SalesAndGeoSnapshot(Measure("Total", expression)));
+
+        Assert.True(result.Data!.Valid);
+        var warning = Assert.Single(result.Data.Warnings);
+        Assert.Equal("DAX0003", warning.Code);
+        Assert.Contains("Column [Region] is not on table 'Sales'", warning.Message);
+        Assert.Contains("'Geo'[Region]", warning.Message);
+    }
+
+    [Theory]
+    [InlineData("SUMX(Geo, LEN([Region]))")]
+    [InlineData("COUNTROWS(FILTER(Geo, [Region] = \"EU\"))")]
+    [InlineData("VAR g = FILTER(Geo, TRUE()) RETURN COUNTROWS(FILTER(g, [Region] = \"EU\"))")]
+    [InlineData("SUMX(SUMMARIZE(Geo, Geo[Region]), LEN([Region]))")]
+    [InlineData("SUMX(Geo, SUMX(Sales, LEN(EARLIER([Region]))))")]
+    [InlineData("SUMX(DATESYTD(Geo[Code]), LEN([Region]))")]
+    // Window functions read ORDERBY/PARTITIONBY columns from their relation (measured live).
+    [InlineData("COUNTROWS(OFFSET(-1, ALL(Geo[Region]), ORDERBY([Region])))")]
+    [InlineData("RANK(DENSE, ALL(Geo[Code], Geo[Region]), ORDERBY([Code]), , PARTITIONBY([Region]))")]
+    [InlineData("COUNTROWS(WINDOW(1, ABS, 3, ABS, ALL(Geo[Region]), ORDERBY([Region])))")]
+    // No relation: the columns come from the filter context, which is not tracked.
+    [InlineData("COUNTROWS(OFFSET(-1, ORDERBY([Region])))")]
+    public async Task HandleAsync_AcceptsALoneColumnATableAroundItMayHave(string expression)
+    {
+        var result = await ValidateAsync(SalesAndGeoSnapshot(Measure("Total", expression)));
+
+        Assert.Empty(result.Data!.Errors);
+        Assert.Empty(result.Data.Warnings);
+    }
+
+    [Theory]
+    [InlineData("Geo", null)]
+    [InlineData("Sales", "DAX0010")]
+    public async Task HandleAsync_JudgesARoleFiltersLoneColumnAgainstItsTable(string table, string? code)
+    {
+        var result = await ValidateAsync(SalesAndGeoSnapshot(Role("Reader", Permission("Reader", table, "[Region] = \"EU\""))));
+
+        Assert.Equal(code, result.Data!.Errors.Concat(result.Data.Warnings).SingleOrDefault()?.Code);
+    }
+
     [Fact]
     public async Task HandleAsync_CarriesSeverity_OnEveryIssue()
     {
@@ -667,6 +743,19 @@ public sealed class ValidateModelHandlerTests
             SourceColumn: null, Children: children);
 
         return new ModelSnapshot("test", 1601, [sales, .. roots]);
+    }
+
+    /// <summary><see cref="SalesSnapshot"/> plus a Geo table with Code and Region columns.</summary>
+    private static ModelSnapshot SalesAndGeoSnapshot(params ModelObject[] extras)
+    {
+        var sales = SalesSnapshot(extras);
+        ModelObject Column(string name) => new(name, ModelObjectKind.Column, $"Geo/{name}",
+            Detail: "string", Expression: null, Description: null, Hidden: false, SourceColumn: name, Children: []);
+        var geo = new ModelObject("Geo", ModelObjectKind.Table, "Geo",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [Column("Code"), Column("Region")]);
+
+        return sales with { Objects = [sales.Objects[0], geo, .. sales.Objects.Skip(1)] };
     }
 
     private static ModelSnapshot SnapshotWithMeasureReference()
