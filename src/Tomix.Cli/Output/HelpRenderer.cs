@@ -162,8 +162,21 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ],
         ["auth"] = [
             "tx auth login",
-            "tx auth login --auth spn --client-id $SPN_ID",
+            "tx auth login -u $APP_ID --tenant $TENANT --password-file ./secret.txt",
             "tx auth status",
+            "tx auth logout",
+        ],
+        ["auth login"] = [
+            "tx auth login",
+            "tx auth login --device-code",
+            "tx auth login -u $APP_ID --tenant $TENANT --password-file ./secret.txt",
+            "tx auth login --identity",
+        ],
+        ["auth status"] = [
+            "tx auth status",
+            "tx auth status --output-format json",
+        ],
+        ["auth logout"] = [
             "tx auth logout",
         ],
         ["bpa"] = [
@@ -195,6 +208,15 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx bpa rules init",
             "tx bpa rules --rules-file team.json init",
         ],
+        ["bpa rules list"] = [
+            "tx bpa rules list",
+            "tx bpa rules list --ruleset full",
+            "tx bpa rules list --ignored",
+        ],
+        ["bpa rules show"] = [
+            "tx bpa rules show HIDE_FOREIGN_KEYS",
+            "tx bpa rules show HIDE_FOREIGN_KEYS ./model.tmdl --output-format json",
+        ],
         ["bpa run"] = [
             "tx bpa run",
             "tx bpa run --errors --details",
@@ -225,10 +247,33 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx config show",
             "tx config set noColor true",
         ],
+        ["config init"] = [
+            "tx config init",
+            "tx config init --overwrite",
+        ],
+        ["config set"] = [
+            "tx config set noColor true",
+        ],
+        ["config show"] = [
+            "tx config show",
+            "tx config show --output-format json",
+        ],
+        ["config paths"] = [
+            "tx config paths",
+        ],
         ["profile"] = [
             "tx profile list",
             "tx profile set dev -s MyWorkspace -d Sales",
             "tx connect --profile dev",
+        ],
+        ["profile list"] = [
+            "tx profile list",
+        ],
+        ["profile show"] = [
+            "tx profile show dev",
+        ],
+        ["profile remove"] = [
+            "tx profile remove dev",
         ],
         ["profile set"] = [
             "tx profile set dev -s MyWorkspace -d Sales",
@@ -238,6 +283,18 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx skills install",
             "tx skills install --agent codex --user",
             "tx skills status",
+        ],
+        ["skills install"] = [
+            "tx skills install",
+            "tx skills install --agent codex --user",
+            "tx skills install --force",
+        ],
+        ["skills status"] = [
+            "tx skills status",
+        ],
+        ["skills uninstall"] = [
+            "tx skills uninstall",
+            "tx skills uninstall --agent claude --user",
         ],
         ["interactive"] = [
             "tx interactive ./model",
@@ -268,6 +325,21 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx stage",
             "tx stage commit",
             "tx stage discard",
+        ],
+        ["stage status"] = [
+            "tx stage status",
+        ],
+        ["stage list"] = [
+            "tx stage list",
+            "tx stage list --output-format json",
+        ],
+        ["stage commit"] = [
+            "tx stage commit",
+            "tx stage commit --force",
+        ],
+        ["stage discard"] = [
+            "tx stage discard",
+            "tx stage discard --all",
         ],
         ["update"] = [
             "tx update --check",

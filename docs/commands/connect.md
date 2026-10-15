@@ -263,6 +263,7 @@ tx save [model] [options]
 | `--supporting-files` | Write a `{modelName}.SemanticModel/` folder (with `.platform` and `definition.pbism`) around the output. |
 | `--fix-bpa` / `--bpa-rules <file>` | Apply BPA rule fixes before saving, optionally with specific rule files. |
 | `--overwrite` | Replace an existing output file or directory. |
+| `--no-sync` | Skip the workspace mirror when workspace mode is active. |
 | `-f, --force` | In a live session (`tx interactive`, `tx ui`), write over changes made to the model's files outside it, instead of failing with `TOMIX_SESSION_STALE`. |
 
 ```sh
@@ -281,9 +282,9 @@ tx auth <login|logout|status>
 | Option | Description |
 |--------|-------------|
 | `-u, --username <id>` | Service-principal application (client) id. |
-| `-p, --password <source>` | Service-principal client secret source: pass `-` to read one line from stdin. Secret values on the command line are rejected. |
+| `--password <source>` | Service-principal client secret source: pass `-` to read one line from stdin. Secret values on the command line are rejected. |
 | `--password-file <file>` | Path to a file containing the client secret (trailing newline ignored). |
-| `-t, --tenant <tenant>` | Tenant id or domain (required for service principal). |
+| `--tenant <tenant>` | Tenant id or domain (required for service principal). |
 | `--certificate <file>` | Certificate file (PEM or PKCS12) for service-principal auth. |
 | `--certificate-password <source>` / `--certificate-password-file <file>` | Certificate password via stdin (`-`) or file; plain values on the command line are rejected. |
 | `-I, --identity` | Sign in with a managed identity (Azure-hosted; use `--username` for user-assigned). |
@@ -296,8 +297,8 @@ tx auth login                          # interactive browser login
 tx auth login --device-code            # no local browser (SSH, containers)
 
 # Service principal — secret from stdin (CI) or a file, never argv
-printf '%s' "$SECRET" | tx auth login -u $APP_ID -t $TENANT --password -
-tx auth login -u $APP_ID -t $TENANT --password-file ./secret.txt
+printf '%s' "$SECRET" | tx auth login -u $APP_ID --tenant $TENANT --password -
+tx auth login -u $APP_ID --tenant $TENANT --password-file ./secret.txt
 
 tx auth status
 tx auth logout
