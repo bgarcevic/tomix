@@ -1,6 +1,7 @@
 using Tomix.App.Bpa;
 using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
+using Tomix.Core.Models;
 using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
@@ -187,37 +188,125 @@ public class BpaRenderTests
         Assert.Equal(expected, BpaRunView.HintCommand(["bpa", "run", "O'Brien.bim"], "--details"));
     }
 
-    [Fact]
-    public void PendingFix_PropertySet_ShowsHeadlineAndBeforeAfter()
-    {
-        var (headline, change) = BpaRunView.PendingFix(new BpaFixChange(
-            "FORMAT_RULE", "Measure", "Sales/Total", BpaFixAction.Set, "FormatString", Before: "", After: "#,##0"));
-
-        Assert.Equal("Would fix: Measure 'Sales/Total' — FORMAT_RULE", headline);
-        Assert.Equal("FormatString: \"\" → \"#,##0\"", change);
-    }
-
-    [Fact]
-    public void PendingFix_Delete_HasNoChangeLine()
-    {
-        var (headline, change) = BpaRunView.PendingFix(new BpaFixChange(
-            "UNUSED", "Column", "Sales/Key", BpaFixAction.Delete));
-
-        Assert.Equal("Would delete: Column 'Sales/Key' — UNUSED", headline);
-        Assert.Null(change);
-    }
+    [Theory]
+    // Text stays quoted, so an empty or one-word value is visible as text.
+    [InlineData("FormatString", "", "#,##0", "FormatString: \"\" → \"#,##0\"")]
+    [InlineData("FormatString", "General", "Percent", "FormatString: \"General\" → \"Percent\"")]
+    // Booleans, numbers and enum members read bare.
+    [InlineData("IsHidden", "false", "true", "IsHidden: false → true")]
+    [InlineData("DataType", "Double", "Decimal", "DataType: Double → Decimal")]
+    [InlineData("SortByColumn", "Month Name", "MonthKey", "SortByColumn: \"Month Name\" → MonthKey")]
+    [InlineData("SummarizeBy", null, "None", "SummarizeBy: (unset) → None")]
+    public void ChangeSummary_QuotesOnlyText(string property, string? before, string after, string expected)
+        => Assert.Equal(expected, BpaRunView.ChangeSummary(
+            new BpaFixChange("R", "Column", "T/C", BpaFixAction.Set, property, before, after)));
 
     [Fact]
-    public void PendingFix_UnsetAndMultilineLongValues_StayOnOneBoundedLine()
+    public void ChangeSummary_Delete()
+        => Assert.Equal("Delete", BpaRunView.ChangeSummary(new BpaFixChange("UNUSED", "Column", "Sales/Key", BpaFixAction.Delete)));
+
+    [Fact]
+    public void ChangeSummary_LongMultilineValue_StaysOnOneBoundedLine()
     {
-        var expression = "VAR x =\r\n    1\r\nRETURN\n" + new string('x', 100);
+        var value = "VAR x =\r\n    1\r\nRETURN\n" + new string('x', 100);
 
-        var (_, change) = BpaRunView.PendingFix(new BpaFixChange(
-            "R", "Measure", "M", BpaFixAction.Set, "Expression", Before: null, After: expression));
+        var change = BpaRunView.ChangeSummary(new BpaFixChange(
+            "R", "Column", "T/C", BpaFixAction.Set, "Description", Before: null, After: value));
 
-        Assert.StartsWith("Expression: (unset) → \"VAR x = 1 RETURN xxx", change);
+        Assert.StartsWith("Description: (unset) → \"VAR x = 1 RETURN xxx", change);
         Assert.EndsWith("…\"", change);
-        Assert.DoesNotContain('\n', change!);
+        Assert.DoesNotContain('\n', change);
+    }
+
+    [Fact]
+    public void PendingRules_GroupsByRuleThenIdenticalChange()
+    {
+        BpaFixChange Set(string rule, string type, string path, string before, string after)
+            => new(rule, type, path, BpaFixAction.Set, "FormatString", before, after);
+
+        var rules = BpaRunView.PendingRules(
+        [
+            Set("PCT", "Measure", "Sales/A", "0%", "#,##0.0 %"),
+            Set("INT", "Measure", "Sales/N", "#,0", "#,##0"),
+            Set("PCT", "Measure", "Sales/B", "0.0%", "#,##0.0 %"),
+            Set("PCT", "Measure", "Sales/C", "0%", "#,##0.0 %"),
+        ]);
+
+        Assert.Equal(["PCT", "INT"], rules.Select(r => r.RuleId));
+        var pct = rules[0];
+        Assert.Equal("3 measures", pct.Objects);
+        Assert.Equal(2, pct.Batches.Count);
+        Assert.Equal(["Sales/A", "Sales/C"], pct.Batches[0].Changes.Select(c => c.ObjectPath));
+        Assert.Equal(["Sales/B"], pct.Batches[1].Changes.Select(c => c.ObjectPath));
+        Assert.Equal("1 measure", rules[1].Objects);
+    }
+
+    [Fact]
+    public void PendingRules_ExpressionFixesStayOnePerObject()
+    {
+        BpaFixChange Rewrite(string path) => new(
+            "QUALIFY", "Measure", path, BpaFixAction.Set, "Expression", "SUM([A])", "SUM('T'[A])")
+        { ObjectKind = ModelObjectKind.Measure };
+
+        var rule = Assert.Single(BpaRunView.PendingRules([Rewrite("T/X"), Rewrite("T/Y")]));
+
+        Assert.Equal(2, rule.Batches.Count);
+        Assert.All(rule.Batches, b =>
+        {
+            Assert.Null(b.Change);
+            Assert.NotNull(b.Language);
+            Assert.Single(b.Changes);
+        });
+    }
+
+    [Theory]
+    [InlineData(new[] { "Column", "Column" }, "2 columns")]
+    [InlineData(new[] { "Hierarchy", "Hierarchy" }, "2 hierarchies")]
+    [InlineData(new[] { "Column", "Measure" }, "2 objects")]
+    public void PendingRules_CountsObjectsByType(string[] types, string expected)
+    {
+        var changes = types.Select((t, i) => new BpaFixChange("R", t, $"T/{i}", BpaFixAction.Delete)).ToList();
+
+        Assert.Equal(expected, Assert.Single(BpaRunView.PendingRules(changes)).Objects);
+    }
+
+    [Theory]
+    [InlineData("Expression", ModelObjectKind.Measure, "Dax")]
+    [InlineData("Expression", ModelObjectKind.CalculatedColumn, "Dax")]
+    [InlineData("Expression", ModelObjectKind.Table, "Dax")] // calculated-table partition
+    [InlineData("Expression", ModelObjectKind.Expression, "M")]
+    [InlineData("Expression", ModelObjectKind.Partition, "Plain")]
+    [InlineData("FilterExpression", ModelObjectKind.TablePermission, "Dax")]
+    [InlineData("FormatStringExpression", ModelObjectKind.Measure, "Dax")]
+    public void FixExpressionLanguage_ClassifiesExpressionProperties(
+        string property, ModelObjectKind kind, string expected)
+        => Assert.Equal(Enum.Parse<ExpressionLanguage>(expected), BpaRunView.FixExpressionLanguage(
+            new BpaFixChange("R", "X", "p", BpaFixAction.Set, property, "a", "b") { ObjectKind = kind }));
+
+    [Theory]
+    [InlineData("FormatString", BpaFixAction.Set)]
+    [InlineData("IsHidden", BpaFixAction.Set)]
+    [InlineData(null, BpaFixAction.Delete)]
+    public void FixExpressionLanguage_ScalarOrDelete_IsNull(string? property, BpaFixAction action)
+        => Assert.Null(BpaRunView.FixExpressionLanguage(
+            new BpaFixChange("R", "Measure", "p", action, property) { ObjectKind = ModelObjectKind.Measure }));
+
+    [Fact]
+    public void FixExpressionLines_NormalizesAndCaps()
+    {
+        var (lines, hidden) = BpaRunView.FixExpressionLines("VAR x =\r\n    1\rRETURN\n    x\n\n", cap: 3);
+
+        Assert.Equal(["VAR x =", "    1", "RETURN"], lines);
+        Assert.Equal(1, hidden);
+    }
+
+    [Fact]
+    public void FixExpressionLines_UnderCap_KeepsEveryLine()
+    {
+        var (lines, hidden) = BpaRunView.FixExpressionLines("SUM('Sales'[Amount])");
+
+        Assert.Equal(["SUM('Sales'[Amount])"], lines);
+        Assert.Equal(0, hidden);
     }
 
     [Theory]

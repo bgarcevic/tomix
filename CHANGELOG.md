@@ -25,6 +25,9 @@ and the API surface that major versions protect.
   what it accepted: each rewritten snapshot shows a Before/After table of the cells that changed
   (`differences` in JSON). Snapshots left behind by a deleted or renamed test are reported as
   orphans (`orphans` in JSON) without failing the run (#451).
+- A BPA fix expression can assign a quoted string literal as written, with `\"` and `\\`
+  escapes, so a model-provided rule can set DAX (`Expression = "DIVIDE([A], [B])"`). An
+  unquoted value with `(` or `[` is still an unsupported fix expression (#208).
 
 ### Changed
 
@@ -38,6 +41,15 @@ and the API surface that major versions protect.
   hierarchies, functions and the other kinds print as fragments instead of the property view,
   and `tx get .` prints the whole model. A model source without a serializer fails with
   `TOMIX_SCRIPT_UNSUPPORTED` (#243).
+- The `tx bpa run --fix` preview groups pending fixes by rule and shows a property change once
+  over every object that gets it (`IsHidden: false → true` over a list of columns, capped at 10
+  unless `--full`), quoting only text values. An expression fix shows full Before/After blocks,
+  DAX syntax-highlighted in a terminal and plain when piped, capped at 12 lines each, instead of
+  one line cut at 60 characters (#208).
+- A BPA finding is marked fixable (`canFix` in JSON) only when tx can run its rule's fix
+  expression. Under `--fix`, a rule whose fix tx cannot run (such as
+  `Partitions[0].Name = it.Name`) is listed once with its finding count (`unsupportedFixes` in
+  JSON) instead of adding one "Unsupported fix expression" fix error and one skip per object.
 - `tx connect -w` checks whether the workspace target already exists by listing the workspace's
   models instead of downloading the target's whole model, so the step after the model picker is
   fast on large models. A dataset that the list hides but that exists (read-only access) is still

@@ -27,7 +27,8 @@ internal static class BpaRunRenderer
             .Where(g => BpaRunView.MatchesFilter(g.Severity, view.Errors, view.Warnings, view.Info))
             .ToList();
         var fixRan = result.Preview || result.FixesApplied > 0 || result.FixesSkipped > 0
-            || result.DestructiveFixesSkipped > 0 || result.FixErrors is { Count: > 0 };
+            || result.DestructiveFixesSkipped > 0 || result.FixErrors is { Count: > 0 }
+            || result.UnsupportedFixes.Count > 0;
 
         AnsiConsole.WriteLine();
         if (groups.Count > 0)
@@ -179,6 +180,8 @@ internal static class BpaRunRenderer
                 $"  {Styling.Warning($"{result.DestructiveFixesSkipped} destructive fixes skipped")}"
                 + Styling.Muted($"{Styling.Glyphs.Dash}they delete objects; add --allow-delete to apply"));
 
+        RenderUnsupportedFixes(result);
+
         if (result.FixErrors is { Count: > 0 })
         {
             AnsiConsole.MarkupLine($"  {Styling.Error("Fix errors:")}");
@@ -210,12 +213,27 @@ internal static class BpaRunRenderer
     {
         AnsiConsole.WriteLine();
 
-        foreach (var change in result.FixChanges)
+        if (result.FixChanges.Count > 0)
+            AnsiConsole.MarkupLine(Styling.Muted("Pending fixes:"));
+
+        foreach (var rule in BpaRunView.PendingRules(result.FixChanges, Styling.Glyphs))
         {
-            var (headline, detail) = BpaRunView.PendingFix(change, Styling.Glyphs);
-            AnsiConsole.MarkupLine($"  {Styling.MarkupEscape(headline)}");
-            if (detail is not null)
-                AnsiConsole.MarkupLine($"    {Styling.Muted(detail)}");
+            AnsiConsole.MarkupLine($"  {Styling.Bold(rule.RuleId)}  {Styling.Muted(rule.Objects)}");
+            foreach (var batch in rule.Batches)
+            {
+                if (batch.Language is { } language)
+                {
+                    var change = batch.Changes[0];
+                    AnsiConsole.MarkupLine($"    {Styling.MarkupEscape(change.ObjectPath)}");
+                    RenderExpressionChange(change, language, result.MeasureNames);
+                    continue;
+                }
+
+                AnsiConsole.MarkupLine($"    {Styling.MarkupEscape(batch.Change!)}");
+                var paths = batch.Changes.Select(c => c.ObjectPath).ToList();
+                foreach (var path in BpaRunView.ObjectLines(paths, view.Full, glyphs: Styling.Glyphs))
+                    AnsiConsole.MarkupLine($"      {Styling.Muted(path)}");
+            }
         }
 
         if (result.FixChanges.Count > 0)
@@ -236,6 +254,8 @@ internal static class BpaRunRenderer
                 $"  {Styling.Warning($"{result.DestructiveFixesSkipped} destructive fixes not previewed")}"
                 + Styling.Muted($"{Styling.Glyphs.Dash}they delete objects; add --allow-delete to include them"));
 
+        RenderUnsupportedFixes(result);
+
         if (result.FixErrors is { Count: > 0 })
         {
             AnsiConsole.MarkupLine($"  {Styling.Error("Fix errors:")}");
@@ -251,6 +271,56 @@ internal static class BpaRunRenderer
                     result.FixChanges.Any(c => c.Action == BpaFixAction.Delete)
                         ? ["--fix", "--allow-delete", "--save"]
                         : ["--fix", "--save"])));
+    }
+
+    /// <summary>
+    /// Rules whose fix expression tx cannot run, once per rule with the fix and its finding count.
+    /// Their findings stay as they are; the rule needs fixing by hand or in another tool.
+    /// </summary>
+    private static void RenderUnsupportedFixes(BpaRunResult result)
+    {
+        if (result.UnsupportedFixes.Count == 0)
+            return;
+
+        var findings = result.UnsupportedFixes.Sum(u => u.Findings);
+        AnsiConsole.MarkupLine(
+            $"  {Styling.Warning($"{findings} {(findings == 1 ? "finding" : "findings")} not fixable by tx")}"
+            + Styling.Muted($"{Styling.Glyphs.Dash}the rule's fix expression is not supported:"));
+        foreach (var fix in result.UnsupportedFixes)
+            AnsiConsole.MarkupLine(
+                $"    {Styling.MarkupEscape(fix.RuleId)} {Styling.Muted($"({fix.Findings}){Styling.Glyphs.Dash}{fix.FixExpression}")}");
+    }
+
+    /// <summary>
+    /// An expression fix in the preview: the property, then its before and after text as
+    /// indented, highlighted blocks capped at <see cref="BpaRunView.FixExpressionLineCap"/>
+    /// lines. The expression lines carry no prefix, so they copy-paste as written.
+    /// </summary>
+    private static void RenderExpressionChange(
+        BpaFixChange change, ExpressionLanguage language, IReadOnlySet<string>? measureNames)
+    {
+        AnsiConsole.MarkupLine($"      {Styling.Muted($"{change.Property}:")}");
+        RenderExpressionValue("Before:", change.Before, language, measureNames);
+        RenderExpressionValue("After:", change.After, language, measureNames);
+    }
+
+    private static void RenderExpressionValue(
+        string label, string? value, ExpressionLanguage language, IReadOnlySet<string>? measureNames)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            AnsiConsole.MarkupLine($"        {Styling.Bold(label)} {Styling.Muted("(unset)")}");
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"        {Styling.Bold(label)}");
+        var (lines, hidden) = BpaRunView.FixExpressionLines(value);
+        // Highlight the block as one text so a multi-line string or comment keeps its color.
+        const string indent = "          ";
+        AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
+            language, string.Join('\n', lines.Select(l => indent + l)), measureNames));
+        if (hidden > 0)
+            AnsiConsole.MarkupLine(indent + Styling.Muted($"{Styling.Glyphs.Ellipsis} (+{hidden} {(hidden == 1 ? "line" : "lines")})"));
     }
 
     /// <summary>Copy-pasteable next steps, on stderr so piped output stays results-only.</summary>
@@ -414,6 +484,13 @@ internal static class BpaRunRenderer
             fixesSkipped = result.FixesSkipped,
             destructiveFixesSkipped = result.DestructiveFixesSkipped,
             fixErrors = result.FixErrors ?? Array.Empty<string>(),
+            // --fix: rules whose fix expression tx cannot run, once per rule; their findings have canFix false.
+            unsupportedFixes = result.UnsupportedFixes.Select(u => new
+            {
+                ruleId = u.RuleId,
+                fixExpression = u.FixExpression,
+                findings = u.Findings
+            }),
             // --fix preview: fixesApplied stays 0; the pending fixes are counted and listed
             // under fixes, and wouldRemain is what they would leave (null outside a preview).
             preview = result.Preview,
