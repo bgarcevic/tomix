@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-15
+
 ### Added
 
 - `tx rm` removes several objects as one change: pass several paths, or `--from <file|->` with
@@ -1373,7 +1375,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix-cli/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/bgarcevic/tomix-cli/compare/v0.8.0...v0.9.0
