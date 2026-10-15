@@ -39,6 +39,14 @@ and the API surface that major versions protect.
   and `tx get .` prints the whole model. A model source without a serializer fails with
   `TOMIX_SCRIPT_UNSUPPORTED` (#243).
 
+### Fixed
+
+- Help for subcommands such as `tx stage commit`, `tx auth login`, `tx config set` and
+  `tx skills install` now shows an `Examples:` block. The `tx auth login` service-principal example
+  uses `-u` for the app id instead of `--client-id`. The reference docs list every shipped option,
+  including `format --type`, `save --no-sync` and the `bpa run` staging flags, and no longer show
+  `-p`/`-t` aliases that `tx auth login` does not have (#148).
+
 ## [0.11.0] - 2026-10-12
 
 ### Added
