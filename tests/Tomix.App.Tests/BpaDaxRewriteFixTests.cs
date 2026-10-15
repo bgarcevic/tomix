@@ -49,6 +49,29 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Contains(reason, error);
     }
 
+    // CustomerID is in Sales and Customers: in an expression of either table, the lone reference
+    // means that table's own column, as DAX resolves it. Elsewhere it stays ambiguous.
+    [Theory]
+    [InlineData("Customers", "COUNTROWS(FILTER(Customers, [CustomerID] > 0))", "COUNTROWS(FILTER(Customers, 'Customers'[CustomerID] > 0))")]
+    [InlineData("Sales", "DISTINCTCOUNT([CustomerID])", "DISTINCTCOUNT('Sales'[CustomerID])")]
+    public void Rewrite_QualifiesALoneColumnWithItsOwnTable(string ownTable, string before, string expected)
+    {
+        var (text, error) = BpaDaxRewriter.Rewrite(before, BpaDaxRewrite.QualifyColumnReferences, Names(), ownTable);
+
+        Assert.Null(error);
+        Assert.Equal(expected, text);
+    }
+
+    [Fact]
+    public void Rewrite_ALoneColumnItsOwnTableLacks_StaysAmbiguous()
+    {
+        var (text, error) = BpaDaxRewriter.Rewrite(
+            "DISTINCTCOUNT([CustomerID])", BpaDaxRewrite.QualifyColumnReferences, Names(), ownTable: "Products");
+
+        Assert.Null(text);
+        Assert.Contains("column [CustomerID] exists in tables", error);
+    }
+
     [Theory]
     [InlineData("Delete()")]
     [InlineData("IsHidden = true")]
@@ -87,14 +110,15 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Empty(second.Data.FixChanges);
     }
 
+    // Products has no CustomerID, so a lone [CustomerID] there could mean Sales' or Customers'.
     [Theory]
-    [InlineData("DAX_COLUMNS_FULLY_QUALIFIED", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))", "column [CustomerID] exists in tables")]
-    [InlineData("DAX_MEASURES_UNQUALIFIED", "'Customers'[Total Sales]", "is qualified with 'Customers' but lives in 'Sales'")]
-    public async Task Fix_AmbiguousReference_ReportsFixErrorAndLeavesDaxUntouched(string ruleId, string dax, string reason)
+    [InlineData("DAX_COLUMNS_FULLY_QUALIFIED", "Products", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))", "column [CustomerID] exists in tables")]
+    [InlineData("DAX_MEASURES_UNQUALIFIED", "Sales", "'Customers'[Total Sales]", "is qualified with 'Customers' but lives in 'Sales'")]
+    public async Task Fix_AmbiguousReference_ReportsFixErrorAndLeavesDaxUntouched(string ruleId, string table, string dax, string reason)
     {
         using var config = new TempConfigDir();
         using var root = new TempDir();
-        var model = ModelWithMeasure(root, "Ambiguous", dax);
+        var model = ModelWithMeasure(root, "Ambiguous", dax, table);
 
         var result = await RunAsync(config, model, ruleId, save: true);
 
@@ -103,9 +127,24 @@ public sealed class BpaDaxRewriteFixTests
         Assert.Equal(0, data.FixesApplied);
         Assert.Empty(data.FixChanges);
         var error = Assert.Single(data.FixErrors!);
-        Assert.StartsWith($"[{ruleId}] Sales/Ambiguous: cannot rewrite safely:", error);
+        Assert.StartsWith($"[{ruleId}] {table}/Ambiguous: cannot rewrite safely:", error);
         Assert.Contains(reason, error);
-        Assert.Equal(dax, await ExpressionAsync(model, "Ambiguous"));
+        Assert.Equal(dax, await ExpressionAsync(model, "Ambiguous", table));
+    }
+
+    [Fact]
+    public async Task Fix_ALoneColumnOfTheMeasuresOwnTable_IsQualifiedWithIt()
+    {
+        // CustomerID is in Sales and Customers; in a Sales measure DAX reads Sales' own.
+        using var config = new TempConfigDir();
+        using var root = new TempDir();
+        var model = ModelWithMeasure(root, "Own", "COUNTROWS(FILTER(Sales, [CustomerID] > 0))");
+
+        var result = await RunAsync(config, model, "DAX_COLUMNS_FULLY_QUALIFIED", save: true);
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.Equal(1, result.Data!.FixesApplied);
+        Assert.Equal("COUNTROWS(FILTER(Sales, 'Sales'[CustomerID] > 0))", await ExpressionAsync(model, "Own"));
     }
 
     [Fact]
@@ -195,15 +234,16 @@ public sealed class BpaDaxRewriteFixTests
             .OpenAsync(new ModelReference(SampleModel.Locate()), CancellationToken.None).Result
             .GetSnapshotAsync(CancellationToken.None).Result);
 
-    private static string ModelWithMeasure(TempDir root, string name, string dax)
+    private static string ModelWithMeasure(TempDir root, string name, string dax, string table = "Sales")
     {
         var model = SampleModel.CopyTo(root, "model");
-        var sales = Path.Combine(model, "tables", "Sales.tmdl");
-        var text = File.ReadAllText(sales).Replace(
-            "\tcolumn SaleID",
-            $"\tmeasure {name} = {dax}\n\n\tcolumn SaleID",
+        var file = Path.Combine(model, "tables", $"{table}.tmdl");
+        var firstColumn = table == "Products" ? "\tcolumn ProductID" : "\tcolumn SaleID";
+        var text = File.ReadAllText(file).Replace(
+            firstColumn,
+            $"\tmeasure {name} = {dax}\n\n{firstColumn}",
             StringComparison.Ordinal);
-        File.WriteAllText(sales, text);
+        File.WriteAllText(file, text);
         return model;
     }
 
@@ -225,11 +265,11 @@ public sealed class BpaDaxRewriteFixTests
             .Single(c => c.Kind == ModelObjectKind.TablePermission).Expression;
     }
 
-    private static async Task<string?> ExpressionAsync(string model, string measure)
+    private static async Task<string?> ExpressionAsync(string model, string measure, string table = "Sales")
     {
         await using var session = await new TmdlModelProvider().OpenAsync(new ModelReference(model), CancellationToken.None);
         var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
-        return snapshot.Objects.Single(o => o.Name == "Sales").Children
+        return snapshot.Objects.Single(o => o.Name == table).Children
             .Single(c => c.Kind == ModelObjectKind.Measure && c.Name == measure).Expression;
     }
 

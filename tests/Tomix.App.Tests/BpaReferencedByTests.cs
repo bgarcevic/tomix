@@ -69,6 +69,32 @@ public sealed class BpaReferencedByTests
     }
 
     [Fact]
+    public void UnqualifiedReference_ResolvesToTheExpressionsOwnTable()
+    {
+        // DAX resolves a lone [Col] against the expression's own table: A's measure reads A[Dup],
+        // and DateTableTemplate's calculated column reads its own [Date], never Sales[Date].
+        var year = new ModelObject("Year", ModelObjectKind.CalculatedColumn, "DateTableTemplate/Year",
+            Detail: null, Expression: "YEAR ( [Date] )", Description: null, Hidden: true, SourceColumn: null,
+            Children: [], Properties: new Dictionary<string, string> { ["ObjectType"] = "CalculatedColumn" });
+        var snapshot = new ModelSnapshot("M", 1601,
+        [
+            Table("A", Column("Dup", "A"), Measure("Total", "A", "SUMX ( A, [Dup] )")),
+            Table("B", Column("Dup", "B")),
+            Table("Sales", Column("Date", "Sales")),
+            Table("DateTableTemplate", Column("Date", "DateTableTemplate"), year)
+        ]);
+
+        var model = BpaModelBuilder.Build(snapshot);
+
+        Assert.True(Col(model, "A", "Dup").ReferencedBy.Count > 0);
+        Assert.Equal(0, Col(model, "B", "Dup").ReferencedBy.Count);
+        Assert.True(Col(model, "DateTableTemplate", "Date").ReferencedBy.Count > 0);
+        Assert.Equal(0, Col(model, "Sales", "Date").ReferencedBy.Count);
+        // Still written unqualified, so DAX_COLUMNS_FULLY_QUALIFIED keeps flagging it.
+        Assert.Contains(model.AllMeasures.Single(m => m.Name == "Total").DependsOn.SelectMany(e => e.Value), r => !r.FullyQualified);
+    }
+
+    [Fact]
     public void UnnecessaryColumns_FlagsOnlyTheUnreferencedSameNamedColumn()
     {
         // End-to-end through the bundled rule: hidden 'B'[Dup] is unnecessary; hidden 'A'[Dup] is

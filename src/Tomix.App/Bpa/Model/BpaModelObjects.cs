@@ -262,6 +262,12 @@ public sealed class BpaReference
 
     /// <summary>The table qualifier when the reference was written <c>'Table'[X]</c>, else null.</summary>
     public string? Table { get; internal set; }
+
+    /// <summary>
+    /// The table the reference resolves to: the qualifier, or for a lone column reference the
+    /// expression's own table when it has that column; null when unknown. Not exposed to rules.
+    /// </summary>
+    internal string? ResolvedTable { get; set; }
 }
 
 /// <summary>Inverse of <see cref="BpaObject"/> dependencies: who references this object.</summary>

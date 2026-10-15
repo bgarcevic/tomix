@@ -71,6 +71,10 @@ and the API surface that major versions protect.
   because `DateTableTemplate`'s `YEAR([Date])` reads its own `Date`, and `tx deps` and rename
   fixups follow the right column. When the own table has no such column, every table's column of
   that name still counts, so a removal blocks rather than breaking a reference.
+- BPA follows the same rule: `ReferencedBy` counts a lone `[Col]` only for the expression's own
+  table's column, so a dead `Sales[Date]` is no longer kept alive by `DateTableTemplate`'s
+  `YEAR([Date])`, and the `DAX_COLUMNS_FULLY_QUALIFIED` fix qualifies such a reference with its own
+  table instead of refusing because other tables share the name.
 - Help for subcommands such as `tx stage commit`, `tx auth login`, `tx config set` and
   `tx skills install` now shows an `Examples:` block. The `tx auth login` service-principal example
   uses `-u` for the app id instead of `--client-id`. The reference docs list every shipped option,

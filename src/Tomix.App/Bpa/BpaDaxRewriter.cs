@@ -41,8 +41,11 @@ internal static class BpaDaxRewriter
     /// <summary>
     /// The rewritten expression, unchanged text when nothing needed rewriting, or an error naming
     /// every reference that could not be rewritten safely (the expression is then left alone).
+    /// <paramref name="ownTable"/> is the table the expression belongs to: DAX resolves a lone
+    /// <c>[Col]</c> against it, so its own column is the one to qualify with.
     /// </summary>
-    public static (string? Text, string? Error) Rewrite(string expression, BpaDaxRewrite rewrite, BpaDaxNames names)
+    public static (string? Text, string? Error) Rewrite(
+        string expression, BpaDaxRewrite rewrite, BpaDaxNames names, string? ownTable = null)
     {
         // A string literal can name a query-scoped column (ADDCOLUMNS(..., "Amount", ...)) that a
         // bracketed [Amount] then resolves to; re-qualifying such a reference would change what it
@@ -65,13 +68,14 @@ internal static class BpaDaxRewriter
                     || names.ColumnTables(name) is not { Count: > 0 } tables)
                     continue;
 
-                if (tables.Count > 1)
+                var own = ownTable is null ? null : tables.FirstOrDefault(t => string.Equals(t, ownTable, StringComparison.OrdinalIgnoreCase));
+                if (own is null && tables.Count > 1)
                     errors.Add($"column [{name}] exists in tables {string.Join(", ", tables.Select(RenameFixup.QuoteTable))}");
                 else if (literals.Contains(name))
                     errors.Add($"[{name}] may name a query-scoped column (\"{name}\" is also a string literal)");
                 else
                     edits.Add((reference.Start, reference.End,
-                        RenameFixup.QuoteTable(tables[0]) + expression[reference.Start..(reference.End + 1)]));
+                        RenameFixup.QuoteTable(own ?? tables[0]) + expression[reference.Start..(reference.End + 1)]));
             }
             else
             {

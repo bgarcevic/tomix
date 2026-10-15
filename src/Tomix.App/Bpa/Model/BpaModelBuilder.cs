@@ -45,6 +45,7 @@ public static class BpaModelBuilder
         var measures = new List<BpaMeasure>();
         var partitions = new List<BpaPartition>();
         var calculationItems = new List<BpaCalculationItem>();
+        var itemTables = new Dictionary<BpaCalculationItem, string>();
         var hierarchies = new List<BpaHierarchy>();
 
         foreach (var tableObj in tableObjects)
@@ -86,6 +87,7 @@ public static class BpaModelBuilder
                         var item = BuildCalculationItem(child, model);
                         tableCalcItems.Add(item);
                         calculationItems.Add(item);
+                        itemTables[item] = table.Name;
                         break;
                     case ModelObjectKind.Hierarchy:
                         hierarchies.Add(BuildHierarchy(child, model));
@@ -143,17 +145,21 @@ public static class BpaModelBuilder
         // Dependency graphs for DAX-bearing objects.
         var measureNames = new HashSet<string>(measures.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
         var columnNames = new HashSet<string>(columns.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
+        var columnsByTable = columns
+            .GroupBy(c => c.Table.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        HashSet<string>? Own(string? table) => table is null ? null : columnsByTable.GetValueOrDefault(table);
 
         foreach (var measure in measures)
-            measure.DependsOn = ComputeDependsOn(measure.Expression, measureNames, columnNames);
+            measure.DependsOn = ComputeDependsOn(measure.Expression, measureNames, columnNames, measure.Table.Name, Own(measure.Table.Name));
         foreach (var column in columns)
-            column.DependsOn = ComputeDependsOn(column.Source.Expression, measureNames, columnNames);
+            column.DependsOn = ComputeDependsOn(column.Source.Expression, measureNames, columnNames, column.Table.Name, Own(column.Table.Name));
         foreach (var item in calculationItems)
-            item.DependsOn = ComputeDependsOn(item.Expression, measureNames, columnNames);
+            item.DependsOn = ComputeDependsOn(item.Expression, measureNames, columnNames, itemTables.GetValueOrDefault(item), Own(itemTables.GetValueOrDefault(item)));
         foreach (var permission in tablePermissions)
-            permission.DependsOn = ComputeDependsOn(permission.Expression, measureNames, columnNames);
+            permission.DependsOn = ComputeDependsOn(permission.Expression, measureNames, columnNames, permission.Table?.Name, Own(permission.Table?.Name));
         foreach (var table in tables)
-            table.DependsOn = ComputeDependsOn(CalculatedTableExpression(table), measureNames, columnNames);
+            table.DependsOn = ComputeDependsOn(CalculatedTableExpression(table), measureNames, columnNames, table.Name, Own(table.Name));
 
         AssignSortByUsage(tables);
         AssignRelationshipParticipation(tables, columns, relationships);
@@ -316,12 +322,16 @@ public static class BpaModelBuilder
     /// <summary>
     /// Groups the references in a DAX expression by referenced object type, tagging each with
     /// whether it was written fully-qualified. A qualified reference is resolved to a column
-    /// first (a table qualifier implies a column); a lone reference to a measure first.
+    /// first (a table qualifier implies a column); a lone reference to a measure first. A lone
+    /// column reference resolves to <paramref name="ownTable"/>'s column when it has one, as DAX
+    /// resolves it.
     /// </summary>
     private static IReadOnlyList<BpaDependsOnEntry> ComputeDependsOn(
         string? expression,
         HashSet<string> measureNames,
-        HashSet<string> columnNames)
+        HashSet<string> columnNames,
+        string? ownTable,
+        HashSet<string>? ownColumns)
     {
         if (string.IsNullOrWhiteSpace(expression))
             return [];
@@ -352,6 +362,8 @@ public static class BpaModelBuilder
                 ObjectType = objectType,
                 Name = reference.Object,
                 Table = reference.Table,
+                ResolvedTable = reference.FullyQualified ? reference.Table
+                    : objectType == "Column" && ownColumns?.Contains(name) == true ? ownTable : null,
             });
         }
 
@@ -432,8 +444,9 @@ public static class BpaModelBuilder
 
         foreach (var measure in measures)
             measure.ReferencedBy = MakeReferencedBy([MeasureKey(measure.Name)], measuresByRef, countByRef);
-        // A column is referenced by qualified refs to its exact table[name], plus any
-        // unqualified [name] refs (which DAX resolves by context and we cannot disambiguate).
+        // A column is referenced by refs resolved to its exact table[name] (qualified, or a lone
+        // [name] in an expression of its own table), plus lone [name] refs whose own table has no
+        // such column (which table they mean is unknown, so they count for every one).
         foreach (var column in columns)
             column.ReferencedBy = MakeReferencedBy([ColumnKey(column.Table.Name, column.Name), ColumnWildcardKey(column.Name)], measuresByRef, countByRef);
     }
@@ -445,8 +458,8 @@ public static class BpaModelBuilder
     private static string ReferenceKey(BpaReference reference)
         => reference.ObjectType.Equals("Measure", StringComparison.OrdinalIgnoreCase)
             ? MeasureKey(reference.Name)
-            : reference.FullyQualified && !string.IsNullOrEmpty(reference.Table)
-                ? ColumnKey(reference.Table!, reference.Name)
+            : !string.IsNullOrEmpty(reference.ResolvedTable)
+                ? ColumnKey(reference.ResolvedTable!, reference.Name)
                 : ColumnWildcardKey(reference.Name);
 
     private static void AssignDataSourceUsage(List<BpaDataSource> dataSources, List<BpaPartition> partitions)
