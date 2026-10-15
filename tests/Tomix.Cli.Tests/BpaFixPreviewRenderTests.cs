@@ -49,9 +49,17 @@ public sealed partial class BpaFixPreviewRenderTests
     {
         var output = Render([Rewrite], plain: true);
 
-        Assert.DoesNotContain("\x1b", output);
-        Assert.Contains("\n        SUM('Sales'[Amount]) + [Margin]\n", output.Replace("\r\n", "\n"));
-        Assert.DoesNotMatch(@"[^\x00-\x7F]", output);
+        // Scoped to the preview block: Console is process-global, so a test outside
+        // ConsoleStateCollection can write its own colored output into this capture.
+        var block = Regex.Match(output, @"  Would fix: .*?(?=\nWould fix \d)", RegexOptions.Singleline).Value;
+        Assert.Equal(
+            "  Would fix: Measure 'Sales/Total' - QUALIFY_COLUMNS\n"
+            + "    Expression:\n"
+            + "      Before:\n"
+            + "        SUM([Amount]) + [Margin]\n"
+            + "      After:\n"
+            + "        SUM('Sales'[Amount]) + [Margin]\n",
+            block);
     }
 
     [Fact]
