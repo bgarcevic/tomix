@@ -4,9 +4,9 @@
 [project]
 site_name = "tomix"
 site_description = "Open-source CLI for inspecting, validating, querying, testing, and deploying tabular semantic models."
-site_url = "https://bgarcevic.github.io/tomix-cli/"
-repo_url = "https://github.com/bgarcevic/tomix-cli"
-repo_name = "bgarcevic/tomix-cli"
+site_url = "https://bgarcevic.github.io/tomix/"
+repo_url = "https://github.com/bgarcevic/tomix"
+repo_name = "bgarcevic/tomix"
 edit_uri = "edit/main/docs/"
 
 nav = [

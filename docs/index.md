@@ -76,11 +76,11 @@ settling but not settled; JSON field names and exit codes may still change
 before 1.0.
 
 If you try it and something breaks or reads wrong, an
-[issue](https://github.com/bgarcevic/tomix-cli/issues) with the output of
+[issue](https://github.com/bgarcevic/tomix/issues) with the output of
 `tx doctor` attached is genuinely useful at this stage.
 
 ## License
 
-[MIT](https://github.com/bgarcevic/tomix-cli/blob/main/LICENSE). Third-party
+[MIT](https://github.com/bgarcevic/tomix/blob/main/LICENSE). Third-party
 components and the provenance of the bundled BPA rules are documented in
-[THIRD-PARTY-NOTICES.md](https://github.com/bgarcevic/tomix-cli/blob/main/THIRD-PARTY-NOTICES.md).
+[THIRD-PARTY-NOTICES.md](https://github.com/bgarcevic/tomix/blob/main/THIRD-PARTY-NOTICES.md).

@@ -6,7 +6,7 @@ test suite or in `scripts/qa/` (offline, self-testing harnesses); this page
 covers only what those cannot prove: network behavior, server-side state
 changes, permissions, and engine semantics against real data.
 
-The fixture for this pass is [`samples/qa-fixture`](https://github.com/bgarcevic/tomix-cli/tree/main/samples/qa-fixture)
+The fixture for this pass is [`samples/qa-fixture`](https://github.com/bgarcevic/tomix/tree/main/samples/qa-fixture)
 — its README records the expected manifest (counts, findings, query results)
 you compare against. A check with no expected value recorded is not a check.
 

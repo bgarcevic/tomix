@@ -9,7 +9,7 @@ description: Inspects, edits, lints, diffs, queries, and deploys Power BI, Fabri
 (`Sales`, `Sales/Total Sales`, `Sales/Measures`). Data goes to stdout, diagnostics go to stderr.
 
 Check the install with `tx doctor`. If `tx` is missing, ask the user to install it:
-https://bgarcevic.github.io/tomix-cli/getting-started/installation/
+https://bgarcevic.github.io/tomix/getting-started/installation/
 
 ## How to call it
 
@@ -22,7 +22,7 @@ https://bgarcevic.github.io/tomix-cli/getting-started/installation/
   - `ls` and `find` tables shorten long expressions. Read one in full with `tx get <path>`.
 - Errors arrive on stderr as one JSON object: `{"error", "code", "severity", "hint"}`.
   Read `hint` before retrying. Codes are listed at
-  https://bgarcevic.github.io/tomix-cli/error-codes/
+  https://bgarcevic.github.io/tomix/error-codes/
 - Exit codes:
   - `0` ok, `1` failure, `2` usage or precondition error.
   - `3` from `tx deploy` or `tx refresh` without `--yes`: the preview ran and nothing was applied.
@@ -160,4 +160,4 @@ overwrite flags or `--skip-bpa` unless the user asks for them.
 ## Task references
 
 - CI pipelines (GitHub Actions, Azure DevOps): [references/ci.md](references/ci.md)
-- Full command reference: https://bgarcevic.github.io/tomix-cli/commands/
+- Full command reference: https://bgarcevic.github.io/tomix/commands/

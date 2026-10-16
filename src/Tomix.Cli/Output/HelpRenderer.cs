@@ -14,7 +14,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
     /// </summary>
     public override bool ClearsParseErrors => true;
 
-    internal const string DocsUrl = "https://bgarcevic.github.io/tomix-cli/";
+    internal const string DocsUrl = "https://bgarcevic.github.io/tomix/";
 
     /// <summary>Help never wraps wider than this, however wide the terminal (clap's default too).</summary>
     internal const int MaxWidth = 100;

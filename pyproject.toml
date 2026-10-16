@@ -1,7 +1,7 @@
 [project]
 name = "tomix-docs"
 version = "0.0.0"
-description = "Documentation tooling for tomix-cli — the docs site is built with Zensical (zensical.toml + docs/)."
+description = "Documentation tooling for tomix — the docs site is built with Zensical (zensical.toml + docs/)."
 requires-python = ">=3.11"
 dependencies = []
 

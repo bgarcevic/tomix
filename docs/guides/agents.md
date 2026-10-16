@@ -38,7 +38,7 @@ that works too. It installs the latest version from GitHub, which may describe
 commands newer than your `tx`:
 
 ```sh
-npx skills add bgarcevic/tomix-cli --skill tomix
+npx skills add bgarcevic/tomix --skill tomix
 ```
 
 ## Agents without skills
@@ -103,5 +103,5 @@ for the tools and options.
 - In a live session (`tx mcp` tools, or a model open in `tx ui`), edit through the session and
   never the files. Save file models when done, and ask before saving to a server.
 
-The skill's [CI reference](https://github.com/bgarcevic/tomix-cli/blob/main/skills/tomix/references/ci.md)
+The skill's [CI reference](https://github.com/bgarcevic/tomix/blob/main/skills/tomix/references/ci.md)
 has GitHub Actions workflows for pull-request checks and deploying after merge.

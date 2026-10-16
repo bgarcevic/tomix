@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.sh | sh
+      - run: curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.sh | sh
       - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: tx validate -m "./MyModel.SemanticModel" --ci github --non-interactive
       - run: tx bpa run -m "./MyModel.SemanticModel" --ci github --non-interactive
@@ -59,7 +59,7 @@ jobs:
     environment: production        # require a reviewer in the repository settings
     steps:
       - uses: actions/checkout@v4
-      - run: curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.sh | sh
+      - run: curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.sh | sh
       - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: printf '%s' "$CLIENT_SECRET" | tx auth login -u "$CLIENT_ID" -t "$TENANT_ID" --password -
         env:

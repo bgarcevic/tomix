@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-08
-- **Issue:** [#352](https://github.com/bgarcevic/tomix-cli/issues/352), part of epic [#341](https://github.com/bgarcevic/tomix-cli/issues/341)
+- **Issue:** [#352](https://github.com/bgarcevic/tomix/issues/352), part of epic [#341](https://github.com/bgarcevic/tomix/issues/341)
 - **Answers:** the performance questions that [ADR 0001](adr-0001-live-model-session.md) §3 and §7, [ADR 0002](adr-0002-live-session-lease-gate-and-journal-first.md) and [ADR 0003](adr-0003-live-session-checkpoint-rollback.md) left to #352. It changes none of their decisions.
 
 ## Context
@@ -44,7 +44,7 @@ Opening a session, saving, a cold `bpa.run` and the derived-data recompute have 
 
 ### 3. Results
 
-These are the medians of three Release runs on an AMD Ryzen AI 7 PRO 350 with 24 GB, under Windows 11 and .NET 10, on 2026-10-08. The first column is from #352, and the second is after [#423](https://github.com/bgarcevic/tomix-cli/issues/423) (§4).
+These are the medians of three Release runs on an AMD Ryzen AI 7 PRO 350 with 24 GB, under Windows 11 and .NET 10, on 2026-10-08. The first column is from #352, and the second is after [#423](https://github.com/bgarcevic/tomix/issues/423) (§4).
 
 | Operation | Median (ms), #352 | Median (ms), #423 | Target (ms) |
 |---|---:|---:|---:|

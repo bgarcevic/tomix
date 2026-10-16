@@ -29,7 +29,7 @@ public sealed record ValidationRule(
 public static class ValidationRules
 {
     /// <summary>Where the validate issue codes are documented.</summary>
-    public const string DocsUrl = "https://bgarcevic.github.io/tomix-cli/error-codes/#validate-issue-codes";
+    public const string DocsUrl = "https://bgarcevic.github.io/tomix/error-codes/#validate-issue-codes";
 
     private const string DaxCategory = "DAX Expressions";
     private const string MCategory = "Power Query Expressions";

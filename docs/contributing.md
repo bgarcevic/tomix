@@ -1,7 +1,7 @@
 # How to contribute
 
 The full contribution guide lives in
-[CONTRIBUTING.md](https://github.com/bgarcevic/tomix-cli/blob/main/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/bgarcevic/tomix/blob/main/CONTRIBUTING.md)
 in the repository — this page is the short version.
 
 ## Getting set up
@@ -84,7 +84,7 @@ Linux; it needs the .NET SDK and a monospace font (Cascadia Mono preferred).
 
 ## Bugs and ideas
 
-Open an [issue](https://github.com/bgarcevic/tomix-cli/issues). For bugs,
+Open an [issue](https://github.com/bgarcevic/tomix/issues). For bugs,
 include the output of `tx doctor`, the command you ran, and what you
 expected. Issues labeled `good first issue` are scoped to be doable without
 understanding the whole codebase.

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-`tomix-cli` is licensed under the [MIT License](LICENSE). It redistributes, depends on, or derives
+`tomix` is licensed under the [MIT License](LICENSE). It redistributes, depends on, or derives
 from the third-party components below. Each remains under its own license, reproduced or linked here
 to satisfy that license's attribution requirements.
 
@@ -61,7 +61,7 @@ only and is not redistributed.
 
 ## Tabular Editor (interoperability; no code used)
 
-`tomix-cli` is not affiliated with, endorsed by, or sponsored by Tabular Editor ApS. "Tabular
+`tomix` is not affiliated with, endorsed by, or sponsored by Tabular Editor ApS. "Tabular
 Editor" is used in this repository only to describe compatibility and prior art.
 
 **No Tabular Editor source code, binaries, or other files are used, included, or redistributed**,

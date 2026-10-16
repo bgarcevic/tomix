@@ -10,7 +10,7 @@ in a terminal, in scripts, in CI, in a diff.
 
 ![tx connecting to a PBIP model, searching expressions, and tracing a measure's dependencies](docs/assets/media/explore.gif)
 
-Read the full [documentation](https://bgarcevic.github.io/tomix-cli/) for
+Read the full [documentation](https://bgarcevic.github.io/tomix/) for
 installation, quickstart guides, command references, and scripting examples.
 
 ```
@@ -82,14 +82,14 @@ Standalone binary, no runtime required:
 
 ```sh
 # Linux / macOS
-curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.sh | sh
 
 # Windows
-powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.ps1 | iex"
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.ps1 | iex"
 ```
 
 If you have the .NET SDK: `dotnet tool install -g Tomix.Cli`. Archives for six
-platforms are on the [releases page](https://github.com/bgarcevic/tomix-cli/releases);
+platforms are on the [releases page](https://github.com/bgarcevic/tomix/releases);
 checksums included.
 
 Connecting to a locally running Power BI Desktop instance (`--local`) is
@@ -139,7 +139,7 @@ release-notes preview)
 
 Working from a coding agent? `tx skills install` teaches Claude Code, Codex,
 and other Agent Skills harnesses how to use `tx`; see
-[Using tomix from your agent](https://bgarcevic.github.io/tomix-cli/guides/agents/).
+[Using tomix from your agent](https://bgarcevic.github.io/tomix/guides/agents/).
 
 `tx <command> --help` shows options and examples. `tx doctor` checks your
 environment when something seems off.
