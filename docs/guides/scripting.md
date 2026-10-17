@@ -105,7 +105,7 @@ failing test. Accept intentional result changes by re-running
 `tx test --update` locally and committing the snapshot diff.
 
 Ready-made workflow examples live in the
-[samples folder](https://github.com/bgarcevic/tomix-cli/tree/main/samples).
+[samples folder](https://github.com/bgarcevic/tomix/tree/main/samples).
 
 ### Refresh-policy bootstrap
 

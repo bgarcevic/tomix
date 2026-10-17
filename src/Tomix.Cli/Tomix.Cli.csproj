@@ -32,8 +32,8 @@
     <Authors>Boris Garcevic</Authors>
     <Description>tx - open-source CLI for inspecting, validating, querying, testing, and deploying tabular semantic models (Power BI, Microsoft Fabric, Analysis Services).</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/bgarcevic/tomix-cli</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/bgarcevic/tomix-cli</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/bgarcevic/tomix</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/bgarcevic/tomix</RepositoryUrl>
     <PackageTags>powerbi;fabric;analysis-services;tabular;tmdl;semantic-model;dax;cli</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

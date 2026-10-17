@@ -1,12 +1,12 @@
 # tx installer — usage:
-#   powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.ps1 | iex"
+#   powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.ps1 | iex"
 # Pin a version:    $env:TOMIX_VERSION = '0.2.0'; irm ... | iex
 # Custom location:  $env:TOMIX_INSTALL = 'D:\tools\tx'; irm ... | iex
-# Other repo (forks/CI): $env:TOMIX_REPO = 'you/tomix-cli'; irm ... | iex
+# Other repo (forks/CI): $env:TOMIX_REPO = 'you/tomix'; irm ... | iex
 
 $ErrorActionPreference = 'Stop'
 
-$Repo = if ($env:TOMIX_REPO) { $env:TOMIX_REPO } else { 'bgarcevic/tomix-cli' }
+$Repo = if ($env:TOMIX_REPO) { $env:TOMIX_REPO } else { 'bgarcevic/tomix' }
 $Version = if ($env:TOMIX_VERSION) { $env:TOMIX_VERSION } else { 'latest' }
 $InstallDir = if ($env:TOMIX_INSTALL) { $env:TOMIX_INSTALL } else { Join-Path $env:LOCALAPPDATA 'Programs\tx' }
 

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted. §2 is superseded by [ADR 0003](adr-0003-live-session-checkpoint-rollback.md) where it makes the journal the source of rollback and undo.
 - **Date:** 2026-10-01
-- **Issue:** [#343](https://github.com/bgarcevic/tomix-cli/issues/343), part of epic [#341](https://github.com/bgarcevic/tomix-cli/issues/341)
+- **Issue:** [#343](https://github.com/bgarcevic/tomix/issues/343), part of epic [#341](https://github.com/bgarcevic/tomix/issues/341)
 - **Supersedes:** [ADR 0001](adr-0001-live-model-session.md) §3 (threading model), the threading parts of §4 (cancellation and explicit grouping), and the order of work in its Consequences section. All other decisions in ADR 0001 stand.
 
 ## Context
@@ -34,7 +34,7 @@ ADR 0001 §4 also has #344 route every TOM write through `TomChangeJournal`, and
 
 ### 2. The journal lands before the live session
 
-- **A journal PR ([#379](https://github.com/bgarcevic/tomix-cli/issues/379)) comes between #343 and #344.** It adds `TomWriter`, `TomChangeJournal` and `TomObjectIdMap`, and moves every TOM write in the mutation collaborators onto `TomWriter`. The primitives are those of ADR 0001 §4:
+- **A journal PR ([#379](https://github.com/bgarcevic/tomix/issues/379)) comes between #343 and #344.** It adds `TomWriter`, `TomChangeJournal` and `TomObjectIdMap`, and moves every TOM write in the mutation collaborators onto `TomWriter`. The primitives are those of ADR 0001 §4:
   - `Set`: one generic method for every property, for example `w.Set(measure, m => m.Expression, value)` in place of `measure.Expression = value`.
   - `Attach` and `Detach` for collection adds and removes.
   - `Rebind` wherever TOM replaces an instance.

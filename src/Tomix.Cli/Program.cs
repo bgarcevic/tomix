@@ -184,7 +184,7 @@ internal static class Program
                         "TOMIX_PROVIDER_AMBIGUOUS",
                         DiagnosticSeverity.Error,
                         ex.Message,
-                        "Report this at https://github.com/bgarcevic/tomix-cli/issues.")],
+                        "Report this at https://github.com/bgarcevic/tomix/issues.")],
                     GlobalOptions.ErrorFormatValue(parseResult));
                 return 1;
             default:
@@ -196,7 +196,7 @@ internal static class Program
                         "TOMIX_UNEXPECTED",
                         DiagnosticSeverity.Error,
                         $"Unexpected error: {exception.Message}",
-                        "Re-run with --debug for the full stack trace; if this persists, report it at https://github.com/bgarcevic/tomix-cli/issues.")],
+                        "Re-run with --debug for the full stack trace; if this persists, report it at https://github.com/bgarcevic/tomix/issues.")],
                     GlobalOptions.ErrorFormatValue(parseResult),
                     detail: parseResult.GetValue(GlobalOptions.Debug) ? exception.ToString() : null);
 

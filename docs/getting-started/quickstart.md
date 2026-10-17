@@ -1,7 +1,7 @@
 # Quickstart
 
 This walkthrough uses the sample model that ships with the repository. Clone
-it (or download [`samples/basic-tmdl`](https://github.com/bgarcevic/tomix-cli/tree/main/samples))
+it (or download [`samples/basic-tmdl`](https://github.com/bgarcevic/tomix/tree/main/samples))
 if you want to follow along exactly — every command works the same against
 your own TMDL folder or `.bim` file.
 

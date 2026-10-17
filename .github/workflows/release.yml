@@ -422,7 +422,7 @@ jobs:
       # never block the binary channel. Trusted Publishing (OIDC) replaces a
       # long-lived API key: NuGet/login exchanges this job's GitHub OIDC token
       # for a 1-hour key, authorized by the policy configured on nuget.org
-      # (owner bgarcevic, repo tomix-cli, workflow file release.yml). All steps
+      # (owner bgarcevic, repo tomix, workflow file release.yml). All steps
       # no-op when the NUGET_USER secret (nuget.org profile name) is unset
       # (forks, and the canonical repo until the nuget.org policy exists);
       # --skip-duplicate keeps tag re-runs idempotent.

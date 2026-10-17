@@ -8,17 +8,17 @@ platform, verifies its checksum, and puts `tx` on your `PATH`:
 === "Linux / macOS"
 
     ```sh
-    curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.sh | sh
+    curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.sh | sh
     ```
 
 === "Windows"
 
     ```powershell
-    powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.ps1 | iex"
+    powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.ps1 | iex"
     ```
 
 Archives for six platforms are on the
-[releases page](https://github.com/bgarcevic/tomix-cli/releases), checksums
+[releases page](https://github.com/bgarcevic/tomix/releases), checksums
 included, if you prefer to install manually.
 
 ## .NET tool
@@ -34,8 +34,8 @@ dotnet tool install -g Tomix.Cli
 You need the .NET 10 SDK:
 
 ```sh
-git clone https://github.com/bgarcevic/tomix-cli
-cd tomix-cli
+git clone https://github.com/bgarcevic/tomix
+cd tomix
 dotnet build
 ./tx doctor        # .\tx.ps1 doctor on Windows
 ```

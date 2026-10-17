@@ -1,14 +1,14 @@
 #!/bin/sh
 # tx installer — usage:
-#   curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix-cli/main/install/install.sh | sh
+#   curl -LsSf https://raw.githubusercontent.com/bgarcevic/tomix/main/install/install.sh | sh
 # Pin a version:    curl -LsSf ... | TOMIX_VERSION=0.2.0 sh
 # Custom location:  curl -LsSf ... | TOMIX_INSTALL=~/bin sh
-# Other repo (forks/CI): curl -LsSf ... | TOMIX_REPO=you/tomix-cli sh
+# Other repo (forks/CI): curl -LsSf ... | TOMIX_REPO=you/tomix sh
 # (Set the variables on the sh side of the pipe: a VAR=x prefix on curl
 #  would apply to curl only, and the installer would never see it.)
 set -eu
 
-REPO="${TOMIX_REPO:-bgarcevic/tomix-cli}"
+REPO="${TOMIX_REPO:-bgarcevic/tomix}"
 VERSION="${TOMIX_VERSION:-latest}"
 INSTALL_DIR="${TOMIX_INSTALL:-$HOME/.local/bin}"
 

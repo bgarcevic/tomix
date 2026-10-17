@@ -12,7 +12,7 @@ namespace Tomix.App.Update;
 public sealed class GitHubReleaseSource : IReleaseSource
 {
     private const string Owner = "bgarcevic";
-    private const string Repo = "tomix-cli";
+    private const string Repo = "tomix";
     private const string ApiBase = $"https://api.github.com/repos/{Owner}/{Repo}";
     private const string DownloadBase = $"https://github.com/{Owner}/{Repo}/releases/download";
 

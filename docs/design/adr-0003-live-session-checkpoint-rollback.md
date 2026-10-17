@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-01
-- **Issue:** [#379](https://github.com/bgarcevic/tomix-cli/issues/379), part of epic [#341](https://github.com/bgarcevic/tomix-cli/issues/341)
+- **Issue:** [#379](https://github.com/bgarcevic/tomix/issues/379), part of epic [#341](https://github.com/bgarcevic/tomix/issues/341)
 - **Supersedes:** [ADR 0002](adr-0002-live-session-lease-gate-and-journal-first.md) §2 where it makes the journal the source of rollback and undo, and [ADR 0001](adr-0001-live-model-session.md) §4 where undo replays inverse journal entries. The journal stays the only source of change events and of replayable operations.
 
 ## Context

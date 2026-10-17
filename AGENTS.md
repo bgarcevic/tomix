@@ -1,4 +1,4 @@
-# tomix-cli
+# tomix
 
 Open-source CLI for inspecting, validating, querying, testing, and deploying tabular semantic models.
 
