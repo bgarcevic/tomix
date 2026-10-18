@@ -255,6 +255,7 @@ Deploy a semantic model to a workspace
   opt --fix-bpa  Apply BPA rule fixes to the model before deploying, where a rule provides one
   opt --bpa-rules <file>  Additional BPA rule files to enforce for this deploy, alongside the built-in ruleset
   opt --bpa-fail-on <level>  Severity that blocks the deploy: error or warning (default: error). Rules that cannot be evaluated count as errors.
+  opt --rollback-on-error  Check the deployed model before it is committed and roll the deploy back when an object is in an error state
   opt --ci <system>  Print CI annotations to stderr for post-deploy errors and warnings: vsts or github
   opt --deploy-connections  Overwrite the target's data sources (default: keep the target's connection strings)
   opt --deploy-partitions  Overwrite the target's table partitions (default: keep the target's partitions and processed data)

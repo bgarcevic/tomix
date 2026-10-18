@@ -38,6 +38,16 @@ var good = TmdlSerializer.DeserializeDatabaseFromFolder(samplePath);
 var broken = good.Clone();
 broken.Model.Tables["Sales"].Measures["Total Amount"].Expression = "SUM ( Sales[Nope] )";
 
+// --drop <name>: delete one dataset the manual `tx deploy` checks left behind, then exit.
+var dropIndex = Array.IndexOf(args, "--drop");
+if (dropIndex >= 0)
+{
+    using var dropServer = await ConnectAsync();
+    Execute(dropServer, """{"delete":{"object":{"database":""" + System.Text.Json.JsonSerializer.Serialize(args[dropIndex + 1]) + "}}}");
+    Console.WriteLine($"deleted '{args[dropIndex + 1]}'");
+    return 0;
+}
+
 var report = new StringBuilder();
 void Log(string line = "")
 {

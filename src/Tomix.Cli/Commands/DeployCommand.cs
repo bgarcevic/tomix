@@ -71,6 +71,10 @@ internal sealed class DeployCommand : ICommandModule
         {
             Description = "Severity that blocks the deploy: error or warning (default: error). Rules that cannot be evaluated count as errors."
         }.In("BPA gate options");
+        var rollbackOnErrorOption = new Option<bool>("--rollback-on-error")
+        {
+            Description = "Check the deployed model before it is committed and roll the deploy back when an object is in an error state"
+        };
         var ciOption = new Option<string?>("--ci")
         {
             Description = "Print CI annotations to stderr for post-deploy errors and warnings: vsts or github"
@@ -114,6 +118,7 @@ internal sealed class DeployCommand : ICommandModule
             fixBpaOption,
             bpaRulesOption,
             bpaFailOnOption,
+            rollbackOnErrorOption,
             ciOption,
             deployConnectionsOption,
             deployPartitionsOption,
@@ -240,7 +245,8 @@ internal sealed class DeployCommand : ICommandModule
                         parseResult.GetValue(ciOption),
                         Preview: previewFirst,
                         deployOptions,
-                        parseResult.GetValue(bpaFailOnOption)),
+                        parseResult.GetValue(bpaFailOnOption),
+                        parseResult.GetValue(rollbackOnErrorOption)),
                     cancellationToken),
                 suppress: suppressSpinner);
 

@@ -90,6 +90,13 @@ public sealed class DeployModelHandler
                 "--deploy-policy-partitions requires --deploy-partitions.",
                 exitCode: 2));
 
+        // A script never reaches the target, so there is nothing to check or undo.
+        if (request.RollbackOnError && !string.IsNullOrWhiteSpace(request.XmlaOutput))
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
+                "TOMIX_DEPLOY_INVALID_FLAGS",
+                "--rollback-on-error cannot be combined with --xmla: a script is not deployed, so there is nothing to roll back.",
+                exitCode: 2));
+
         // Validated even when --skip-bpa makes the threshold unused, so a typo fails as a usage
         // error instead of being silently ignored.
         if (!BpaFailOn.TryParse(request.BpaFailOn, "--bpa-fail-on", out var bpaFailOn, out var bpaFailOnError))
@@ -159,7 +166,8 @@ public sealed class DeployModelHandler
                 database,
                 request.CreateOnly,
                 Force: false,
-                deployOptions);
+                deployOptions,
+                request.RollbackOnError);
 
             return new DeployOperation(session, deployer, deployRequest, request, server, database, warnings);
         }

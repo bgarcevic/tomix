@@ -118,10 +118,77 @@ public sealed class DeployPostValidationTests
             _ => "CalculationNeeded"
         }, Message: null);
 
-    private static async Task<Tomix.Core.Results.TomixResult<DeployModelResult>> Deploy(ModelDeployResult deployed)
+    // -- --rollback-on-error (ADR 0005) ----------------------------------------------------------
+
+    [Fact]
+    public async Task RolledBack_FailsWithTheBrokenObjects_AndSaysTheTargetIsUnchanged()
+    {
+        var result = await Deploy(new ModelDeployResult(
+            "ws", "Prod", ModelDeployResult.RolledBack, 42, new DeployValidation(
+            [
+                Issue(RuleSeverity.Error, "Total"),
+                Issue(RuleSeverity.Info, "Unprocessed")
+            ])), rollbackOnError: true);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("rolled-back", result.Data!.Status);
+        Assert.Equal(1, result.Data.Validation!.Errors);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_DEPLOY_ROLLED_BACK", diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Rolled back the deploy to 'Prod'", diagnostic.Message);
+        Assert.Contains("Sales[Total] (SemanticError)", diagnostic.Message);
+        Assert.Contains("The target is unchanged.", diagnostic.Message);
+        Assert.DoesNotContain("Deployed 'Prod'", diagnostic.Message);
+    }
+
+    [Fact]
+    public async Task RolledBack_BecauseTheCheckCouldNotRun_SaysWhy()
+    {
+        var result = await Deploy(new ModelDeployResult(
+            "ws", "Prod", ModelDeployResult.RolledBack, 42, Validation: null, ValidationError: "connection dropped"),
+            rollbackOnError: true);
+
+        Assert.Equal(1, result.ExitCode);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_DEPLOY_ROLLED_BACK", diagnostic.Code);
+        Assert.Contains("could not be checked: connection dropped", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RollbackOnError_ReachesTheProvider(bool rollbackOnError)
+    {
+        var session = new Session(new ModelDeployResult("ws", "Prod", "updated", 42));
+
+        await Deploy(session, rollbackOnError);
+
+        Assert.Equal(rollbackOnError, session.LastRequest!.RollbackOnError);
+    }
+
+    [Fact]
+    public async Task RollbackOnError_WithXmla_IsAUsageError()
+    {
+        var session = new Session(new ModelDeployResult("ws", "Prod", "updated", 42));
+
+        var result = await Deploy(session, rollbackOnError: true, xmla: "-");
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Equal("TOMIX_DEPLOY_INVALID_FLAGS", Assert.Single(result.Diagnostics).Code);
+        Assert.Null(session.LastRequest);
+    }
+
+    private static Task<Tomix.Core.Results.TomixResult<DeployModelResult>> Deploy(
+        ModelDeployResult deployed, bool rollbackOnError = false)
+        => Deploy(new Session(deployed), rollbackOnError);
+
+    private static async Task<Tomix.Core.Results.TomixResult<DeployModelResult>> Deploy(
+        Session session, bool rollbackOnError, string? xmla = null)
     {
         using var config = new TempConfigDir();
-        var handler = new DeployModelHandler([new Provider(deployed)], config.State);
+        var handler = new DeployModelHandler([new Provider(session)], config.State);
         return await handler.HandleAsync(
             new DeployModelRequest(
                 new ModelReference("local-model"),
@@ -132,21 +199,24 @@ public sealed class DeployPostValidationTests
                 SkipBpa: true,
                 FixBpa: false,
                 BpaRules: null,
-                XmlaOutput: null,
-                Ci: null),
+                XmlaOutput: xmla,
+                Ci: null,
+                RollbackOnError: rollbackOnError),
             CancellationToken.None);
     }
 
-    private sealed class Provider(ModelDeployResult deployed) : IModelProvider
+    private sealed class Provider(Session session) : IModelProvider
     {
         public bool CanOpen(ModelReference _) => true;
 
         public Task<IModelSession> OpenAsync(ModelReference _, CancellationToken ct)
-            => Task.FromResult<IModelSession>(new Session(deployed));
+            => Task.FromResult<IModelSession>(session);
     }
 
     private sealed class Session(ModelDeployResult deployed) : IModelSession, IModelDeploySession
     {
+        public ModelDeployRequest? LastRequest { get; private set; }
+
         public string SourcePath => "";
 
         public Task<ModelSummary> GetSummaryAsync(CancellationToken _)
@@ -158,7 +228,10 @@ public sealed class DeployPostValidationTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         public Task<ModelDeployResult> DeployAsync(ModelDeployRequest request, CancellationToken ct)
-            => Task.FromResult(deployed);
+        {
+            LastRequest = request;
+            return Task.FromResult(deployed);
+        }
 
         public Task<string> GenerateScriptAsync(ModelDeployRequest request, CancellationToken ct)
             => throw new NotSupportedException();

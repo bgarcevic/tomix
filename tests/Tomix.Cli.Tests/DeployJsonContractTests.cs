@@ -50,6 +50,24 @@ public sealed class DeployJsonContractTests
             data.EnumerateObject().Select(p => p.Name));
     }
 
+    /// <summary><c>--rollback-on-error</c> (ADR 0005) adds one status value and no new fields: the
+    /// validation that caused the rollback rides along as for any deploy.</summary>
+    [Fact]
+    public void RolledBack_IsAStatus_WithTheValidationThatCausedIt()
+    {
+        var data = Serialize(new DeployModelResult("ws", "Prod", ModelDeployResult.RolledBack, 42, null, null)
+        {
+            Validation = new DeployValidation(
+                [new DeployedObjectIssue(RuleSeverity.Error, "Measure", "Sales[Total]", "SemanticError", "bad")])
+        });
+
+        Assert.Equal("rolled-back", data.GetProperty("status").GetString());
+        Assert.Equal(1, data.GetProperty("validation").GetProperty("errors").GetInt32());
+        Assert.Equal(
+            ["server", "database", "status", "durationMs", "diff", "validation"],
+            data.EnumerateObject().Select(p => p.Name));
+    }
+
     private static JsonElement Serialize(DeployModelResult result)
         => JsonDocument.Parse(JsonOutput.Serialize(new CommandEnvelope<DeployModelResult>(result, [])))
             .RootElement.GetProperty("data");

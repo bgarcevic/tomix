@@ -108,6 +108,19 @@ public sealed class DeployRendererTests
     }
 
     [Fact]
+    public void RolledBack_SaysTheTargetIsUnchanged_AndListsTheCause()
+    {
+        var deployed = Deployed(new DeployValidation(
+            [new DeployedObjectIssue(RuleSeverity.Error, "Measure", "Sales[Total]", "SemanticError", "Column [X] not found.")]));
+
+        var output = Render(deployed with { Status = ModelDeployResult.RolledBack });
+
+        Assert.Contains("Rolled back: the target is unchanged (42ms)", output);
+        Assert.DoesNotContain("Deployed:", output);
+        Assert.Contains("Error Measure Sales[Total]: SemanticError — Column [X] not found.", output);
+    }
+
+    [Fact]
     public void Deployed_WithoutValidation_PrintsNoCheckLine()
         => Assert.DoesNotContain("Post-deploy check", Render(Deployed(validation: null)));
 

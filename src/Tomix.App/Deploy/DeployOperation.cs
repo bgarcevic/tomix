@@ -215,7 +215,9 @@ public sealed class DeployOperation : IAsyncDisposable
             result.Server, result.Database, result.Status, result.DurationMs, null, null,
             Validation: result.Validation);
         var ok = Ok(data);
-        var (diagnostics, failed) = PostDeployDiagnostics(result.Database, result.Validation, result.ValidationError);
+        var (diagnostics, failed) = result.Status == ModelDeployResult.RolledBack
+            ? (RolledBackDiagnostics(result.Database, result.Validation, result.ValidationError), true)
+            : PostDeployDiagnostics(result.Database, result.Validation, result.ValidationError);
         return new TomixResult<DeployModelResult>(
             Success: !failed,
             data,
@@ -260,6 +262,30 @@ public sealed class DeployOperation : IAsyncDisposable
                 $"The server reports {warnings.Count} incomplete object(s) in '{database}': {Named(warnings)}."));
 
         return (diagnostics, errors.Count > 0);
+    }
+
+    /// <summary>
+    /// A deploy <c>--rollback-on-error</c> undid (ADR 0005): always a failure, since the model
+    /// did not deploy, and the reason is either the broken objects or a check that could not run.
+    /// </summary>
+    internal static IReadOnlyList<TomixDiagnostic> RolledBackDiagnostics(
+        string database, DeployValidation? validation, string? validationError)
+    {
+        var errors = validation?.Issues.Where(issue => issue.Severity == RuleSeverity.Error).ToList() ?? [];
+        var reason = errors.Count > 0
+            ? $"the server reports {errors.Count} object(s) in an error state: {Named(errors)}"
+            : $"the deployed model could not be checked: {validationError ?? "no result"}";
+
+        return
+        [
+            new TomixDiagnostic(
+                "TOMIX_DEPLOY_ROLLED_BACK",
+                DiagnosticSeverity.Error,
+                $"Rolled back the deploy to '{database}': {reason}. The target is unchanged.",
+                Hint: errors.Count > 0
+                    ? "Fix them and deploy again; 'tx validate' checks a model before it is deployed."
+                    : "Deploy again, or run without --rollback-on-error and check the model with 'tx validate'.")
+        ];
     }
 
     private static string Named(IReadOnlyList<DeployedObjectIssue> issues)
