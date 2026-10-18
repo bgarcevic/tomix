@@ -31,6 +31,16 @@ and the API surface that major versions protect.
   unannotated model no longer lists them as "Not checked". A named `--ruleset` is used as given:
   `--ruleset standard` now skips them (#234).
 
+## [0.12.1] - 2026-10-18
+
+### Fixed
+
+- Sign-in and tx's own HTTP requests no longer hang on networks that advertise IPv6 they cannot
+  route: connections race IPv6 and IPv4 the way browsers do (Happy Eyeballs), so `tx auth login`
+  falls back to IPv4 within a quarter of a second instead of timing out. A spinner waiting on a
+  remote host (auth login, connect, deploy, query) now says which host after 10 seconds and that
+  Ctrl+C cancels.
+
 ## [0.12.0] - 2026-10-15
 
 ### Added
@@ -1396,7 +1406,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/bgarcevic/tomix/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/bgarcevic/tomix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/bgarcevic/tomix/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/bgarcevic/tomix/compare/v0.9.0...v0.10.0

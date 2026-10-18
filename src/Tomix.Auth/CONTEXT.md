@@ -21,6 +21,7 @@ MSAL-backed authentication and credential caching.
 - Keep MSAL types inside this project.
 - Never expose secrets through command arguments, logs, or result types.
 - Translate missing or expired credentials to Core's `AuthenticationRequiredException`.
+- Give every MSAL app `DualStackMsalHttpClientFactory`, so sign-in races IPv6 and IPv4.
 - Keep settings precedence in `AuthSettingsFactory`.
 
 ## Test

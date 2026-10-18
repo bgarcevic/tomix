@@ -160,7 +160,8 @@ internal sealed class ConnectCommand : ICommandModule
                     var models = await CliSpinner.RunAsync(
                         "Listing models...",
                         () => new ConnectRemoteListHandler(_providers).HandleAsync(listServer!, cancellationToken),
-                        suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
+                        suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format),
+                        waitingOn: CliSpinner.WaitTarget(listServer));
                     return CommandOutput.Render(parseResult, models, format, RenderRemoteList, ProjectRemoteListJson);
                 }
 
@@ -385,7 +386,8 @@ internal sealed class ConnectCommand : ICommandModule
                     () => new InfoModelHandler(_providers).HandleAsync(
                         new InfoModelRequest(validation),
                         cancellationToken),
-                    suppress: suppressSpinner);
+                    suppress: suppressSpinner,
+                    waitingOn: CliSpinner.WaitTarget(remoteServer));
 
                 if (!infoResult.Success)
                 {
@@ -538,7 +540,8 @@ internal sealed class ConnectCommand : ICommandModule
                 () => infoHandler.HandleAsync(
                     new InfoModelRequest(validation),
                     cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
+                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format),
+                waitingOn: CliSpinner.WaitTarget(connection.Server));
 
             if (!infoResult.Success)
             {
