@@ -10,6 +10,14 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Fixed
+
+- Sign-in and tx's own HTTP requests no longer hang on networks that advertise IPv6 they cannot
+  route: connections race IPv6 and IPv4 the way browsers do (Happy Eyeballs), so `tx auth login`
+  falls back to IPv4 within a quarter of a second instead of timing out. A spinner waiting on a
+  remote host (auth login, connect, deploy, query) now says which host after 10 seconds and that
+  Ctrl+C cancels.
+
 ## [0.12.0] - 2026-10-15
 
 ### Added

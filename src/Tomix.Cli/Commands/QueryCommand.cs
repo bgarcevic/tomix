@@ -206,7 +206,8 @@ internal sealed class QueryCommand : ICommandModule
             var result = await CliSpinner.RunAsync(
                 "Running query...",
                 () => new QueryModelHandler(_providers, _loadCurrentSession).HandleAsync(request, rawTraceWriter, cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || rawTracePath == "-");
+                suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format) || rawTracePath == "-",
+                waitingOn: CliSpinner.WaitTarget(request.Server ?? _loadCurrentSession()?.Server));
 
             // Timings/benchmark are diagnostics (stderr); they are embedded in the result when
             // the primary sink is JSON, so avoid duplicating them there.
