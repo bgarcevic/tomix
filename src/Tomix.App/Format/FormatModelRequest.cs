@@ -1,3 +1,4 @@
+using Tomix.Core.Dax;
 using Tomix.Core.Models;
 
 namespace Tomix.App.Format;
@@ -16,4 +17,6 @@ public sealed record FormatModelRequest(
     bool Overwrite = false,
     bool Stage = false,
     bool Revert = false,
-    bool NoSync = false);
+    bool NoSync = false,
+    DaxSeparators Separators = DaxSeparators.Us,
+    DaxFunctionSpacing FunctionSpacing = DaxFunctionSpacing.Space);

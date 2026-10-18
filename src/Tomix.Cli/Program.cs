@@ -257,7 +257,7 @@ internal static class Program
                 Path.Combine(services.ConfigDirectory, "auth"),
                 configLoadError),
             new FindCommand(providers, services.State),
-            new FormatCommand(providers, formatter, services.State, mutations),
+            new FormatCommand(providers, formatter, services.State, mutations, config: services.ConfigStore),
             new GetCommand(providers, services.State),
             new InitCommand(),
             new InteractiveCommand(
@@ -345,7 +345,7 @@ internal static class Program
             new BpaCommand(providers, services.State, mutations, services.BpaRules, services.ConfigDirectory, httpClient, session),
             new DepsCommand(providers, services.State, session),
             new FindCommand(providers, services.State, session),
-            new FormatCommand(providers, formatter, services.State, mutations, session),
+            new FormatCommand(providers, formatter, services.State, mutations, session, services.ConfigStore),
             new GetCommand(providers, services.State, session),
             new LsCommand(providers, services.State, session),
             new MvCommand(providers, services.State, mutations, session),

@@ -604,7 +604,19 @@
         },
         "long": {
           "type": "boolean",
-          "description": "Prefer long lines when formatting M"
+          "description": "Long lines: wrap DAX at 120 columns instead of 65, and M at 120 instead of 40"
+        },
+        "short": {
+          "type": "boolean",
+          "description": "Short lines (the default); overrides format.lines=long in config"
+        },
+        "separators": {
+          "type": "string",
+          "description": "Display-only DAX separators: us (A, B, 1.5) or eu (A; B; 1,5); models always store us"
+        },
+        "functionSpacing": {
+          "type": "string",
+          "description": "Space between a DAX function name and its parenthesis: space (IF ( ) or none (IF( )"
         },
         "lang": {
           "type": "string",

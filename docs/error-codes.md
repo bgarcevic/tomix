@@ -368,6 +368,7 @@ come from structural integrity checks.
 | `TOMIX_REPLACE_PATTERN_REQUIRED` | 2 | `replace` called without a search pattern. |
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |
+| `TOMIX_FORMAT_SEPARATORS_DISPLAY_ONLY` | 2 | `format --separators eu` was combined with `--save`, `--save-to`, `--stage`, or `--revert`. EU separators only change what is shown; models always store DAX with US separators. Drop `--separators eu` to write, or preview without the write flag. |
 | `TOMIX_FORMAT_FAILED` | 1 | `format` could not format the inline expression (`--expression`) or the object (`--path`), or a whole-model run had failed expressions and applied nothing (the result rows are still written; each failed row's `error` says why). DAX and M are both formatted offline. The message includes the formatter's error details; DAX or M that does not lex or parse also carries `line`, `column`, and `syntaxErrors` (plus `objectPath` for `--path`). |
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_COMPLETION_SHELL_REQUIRED` | 2 | `completion` called without its required shell argument. |

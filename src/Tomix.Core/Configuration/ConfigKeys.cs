@@ -29,6 +29,15 @@ public static class ConfigKeys
     /// </summary>
     public const string BpaRules = "bpa.rules";
 
+    /// <summary><c>tx format</c> DAX separators: <c>us</c> (default) or <c>eu</c>. Display only; models always store <c>us</c>.</summary>
+    public const string FormatSeparators = "format.separators";
+
+    /// <summary><c>tx format</c> DAX function spacing: <c>space</c> (default, <c>IF (</c>) or <c>none</c> (<c>IF(</c>).</summary>
+    public const string FormatFunctionSpacing = "format.functionSpacing";
+
+    /// <summary><c>tx format</c> line length for DAX and M: <c>short</c> (default) or <c>long</c>.</summary>
+    public const string FormatLines = "format.lines";
+
     public static readonly IReadOnlyList<string> All =
     [
         DefaultFormat,
@@ -38,7 +47,10 @@ public static class ConfigKeys
         AuthClientId,
         AuthTenant,
         AuthAuthority,
-        BpaRules
+        BpaRules,
+        FormatSeparators,
+        FormatFunctionSpacing,
+        FormatLines
     ];
 
     public static bool IsKnown(string key) => All.Contains(key, StringComparer.OrdinalIgnoreCase);

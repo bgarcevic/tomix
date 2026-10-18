@@ -302,7 +302,10 @@ Pretty-print DAX and M expressions
   arg [model]  Optional path to the model; defaults to the active connection
   opt --expression, -e <expr>  The expression to format, given inline
   opt --path <path>  Format the expression on a model object path
-  opt --long  Prefer long lines when formatting M
+  opt --long  Long lines: wrap DAX at 120 columns instead of 65, and M at 120 instead of 40
+  opt --short  Short lines (the default); overrides format.lines=long in config
+  opt --separators <us|eu>  Display-only DAX separators: us (A, B, 1.5) or eu (A; B; 1,5); models always store us
+  opt --function-spacing <space|none>  Space between a DAX function name and its parenthesis: space (IF ( ) or none (IF( )
   opt --save-to <path>  Write the saved model to this path instead of its source (implies --save)
   opt --lang <language>  Expression language: dax or m
   opt --type, -t <type>  Type to pick when the path matches several objects under a table

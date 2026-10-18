@@ -1,3 +1,4 @@
+using Tomix.App.Format;
 using Tomix.Core.Configuration;
 using Tomix.Core.Results;
 
@@ -91,6 +92,18 @@ public sealed class ConfigHandler
                 error = $"{key} must be 'true' or 'false'.";
                 return false;
 
+            case ConfigKeys.FormatSeparators when !FormatStyle.TryParseSeparators(value, out _):
+                error = $"{key} must be one of: {string.Join(", ", FormatStyle.SeparatorValues)}.";
+                return false;
+
+            case ConfigKeys.FormatFunctionSpacing when !FormatStyle.TryParseFunctionSpacing(value, out _):
+                error = $"{key} must be one of: {string.Join(", ", FormatStyle.FunctionSpacingValues)}.";
+                return false;
+
+            case ConfigKeys.FormatLines when !FormatStyle.TryParseLines(value, out _):
+                error = $"{key} must be one of: {string.Join(", ", FormatStyle.LinesValues)}.";
+                return false;
+
             default:
                 return true;
         }
@@ -98,6 +111,9 @@ public sealed class ConfigHandler
 
     private static string NormalizeValue(string key, string value)
     {
+        if (key is ConfigKeys.FormatSeparators or ConfigKeys.FormatFunctionSpacing or ConfigKeys.FormatLines)
+            return value.Trim().ToLowerInvariant();
+
         if (key.Equals(ConfigKeys.ValidateOnSave, StringComparison.OrdinalIgnoreCase)
             && bool.TryParse(value, out var validateOnSave))
             return validateOnSave ? "true" : "false";

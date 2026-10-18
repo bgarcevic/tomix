@@ -1,0 +1,7 @@
+VAR Threshold =
+    1,5 -- rate, as 1.5
+RETURN
+    SUMX(
+        FILTER( Sales; Sales[Price] > Threshold && Sales[Region] IN { "West, North"; "East" } );
+        Sales[Qty] * Sales[Price] * 0,25
+    ) + DIVIDE( COUNTROWS( Sales ); YEAR( NOW() ); 0 )

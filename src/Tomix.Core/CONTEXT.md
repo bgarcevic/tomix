@@ -19,7 +19,8 @@ Core domain types and abstractions.
 - The DAX language engine (`Dax/`) — vendored lexer/parser/classifier/printer (`Dax/Engine/`, see
   `THIRD-PARTY-NOTICES.md`) behind the `DaxLanguage.Classify` highlighting facade, the
   `DaxSyntaxCheck` offline syntax analyzer, the `DaxFormatter` offline formatter that powers
-  `tx format`'s DAX, and `DaxLexicalTokens`, the one DAX token stream (raw source, unescaped
+  `tx format`'s DAX (style knobs: `DaxFunctionSpacing`, line length, and the display-only
+  `DaxSeparators` rewrite `WithSeparators` — models always store US separators), and `DaxLexicalTokens`, the one DAX token stream (raw source, unescaped
   names, spans) that App's reference extraction reads. Do not add a second DAX lexer. Pure BCL, model-agnostic: it knows syntax, never the model. Model-aware DAX
   analysis (reference extraction, validation) lives in `/src/Tomix.App/Dax`.
 - The shared rule shape (`Rules/`) — `RuleDefinition` (id, name, category, severity, scope,

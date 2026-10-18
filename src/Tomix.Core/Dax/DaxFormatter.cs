@@ -20,6 +20,9 @@ public static class DaxFormatter
 {
     public const int DefaultMaximumLineLength = Engine.DaxCodeFormatter.DefaultMaximumLineLength;
 
+    /// <summary>The line length of the long-lines style, matching the M formatter's.</summary>
+    public const int LongMaximumLineLength = 120;
+
     /// <summary>
     /// Formats <paramref name="dax"/>, returning the input unchanged when it cannot be formatted.
     /// The result uses the platform's line endings.
@@ -38,14 +41,17 @@ public static class DaxFormatter
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="maximumLineLength"/> is outside the 20–500 character range the printer supports.
     /// </exception>
-    public static DaxFormatResult TryFormat(string dax, int maximumLineLength = DefaultMaximumLineLength)
+    public static DaxFormatResult TryFormat(
+        string dax,
+        int maximumLineLength = DefaultMaximumLineLength,
+        DaxFunctionSpacing functionSpacing = DaxFunctionSpacing.Space)
     {
         if (string.IsNullOrWhiteSpace(dax))
             return new DaxFormatResult(false, dax, null);
 
         try
         {
-            if (!Engine.DaxCodeFormatter.TryFormatChecked(dax, maximumLineLength, out var prepared, out var printed))
+            if (!Engine.DaxCodeFormatter.TryFormatChecked(dax, maximumLineLength, functionSpacing, out var prepared, out var printed))
             {
                 // Declined: the text to use is the prepared input, and the first difference is
                 // found by comparing it against the rejected printed output.
@@ -80,6 +86,30 @@ public static class DaxFormatter
     /// <summary>Formats <paramref name="dax"/> at the default line length. See the two-argument overload.</summary>
     public static bool TryFormat(string dax, out string formatted)
         => TryFormat(dax, DefaultMaximumLineLength, out formatted);
+
+    /// <summary>
+    /// Rewrites <paramref name="dax"/> with the given separators: with <see cref="DaxSeparators.Eu"/>
+    /// every list comma becomes <c>;</c> and every decimal point in a number becomes <c>,</c>.
+    /// Token-aware, so strings, comments, and names keep their commas and points. This is for
+    /// display only — models store <see cref="DaxSeparators.Us"/>, and the formatter cannot read
+    /// the result back.
+    /// </summary>
+    public static string WithSeparators(string dax, DaxSeparators separators)
+    {
+        if (separators == DaxSeparators.Us || string.IsNullOrEmpty(dax))
+            return dax;
+
+        var builder = new System.Text.StringBuilder(dax);
+        foreach (var token in Engine.DaxLexer.Tokenize(dax))
+        {
+            if (token.Kind == Engine.DaxTokenKind.Comma)
+                builder[token.Start] = ';';
+            else if (token.Kind == Engine.DaxTokenKind.Number && token.Text.IndexOf('.') is var point and >= 0)
+                builder[token.Start + point] = ',';
+        }
+
+        return builder.ToString();
+    }
 
     /// <summary>
     /// Maps a declined format back into the prepared source: the 1-based line of the first token
