@@ -463,6 +463,8 @@ internal static class BpaRunRenderer
         hint.MarkupLine("  " + Styling.Guidance("Collect them from a deployed copy:"));
         hint.MarkupLine("    " + Styling.Option(BpaEngine.VertipaqWorkspaceConnectCommand));
         hint.MarkupLine("    " + Styling.Option(BpaEngine.VertipaqAnnotateCommand));
+        hint.MarkupLine("  " + Styling.Guidance("Or read them from a file exported with tx vertipaq --export:"));
+        hint.MarkupLine("    " + Styling.Option(BpaEngine.VertipaqVpaxCommand));
     }
 
     /// <summary>

@@ -234,6 +234,13 @@ public sealed class BpaModel
 
     /// <summary>Synthetic snapshot object used to build a model-scoped violation.</summary>
     public ModelObject Source { get; internal set; } = null!;
+
+    /// <summary>
+    /// Reads a model-level annotation, as <see cref="BpaObject.GetAnnotation"/> does for an object,
+    /// so a rule can compare against model totals: <c>Model.GetAnnotation("Vertipaq_TotalSize")</c>.
+    /// </summary>
+    public string? GetAnnotation(string name)
+        => Source.Property($"Annotation:{name}");
 }
 
 /// <summary>

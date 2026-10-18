@@ -66,7 +66,11 @@ Runs the BPA gate before deploying. The gate blocks only on findings at or above
 severity threshold: error-severity by default, or warnings too with `--bpa-fail-on warning`.
 A rule that cannot be evaluated is itself an error-severity finding — a broken rule
 expression blocks the deploy (named in the message) instead of silently skipping the rule.
-Rules that need VertiPaq statistics the model doesn't have are not checked. The deploy
+The built-in statistics rules are in the default-off `vertipaq` preset; the gate adds it
+to `standard` when the model has `Vertipaq_*` annotations, so a model annotated with
+`tx vertipaq --annotate --save` is checked for referential-integrity and size problems.
+When a rule from `bpa.rules`, `TOMIX_BPA_RULES`, or `--bpa-rules` needs VertiPaq
+statistics the model doesn't have, it is not checked. The deploy
 still proceeds, with a `TOMIX_BPA_VERTIPAQ_STATS_MISSING` warning that names them and
 says how to collect the statistics: `tx vertipaq --annotate --save` on a deployed model,
 or on a local model connected to one in workspace mode.

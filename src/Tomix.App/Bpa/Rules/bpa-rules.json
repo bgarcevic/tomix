@@ -23,9 +23,9 @@
   },
   {
     "ID": "AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS",
-    "Name": "[Performance] Avoid bi-directional relationships against high-cardinality columns",
-    "Category": "Performance",
-    "Description": "For best performance, it is recommended to avoid using bi-directional relationships against high-cardinality columns. In order to run this rule, you must first run the script shown here: https://www.elegantbi.com/post/vertipaqintabulareditor",
+    "Name": "[VertiPaq] Avoid bi-directional relationships against high-cardinality columns",
+    "Category": "VertiPaq",
+    "Description": "For best performance, it is recommended to avoid using bi-directional relationships against high-cardinality columns. Reads VertiPaq statistics: run 'tx bpa run --vpax <file.vpax>' with a file from 'tx vertipaq --export', or annotate the model with 'tx vertipaq --annotate --save'.",
     "Severity": 2,
     "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
     "Expression": "UsedInRelationships.Any(CrossFilteringBehavior == CrossFilteringBehavior.BothDirections)\n\nand\n\nConvert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) > 100000",
@@ -53,9 +53,9 @@
   },
   {
     "ID": "LARGE_TABLES_SHOULD_BE_PARTITIONED",
-    "Name": "[Performance] Large tables should be partitioned",
-    "Category": "Performance",
-    "Description": "Large tables should be partitioned in order to optimize processing. In order for this rule to run properly, you must run the script shown here: https://www.elegantbi.com/post/vertipaqintabulareditor",
+    "Name": "[VertiPaq] Large tables should be partitioned",
+    "Category": "VertiPaq",
+    "Description": "Large tables should be partitioned in order to optimize processing. Reads VertiPaq statistics: run 'tx bpa run --vpax <file.vpax>' with a file from 'tx vertipaq --export', or annotate the model with 'tx vertipaq --annotate --save'.",
     "Severity": 2,
     "Scope": "Table",
     "Expression": "Convert.ToInt64(GetAnnotation(\"Vertipaq_RowCount\")) > 25000000\r\nand\r\nPartitions.Count = 1",
@@ -469,9 +469,9 @@
   },
   {
     "ID": "FIX_REFERENTIAL_INTEGRITY_VIOLATIONS",
-    "Name": "[Maintenance] Fix referential integrity violations",
-    "Category": "Maintenance",
-    "Description": "This rule highlights relationships which have referential integrity violations. This indicates that there are values in the table on the 'from' side of the relationship which do not exist in the table on the 'to' side of the relationship. Referential integrity violations will also produce the 'blank' member value in slicers. It is recommended to fix these issues by ensuring that the 'to' table's primary key column has all the values in the 'from' table's foreign key column.\r\n\r\nReference: https://blog.enterprisedna.co/vertipaq-analyzer-tutorial-relationships-referential-integrity/",
+    "Name": "[VertiPaq] Fix referential integrity violations",
+    "Category": "VertiPaq",
+    "Description": "This rule highlights relationships which have referential integrity violations. This indicates that there are values in the table on the 'from' side of the relationship which do not exist in the table on the 'to' side of the relationship. Referential integrity violations will also produce the 'blank' member value in slicers. It is recommended to fix these issues by ensuring that the 'to' table's primary key column has all the values in the 'from' table's foreign key column.\r\n\r\nReference: https://blog.enterprisedna.co/vertipaq-analyzer-tutorial-relationships-referential-integrity/ Reads VertiPaq statistics: run 'tx bpa run --vpax <file.vpax>' with a file from 'tx vertipaq --export', or annotate the model with 'tx vertipaq --annotate --save'.",
     "Severity": 2,
     "Scope": "Relationship",
     "Expression": "Convert.ToInt64(GetAnnotation(\"Vertipaq_RIViolationInvalidRows\")) > 0",
@@ -714,6 +714,26 @@
     "Severity": 2,
     "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
     "Expression": "Name.ToUpper().Contains(\"MONTH\")\r\nand\r\n! Name.ToUpper().Contains(\"MONTHS\") \r\nand \r\n\n\nDataType == DataType.String \r\nand \r\nSortByColumn == null",
+    "CompatibilityLevel": 1200
+  },
+  {
+    "ID": "LARGE_SHARE_OF_MODEL_SIZE",
+    "Name": "[VertiPaq] Review tables that hold most of the model's size",
+    "Category": "VertiPaq",
+    "Description": "This table takes more than half of the memory of a model of at least 100 MB. Most size savings are found here: look for columns that can be removed, high-cardinality columns that can be split or rounded, and history that can be archived or aggregated. Reads VertiPaq statistics: run 'tx bpa run --vpax <file.vpax>' with a file from 'tx vertipaq --export', or annotate the model with 'tx vertipaq --annotate --save'.",
+    "Severity": 1,
+    "Scope": "Table, CalculatedTable",
+    "Expression": "Model.Tables.Count > 1\nand\nConvert.ToInt64(Model.GetAnnotation(\"Vertipaq_TotalSize\")) >= 104857600\nand\nConvert.ToInt64(GetAnnotation(\"Vertipaq_TableSize\")) * 2 > Convert.ToInt64(Model.GetAnnotation(\"Vertipaq_TotalSize\"))",
+    "CompatibilityLevel": 1200
+  },
+  {
+    "ID": "UNUSED_HIDDEN_HIGH_CARDINALITY_COLUMNS",
+    "Name": "[VertiPaq] Remove unused hidden high-cardinality columns",
+    "Category": "VertiPaq",
+    "Description": "This hidden column has more than a million distinct values, and nothing in the model uses it: no relationship, sort-by, hierarchy, or DAX reference. High-cardinality columns are the most expensive to store, so removing it is likely to shrink the model. Report visuals and external tools are not visible to this check, so confirm before removing. Reads VertiPaq statistics: run 'tx bpa run --vpax <file.vpax>' with a file from 'tx vertipaq --export', or annotate the model with 'tx vertipaq --annotate --save'.",
+    "Severity": 2,
+    "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
+    "Expression": "(IsHidden or Table.IsHidden)\nand\nnot IsKey\nand\nnot UsedInRelationships.Any()\nand\nnot UsedInSortBy.Any()\nand\nnot UsedInHierarchies.Any()\nand\nReferencedBy.Count = 0\nand\nConvert.ToInt64(GetAnnotation(\"Vertipaq_Cardinality\")) > 1000000",
     "CompatibilityLevel": 1200
   }
 ]

@@ -78,11 +78,12 @@ public sealed class BpaStandardRulesetSampleTests
     }
 
     [Fact]
-    public async Task Standard_UnannotatedSample_NamesEveryStatisticsRuleAsNotChecked()
+    public async Task VertipaqPreset_UnannotatedSample_NamesEveryStatisticsRuleAsNotChecked()
     {
         // #266: the sample has no Vertipaq_* annotations, so every bundled rule that reads them
-        // must be reported as not checked rather than silently passing.
-        var rules = await BpaRuleLoader.LoadDefaultRulesAsync(CancellationToken.None);
+        // must be reported as not checked rather than silently passing. Since #234 they all sit
+        // in the default-off vertipaq preset.
+        var rules = await BpaRuleLoader.LoadRulesetAsync("vertipaq", CancellationToken.None);
         await using var session = await new TmdlModelProvider()
             .OpenAsync(new ModelReference(SampleModel.Locate("basic-tmdl")), CancellationToken.None);
         var snapshot = await session.GetSnapshotAsync(CancellationToken.None);
