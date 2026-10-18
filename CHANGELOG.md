@@ -10,6 +10,16 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx format` style options (#229): `--separators us|eu` shows DAX with `;` list and `,`
+  decimal separators (display only; models always store the US form, and an explicit
+  `--separators eu` with `--save`, `--save-to`, `--stage` or `--revert` fails with the new
+  `TOMIX_FORMAT_SEPARATORS_DISPLAY_ONLY`), `--function-spacing space|none` drops the space
+  before a DAX call's parenthesis, and `--short` undoes `--long`. Each has a config key
+  (`format.separators`, `format.functionSpacing`, `format.lines`) that the flag overrides.
+  Golden files pin the printed output for each style.
+
 ## [0.12.0] - 2026-10-15
 
 ### Added
