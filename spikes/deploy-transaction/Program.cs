@@ -102,6 +102,78 @@ try
     await InspectFresh(existingDb, "after rollback, fresh connection (expect: good expression, no errors)");
     Log();
 
+    // ---- A4: existing database, no reads at all between execute and rollback ----
+    Log($"## A4 '{existingDb}': restore good model, then begin, deploy broken, roll back immediately");
+    using (var server = await ConnectAsync())
+    {
+        var id = server.Databases.FindByName(existingDb)?.ID;
+        Step("Execute createOrReplace (good, autocommit)", () => Execute(server, Script(good, existingDb, id)));
+    }
+    using (var server = await ConnectAsync())
+    {
+        var id = server.Databases.FindByName(existingDb)?.ID;
+        if (Step("BeginTransaction", server.BeginTransaction))
+        {
+            Step("Execute createOrReplace (broken)", () => Execute(server, Script(broken, existingDb, id)));
+            Step("RollbackTransaction", server.RollbackTransaction);
+        }
+    }
+    await InspectFresh(existingDb, "after rollback, fresh connection (expect: good expression, no errors)");
+    Log();
+
+    // ---- A5: object-level change (TOM SaveChanges = alter, not database createOrReplace) ----
+    Log($"## A5 '{existingDb}': restore good model, then begin, alter one measure via TOM SaveChanges, inspect, roll back");
+    using (var server = await ConnectAsync())
+    {
+        var id = server.Databases.FindByName(existingDb)?.ID;
+        Step("Execute createOrReplace (good, autocommit)", () => Execute(server, Script(good, existingDb, id)));
+    }
+    using (var server = await ConnectAsync())
+    {
+        server.Refresh();
+        var db = server.Databases.FindByName(existingDb);
+        Log($"- database visible: {db is not null} (databases in workspace: {server.Databases.Count})");
+        foreach (Microsoft.AnalysisServices.Tabular.Database d in server.Databases)
+            if (d.Name.StartsWith("txspike", StringComparison.Ordinal))
+                Log($"    '{d.Name}' id={d.ID}");
+        db?.Refresh(true);
+        if (db is not null && Step("BeginTransaction", server.BeginTransaction))
+        {
+            Step("SaveChanges (measure -> SUM ( Sales[Nope] ))", () =>
+            {
+                db.Model.Tables["Sales"].Measures["Total Amount"].Expression = "SUM ( Sales[Nope] )";
+                db.Model.SaveChanges();
+            });
+            InspectInSession(server, existingDb, "mid-transaction, after SaveChanges");
+            Step("RollbackTransaction", server.RollbackTransaction);
+        }
+    }
+    await InspectFresh(existingDb, "after rollback, fresh connection (expect: good expression, no errors)");
+    Log();
+
+    // ---- A6/A7: whole-model deploy as object-level changes (Model.CopyTo + SaveChanges) ----
+    Log($"## A6 '{existingDb}': restore + process good model, then begin, CopyTo(broken model), SaveChanges, inspect, roll back");
+    using (var server = await ConnectAsync())
+    {
+        server.Refresh();
+        var id = server.Databases.FindByName(existingDb)?.ID;
+        Step("Execute createOrReplace (good, autocommit)", () => Execute(server, Script(good, existingDb, id)));
+        Step("Execute refresh full (autocommit)", () => Execute(server, RefreshType(existingDb, "full")));
+    }
+    await RowCount(existingDb, "baseline");
+    await CopyToInTransaction(broken, commit: false, "broken");
+    await InspectFresh(existingDb, "after rollback, fresh connection (expect: good expression, no errors)");
+    await RowCount(existingDb, "after rollback (expect: baseline)");
+    Log();
+
+    Log($"## A7 '{existingDb}': begin, CopyTo(good model + changed description), SaveChanges, inspect, commit");
+    var described = good.Clone();
+    described.Model.Tables["Sales"].Measures["Total Amount"].Description = $"spike {stamp}";
+    await CopyToInTransaction(described, commit: true, "good + description");
+    await InspectFresh(existingDb, "after commit, fresh connection (expect: no errors)");
+    await RowCount(existingDb, "after commit (expect: baseline, data kept)");
+    Log();
+
     // ---- A3: control — same as A2 but commit, so the post-commit state is known ----
     Log($"## A3 control on '{existingDb}': broken model in a transaction, commit");
     using (var server = await ConnectAsync())
@@ -228,16 +300,25 @@ void InspectInSession(Server server, string name, string label)
 
     try
     {
-        using var conn = new AdomdConnection(XmlaConnectionString.Build(endpoint, name));
-        if (server.AccessToken.Token is { } t)
-            conn.AccessToken = new AsAccessToken(t, server.AccessToken.ExpirationTime);
-        conn.SessionID = server.SessionID;
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT [Name], [Expression], [State], [ErrorMessage] FROM $SYSTEM.TMSCHEMA_MEASURES";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-            Log($"    DMV: {reader[0]} expression=`{reader[1]}` state={reader[2]} error={reader[3]}");
+        // Close(endSession: false): the session belongs to the AMO server, and a plain
+        // Close/Dispose would end it (and with it the open transaction).
+        var conn = new AdomdConnection(XmlaConnectionString.Build(endpoint, name));
+        try
+        {
+            if (server.AccessToken.Token is { } t)
+                conn.AccessToken = new AsAccessToken(t, server.AccessToken.ExpirationTime);
+            conn.SessionID = server.SessionID;
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT [Name], [Expression], [State], [ErrorMessage] FROM $SYSTEM.TMSCHEMA_MEASURES";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                Log($"    DMV: {reader[0]} expression=`{reader[1]}` state={reader[2]} error={reader[3]}");
+        }
+        finally
+        {
+            conn.Close(false);
+        }
     }
     catch (Exception ex)
     {
@@ -247,9 +328,21 @@ void InspectInSession(Server server, string name, string label)
 
 async Task InspectFresh(string name, string label)
 {
-    using var server = await ConnectAsync();
     Log($"  inspect [{label}]");
-    var db = server.Databases.FindByName(name);
+    // The service's database list lags a few seconds behind a change; retry on new connections.
+    Server? server = null;
+    Database? db = null;
+    for (var attempt = 1; attempt <= 6 && db is null; attempt++)
+    {
+        server?.Dispose();
+        if (attempt > 1)
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        server = await ConnectAsync();
+        db = server.Databases.FindByName(name);
+        if (db is null)
+            Log($"    attempt {attempt}: database not listed yet");
+    }
+    using var owned = server!;
     if (db is null)
     {
         Log("    database not found");
@@ -261,6 +354,71 @@ async Task InspectFresh(string name, string label)
     var v = TomDeployValidator.Inspect(db);
     Log($"    TomDeployValidator errors={v.Errors} warnings={v.Warnings} unprocessed={v.Unprocessed}");
 }
+
+async Task CopyToInTransaction(Database source, bool commit, string label)
+{
+    using var server = await ConnectAsync();
+    server.Refresh();
+    var db = server.Databases.FindByName(existingDb);
+    if (db is null)
+    {
+        Log("- target not visible; skipped");
+        return;
+    }
+    db.Refresh(true);
+    if (!Step("BeginTransaction", server.BeginTransaction))
+        return;
+    Step($"CopyTo ({label}) + SaveChanges", () =>
+    {
+        // Merge exactly as tx deploy does (Preserve: target partitions, roles, connections
+        // stay), then copy the merged model over the live one so TOM sends only the diff.
+        var clone = source.Clone();
+        clone.Name = db.Name;
+        var restricted = new SerializeOptions { IncludeRestrictedInformation = true };
+        var builder = typeof(TomModelDeployer).Assembly.GetType("Tomix.Provider.Tom.TmslDeployScriptBuilder")!;
+        var node = builder.GetMethod("BuildDatabaseNode", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(null, [JsonSerializer.SerializeDatabase(clone, restricted), JsonSerializer.SerializeDatabase(db, restricted),
+                db.Name, db.ID, ModelDeployOptions.Preserve, true])!;
+        var merged = JsonSerializer.DeserializeDatabase(node.ToString()!);
+        merged.Model.CopyTo(db.Model);
+        var result = db.Model.SaveChanges();
+        Log($"    SaveChanges xmla results: {result.XmlaResults?.Count ?? 0}");
+    });
+    InspectInSession(server, existingDb, "mid-transaction, after SaveChanges");
+    var validation = TomDeployValidator.Inspect(db);
+    if (commit && validation.Errors == 0)
+        Step("CommitTransaction", server.CommitTransaction);
+    else
+        Step($"RollbackTransaction (errors={validation.Errors})", server.RollbackTransaction);
+}
+
+async Task RowCount(string name, string label)
+{
+    using var server = await ConnectAsync();
+    var conn = new AdomdConnection(XmlaConnectionString.Build(endpoint, name));
+    try
+    {
+        if (server.AccessToken.Token is { } t)
+            conn.AccessToken = new AsAccessToken(t, server.AccessToken.ExpirationTime);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "EVALUATE ROW(\"customers\", COUNTROWS(Customers), \"sales\", COUNTROWS(Sales))";
+        using var reader = cmd.ExecuteReader();
+        reader.Read();
+        Log($"  rows [{label}]: Customers={reader[0]} Sales={reader[1]}");
+    }
+    catch (Exception ex)
+    {
+        Log($"  rows [{label}]: FAILED {OneLine(ex)}");
+    }
+    finally
+    {
+        conn.Close();
+    }
+}
+
+static string RefreshType(string name, string type)
+    => """{"refresh":{"type":""" + System.Text.Json.JsonSerializer.Serialize(type) + ""","objects":[{"database":""" + System.Text.Json.JsonSerializer.Serialize(name) + "}]}}";
 
 static string OneLine(Exception ex)
     => (ex.InnerException?.Message ?? ex.Message).ReplaceLineEndings(" ");
