@@ -318,7 +318,8 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
 
         var builder = ConfidentialClientApplicationBuilder
             .Create(options.ClientId)
-            .WithAuthority($"https://login.microsoftonline.com/{options.Tenant}");
+            .WithAuthority($"https://login.microsoftonline.com/{options.Tenant}")
+            .WithHttpClientFactory(DualStackMsalHttpClientFactory.Instance);
 
         if (useCertificate)
         {
@@ -365,6 +366,7 @@ public sealed class MsalAuthenticator : IAuthenticator, IAccessTokenProvider
             .Create(_settings.ClientId)
             .WithAuthority(ResolveAuthority(tenant))
             .WithRedirectUri("http://localhost")
+            .WithHttpClientFactory(DualStackMsalHttpClientFactory.Instance)
             .Build();
 
         var helper = await GetUserCacheHelperAsync().ConfigureAwait(false);

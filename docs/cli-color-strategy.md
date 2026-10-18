@@ -72,7 +72,7 @@ A label never outranks its value: key-value labels stay plain and the values lin
 | Banner             | `[bold]` on title                             | `[bold]tx doctor[/]`                            |
 | Section header     | `[bold]` label                                | `[bold]Tables[/] (4)`                            |
 | Help               | `[bold]` headings, plain command and option names, dim placeholders | `[bold]Discover:[/]` then `summary  ...`, `--model [dim]<path>[/]` |
-| Status progress    | Info                                          | spinner frame in cyan, label plain; without an animating terminal (stdin piped) the label prints once, dim, on stderr |
+| Status progress    | Info                                          | spinner frame in cyan, label plain; without an animating terminal (stdin piped) the label prints once, dim, on stderr; after 10s of waiting on a remote host the label (or one more dim stderr line) says which host and that Ctrl+C cancels |
 | Success            | Success                                       | `Saved: model.tmdl` in green                     |
 | Warning            | Warning                                       | `Changes not saved.` in yellow                   |
 | Error              | Error + bold                                  | `Build failed` in bold red                       |

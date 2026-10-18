@@ -19,6 +19,7 @@ using Tomix.Core.Configuration;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Vertipaq;
+using Tomix.Platform.Networking;
 using Tomix.Provider.Tmdl;
 using Tomix.Provider.Tom;
 using Tomix.Provider.Vpax;
@@ -66,8 +67,9 @@ internal static class Program
         IReadOnlyList<IModelProvider> providers =
             [new TmdlModelProvider(tokenProvider), new TomFileModelProvider(tokenProvider), new TomServerModelProvider(tokenProvider)];
         // Explicit timeout so hung REST endpoints fail predictably instead of holding the
-        // command for HttpClient's 100s default.
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        // command for HttpClient's 100s default. Connections race IPv6 and IPv4, so a network
+        // that advertises IPv6 it cannot route falls back instead of stalling into the timeout.
+        var httpClient = new HttpClient(DualStackHttp.CreateHandler()) { Timeout = TimeSpan.FromSeconds(30) };
         var formatter = new CompositeExpressionFormatterClient(
             [
                 new OfflineDaxFormatterClient(),
