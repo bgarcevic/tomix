@@ -1,10 +1,12 @@
 using System.CommandLine;
 using Spectre.Console;
+using Tomix.App.Config;
 using Tomix.App.Format;
 using Tomix.App.Mutations;
 using Tomix.App.State;
 using Tomix.Cli.Interactive;
 using Tomix.Cli.Output;
+using Tomix.Core.Dax;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 
@@ -18,15 +20,18 @@ internal sealed class FormatCommand : ICommandModule
 
     private readonly CliStateStore _state;
     private readonly MutationStores _mutations;
+    private readonly TomixConfigStore? _config;
 
     public FormatCommand(
         IReadOnlyList<IModelProvider> providers,
         IExpressionFormatterClient formatter,
         CliStateStore state,
         MutationStores mutations,
-        SessionScope? session = null)
+        SessionScope? session = null,
+        TomixConfigStore? config = null)
     {
         _session = session;
+        _config = config;
         _providers = providers;
         _formatter = formatter;
         _state = state;
@@ -51,8 +56,24 @@ internal sealed class FormatCommand : ICommandModule
         };
         var longOption = new Option<bool>("--long")
         {
-            Description = "Prefer long lines when formatting M"
+            Description = "Long lines: wrap DAX at 120 columns instead of 65, and M at 120 instead of 40"
         };
+        var shortOption = new Option<bool>("--short")
+        {
+            Description = "Short lines (the default); overrides format.lines=long in config"
+        };
+        var separatorsOption = new Option<string?>("--separators")
+        {
+            Description = "Display-only DAX separators: us (A, B, 1.5) or eu (A; B; 1,5); models always store us",
+            HelpName = "us|eu"
+        };
+        separatorsOption.AcceptAmongIgnoreCase([.. FormatStyle.SeparatorValues]);
+        var functionSpacingOption = new Option<string?>("--function-spacing")
+        {
+            Description = "Space between a DAX function name and its parenthesis: space (IF ( ) or none (IF( )",
+            HelpName = "space|none"
+        };
+        functionSpacingOption.AcceptAmongIgnoreCase([.. FormatStyle.FunctionSpacingValues]);
         var saveToOption = LifecycleOptions.SaveTo();
         var langOption = new Option<string?>("--lang")
         {
@@ -76,6 +97,9 @@ internal sealed class FormatCommand : ICommandModule
             expressionOption,
             pathOption,
             longOption,
+            shortOption,
+            separatorsOption,
+            functionSpacingOption,
             saveToOption,
             langOption,
             typeOption,
@@ -105,16 +129,27 @@ internal sealed class FormatCommand : ICommandModule
                 type = parsed;
             }
 
+            var writes = parseResult.GetValue(saveOption)
+                         || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption))
+                         || parseResult.GetValue(stageOption)
+                         || parseResult.GetValue(revertOption);
+            if (!TryResolveStyle(
+                    parseResult.GetValue(separatorsOption),
+                    parseResult.GetValue(functionSpacingOption),
+                    parseResult.GetValue(longOption),
+                    parseResult.GetValue(shortOption),
+                    writes,
+                    GlobalOptions.ErrorFormatValue(parseResult, formatValue),
+                    out var style))
+                return 2;
+
             var modelValue = GlobalOptions.ModelValue(parseResult) ?? parseResult.GetValue(modelArgument);
             var expression = InputValueResolver.Resolve(
                 parseResult.GetValue(expressionOption),
                 readPipedInput: ReadsPipedExpression(
                     modelValue,
                     parseResult.GetValue(pathOption),
-                    writes: parseResult.GetValue(saveOption)
-                            || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption))
-                            || parseResult.GetValue(stageOption)
-                            || parseResult.GetValue(revertOption)));
+                    writes));
             var quiet = parseResult.GetValue(GlobalOptions.Quiet);
             if (!SessionScope.TryResolveModel(
                     _session,
@@ -134,7 +169,7 @@ internal sealed class FormatCommand : ICommandModule
                         parseResult.GetValue(pathOption),
                         parseResult.GetValue(langOption) ?? "",
                         type,
-                        parseResult.GetValue(longOption),
+                        style.Long,
                         parseResult.GetValue(saveOption),
                         parseResult.GetValue(saveToOption),
                         Serialization: "",
@@ -142,7 +177,9 @@ internal sealed class FormatCommand : ICommandModule
                         Overwrite: parseResult.GetValue(overwriteOption),
                         Stage: parseResult.GetValue(stageOption),
                         Revert: parseResult.GetValue(revertOption),
-                        NoSync: parseResult.GetValue(noSyncOption)),
+                        NoSync: parseResult.GetValue(noSyncOption),
+                        Separators: style.Separators,
+                        FunctionSpacing: style.FunctionSpacing),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
@@ -163,6 +200,53 @@ internal sealed class FormatCommand : ICommandModule
 
         return command;
     }
+
+    /// <summary>
+    /// The style to format with: each flag overrides its <c>format.*</c> config key. EU separators
+    /// are display only, so asking for them explicitly alongside a write is rejected rather than
+    /// letting the user believe the model now stores them; from config they simply stay on screen.
+    /// </summary>
+    private bool TryResolveStyle(
+        string? separators,
+        string? functionSpacing,
+        bool longLines,
+        bool shortLines,
+        bool writes,
+        string? errorFormat,
+        out FormatStyle style)
+    {
+        style = FormatStyle.Default;
+        if (longLines && shortLines)
+        {
+            WriteUsageError("TOMIX_USAGE", "--long and --short cannot be combined.", "Pick one line length.", errorFormat);
+            return false;
+        }
+
+        style = _config is null ? FormatStyle.Default : FormatStyle.FromConfig(_config.Load());
+        if (FormatStyle.TryParseSeparators(separators, out var parsedSeparators))
+        {
+            if (writes && parsedSeparators == DaxSeparators.Eu)
+            {
+                WriteUsageError(
+                    "TOMIX_FORMAT_SEPARATORS_DISPLAY_ONLY",
+                    "--separators eu only changes what is shown; models always store DAX with us separators.",
+                    "Drop --separators to save, or preview without --save, --save-to, --stage or --revert.",
+                    errorFormat);
+                return false;
+            }
+
+            style = style with { Separators = parsedSeparators };
+        }
+
+        if (FormatStyle.TryParseFunctionSpacing(functionSpacing, out var parsedSpacing))
+            style = style with { FunctionSpacing = parsedSpacing };
+        if (longLines || shortLines)
+            style = style with { Long = longLines };
+        return true;
+    }
+
+    private static void WriteUsageError(string code, string message, string hint, string? errorFormat)
+        => ErrorOutput.Write([new TomixDiagnostic(code, DiagnosticSeverity.Error, message, hint)], errorFormat);
 
     /// <summary>
     /// Whether piped stdin can be the expression to format: only when nothing names a model to

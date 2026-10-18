@@ -29,7 +29,9 @@ Supported keys are `defaultFormat` (`text` or `json`), `noColor`, `updateCheck`,
 introduce validation errors),
 the non-secret authentication settings `auth.clientId`, `auth.tenant`, and
 `auth.authority`, and `bpa.rules` (BPA rule files or URLs that every `bpa run`
-and the `deploy` gate load, separated by `;`; see [rule sources](validate.md#rule-sources)). An
+and the `deploy` gate load, separated by `;`; see [rule sources](validate.md#rule-sources)),
+and the `tx format` style keys `format.separators` (`us` or `eu`), `format.functionSpacing`
+(`space` or `none`), and `format.lines` (`short` or `long`); see [format style](modify.md#format-style). An
 explicit `--output-format` always overrides `defaultFormat`; the legacy value `human` is read as `text`.
 
 Unknown legacy entries are preserved when another setting is changed and are

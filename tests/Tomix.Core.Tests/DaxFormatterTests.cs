@@ -138,4 +138,45 @@ public sealed class DaxFormatterTests
     public void Format_LineLengthOutsideSupportedRange_Throws(int maximumLineLength)
         => Assert.Throws<ArgumentOutOfRangeException>(
             () => DaxFormatter.Format("SUM(Sales[Amount])", maximumLineLength));
+
+    // ── Style knobs (#229) ───────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(DaxFunctionSpacing.Space, "CALCULATE ( SUM ( Sales[Amount] ), NOW () )")]
+    [InlineData(DaxFunctionSpacing.None, "CALCULATE( SUM( Sales[Amount] ), NOW() )")]
+    public void TryFormat_FunctionSpacing_ControlsTheGapBeforeTheParenthesis(DaxFunctionSpacing spacing, string expected)
+    {
+        var result = DaxFormatter.TryFormat(
+            "calculate(sum(Sales[Amount]), now())", DaxFormatter.DefaultMaximumLineLength, spacing);
+
+        Assert.True(result.Success);
+        Assert.Equal(expected, result.Formatted);
+    }
+
+    [Fact]
+    public void TryFormat_LongLines_KeepsWhatFitsIn120ColumnsOnOneLine()
+    {
+        var expression = "SUMX(FILTER(Sales, Sales[Price] > 1 && Sales[Region] = \"West\"), Sales[Qty] * Sales[Price])";
+
+        Assert.Contains(Environment.NewLine, DaxFormatter.TryFormat(expression).Formatted);
+        Assert.DoesNotContain(
+            Environment.NewLine,
+            DaxFormatter.TryFormat(expression, DaxFormatter.LongMaximumLineLength).Formatted);
+    }
+
+    [Theory]
+    [InlineData("DIVIDE ( 1.5, 2 )", "DIVIDE ( 1,5; 2 )")]
+    [InlineData("{ 1, 2.25E+3 }", "{ 1; 2,25E+3 }")]
+    [InlineData("IF ( x, \"a, b. c\", 'T, 1.5'[C,1.5] ) -- keep, 1.5", "IF ( x; \"a, b. c\"; 'T, 1.5'[C,1.5] ) -- keep, 1.5")]
+    [InlineData("/* a, 1.5 */ SUM ( T[C] )", "/* a, 1.5 */ SUM ( T[C] )")]
+    [InlineData(".5 + 1", ",5 + 1")]
+    public void WithSeparators_Eu_RewritesOnlyListCommasAndDecimalPoints(string dax, string expected)
+        => Assert.Equal(expected, DaxFormatter.WithSeparators(dax, DaxSeparators.Eu));
+
+    [Fact]
+    public void WithSeparators_Us_ReturnsTheInputUnchanged()
+    {
+        const string dax = "DIVIDE ( 1.5, 2 )";
+        Assert.Same(dax, DaxFormatter.WithSeparators(dax, DaxSeparators.Us));
+    }
 }

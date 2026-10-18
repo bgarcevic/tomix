@@ -1,4 +1,5 @@
 using Tomix.App.Format;
+using Tomix.Core.Dax;
 using Tomix.Core.Models;
 using Tomix.Provider.Tmdl;
 using Tomix.Tests.Support;
@@ -14,17 +15,28 @@ namespace Tomix.Cli.Tests;
 /// </summary>
 public sealed class OfflineDaxFormatterCorpusTests
 {
-    public static TheoryData<string> SampleModels()
+    private static IEnumerable<string> SampleModelNames()
     {
-        var data = new TheoryData<string> { SampleModel.DefaultName };
+        yield return SampleModel.DefaultName;
         foreach (var directory in Directory.EnumerateDirectories(RepoPaths.Samples, "*.SemanticModel"))
-            data.Add(Path.GetFileName(directory));
+            yield return Path.GetFileName(directory);
+    }
+
+    public static TheoryData<string, bool, DaxFunctionSpacing> SampleModelsAndStyles()
+    {
+        var data = new TheoryData<string, bool, DaxFunctionSpacing>();
+        foreach (var name in SampleModelNames())
+        {
+            data.Add(name, false, DaxFunctionSpacing.Space);
+            data.Add(name, true, DaxFunctionSpacing.None);
+        }
         return data;
     }
 
     [Theory]
-    [MemberData(nameof(SampleModels))]
-    public async Task SampleModel_DaxExpressions_FormatOfflineAndAreIdempotent(string name)
+    [MemberData(nameof(SampleModelsAndStyles))]
+    public async Task SampleModel_DaxExpressions_FormatOfflineAndAreIdempotent(
+        string name, bool longLines, DaxFunctionSpacing spacing)
     {
         var provider = new TmdlModelProvider();
         var reference = new ModelReference(SampleModel.Locate(name));
@@ -38,14 +50,14 @@ public sealed class OfflineDaxFormatterCorpusTests
         foreach (var (path, kind, expression) in DaxExpressions(snapshot.Objects))
         {
             var first = await client.FormatAsync(
-                new ExpressionFormatRequest(expression, "dax", Long: false),
+                new ExpressionFormatRequest(expression, "dax", longLines, spacing),
                 CancellationToken.None);
             Assert.True(
                 first.Success,
                 $"Offline formatting declined {path} ({kind}): {string.Join("; ", first.Errors)}");
 
             var second = await client.FormatAsync(
-                new ExpressionFormatRequest(first.Formatted, "dax", Long: false),
+                new ExpressionFormatRequest(first.Formatted, "dax", longLines, spacing),
                 CancellationToken.None);
             Assert.True(second.Success, $"Reformatting declined {path} ({kind}).");
             Assert.Equal(first.Formatted, second.Formatted);
