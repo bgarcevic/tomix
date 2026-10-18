@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using Tomix.App.Deploy;
 using Tomix.App.Diff;
 using Tomix.Cli.Output;
+using Tomix.Core.Models;
+using Tomix.Core.Rules;
 
 namespace Tomix.Cli.Tests;
 
@@ -78,6 +80,66 @@ public sealed class DeployRendererTests
         Assert.DoesNotContain("deploy plan", output);
     }
 
+    [Fact]
+    public void Deployed_CleanValidation_SaysAllObjectsReady()
+    {
+        var output = Render(Deployed(new DeployValidation([])));
+
+        Assert.Contains("Deployed: updated (42ms)", output);
+        Assert.Contains("Post-deploy check: all objects ready.", output);
+    }
+
+    [Fact]
+    public void Deployed_ListsBrokenObjects_AndCountsUnprocessedOnes()
+    {
+        var output = Render(Deployed(new DeployValidation(
+        [
+            new DeployedObjectIssue(RuleSeverity.Error, "Measure", "Sales[Total]", "SemanticError", "Column [X] not found."),
+            new DeployedObjectIssue(RuleSeverity.Warning, "Partition", "Sales[P]", "Incomplete", null),
+            new DeployedObjectIssue(RuleSeverity.Info, "Partition", "Sales[Fact]", "NoData", null),
+            new DeployedObjectIssue(RuleSeverity.Info, "CalculatedColumn", "Sales[C]", "CalculationNeeded", null)
+        ])));
+
+        Assert.Contains("Post-deploy check: 1 error(s), 1 warning(s)", output);
+        Assert.Contains("Error Measure Sales[Total]: SemanticError — Column [X] not found.", output);
+        Assert.Contains("Warning Partition Sales[P]: Incomplete", output);
+        Assert.DoesNotContain("Sales[Fact]", output);
+        Assert.Contains("2 object(s) hold no data or need recalculation; run 'tx refresh'", output);
+    }
+
+    [Fact]
+    public void Deployed_WithoutValidation_PrintsNoCheckLine()
+        => Assert.DoesNotContain("Post-deploy check", Render(Deployed(validation: null)));
+
+    [Fact]
+    public void EmitCi_AnnotatesErrorsAndWarnings_NotUnprocessedObjects()
+    {
+        var result = Deployed(new DeployValidation(
+        [
+            new DeployedObjectIssue(RuleSeverity.Error, "Measure", "Sales[Total]", "SemanticError", "bad"),
+            new DeployedObjectIssue(RuleSeverity.Warning, "Partition", "Sales[P]", "Incomplete", null),
+            new DeployedObjectIssue(RuleSeverity.Info, "Partition", "Sales[Fact]", "NoData", null)
+        ]));
+
+        var captured = ConsoleCapture.Run(() => DeployRenderer.EmitCi("github", result));
+
+        var lines = captured.Stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal(
+            [
+                "::error::tx deploy Prod: Measure Sales[Total] is SemanticError: bad",
+                "::warning::tx deploy Prod: Partition Sales[P] is Incomplete"
+            ],
+            lines);
+    }
+
+    [Fact]
+    public void EmitCi_WithoutValidation_IsSilent()
+    {
+        var captured = ConsoleCapture.Run(() => DeployRenderer.EmitCi("vsts", Deployed(validation: null)));
+
+        Assert.Equal("", captured.Stderr);
+    }
+
     // -- Helpers ---------------------------------------------------------------------------------
 
     private static DeployModelResult Preview(
@@ -89,6 +151,12 @@ public sealed class DeployRendererTests
             Diff = diff,
             DiffError = diffError,
             CreatesDatabase = createsDatabase
+        };
+
+    private static DeployModelResult Deployed(DeployValidation? validation)
+        => new(Server, "Prod", Status: "updated", DurationMs: 42, ScriptPath: null, Script: null)
+        {
+            Validation = validation
         };
 
     private static DiffModelResult NoChanges()

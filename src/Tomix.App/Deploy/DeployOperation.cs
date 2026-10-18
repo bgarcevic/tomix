@@ -3,6 +3,7 @@ using Tomix.Core.Authentication;
 using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Rules;
 
 namespace Tomix.App.Deploy;
 
@@ -164,8 +165,7 @@ public sealed class DeployOperation : IAsyncDisposable
         try
         {
             var result = await _deployer!.DeployAsync(_deployRequest!, cancellationToken);
-            return Ok(new DeployModelResult(
-                result.Server, result.Database, result.Status, result.DurationMs, null, null));
+            return Deployed(result);
         }
         catch (DeployTargetNameRequiredException ex)
         {
@@ -200,6 +200,72 @@ public sealed class DeployOperation : IAsyncDisposable
         var warnings = _pendingWarnings;
         _pendingWarnings = [];
         return TomixResult<DeployModelResult>.Ok(data, diagnostics: warnings);
+    }
+
+    /// <summary>
+    /// A deploy that ran, judged by the post-deploy pass: an object the server reports in an
+    /// error state fails the command (exit 1) although the model is deployed, so a pipeline
+    /// cannot pass on a model whose measures do not evaluate. Incomplete objects, and a pass
+    /// that could not read the target, are warnings; unprocessed objects are expected after a
+    /// metadata deploy and only reported in the result.
+    /// </summary>
+    private TomixResult<DeployModelResult> Deployed(ModelDeployResult result)
+    {
+        var data = new DeployModelResult(
+            result.Server, result.Database, result.Status, result.DurationMs, null, null,
+            Validation: result.Validation);
+        var ok = Ok(data);
+        var (diagnostics, failed) = PostDeployDiagnostics(result.Database, result.Validation, result.ValidationError);
+        return new TomixResult<DeployModelResult>(
+            Success: !failed,
+            data,
+            [.. ok.Diagnostics, .. diagnostics],
+            ExitCode: failed ? 1 : 0);
+    }
+
+    /// <summary>Most objects a post-deploy message names before summarising the rest.</summary>
+    internal const int NamedObjectLimit = 5;
+
+    internal static (IReadOnlyList<TomixDiagnostic> Diagnostics, bool Failed) PostDeployDiagnostics(
+        string database, DeployValidation? validation, string? validationError)
+    {
+        if (validation is null)
+        {
+            return validationError is null
+                ? ([], false)
+                : ([
+                    new TomixDiagnostic(
+                        "TOMIX_DEPLOY_VALIDATION_UNAVAILABLE",
+                        DiagnosticSeverity.Warning,
+                        $"Deployed '{database}', but the post-deploy check could not read it: {validationError}",
+                        Hint: "Run 'tx validate' against the deployed model to check it.")
+                ], false);
+        }
+
+        var diagnostics = new List<TomixDiagnostic>();
+        var errors = validation.Issues.Where(issue => issue.Severity == RuleSeverity.Error).ToList();
+        var warnings = validation.Issues.Where(issue => issue.Severity == RuleSeverity.Warning).ToList();
+
+        if (errors.Count > 0)
+            diagnostics.Add(new TomixDiagnostic(
+                "TOMIX_DEPLOY_VALIDATION_FAILED",
+                DiagnosticSeverity.Error,
+                $"Deployed '{database}', but the server reports {errors.Count} object(s) in an error state: {Named(errors)}.",
+                Hint: "The deployed model is live with these errors. Fix them and deploy again; 'tx validate' checks a model before it is deployed."));
+
+        if (warnings.Count > 0)
+            diagnostics.Add(new TomixDiagnostic(
+                "TOMIX_DEPLOY_VALIDATION_WARNINGS",
+                DiagnosticSeverity.Warning,
+                $"The server reports {warnings.Count} incomplete object(s) in '{database}': {Named(warnings)}."));
+
+        return (diagnostics, errors.Count > 0);
+    }
+
+    private static string Named(IReadOnlyList<DeployedObjectIssue> issues)
+    {
+        var named = string.Join(", ", issues.Take(NamedObjectLimit).Select(issue => $"{issue.ObjectName} ({issue.State})"));
+        return issues.Count > NamedObjectLimit ? $"{named} and {issues.Count - NamedObjectLimit} more" : named;
     }
 
     public ValueTask DisposeAsync() => _session?.DisposeAsync() ?? ValueTask.CompletedTask;

@@ -184,6 +184,9 @@ Returned by `tx mcp` as the result of a failed tool call (`isError: true`, a JSO
 | `TOMIX_DEPLOY_FIX_UNSUPPORTED` | 2 | `deploy --fix-bpa` was requested but the provider session does not implement `IModelMutationSession`. |
 | `TOMIX_DEPLOY_INVALID_FLAGS` | 2 | Contradictory deployment scope: `--deploy-full` combined with a granular `--deploy-*` flag, or a dependent flag without the one it refines (`--deploy-policy-partitions` without `--deploy-partitions`, `--deploy-role-members` without `--deploy-roles`). |
 | `TOMIX_DEPLOY_FAILED` | 1 | The deployment operation failed. |
+| `TOMIX_DEPLOY_VALIDATION_FAILED` | 1 | The deploy ran, but the post-deploy check found objects the server reports in an error state (semantic, evaluation, or dependency error). The model **is** deployed; the result data and its `validation` object are still written. |
+| `TOMIX_DEPLOY_VALIDATION_WARNINGS` | 0 | Warning, not a failure. The post-deploy check found objects the server reports as incomplete. |
+| `TOMIX_DEPLOY_VALIDATION_UNAVAILABLE` | 0 | Warning, not a failure. The deploy succeeded, but the post-deploy check could not re-read the deployed model. |
 | `TOMIX_DEPLOY_AMBIGUOUS_SERVER` | 0 | Warning, not a failure. The `-s` value is a dotted two-part name such as `Sales.Prod`, deployed to the Analysis Services server of that name. Pass `powerbi://api.powerbi.com/v1.0/myorg/<name>` to target a Power BI workspace with that name instead. |
 
 ## Refresh Codes (`TOMIX_REFRESH_*`)

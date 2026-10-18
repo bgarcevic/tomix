@@ -82,8 +82,15 @@ public sealed record ModelDeployRequest(
     public ModelDeployOptions EffectiveOptions => Options ?? ModelDeployOptions.Preserve;
 }
 
+/// <summary>
+/// <paramref name="Validation"/> is the server's post-deploy view of the deployed objects; null
+/// when the provider does not inspect them. <paramref name="ValidationError"/> says why the
+/// inspection could not run after a deploy that did — the deploy itself still succeeded.
+/// </summary>
 public sealed record ModelDeployResult(
     string Server,
     string Database,
     string Status,
-    long DurationMs);
+    long DurationMs,
+    DeployValidation? Validation = null,
+    string? ValidationError = null);

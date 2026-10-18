@@ -1,6 +1,8 @@
 using Spectre.Console;
 using Tomix.App.Deploy;
 using Tomix.App.Diff;
+using Tomix.Core.Models;
+using Tomix.Core.Rules;
 using Tomix.Provider.Tom;
 
 namespace Tomix.Cli.Output;
@@ -57,5 +59,56 @@ internal static class DeployRenderer
             $"Deploying {modelName} to {result.Server} / {result.Database}..."));
         AnsiConsole.MarkupLine(Styling.Success(
             $"Deployed: {result.Status} ({result.DurationMs}ms)"));
+
+        if (result.Validation is { } validation)
+            RenderValidation(validation);
+    }
+
+    /// <summary>
+    /// The post-deploy pass: each broken or incomplete object on its own line with the server's
+    /// message, then a count of unprocessed objects — expected after a metadata deploy, so
+    /// counted rather than listed.
+    /// </summary>
+    private static void RenderValidation(DeployValidation validation)
+    {
+        if (validation.Issues.Count == 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Success("Post-deploy check: all objects ready."));
+            return;
+        }
+
+        if (validation.Errors + validation.Warnings > 0)
+        {
+            AnsiConsole.MarkupLine(Styling.Bold(
+                $"Post-deploy check: {validation.Errors} error(s), {validation.Warnings} warning(s)"));
+            foreach (var issue in validation.Issues.Where(issue => issue.Severity != RuleSeverity.Info))
+            {
+                var message = issue.Message is null ? string.Empty : $" — {issue.Message}";
+                AnsiConsole.MarkupLine(
+                    $"  {Styling.SeverityMarkup(issue.Severity.ToString())} "
+                    + Styling.Value($"{issue.ObjectType} {issue.ObjectName}: {issue.State}{message}"));
+            }
+        }
+
+        if (validation.Unprocessed > 0)
+            AnsiConsole.MarkupLine(Styling.Guidance(
+                $"{validation.Unprocessed} object(s) hold no data or need recalculation; run 'tx refresh' to process them."));
+    }
+
+    /// <summary>CI annotations (<c>--ci</c>) for the post-deploy errors and warnings.</summary>
+    public static void EmitCi(string? ci, DeployModelResult result)
+    {
+        if (result.Validation is not { } validation)
+            return;
+
+        var annotations = validation.Issues
+            .Where(issue => issue.Severity != RuleSeverity.Info)
+            .Select(issue => new CiAnnotation(
+                IsError: issue.Severity == RuleSeverity.Error,
+                $"tx deploy {result.Database}: {issue.ObjectType} {issue.ObjectName} is {issue.State}"
+                    + (issue.Message is null ? string.Empty : $": {issue.Message}")))
+            .ToList();
+
+        CiAnnotations.Emit(ci, annotations, Console.Error);
     }
 }

@@ -52,13 +52,37 @@ public static class TomModelDeployer
 
             sw.Stop();
             var deployName = existing?.Name ?? targetName;
-            return new ModelDeployResult(request.Server, deployName, status, sw.ElapsedMilliseconds);
+            var (validation, validationError) = InspectDeployed(server, deployName);
+            return new ModelDeployResult(
+                request.Server, deployName, status, sw.ElapsedMilliseconds, validation, validationError);
         }
         finally
         {
             if (server.Connected)
                 server.Disconnect();
             server.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Re-reads the deployed database on the open connection and runs the post-deploy pass
+    /// (#237). The deploy has already succeeded, so a failed read is reported, not thrown.
+    /// </summary>
+    private static (DeployValidation? Validation, string? Error) InspectDeployed(TabularServer server, string name)
+    {
+        try
+        {
+            // The server object predates the deploy: a created database is not in its
+            // collection yet, and an updated one still holds the pre-deploy object states.
+            server.Refresh();
+            var deployed = server.Databases.FindByName(name)
+                ?? throw new InvalidOperationException($"Database '{name}' was not found after the deploy.");
+            deployed.Refresh(true);
+            return (TomDeployValidator.Inspect(deployed), null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return (null, ex.InnerException?.Message ?? ex.Message);
         }
     }
 
