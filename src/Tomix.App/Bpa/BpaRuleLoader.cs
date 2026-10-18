@@ -9,6 +9,7 @@ public sealed partial class BpaRuleLoader
 {
     public const string StandardRuleset = "standard";
     public const string FullRuleset = "full";
+    public const string VertipaqRuleset = "vertipaq";
 
     private const string BundledRulesResourceName = "Tomix.App.Bpa.Rules.bpa-rules.json";
     private const string MicrosoftRulesUrl = "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/BestPracticeRules/BPARules.json";
@@ -46,16 +47,18 @@ public sealed partial class BpaRuleLoader
     /// name in kebab case), for example <c>--ruleset standard,localization</c>. A new category
     /// whose rules would bury real findings on most models — localization rules fire on every
     /// visible object of a single-culture model — belongs here rather than in <c>full</c>.
+    /// VertiPaq rules are here because they need statistics most runs lack (#234).
     /// </summary>
     public static IReadOnlySet<string> DefaultOffCategories { get; } =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Localization" };
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Localization", "VertiPaq" };
 
     /// <summary>
     /// The curated subset of the bundled catalog that makes up the <c>standard</c> ruleset.
     /// It also drives the deploy BPA gate, which blocks on error severity by default, so
     /// error-severity rules here must flag only a broken model (it fails to deploy, refresh, or
     /// query correctly). Noisy, heuristic, and style-opinion rules remain available through
-    /// <c>--ruleset full</c>.
+    /// <c>--ruleset full</c>. Rules that read VertiPaq statistics live in the default-off
+    /// <c>vertipaq</c> preset instead (#234): most runs have no statistics to check them with.
     /// </summary>
     private static readonly HashSet<string> CuratedRuleIds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -68,7 +71,6 @@ public sealed partial class BpaRuleLoader
         "AVOID_INVALID_DESCRIPTION_CHARACTERS",
         "SET_ISAVAILABLEINMDX_TO_TRUE_ON_NECESSARY_COLUMNS",
         // Performance
-        "AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS",
         "REDUCE_USAGE_OF_LONG-LENGTH_COLUMNS_WITH_HIGH_CARDINALITY",
         "MANY-TO-MANY_RELATIONSHIPS_SHOULD_BE_SINGLE-DIRECTION",
         "AVOID_USING_MANY-TO-MANY_RELATIONSHIPS_ON_TABLES_USED_FOR_DYNAMIC_ROW_LEVEL_SECURITY",
@@ -83,7 +85,6 @@ public sealed partial class BpaRuleLoader
         "INACTIVE_RELATIONSHIPS_THAT_ARE_NEVER_ACTIVATED",
         "EVALUATEANDLOG_SHOULD_NOT_BE_USED_IN_PRODUCTION_MODELS",
         // Maintenance
-        "FIX_REFERENTIAL_INTEGRITY_VIOLATIONS",
         "CALCULATION_GROUPS_WITH_NO_CALCULATION_ITEMS",
         // Formatting
         "OBJECTS_SHOULD_NOT_START_OR_END_WITH_A_SPACE",
@@ -138,6 +139,16 @@ public sealed partial class BpaRuleLoader
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return presets.Length == 0 ? [StandardRuleset] : presets;
     }
+
+    /// <summary>
+    /// The presets a run loads: <see cref="SplitRulesets"/>, except that a run with no
+    /// <c>--ruleset</c> on a model that has VertiPaq statistics also loads <c>vertipaq</c>, since
+    /// those rules can then be checked (#234). A ruleset the user names is taken as given.
+    /// </summary>
+    public static IReadOnlyList<string> ResolveRulesets(string? ruleset, bool hasVertipaqStats)
+        => string.IsNullOrWhiteSpace(ruleset) && hasVertipaqStats
+            ? [StandardRuleset, VertipaqRuleset]
+            : SplitRulesets(ruleset);
 
     /// <summary>
     /// Selects a bundled preset from <paramref name="catalog"/>: <c>standard</c> (the curated

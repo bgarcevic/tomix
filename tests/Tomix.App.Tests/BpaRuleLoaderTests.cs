@@ -21,11 +21,11 @@ public sealed class BpaRuleLoaderTests
         var standard = await BpaRuleLoader.LoadRulesetAsync("standard", CancellationToken.None);
         var catalog = BpaRuleLoader.LoadBundledCatalog();
 
-        // Exactly the curated IDs must resolve against the catalog — a drop below 26 means a
+        // Exactly the curated IDs must resolve against the catalog — a drop below 24 means a
         // curated ID drifted from the bundled rule IDs.
-        Assert.Equal(26, standard.Count);
+        Assert.Equal(24, standard.Count);
         Assert.True(standard.Count < catalog.Count);
-        Assert.Contains(standard, r => r.Id == "AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS");
+        Assert.Contains(standard, r => r.Id == "HIDE_FOREIGN_KEYS");
     }
 
     [Theory]
@@ -78,11 +78,13 @@ public sealed class BpaRuleLoaderTests
     }
 
     [Fact]
-    public async Task LoadRulesetAsync_Full_LoadsEntireBundledCatalog()
+    public async Task LoadRulesetAsync_Full_LoadsEveryBundledRuleOutsideTheDefaultOffCategories()
     {
         var full = await BpaRuleLoader.LoadRulesetAsync("full", CancellationToken.None);
 
-        Assert.Equal(BpaRuleLoader.LoadBundledCatalog().Count, full.Count);
+        Assert.Equal(
+            BpaRuleLoader.LoadBundledCatalog().Count(r => !BpaRuleLoader.DefaultOffCategories.Contains(r.Category)),
+            full.Count);
         Assert.Contains(full, r => r.Id == "UNNECESSARY_COLUMNS");
     }
 

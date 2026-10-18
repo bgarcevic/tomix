@@ -8,6 +8,8 @@ using Tomix.Cli.Output;
 using Tomix.Core.Bpa;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Vertipaq;
+using Tomix.Provider.Vpax;
 
 namespace Tomix.Cli.Commands;
 
@@ -21,6 +23,7 @@ internal sealed class BpaCommand : ICommandModule
     private readonly BpaUserRuleState _bpaRules;
     private readonly string _configDirectory;
     private readonly HttpClient? _httpClient;
+    private readonly IVertipaqAnalyzer _vertipaq;
 
     public BpaCommand(
         IReadOnlyList<IModelProvider> providers,
@@ -29,7 +32,8 @@ internal sealed class BpaCommand : ICommandModule
         BpaUserRuleState bpaRules,
         string configDirectory,
         HttpClient? httpClient = null,
-        SessionScope? session = null)
+        SessionScope? session = null,
+        IVertipaqAnalyzer? vertipaq = null)
     {
         _session = session;
         _providers = providers;
@@ -38,6 +42,8 @@ internal sealed class BpaCommand : ICommandModule
         _bpaRules = bpaRules;
         _configDirectory = configDirectory;
         _httpClient = httpClient;
+        // bpa only reads exported files, which needs neither a token nor the extractor version.
+        _vertipaq = vertipaq ?? new VpaxVertipaqAnalyzer(tokenProvider: null, version: "");
     }
 
     /// <summary>The live session inside <c>tx interactive</c>, otherwise the providers.</summary>
@@ -123,6 +129,12 @@ internal sealed class BpaCommand : ICommandModule
             Description = "Write results to a .trx test-run file at this path"
         }.In("CI options");
 
+        var vpaxOption = new Option<string?>("--vpax")
+        {
+            Description = "Read VertiPaq statistics from an exported .vpax file for the rules that need them",
+            HelpName = "file.vpax"
+        }.In("Rule options");
+
         var allowExternalRulesOption = new Option<bool>("--allow-external-rules")
         {
             Description = "Allow rule URLs found in model annotations to be fetched"
@@ -182,6 +194,7 @@ internal sealed class BpaCommand : ICommandModule
             ciOption,
             trxOption,
             allowExternalRulesOption,
+            vpaxOption,
             pathOption,
             noMultilineOption,
             detailsOption,
@@ -232,7 +245,7 @@ internal sealed class BpaCommand : ICommandModule
             var result = await CliSpinner.RunAsync(
                 "Running BPA analysis...",
                 () => new BpaRunHandler(
-                    Sessions, _mutations, _bpaRules, _configDirectory, _httpClient).HandleAsync(
+                    Sessions, _mutations, _bpaRules, _configDirectory, _httpClient, vertipaq: _vertipaq).HandleAsync(
                     new BpaRunRequest(
                         model,
                         ruleFiles,
@@ -252,7 +265,8 @@ internal sealed class BpaCommand : ICommandModule
                         parseResult.GetValue(stageOption),
                         parseResult.GetValue(revertOption),
                         NoSync: parseResult.GetValue(noSyncOption),
-                        Overwrite: parseResult.GetValue(overwriteOption)),
+                        Overwrite: parseResult.GetValue(overwriteOption),
+                        VpaxPath: parseResult.GetValue(vpaxOption)),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(format) || OutputFormats.IsCsv(format));
 

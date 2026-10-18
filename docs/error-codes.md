@@ -101,6 +101,8 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 | `TOMIX_BPA_RULES_LOAD_FAILED` | 2 | Failed to load the BPA rules catalog, or a rules file or model `BestPracticeAnalyzer` annotation being edited is not a JSON array of rules. |
 | `TOMIX_BPA_RULES_TARGET_CONFLICT` | 2 | `bpa rules add/set/remove` was given both a model and `--rules-file`. A model edits its `BestPracticeAnalyzer` annotation; `--rules-file` edits that file. Pass one. |
 | `TOMIX_BPA_VERTIPAQ_STATS_MISSING` | 0 | Warning, not a failure. The deploy BPA gate did not check rules that read `Vertipaq_*` statistics, because the model has none. The message names the rules. Collect the statistics with `tx vertipaq --annotate --save` on a deployed model, or on a local model connected to one in workspace mode. |
+| `TOMIX_BPA_VPAX_MISMATCH` | 2 | `bpa run --vpax` found none of the file's tables in the model (statistics from another model, or an obfuscated export), so no statistics rule could be checked. Export statistics from a deployed copy of this model without `--obfuscate`. |
+| `TOMIX_BPA_VPAX_PARTIAL` | 0 | Warning, not a failure. Some tables in the `bpa run --vpax` file are not in the model, which the message names; the statistics may be older than the model. The run checks the tables that match. |
 | `TOMIX_BPA_VIOLATIONS` | 1 | BPA gate blocked the operation: violations at or above the configured threshold were found (with `deploy --fix-bpa`, they remained after auto-fix). Rules that could not be evaluated count as error-severity violations and are named in the message. Use `--skip-bpa` to bypass. |
 
 ## Staging Codes (`TOMIX_STAGE_*`)
@@ -265,7 +267,7 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 | `TOMIX_VERTIPAQ_INVALID_TOP` | 2 | `--top` was zero or negative; it must be a positive integer. |
 | `TOMIX_VERTIPAQ_TABLE_NOT_FOUND` | 1 | The positional table filter matched no table in the statistics. |
 | `TOMIX_VERTIPAQ_FAILED` | 1 | Statistics extraction against the live engine failed. |
-| `TOMIX_VPAX_READ_FAILED` | 2 | The `--import` file is missing, unreadable, or not a valid statistics package. |
+| `TOMIX_VPAX_READ_FAILED` | 2 | The `vertipaq --import` or `bpa run --vpax` file is missing, unreadable, or not a valid statistics package. |
 | `TOMIX_VPAX_WRITE_FAILED` | 2 | The `--export` target (or its obfuscation dictionary) could not be written. |
 
 ## Init Codes (`TOMIX_INIT_*`)

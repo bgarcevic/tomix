@@ -21,33 +21,10 @@ public static class VertipaqAnnotationBuilder
 {
     public static IReadOnlyList<VertipaqAnnotationTarget> Build(VertipaqModelStats stats)
     {
-        var targets = new List<VertipaqAnnotationTarget>
-        {
-            new(".", null,
-            [
-                Annotation("Vertipaq_TotalSize", stats.TotalSize),
-                Annotation("Vertipaq_TableCount", stats.TableCount),
-                Annotation("Vertipaq_ColumnCount", stats.ColumnCount),
-                new ModelPropertyAssignment(
-                    "Annotation:Vertipaq_ExtractionDate",
-                    (stats.ExtractionDate ?? DateTimeOffset.UtcNow).UtcDateTime
-                        .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture))
-            ])
-        };
+        var targets = new List<VertipaqAnnotationTarget> { new(".", null, ForModel(stats)) };
 
         foreach (var table in stats.Tables)
-        {
-            targets.Add(new VertipaqAnnotationTarget(
-                Segment(table.TableName),
-                ModelObjectKind.Table,
-                [
-                    Annotation("Vertipaq_RowCount", table.RowCount),
-                    Annotation("Vertipaq_TableSize", table.TableSize),
-                    Annotation("Vertipaq_ColumnsTotalSize", table.ColumnsTotalSize),
-                    Annotation("Vertipaq_RelationshipsSize", table.RelationshipsSize),
-                    Annotation("Vertipaq_UserHierarchiesSize", table.UserHierarchiesSize)
-                ]));
-        }
+            targets.Add(new VertipaqAnnotationTarget(Segment(table.TableName), ModelObjectKind.Table, ForTable(table)));
 
         foreach (var column in stats.Columns)
         {
@@ -57,14 +34,7 @@ public static class VertipaqAnnotationBuilder
             targets.Add(new VertipaqAnnotationTarget(
                 $"{Segment(column.TableName)}/{Segment(column.ColumnName)}",
                 ModelObjectKind.Column,
-                [
-                    Annotation("Vertipaq_Cardinality", column.Cardinality),
-                    Annotation("Vertipaq_TotalSize", column.TotalSize),
-                    Annotation("Vertipaq_DataSize", column.DataSize),
-                    Annotation("Vertipaq_DictionarySize", column.DictionarySize),
-                    Annotation("Vertipaq_HierarchiesSize", column.HierarchiesSize),
-                    new ModelPropertyAssignment("Annotation:Vertipaq_Encoding", column.Encoding)
-                ]));
+                ForColumn(column)));
         }
 
         foreach (var relationship in stats.Relationships)
@@ -72,15 +42,49 @@ public static class VertipaqAnnotationBuilder
             targets.Add(new VertipaqAnnotationTarget(
                 $"{relationship.FromColumn}->{relationship.ToColumn}",
                 ModelObjectKind.Relationship,
-                [
-                    Annotation("Vertipaq_RIViolationInvalidRows", relationship.InvalidRows),
-                    Annotation("Vertipaq_MissingKeys", relationship.MissingKeys),
-                    Annotation("Vertipaq_UsedSize", relationship.UsedSize)
-                ]));
+                ForRelationship(relationship)));
         }
 
         return targets;
     }
+
+    /// <summary>The model-level statistics annotations.</summary>
+    internal static IReadOnlyList<ModelPropertyAssignment> ForModel(VertipaqModelStats stats) =>
+    [
+        Annotation("Vertipaq_TotalSize", stats.TotalSize),
+        Annotation("Vertipaq_TableCount", stats.TableCount),
+        Annotation("Vertipaq_ColumnCount", stats.ColumnCount),
+        new ModelPropertyAssignment(
+            "Annotation:Vertipaq_ExtractionDate",
+            (stats.ExtractionDate ?? DateTimeOffset.UtcNow).UtcDateTime
+                .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture))
+    ];
+
+    internal static IReadOnlyList<ModelPropertyAssignment> ForTable(VertipaqTableStats table) =>
+    [
+        Annotation("Vertipaq_RowCount", table.RowCount),
+        Annotation("Vertipaq_TableSize", table.TableSize),
+        Annotation("Vertipaq_ColumnsTotalSize", table.ColumnsTotalSize),
+        Annotation("Vertipaq_RelationshipsSize", table.RelationshipsSize),
+        Annotation("Vertipaq_UserHierarchiesSize", table.UserHierarchiesSize)
+    ];
+
+    internal static IReadOnlyList<ModelPropertyAssignment> ForColumn(VertipaqColumnStats column) =>
+    [
+        Annotation("Vertipaq_Cardinality", column.Cardinality),
+        Annotation("Vertipaq_TotalSize", column.TotalSize),
+        Annotation("Vertipaq_DataSize", column.DataSize),
+        Annotation("Vertipaq_DictionarySize", column.DictionarySize),
+        Annotation("Vertipaq_HierarchiesSize", column.HierarchiesSize),
+        new ModelPropertyAssignment("Annotation:Vertipaq_Encoding", column.Encoding)
+    ];
+
+    internal static IReadOnlyList<ModelPropertyAssignment> ForRelationship(VertipaqRelationshipStats relationship) =>
+    [
+        Annotation("Vertipaq_RIViolationInvalidRows", relationship.InvalidRows),
+        Annotation("Vertipaq_MissingKeys", relationship.MissingKeys),
+        Annotation("Vertipaq_UsedSize", relationship.UsedSize)
+    ];
 
     private static ModelPropertyAssignment Annotation(string name, long value)
         => new($"Annotation:{name}", value.ToString(CultureInfo.InvariantCulture));

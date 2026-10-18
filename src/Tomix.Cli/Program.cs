@@ -234,7 +234,8 @@ internal static class Program
                 mutations,
                 services.BpaRules,
                 services.ConfigDirectory,
-                httpClient),
+                httpClient,
+                vertipaq: analyzer),
             new CompletionCommand(),
             new ConfigCommand(services.ConfigStore, services.ConfigDirectory, services.ConfigFilePath),
             new ConnectCommand(

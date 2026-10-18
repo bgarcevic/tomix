@@ -76,7 +76,8 @@ public static class BpaRuleSources
     }
 
     /// <summary>
-    /// The rules a deploy gate checks: the <c>standard</c> ruleset, then <c>bpa.rules</c>,
+    /// The rules a deploy gate checks: the <c>standard</c> ruleset (with <c>vertipaq</c> when the
+    /// model has statistics), then <c>bpa.rules</c>,
     /// <c>TOMIX_BPA_RULES</c>, and the command's own rule files, resolved like <c>bpa run</c> so
     /// a later source overrides an earlier one for the same id. The personal config-dir
     /// <c>bpa-rules.json</c> and the model's annotations stay <c>bpa run</c>-only.
@@ -87,14 +88,15 @@ public static class BpaRuleSources
         IReadOnlyList<string>? optionFiles,
         string optionName,
         HttpClient? httpClient,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool hasVertipaqStats = false)
     {
-        var collections = new List<BpaRuleCollection>
-        {
-            new(BpaRuleSourceKind.Machine, BpaRuleLoader.StandardRuleset,
-                await BpaRuleLoader.LoadRulesetAsync(null, httpClient, cancellationToken).ConfigureAwait(false),
-                BpaRuleOrigin.Ruleset)
-        };
+        var collections = new List<BpaRuleCollection>();
+        foreach (var preset in BpaRuleLoader.ResolveRulesets(null, hasVertipaqStats))
+            collections.Add(new BpaRuleCollection(
+                BpaRuleSourceKind.Machine, preset,
+                await BpaRuleLoader.LoadRulesetAsync(preset, httpClient, cancellationToken).ConfigureAwait(false),
+                BpaRuleOrigin.Ruleset));
 
         foreach (var entry in Resolve(configDirectory, environment, optionFiles, optionName))
             collections.Add(new BpaRuleCollection(
