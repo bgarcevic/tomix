@@ -82,9 +82,10 @@ The catalog grows through presets rather than through the default set: a
 category whose rules would bury real findings on most models ships
 default-off. Neither `standard` nor `full` includes a default-off category; its
 own `--ruleset` preset (the category name in kebab case) opts in, and presets
-combine with commas — for example `--ruleset standard,localization` once
-localization rules ship. Localization is the first such category: on a
-single-culture model, translation rules would report every visible object.
+combine with commas — for example `--ruleset standard,vertipaq`. The
+`vertipaq` preset holds the rules that need VertiPaq statistics (see below).
+Localization is also default-off once its rules ship: on a single-culture
+model, translation rules would report every visible object.
 
 `standard` also drives the [`deploy`](connect.md#deploy-deploy-to-a-workspace) BPA gate, which blocks on
 error-severity findings by default. Error severity is therefore reserved for
@@ -96,16 +97,45 @@ sort-by or hierarchy columns hidden from MDX (see
 a warning or info that `bpa run` reports without blocking a deploy
 (`deploy --bpa-fail-on warning` blocks on warnings too).
 
-A few rules — high-cardinality bi-directional relationships, large unpartitioned
-tables, and referential-integrity violations — read VertiPaq statistics. On a
-model without them (no `Vertipaq_*` annotations), these rules are not run: `bpa run`
+Rules that read VertiPaq statistics are in the default-off `vertipaq` preset, so
+neither `standard` nor `full` includes them. A run without `--ruleset` loads `vertipaq`
+alongside `standard` when the model has statistics (`Vertipaq_*` annotations, or
+`--vpax`); the "Rules loaded" line then lists the `vertipaq` ruleset. A ruleset you name
+is used as given, so `--ruleset standard` skips them and `--ruleset 'standard,vertipaq'`
+asks for them on any model. On a model without statistics, these rules are not run: `bpa run`
 lists them under "Not checked" and doesn't count them as passed. In JSON they
 appear in `missingVertipaqStatsRules` and as `MissingVertipaqStats` diagnostics.
-They don't fail the run. To check them, write the statistics into the model first
-with `tx vertipaq --annotate --save`. Statistics only exist on a deployed model, so this
-works on a connected model, or on a local model connected in workspace mode (the
-statistics are read from its deployed mirror). A model file with no deployed copy
-can't be checked by these rules.
+They don't fail the run. Statistics only exist on a deployed model, so there are two
+ways to provide them:
+
+- Write them into the model with `tx vertipaq --annotate --save`. This works on a
+  connected model, or on a local model connected in workspace mode (the statistics are
+  read from its deployed mirror).
+- Export them once from the deployed model and pass the file with `--vpax`. The
+  statistics are applied in memory for the run only; the model is not changed. Use this
+  for a model file, a read-only connection, or CI:
+
+```sh
+tx vertipaq -s <workspace> -d <model> --export stats.vpax
+tx bpa run ./model --vpax stats.vpax
+```
+
+`--vpax` matches tables, columns, and relationships by name, so export without
+`--obfuscate`. Its statistics take precedence over `Vertipaq_*` annotations the model
+already has. If none of the file's tables are in the model, the run fails
+(`TOMIX_BPA_VPAX_MISMATCH`). If only some are missing, it warns and checks the rest
+(`TOMIX_BPA_VPAX_PARTIAL`). Re-export after changing the model so the statistics
+stay current.
+
+The `vertipaq` preset holds every bundled rule that reads statistics:
+
+| Rule | Flags |
+|------|-------|
+| `FIX_REFERENTIAL_INTEGRITY_VIOLATIONS` | Warning. A relationship whose "from" side has values the "to" side lacks, which shows as a blank member in slicers. |
+| `AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS` | Warning. A column with more than 100,000 distinct values in a bi-directional relationship. |
+| `LARGE_TABLES_SHOULD_BE_PARTITIONED` | Warning. A table of more than 25 million rows with a single partition. |
+| `LARGE_SHARE_OF_MODEL_SIZE` | Info. A table that takes more than half of a model of at least 100 MB, so you know where size savings are. |
+| `UNUSED_HIDDEN_HIGH_CARDINALITY_COLUMNS` | Warning. A hidden column with more than a million distinct values that no relationship, sort-by, hierarchy, or DAX expression uses. Reports and external tools are not visible to the check, so confirm before removing it. |
 
 The bundled catalog is embedded in the application and cannot be overridden by
 placing a file beside the executable. Use `--rules`, `bpa.rules`, model rule
@@ -131,6 +161,7 @@ tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save
 | `-r, --rules <file>` | BPA rule files or URLs, as JSON. |
 | `--ruleset <name>` | Standard ruleset: `standard` (curated default), `full`, `microsoft`, `microsoft-it`, `microsoft-ja`, `microsoft-es`, or a default-off category preset. Combine presets by repeating the option (`--ruleset standard --ruleset full`) or with commas; in PowerShell, quote a comma list (`'standard,full'`). |
 | `--rule <id>` | Run only specific rule(s) by ID. |
+| `--vpax <file.vpax>` | Read VertiPaq statistics from a file exported with `tx vertipaq --export`, for the rules that need them. Applied in memory only. |
 | `--path <path>` | Limit analysis to matched objects (literal names, wildcards, or paths). |
 | `--errors` / `--warnings` / `--info` | Show only rules of that severity (combinable). |
 | `--fail-on <threshold>` | Failure threshold: `error` (default) or `warning`. Rules that cannot be evaluated count as error-severity findings and block under either threshold. |

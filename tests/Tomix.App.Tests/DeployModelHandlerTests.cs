@@ -549,11 +549,19 @@ public sealed class DeployModelHandlerTests
         Assert.False(session.DeployCalled);
     }
 
+    // A team rule that reads VertiPaq statistics: the bundled ones are default-off (#234).
+    private const string StatisticsRuleJson =
+            "[{\"ID\":\"TEAM_RI\",\"Name\":\"ri\",\"Category\":\"c\",\"Severity\":2,\"Scope\":\"Relationship\","
+            + "\"Expression\":\"Convert.ToInt64(GetAnnotation(\\\"Vertipaq_RIViolationInvalidRows\\\")) > 0\",\"CompatibilityLevel\":1200}]";
+
     [Fact]
     public async Task HandleAsync_UnannotatedModel_DeploysWithWarningNamingStatisticsRules()
     {
         // #266: the gate passes a model without VertiPaq statistics (warn by default), but the
         // deploy result names the rules it could not check and how to collect the statistics.
+        // The bundled statistics rules are default-off (#234), so a team rules file brings one in.
+        using var root = new TempDir();
+        var rules = root.WriteFile("rules.json", StatisticsRuleJson);
         var handler = new DeployModelHandler(
             [new DirectionalDeployProvider(_ => new ModelSnapshot("m", 1601, []))], TestState);
 
@@ -566,7 +574,7 @@ public sealed class DeployModelHandlerTests
                 CreateOnly: false,
                 SkipBpa: false,
                 FixBpa: false,
-                BpaRules: null,
+                BpaRules: [rules],
                 XmlaOutput: null,
                 Ci: null),
             CancellationToken.None);
@@ -575,8 +583,53 @@ public sealed class DeployModelHandlerTests
         Assert.Equal("created", result.Data!.Status);
         var warning = Assert.Single(result.Diagnostics);
         Assert.Equal("TOMIX_BPA_VERTIPAQ_STATS_MISSING", warning.Code);
-        Assert.Contains("FIX_REFERENTIAL_INTEGRITY_VIOLATIONS", warning.Message);
+        Assert.Contains("TEAM_RI", warning.Message);
         Assert.Contains("tx vertipaq --annotate --save", warning.Hint);
+    }
+
+    [Theory]
+    [InlineData("5", 1)]
+    [InlineData("2000000", 2)]
+    public async Task HandleAsync_AnnotatedModel_GateAlsoChecksTheVertipaqPreset(string cardinality, int violations)
+    {
+        // #234: the bundled statistics rules are default-off, but a model that carries statistics
+        // can be checked, so the gate adds the vertipaq preset. The stub model always misses a
+        // date table (one standard warning); a high-cardinality unused hidden column adds a second.
+        var column = new ModelObject(
+            "Key", ModelObjectKind.Column, "Sales/Key",
+            Detail: "Int64", Expression: null, Description: null, Hidden: true,
+            SourceColumn: "Key", Children: [],
+            Properties: new Dictionary<string, string>
+            {
+                [PropertyBagKeys.DataType] = "Int64",
+                ["Annotation:Vertipaq_Cardinality"] = cardinality
+            });
+        var table = new ModelObject(
+            "Sales", ModelObjectKind.Table, "Sales",
+            Detail: "regular", Expression: null, Description: null, Hidden: false,
+            SourceColumn: null, Children: [column]);
+        var handler = new DeployModelHandler(
+            [new DirectionalDeployProvider(_ => new ModelSnapshot("m", 1601, [table]))], TestState);
+
+        var result = await handler.HandleAsync(
+            new DeployModelRequest(
+                new ModelReference("samples/basic-tmdl"),
+                Server: "my-workspace",
+                Database: "my-model",
+                Profile: null,
+                CreateOnly: false,
+                SkipBpa: false,
+                FixBpa: false,
+                BpaRules: null,
+                XmlaOutput: null,
+                Ci: null,
+                BpaFailOn: "warning"),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        var failure = Assert.Single(result.Diagnostics);
+        Assert.Equal("TOMIX_BPA_VIOLATIONS", failure.Code);
+        Assert.Contains($"found {violations} warning-severity", failure.Message);
     }
 
     [Fact]
@@ -584,6 +637,8 @@ public sealed class DeployModelHandlerTests
     {
         // The CLI previews, confirms, then deploys: one open and one BPA gate, and the gate's
         // warning rides on the preview only, so it is not printed twice.
+        using var root = new TempDir();
+        var rules = root.WriteFile("rules.json", StatisticsRuleJson);
         var provider = new DirectionalDeployProvider(_ => new ModelSnapshot("m", 1601, []));
         var handler = new DeployModelHandler([provider], TestState);
 
@@ -596,7 +651,7 @@ public sealed class DeployModelHandlerTests
                 CreateOnly: false,
                 SkipBpa: false,
                 FixBpa: false,
-                BpaRules: null,
+                BpaRules: [rules],
                 XmlaOutput: null,
                 Ci: null),
             CancellationToken.None);

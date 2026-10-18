@@ -78,7 +78,7 @@ public sealed class BpaCatalogPolicyTests
     [Fact]
     public async Task LoadRulesetAsync_ComposesSeveralPresets()
     {
-        var composed = await BpaRuleLoader.LoadRulesetAsync("standard,full", CancellationToken.None);
+        var composed = await BpaRuleLoader.LoadRulesetAsync("standard,full,vertipaq", CancellationToken.None);
 
         Assert.Equal(
             BpaRuleLoader.LoadBundledCatalog().Count,

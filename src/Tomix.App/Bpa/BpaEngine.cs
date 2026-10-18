@@ -162,6 +162,9 @@ public sealed class BpaEngine
     /// <summary>Connects a plain model file to a deployed copy (workspace mode) so statistics can be read.</summary>
     public const string VertipaqWorkspaceConnectCommand = "tx connect <path> -w <workspace> <model>";
 
+    /// <summary>Reads statistics from a file exported off a deployed copy, without annotating the model.</summary>
+    public const string VertipaqVpaxCommand = "tx bpa run --vpax <file.vpax>";
+
     private const string VertipaqAnnotationPrefix = "Annotation:Vertipaq_";
 
     /// <summary>Whether a rule expression reads a <c>Vertipaq_*</c> statistics annotation.</summary>
@@ -173,7 +176,7 @@ public sealed class BpaEngine
     /// annotation. <c>tx vertipaq --annotate</c> writes them model-wide in one pass, so one
     /// present annotation means the statistics were collected.
     /// </summary>
-    private static bool HasVertipaqStats(ModelSnapshot snapshot)
+    internal static bool HasVertipaqStats(ModelSnapshot snapshot)
     {
         return HasStat(snapshot.Properties) || snapshot.Objects.Any(Walk);
 

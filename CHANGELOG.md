@@ -20,6 +20,26 @@ and the API surface that major versions protect.
   (`TOMIX_DEPLOY_VALIDATION_WARNINGS`); unprocessed ones point at `tx refresh`. A check that
   cannot run warns with `TOMIX_DEPLOY_VALIDATION_UNAVAILABLE`. `--ci vsts|github` now prints
   annotations for post-deploy errors and warnings.
+- `tx bpa run --vpax <file.vpax>` reads VertiPaq statistics from a file exported with
+  `tx vertipaq --export`, so statistics rules run on a model file, a read-only connection, or in
+  CI without annotating the model. The statistics apply in memory only. A file that matches no
+  table fails the run (`TOMIX_BPA_VPAX_MISMATCH`); tables missing from the model warn
+  (`TOMIX_BPA_VPAX_PARTIAL`) (#234).
+- New default-off `vertipaq` ruleset preset with every bundled rule that reads statistics,
+  including two new rules: `LARGE_SHARE_OF_MODEL_SIZE` and
+  `UNUSED_HIDDEN_HIGH_CARDINALITY_COLUMNS`. Rules can read model-level annotations through
+  `Model.GetAnnotation(...)` (#234).
+
+### Changed
+
+- `FIX_REFERENTIAL_INTEGRITY_VIOLATIONS`, `AVOID_BI-DIRECTIONAL_RELATIONSHIPS_AGAINST_HIGH-CARDINALITY_COLUMNS`
+  and `LARGE_TABLES_SHOULD_BE_PARTITIONED` move to the `vertipaq` preset (category `VertiPaq`),
+  out of `standard` and `full`. `bpa run` without `--ruleset` and the `deploy` BPA gate add the
+  `vertipaq` preset when the model has statistics (`Vertipaq_*` annotations or `--vpax`), so an
+  unannotated model no longer lists them as "Not checked". A named `--ruleset` is used as given:
+  `--ruleset standard` now skips them (#234).
+
+## [0.12.1] - 2026-10-18
 
 ### Fixed
 
@@ -1394,7 +1414,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/bgarcevic/tomix/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/bgarcevic/tomix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/bgarcevic/tomix/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/bgarcevic/tomix/compare/v0.9.0...v0.10.0

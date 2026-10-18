@@ -117,7 +117,7 @@ Create an empty rules file
 # tx bpa rules list
 List rules from every source, with each rule's status
   arg [model]  Path to model
-  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.
+  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es, vertipaq). Repeat or comma-separate to combine.
   opt --no-defaults  Leave the built-in ruleset out of the listing
   opt --ignored  List only ignored rules, whether you or the model ignores them
   opt --all  Include ignored rules in the listing
@@ -159,7 +159,7 @@ Change a custom rule in a rules file or a model
 Show a rule's description, scope, expression, and fix
   arg <rule-id>  Rule ID
   arg [model]  Path to model
-  opt --ruleset <name>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.
+  opt --ruleset <name>  Standard BPA ruleset to look in (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es, vertipaq). Repeat or comma-separate to combine.
   opt --no-defaults  Leave the built-in ruleset out of the lookup
 
 # tx bpa rules unignore
@@ -180,7 +180,7 @@ Stop ignoring a rule in the model, or for you
 Run best-practice rules against a model
   arg [model]  Optional path to the model; defaults to the active connection
   opt --rules, -r <file|url>  BPA rule files or URLs (JSON). Repeatable.
-  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.
+  opt --ruleset <name>  Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es, vertipaq). Repeat or comma-separate to combine.
   opt --no-model-rules  Skip rules embedded in the model's annotations
   opt --no-defaults  Exclude the selected standard BPA ruleset
   opt --fail-on <level>  Failure threshold: error or warning (default: error). Rules that cannot be evaluated count as error-severity findings.
@@ -195,6 +195,7 @@ Run best-practice rules against a model
   opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --trx <file>  Write results to a .trx test-run file at this path
   opt --allow-external-rules  Allow rule URLs found in model annotations to be fetched
+  opt --vpax <file.vpax>  Read VertiPaq statistics from an exported .vpax file for the rules that need them
   opt --path <pattern>  Limit analysis to matched objects (literal names, wildcards, or paths)
   opt --no-multiline  Show each rule's guidance on one line
   opt --details  Show full guidance and affected objects per rule instead of a compact list
