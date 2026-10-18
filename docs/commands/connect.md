@@ -103,7 +103,34 @@ script, so it neither previews nor asks.
 | `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset, `bpa.rules`, and `TOMIX_BPA_RULES`; they override those for the same rule ID. |
 | `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. Rules that cannot be evaluated count as error-severity findings. |
 | `-p, --profile <name>` | Use a saved remote profile for this deploy only. List profiles with `tx profile list`; create one with `tx profile set <name> -s <workspace> -d <database>`. |
-| `--ci <github\|vsts>` | Print CI log-group commands to stderr. |
+| `--ci <github\|vsts>` | Print CI annotations to stderr for post-deploy errors and warnings. |
+
+After a deploy runs, `deploy` re-reads the deployed model and checks the state the server
+reports for each object — the server accepts a model whose DAX does not resolve, so
+"deployed" alone is not proof it works. Measures, columns, partitions, calculation items,
+format-string and detail-rows expressions, hierarchies, relationships, RLS table
+permissions, and functions are checked:
+
+| Server state | Severity | Effect |
+|--------------|----------|--------|
+| Semantic, evaluation, or dependency error | error | Listed; `TOMIX_DEPLOY_VALIDATION_FAILED`, exit `1`. The model is deployed. |
+| Incomplete | warning | Listed; `TOMIX_DEPLOY_VALIDATION_WARNINGS`, exit `0`. |
+| No data, calculation needed | info | Counted as unprocessed — normal after a metadata deploy; `tx refresh` processes them. Exit `0`. |
+
+If the deployed model cannot be re-read, the deploy still succeeds with a
+`TOMIX_DEPLOY_VALIDATION_UNAVAILABLE` warning. With `--ci`, errors and warnings become CI
+annotations. JSON output adds a `validation` object to `data` (omitted on previews and
+`--xmla`):
+
+```json
+"validation": {
+  "issues": [
+    {"severity": "Error", "objectType": "Measure", "objectName": "Sales[Total]",
+     "state": "SemanticError", "message": "..."}
+  ],
+  "errors": 1, "warnings": 0, "unprocessed": 0
+}
+```
 
 The preview diff ignores engine-derived calculated-table column data types, including
 type differences when a column exists on both the processed target and the planned

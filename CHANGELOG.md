@@ -12,6 +12,14 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx deploy` checks the deployed model after it lands: it re-reads the target and reports every
+  object the server holds in an error, incomplete, or unprocessed state, in the text output and
+  as `validation` in the JSON result. Objects in an error state (a measure whose DAX does not
+  resolve, a broken RLS filter) fail the deploy with exit code 1 and
+  `TOMIX_DEPLOY_VALIDATION_FAILED`, even though the model is deployed; incomplete objects warn
+  (`TOMIX_DEPLOY_VALIDATION_WARNINGS`); unprocessed ones point at `tx refresh`. A check that
+  cannot run warns with `TOMIX_DEPLOY_VALIDATION_UNAVAILABLE`. `--ci vsts|github` now prints
+  annotations for post-deploy errors and warnings.
 - `tx format` style options (#229): `--separators us|eu` shows DAX with `;` list and `,`
   decimal separators (display only; models always store the US form, and an explicit
   `--separators eu` with `--save`, `--save-to`, `--stage` or `--revert` fails with the new

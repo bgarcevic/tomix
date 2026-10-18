@@ -73,7 +73,7 @@ internal sealed class DeployCommand : ICommandModule
         }.In("BPA gate options");
         var ciOption = new Option<string?>("--ci")
         {
-            Description = "Print CI log-group commands to stderr for the given system: vsts or github"
+            Description = "Print CI annotations to stderr for post-deploy errors and warnings: vsts or github"
         };
         var deployConnectionsOption = new Option<bool>("--deploy-connections")
         {
@@ -279,6 +279,9 @@ internal sealed class DeployCommand : ICommandModule
                     Console.WriteLine(result.Data.Script);
                 return result.ExitCode;
             }
+
+            if (result.Data is not null)
+                DeployRenderer.EmitCi(parseResult.GetValue(ciOption), result.Data);
 
             return CommandOutput.Render(
                 result,
