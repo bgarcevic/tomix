@@ -26,6 +26,39 @@ public sealed class ConfigHandlerTests
         Assert.Equal("false", handler.Get(ConfigKeys.ValidateOnSave).Data!.Value);
     }
 
+    [Theory]
+    [InlineData(ConfigKeys.FormatSeparators, " EU ", "eu", "fr")]
+    [InlineData(ConfigKeys.FormatFunctionSpacing, "None", "none", "tab")]
+    [InlineData(ConfigKeys.FormatLines, "LONG", "long", "medium")]
+    public void FormatStyleKeys_NormalizeValidValues_AndRejectOthers(string key, string value, string stored, string invalid)
+    {
+        using var dir = new TempDir();
+        var store = new TomixConfigStore(dir.Combine("config.json"));
+        var handler = new ConfigHandler(store);
+
+        var rejected = handler.Set(key, invalid);
+        Assert.False(rejected.Success);
+        Assert.Equal("TOMIX_CONFIG_INVALID_VALUE", rejected.Diagnostics[0].Code);
+
+        Assert.True(handler.Set(key, value).Success);
+        Assert.Equal(stored, handler.Get(key).Data!.Value);
+    }
+
+    [Fact]
+    public void FormatStyle_FromConfig_ReadsEachKey_AndIgnoresUnreadableValues()
+    {
+        var style = Tomix.App.Format.FormatStyle.FromConfig(new Dictionary<string, string>
+        {
+            [ConfigKeys.FormatSeparators] = "eu",
+            [ConfigKeys.FormatFunctionSpacing] = "bogus",
+            [ConfigKeys.FormatLines] = "long"
+        });
+
+        Assert.Equal(Tomix.Core.Dax.DaxSeparators.Eu, style.Separators);
+        Assert.Equal(Tomix.Core.Dax.DaxFunctionSpacing.Space, style.FunctionSpacing);
+        Assert.True(style.Long);
+    }
+
     private static ConfigHandler NewHandler(out string path)
     {
         path = Path.Combine(Path.GetTempPath(), $"tomix-config-test-{Guid.NewGuid():N}.json");

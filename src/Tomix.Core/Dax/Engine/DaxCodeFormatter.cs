@@ -48,10 +48,15 @@ internal static class DaxCodeFormatter
     /// the source after <see cref="PrepareSource"/>, <paramref name="printed"/> the printer's
     /// output, and the result reports whether printing preserved the input's tokens.
     /// </summary>
-    internal static bool TryFormatChecked(string source, int maximumLineLength, out string prepared, out string printed)
+    internal static bool TryFormatChecked(
+        string source,
+        int maximumLineLength,
+        DaxFunctionSpacing functionSpacing,
+        out string prepared,
+        out string printed)
     {
         prepared = PrepareSource(source, maximumLineLength);
-        printed = DaxPrinter.Print(DaxParser.Parse(prepared), maximumLineLength);
+        printed = DaxPrinter.Print(DaxParser.Parse(prepared), maximumLineLength, functionSpacing);
         return PreservesTokens(prepared, printed);
     }
 

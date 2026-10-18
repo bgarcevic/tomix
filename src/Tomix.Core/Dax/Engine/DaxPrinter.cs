@@ -4,12 +4,21 @@
 namespace Tomix.Core.Dax.Engine;
 
 /// <summary>Turns a parsed script into a layout document.</summary>
-internal static class DaxPrinter
+internal sealed class DaxPrinter
 {
-    public static string Print(DaxScript script, int maximumLineLength) =>
-        DocRenderer.Render(BuildScript(script), maximumLineLength);
+    // What separates a function name from its opening parenthesis: "SUM (" or "SUM(".
+    private readonly Doc _callGap;
 
-    private static Doc BuildScript(DaxScript script)
+    private DaxPrinter(DaxFunctionSpacing functionSpacing) =>
+        _callGap = functionSpacing == DaxFunctionSpacing.None ? Doc.Empty : Doc.Text(" ");
+
+    public static string Print(
+        DaxScript script,
+        int maximumLineLength,
+        DaxFunctionSpacing functionSpacing = DaxFunctionSpacing.Space) =>
+        DocRenderer.Render(new DaxPrinter(functionSpacing).BuildScript(script), maximumLineLength);
+
+    private Doc BuildScript(DaxScript script)
     {
         var statements = script.Statements.Select(Build).ToList();
         var body = Doc.Join(Doc.Hard(1), statements);
@@ -21,7 +30,7 @@ internal static class DaxPrinter
             : Doc.Concat(body, Doc.Hard(), trailing);
     }
 
-    private static Doc Build(DaxNode node) => node switch
+    private Doc Build(DaxNode node) => node switch
     {
         DaxLeaf leaf => Token(leaf.Token),
         DaxReference reference => BuildReference(reference),
@@ -46,21 +55,21 @@ internal static class DaxPrinter
     // ---------------------------------------------------------------- tokens and comments
 
     /// <summary>Emits a token with the comments written before it and after it on its own line.</summary>
-    private static Doc Token(DaxToken token) =>
+    private Doc Token(DaxToken token) =>
         Doc.Concat(Comments(token), Doc.Text(token.Text), Trailing(token));
 
     /// <summary>
     /// Emits a word the parser identified as a keyword, upper-cased. Case is only normalized here,
     /// where the position is known, so an identifier that happens to spell a keyword is left alone.
     /// </summary>
-    private static Doc Keyword(DaxToken token) =>
+    private Doc Keyword(DaxToken token) =>
         Doc.Concat(Comments(token), Doc.Text(token.Text.ToUpperInvariant()), Trailing(token));
 
     /// <summary>
     /// Renders leading comments. A single-line comment always forces a break after it, otherwise the
     /// code that follows would end up commented out. A block comment with no line break stays inline.
     /// </summary>
-    private static Doc Comments(DaxToken token)
+    private Doc Comments(DaxToken token)
     {
         if (token.LeadingComments.Count == 0) return Doc.Empty;
 
@@ -84,7 +93,7 @@ internal static class DaxPrinter
     /// enclosing group from collapsing, because everything after a line comment would be commented
     /// out if the code were folded onto one line.
     /// </summary>
-    private static Doc Trailing(DaxToken token)
+    private Doc Trailing(DaxToken token)
     {
         if (token.TrailingComments.Count == 0) return Doc.Empty;
 
@@ -109,7 +118,7 @@ internal static class DaxPrinter
     /// Renders comments written just before a closing bracket. They start their own line and the
     /// bracket's own separator ends it, so the comment never runs into the code around it.
     /// </summary>
-    private static Doc CommentsBeforeClose(DaxToken? token)
+    private Doc CommentsBeforeClose(DaxToken? token)
     {
         if (token is null || token.LeadingComments.Count == 0) return Doc.Empty;
 
@@ -123,10 +132,10 @@ internal static class DaxPrinter
     }
 
     /// <summary>Joins tokens with no separator, for references such as 'Sales'[Amount].</summary>
-    private static Doc BuildReference(DaxReference reference) =>
+    private Doc BuildReference(DaxReference reference) =>
         Doc.Concat(reference.Tokens.Select(Token).ToArray());
 
-    private static Doc Words(IReadOnlyList<DaxToken> tokens, bool firstIsKeyword = false)
+    private Doc Words(IReadOnlyList<DaxToken> tokens, bool firstIsKeyword = false)
     {
         var parts = new List<Doc>();
         for (var index = 0; index < tokens.Count; index++)
@@ -140,12 +149,12 @@ internal static class DaxPrinter
     }
 
     /// <summary>Every word of a clause such as ORDER BY or START AT is a keyword.</summary>
-    private static Doc Keywords(IReadOnlyList<DaxToken> tokens) =>
+    private Doc Keywords(IReadOnlyList<DaxToken> tokens) =>
         Doc.Join(Doc.Text(" "), tokens.Select(Keyword));
 
     // ---------------------------------------------------------------- expressions
 
-    private static Doc BuildCall(DaxCall call)
+    private Doc BuildCall(DaxCall call)
     {
         // A comment written before the call belongs to the line above it, not inside the argument
         // list, so it is lifted out of the group. Otherwise it would expand a call that fits.
@@ -158,11 +167,11 @@ internal static class DaxPrinter
 
         if (call.Arguments.Count == 0)
             return Doc.Concat(
-                leading, callee, Doc.Text(" "), beforeOpen, Doc.Text("("),
+                leading, callee, _callGap, beforeOpen, Doc.Text("("),
                 Trailing(call.OpenParenthesis), beforeClose, Doc.Text(")"), afterClose);
 
         var groups = DaxArgumentShapes.Group(call.FunctionName, call.Arguments);
-        var parts = new List<Doc> { callee, Doc.Text(" "), beforeOpen, Doc.Text("("), Trailing(call.OpenParenthesis) };
+        var parts = new List<Doc> { callee, _callGap, beforeOpen, Doc.Text("("), Trailing(call.OpenParenthesis) };
         var separator = 0;
 
         for (var index = 0; index < groups.Count; index++)
@@ -196,7 +205,7 @@ internal static class DaxPrinter
     /// the pair does not fit, the name keeps its own line and the value is indented under it, rather
     /// than leaving an opening bracket dangling after the name.
     /// </summary>
-    private static Doc BuildArgumentGroup(DaxCall call, DaxArgumentGroup group, ref int separator)
+    private Doc BuildArgumentGroup(DaxCall call, DaxArgumentGroup group, ref int separator)
     {
         var arguments = group.Arguments.Select(argument => Build(call.Arguments[argument])).ToList();
         if (arguments.Count < 2)
@@ -216,10 +225,10 @@ internal static class DaxPrinter
     /// The next comma of a list. The token itself is printed so that a comment written after it
     /// stays on the line it was written on.
     /// </summary>
-    private static Doc Comma(IReadOnlyList<DaxToken> separators, ref int index) =>
+    private Doc Comma(IReadOnlyList<DaxToken> separators, ref int index) =>
         index < separators.Count ? Token(separators[index++]) : Doc.Text(",");
 
-    private static Doc BuildBracketed(DaxBracketed bracketed)
+    private Doc BuildBracketed(DaxBracketed bracketed)
     {
         var open = bracketed.IsBrace ? "{" : "(";
         var close = bracketed.IsBrace ? "}" : ")";
@@ -257,7 +266,7 @@ internal static class DaxPrinter
     /// Prints a chain of operators of equal precedence. When the chain does not fit, every operand
     /// after the first starts a new line led by its operator, which keeps the structure obvious.
     /// </summary>
-    private static Doc BuildBinary(DaxBinary binary)
+    private Doc BuildBinary(DaxBinary binary)
     {
         var operands = new List<Doc>();
         var operators = new List<DaxToken>();
@@ -299,7 +308,7 @@ internal static class DaxPrinter
         return Doc.Choose(Doc.Flat(operatorsInline), Doc.Concat(stacked), operatorsInline);
     }
 
-    private static void Flatten(DaxNode node, int precedence, List<Doc> operands, List<DaxToken> operators)
+    private void Flatten(DaxNode node, int precedence, List<Doc> operands, List<DaxToken> operators)
     {
         if (node is DaxBinary binary && binary.Precedence == precedence)
         {
@@ -319,7 +328,7 @@ internal static class DaxPrinter
     /// A sign binds directly to a number, as in -1, and is separated from anything else, so that
     /// "- Sales[Amount]" and "- ( BLANK () )" read as negation rather than as part of what follows.
     /// </summary>
-    private static Doc BuildUnary(DaxUnary unary)
+    private Doc BuildUnary(DaxUnary unary)
     {
         var spaced = unary.NeedsSpace || unary.Operand is not DaxLeaf { Token.Kind: DaxTokenKind.Number };
         return Doc.Concat(
@@ -328,7 +337,7 @@ internal static class DaxPrinter
             Build(unary.Operand));
     }
 
-    private static Doc BuildParameter(DaxParameter parameter)
+    private Doc BuildParameter(DaxParameter parameter)
     {
         if (parameter.Colon is null) return Token(parameter.Name);
         var parts = new List<Doc> { Token(parameter.Name), Doc.Text(": ") };
@@ -342,7 +351,7 @@ internal static class DaxPrinter
     /// VAR blocks always expand: the name and its expression are easier to scan on separate lines,
     /// and RETURN lines up with the VAR keywords it belongs to.
     /// </summary>
-    private static Doc BuildVarReturn(DaxVarReturn varReturn)
+    private Doc BuildVarReturn(DaxVarReturn varReturn)
     {
         var parts = new List<Doc>();
         foreach (var variable in varReturn.Variables)
@@ -372,7 +381,7 @@ internal static class DaxPrinter
     /// A definition inside DEFINE indents its expression; one written on its own does not, so a
     /// pasted measure starts at the left margin.
     /// </summary>
-    private static Doc BuildDefinition(DaxDefinition definition, int valueIndent)
+    private Doc BuildDefinition(DaxDefinition definition, int valueIndent)
     {
         var head = Doc.Concat(
             Words(definition.NameTokens, definition.StartsWithKeyword),
@@ -384,7 +393,7 @@ internal static class DaxPrinter
             : Doc.Concat(head, Doc.Indent(valueIndent, Doc.Concat(Doc.Hard(), Build(definition.Value))));
     }
 
-    private static Doc BuildFunctionDefinition(DaxFunctionDefinition definition)
+    private Doc BuildFunctionDefinition(DaxFunctionDefinition definition)
     {
         var parts = new List<Doc>
         {
@@ -413,7 +422,7 @@ internal static class DaxPrinter
         return Doc.Concat(parts);
     }
 
-    private static Doc Parameters(DaxFunctionDefinition definition)
+    private Doc Parameters(DaxFunctionDefinition definition)
     {
         var separator = 0;
         var parts = new List<Doc>();
@@ -429,7 +438,7 @@ internal static class DaxPrinter
         return Doc.Concat(parts);
     }
 
-    private static Doc BuildDefine(DaxDefine define)
+    private Doc BuildDefine(DaxDefine define)
     {
         var parts = new List<Doc> { Keyword(define.Keyword) };
         foreach (var definition in define.Definitions)
@@ -440,7 +449,7 @@ internal static class DaxPrinter
         return Doc.Concat(parts);
     }
 
-    private static Doc BuildEvaluate(DaxEvaluate evaluate)
+    private Doc BuildEvaluate(DaxEvaluate evaluate)
     {
         var parts = new List<Doc> { Keyword(evaluate.Keyword) };
         if (evaluate.Expression is not null)

@@ -2,6 +2,7 @@ using Tomix.App.Dax;
 using Tomix.App.ModelObjects;
 using Tomix.App.Models;
 using Tomix.App.Mutations;
+using Tomix.Core.Dax;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
 
@@ -81,7 +82,7 @@ public sealed class FormatModelHandler
                     return (status == "formatted", $"format {obj.Path}",
                         outcome => (IFormatModelResult)new ObjectFormatResult(
                             formatted.Success, obj.Path, FormatterLanguages.DisplayName(language),
-                            status, formatted.Formatted)
+                            status, ForDisplay(formatted.Formatted, language, request.Separators))
                         { Outcome = outcome });
                 },
                 outcome => (IFormatModelResult)new ObjectFormatResult(false, "", "", "", "") { Outcome = outcome },
@@ -169,7 +170,8 @@ public sealed class FormatModelHandler
             new ExpressionFormatRequest(
                 request.Expression!,
                 language,
-                request.Long),
+                request.Long,
+                request.FunctionSpacing),
             cancellationToken);
 
         if (!formatted.Success)
@@ -182,7 +184,7 @@ public sealed class FormatModelHandler
         return TomixResult<IFormatModelResult>.Ok(
             new InlineFormatResult(
                 formatted.Success,
-                formatted.Formatted,
+                ForDisplay(formatted.Formatted, language, request.Separators),
                 FormatterLanguages.DisplayName(language)),
             exitCode: 0);
     }
@@ -196,7 +198,8 @@ public sealed class FormatModelHandler
             new ExpressionFormatRequest(
                 expression,
                 language,
-                request.Long),
+                request.Long,
+                request.FunctionSpacing),
             cancellationToken);
 
     private static IEnumerable<ModelObject> FormatTargets(
@@ -245,6 +248,11 @@ public sealed class FormatModelHandler
         error = "";
         return true;
     }
+
+    // Separators are a display preference: the model stores and is compared with the US form,
+    // and only the text shown to the user is rewritten.
+    private static string ForDisplay(string formatted, string language, DaxSeparators separators)
+        => FormatterLanguages.IsDax(language) ? DaxFormatter.WithSeparators(formatted, separators) : formatted;
 
     private static string Status(string before, string after)
         => string.Equals(NormalizeLineEndings(before), NormalizeLineEndings(after), StringComparison.Ordinal)

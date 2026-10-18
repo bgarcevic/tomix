@@ -509,7 +509,7 @@ tx format [model] [options]
 ```
 
 DAX is formatted offline by the engine bundled with `tx` — no network, no rate limits, same
-result air-gapped. DAX output uses the bundled formatter's style: a 65-column prettier-style
+result air-gapped. DAX output uses the bundled formatter's style (adjustable, see [format style](#format-style)): a 65-column prettier-style
 layout with keywords and known function names upper-cased, so results differ from the
 daxformatter.com style previous releases produced (and from Power BI's format button).
 DAX that does not parse is left unchanged and reported with its line and column
@@ -563,6 +563,32 @@ If any object fails, nothing is applied, saved, or staged: the run exits 1 with
 text summary shows `Formatted: N (not applied)`. The result rows are still written, so the
 counts show what would change once the failures are fixed.
 
+### Format style
+
+Three knobs, modeled on daxformatter.com, set the layout. Each has a flag and a config key;
+the flag wins for one run, the key (`tx config set`) for every run, including `tx format` in
+`tx serve` and `tx mcp` sessions.
+
+| Knob | Flag | Config key | Values |
+|------|------|------------|--------|
+| Separators (DAX) | `--separators` | `format.separators` | `us` (default): `A, B, 1234.00` · `eu`: `A; B; 1234,00` |
+| Spacing (DAX) | `--function-spacing` | `format.functionSpacing` | `space` (default): `IF (` · `none`: `IF(` |
+| Lines (DAX and M) | `--long` / `--short` | `format.lines` | `short` (default): DAX 65, M 40 columns · `long`: 120 columns |
+
+Separators are display only. Models always store DAX with US separators, so `eu` rewrites
+only what is printed — list commas become `;` and decimal points in numbers become `,`, while
+strings, comments, and names are left alone. `--separators eu` together with `--save`,
+`--save-to`, `--stage`, or `--revert` is rejected with `TOMIX_FORMAT_SEPARATORS_DISPLAY_ONLY`;
+with `format.separators=eu` in config, a write stores the US form and only the output shows
+EU. Input must be US-style DAX: `tx format` does not read `;`-separated DAX. Spacing and line
+length do change what `--save` stores.
+
+```sh
+tx config set format.functionSpacing none
+tx format -e "IF(x > 1.5, 1, 0)" --separators eu   # IF( x > 1,5; 1; 0 )
+tx format --save --long                            # whole model, 120-column lines
+```
+
 Formatted DAX and M are syntax-highlighted in text output, for both inline `-e`
 and `--path`; piping or redirecting strips the color, so the output stays safe to
 copy back into a model.
@@ -572,7 +598,10 @@ copy back into a model.
 | `-e, --expression <expr>` | Format an inline expression (no model needed). `-` reads it from stdin. |
 | `--path <path>` | Format the expression on one object. |
 | `--lang <dax\|m>` | Expression language. |
-| `--long` | Prefer long lines when formatting M (120 columns instead of 40). |
+| `--long` | Long lines: DAX at 120 columns instead of 65, M at 120 instead of 40. |
+| `--short` | Short lines (the default); overrides `format.lines=long`. |
+| `--separators <us\|eu>` | DAX separators to show (display only). |
+| `--function-spacing <space\|none>` | `IF (` or `IF(` in DAX. |
 | `-t, --type <type>` | Disambiguate `--path` when it matches several objects under a table. |
 
 ```sh

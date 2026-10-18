@@ -35,7 +35,10 @@ public sealed class OfflineDaxFormatterClient : IExpressionFormatterClient
             });
         }
 
-        var result = DaxFormatter.TryFormat(request.Expression);
+        var result = DaxFormatter.TryFormat(
+            request.Expression,
+            request.Long ? DaxFormatter.LongMaximumLineLength : DaxFormatter.DefaultMaximumLineLength,
+            request.FunctionSpacing);
         if (!result.Success)
         {
             var detail = result.FirstDifferenceLine is { } line
