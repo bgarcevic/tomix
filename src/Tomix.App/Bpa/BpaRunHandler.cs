@@ -4,9 +4,12 @@ using Tomix.App.Diagnostics;
 using Tomix.App.Models;
 using Tomix.App.Mutations;
 using Tomix.App.State;
+using Tomix.App.Vertipaq;
 using Tomix.Core.Bpa;
+using Tomix.Core.Diagnostics;
 using Tomix.Core.Models;
 using Tomix.Core.Results;
+using Tomix.Core.Vertipaq;
 
 namespace Tomix.App.Bpa;
 
@@ -18,6 +21,7 @@ public sealed class BpaRunHandler
     private readonly string _configDirectory;
     private readonly HttpClient? _httpClient;
     private readonly Func<string, string?> _environment;
+    private readonly IVertipaqAnalyzer? _vertipaq;
 
     public BpaRunHandler(
         IEnumerable<IModelProvider> providers,
@@ -25,8 +29,9 @@ public sealed class BpaRunHandler
         BpaUserRuleState userRules,
         string configDirectory,
         HttpClient? httpClient = null,
-        Func<string, string?>? environment = null)
-        : this(new OneShotSessionSource(providers), stores, userRules, configDirectory, httpClient, environment)
+        Func<string, string?>? environment = null,
+        IVertipaqAnalyzer? vertipaq = null)
+        : this(new OneShotSessionSource(providers), stores, userRules, configDirectory, httpClient, environment, vertipaq)
     {
     }
 
@@ -36,7 +41,8 @@ public sealed class BpaRunHandler
         BpaUserRuleState userRules,
         string configDirectory,
         HttpClient? httpClient = null,
-        Func<string, string?>? environment = null)
+        Func<string, string?>? environment = null,
+        IVertipaqAnalyzer? vertipaq = null)
     {
         _sessions = sessions;
         _stores = stores;
@@ -44,6 +50,7 @@ public sealed class BpaRunHandler
         _configDirectory = configDirectory;
         _httpClient = httpClient;
         _environment = environment ?? Environment.GetEnvironmentVariable;
+        _vertipaq = vertipaq;
     }
 
     public async Task<TomixResult<BpaRunResult>> HandleAsync(
@@ -55,6 +62,25 @@ public sealed class BpaRunHandler
                 "TOMIX_BPA_INVALID_FAIL_ON",
                 failOnError!,
                 exitCode: 2);
+
+        // Read the statistics before leasing the model: the file is independent of it, and a
+        // bad file should fail fast without opening a session.
+        VertipaqModelStats? vpaxStats = null;
+        if (!string.IsNullOrWhiteSpace(request.VpaxPath))
+        {
+            if (_vertipaq is null)
+                throw new InvalidOperationException("bpa run --vpax needs a VertiPaq analyzer.");
+            try
+            {
+                vpaxStats = await _vertipaq.ImportAsync(request.VpaxPath, cancellationToken);
+            }
+            catch (VertipaqAnalysisException ex)
+            {
+                return TomixResult<BpaRunResult>.Fail(
+                    "TOMIX_VPAX_READ_FAILED", ex.Message, exitCode: 2,
+                    hint: "Pass a file created with 'tx vertipaq --export <file.vpax>'.");
+            }
+        }
 
         var options = new MutationOptions(
             request.Save && request.Fix,
@@ -106,6 +132,27 @@ public sealed class BpaRunHandler
         async Task<TomixResult<BpaRunResult>> RunAsync(IModelSession session)
         {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
+            var diagnostics = new List<TomixDiagnostic>();
+            var evaluated = snapshot;
+            if (vpaxStats is not null)
+            {
+                var overlay = VertipaqSnapshotOverlay.Apply(snapshot, vpaxStats);
+                evaluated = overlay.Snapshot;
+                if (overlay.MatchedTables == 0)
+                    return TomixResult<BpaRunResult>.Fail(
+                        "TOMIX_BPA_VPAX_MISMATCH",
+                        $"None of the tables in {request.VpaxPath} are in this model, so its statistics cannot be checked.",
+                        exitCode: 2,
+                        hint: "Export statistics from a deployed copy of this model with 'tx vertipaq --export <file.vpax>' (without --obfuscate).");
+                if (overlay.UnmatchedTables.Count > 0)
+                    diagnostics.Add(new TomixDiagnostic(
+                        "TOMIX_BPA_VPAX_PARTIAL",
+                        DiagnosticSeverity.Warning,
+                        $"{overlay.UnmatchedTables.Count} table(s) in {request.VpaxPath} are not in this model: "
+                            + string.Join(", ", overlay.UnmatchedTables) + ".",
+                        Hint: "The statistics may be older than the model; re-export them to check every table."));
+            }
+
             var validationBaseline = SaveValidation.ForSnapshot(
                 snapshot, context, _stores.ShouldValidateOnSave());
 
@@ -120,7 +167,7 @@ public sealed class BpaRunHandler
             IReadOnlyList<string> loadDiagnostics;
             try
             {
-                (resolved, loadDiagnostics) = await LoadRulesAsync(request, snapshot, ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
+                (resolved, loadDiagnostics) = await LoadRulesAsync(request, snapshot, BpaEngine.HasVertipaqStats(evaluated), ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
             }
             // InvalidOperationException: a corrupt config file, which carries the bpa.rules key.
             catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
@@ -136,7 +183,7 @@ public sealed class BpaRunHandler
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var engine = new BpaEngine();
-            var result = engine.Evaluate(snapshot, new BpaEngineOptions(
+            var result = engine.Evaluate(evaluated, new BpaEngineOptions(
                 rules,
                 request.PathFilter,
                 request.RuleIds,
@@ -186,7 +233,7 @@ public sealed class BpaRunHandler
                 if (fixResult.FixesApplied > 0)
                 {
                     var postFixSnapshot = await session.GetSnapshotAsync(cancellationToken);
-                    var postFix = engine.Evaluate(postFixSnapshot, new BpaEngineOptions(
+                    var postFix = engine.Evaluate(WithStats(postFixSnapshot), new BpaEngineOptions(
                         rules,
                         request.PathFilter,
                         request.RuleIds,
@@ -222,12 +269,20 @@ public sealed class BpaRunHandler
                         return TomixResult<BpaRunResult>.Ok(
                             runResult,
                             exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0,
-                            diagnostics: SaveValidation.ForcedNotice(delta));
+                            diagnostics: [.. diagnostics, .. SaveValidation.ForcedNotice(delta)]);
                 }
             }
 
-            return TomixResult<BpaRunResult>.Ok(runResult, exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0);
+            return TomixResult<BpaRunResult>.Ok(
+                runResult,
+                exitCode: BpaFailOn.Blocking(runResult.BlockingCandidates, failOnSeverity).Count > 0 ? 1 : 0,
+                diagnostics: diagnostics);
         }
+
+        // --vpax statistics are laid over every snapshot the rules see, in memory only: the
+        // session (and so anything --fix saves) never carries them.
+        ModelSnapshot WithStats(ModelSnapshot snapshot)
+            => vpaxStats is null ? snapshot : VertipaqSnapshotOverlay.Apply(snapshot, vpaxStats).Snapshot;
     }
 
     /// <summary>
@@ -289,6 +344,7 @@ public sealed class BpaRunHandler
     private async Task<(BpaResolvedRules Resolved, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
         BpaRunRequest request,
         ModelSnapshot snapshot,
+        bool hasVertipaqStats,
         string? modelRuleBaseDirectory,
         CancellationToken cancellationToken)
     {
@@ -297,7 +353,7 @@ public sealed class BpaRunHandler
 
         if (!request.NoDefaults)
         {
-            foreach (var preset in BpaRuleLoader.SplitRulesets(request.Ruleset))
+            foreach (var preset in BpaRuleLoader.ResolveRulesets(request.Ruleset, hasVertipaqStats))
                 collections.Add(new BpaRuleCollection(
                     BpaRuleSourceKind.Machine, preset,
                     await BpaRuleLoader

@@ -215,13 +215,15 @@ public sealed class DeployModelHandler
         RuleSeverity failOn,
         CancellationToken cancellationToken)
     {
+        var snapshot = await session.GetSnapshotAsync(cancellationToken);
         IReadOnlyList<BpaRule> rules;
         try
         {
             // #233: the team's shared rules (bpa.rules, TOMIX_BPA_RULES) gate a deploy the same way
             // they reach `bpa run`, so a pipeline that sets them checks what it deploys.
             rules = (await BpaRuleSources.LoadGateRulesAsync(
-                    _configDirectory, _environment, request.BpaRules, "--bpa-rules", _httpClient, cancellationToken)
+                    _configDirectory, _environment, request.BpaRules, "--bpa-rules", _httpClient, cancellationToken,
+                    hasVertipaqStats: BpaEngine.HasVertipaqStats(snapshot))
                 .ConfigureAwait(false)).Rules;
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
@@ -232,7 +234,6 @@ public sealed class DeployModelHandler
                 exitCode: 2), []);
         }
 
-        var snapshot = await session.GetSnapshotAsync(cancellationToken);
         var engine = new BpaEngine();
         // Issue #254: user-level disables (`bpa rules ignore --user`) must reach the gate exactly as
         // they reach `bpa run`, so the two agree on the same machine. A handler built without

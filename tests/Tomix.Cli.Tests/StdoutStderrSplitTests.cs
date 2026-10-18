@@ -61,7 +61,9 @@ public sealed partial class StdoutStderrSplitTests
     [Theory]
     // #266: `tx vertipaq` needs a live engine, so a plain model file gets the workspace-mode route.
     [InlineData(true, "Collect them: tx vertipaq --annotate --save")]
-    [InlineData(false, "Collect them from a deployed copy: tx connect <path> -w <workspace> <model> tx vertipaq --annotate --save")]
+    // #234: or from an exported file, which needs no deployed copy at run time.
+    [InlineData(false, "Collect them from a deployed copy: tx connect <path> -w <workspace> <model> tx vertipaq --annotate --save"
+        + " Or read them from a file exported with tx vertipaq --export: tx bpa run --vpax <file.vpax>")]
     public void MissingVertipaqStats_NamesRulesOnStdout_AndHintFitsTheModel(bool canCollect, string hint)
     {
         var rule = new BpaRule("STATS_RULE", "Stats rule", "Performance", RuleSeverity.Warning, ["Table"]);

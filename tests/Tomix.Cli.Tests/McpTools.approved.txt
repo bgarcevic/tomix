@@ -276,7 +276,7 @@
         },
         "ruleset": {
           "type": "array",
-          "description": "Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.",
+          "description": "Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es, vertipaq). Repeat or comma-separate to combine.",
           "items": {
             "type": "string"
           }
@@ -295,6 +295,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "vpax": {
+          "type": "string",
+          "description": "Read VertiPaq statistics from an exported .vpax file for the rules that need them"
         },
         "path": {
           "type": "string",
@@ -646,7 +650,7 @@
         },
         "ruleset": {
           "type": "array",
-          "description": "Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es). Repeat or comma-separate to combine.",
+          "description": "Standard BPA ruleset to use (standard, full, microsoft, microsoft-it, microsoft-ja, microsoft-es, vertipaq). Repeat or comma-separate to combine.",
           "items": {
             "type": "string"
           }
@@ -665,6 +669,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "vpax": {
+          "type": "string",
+          "description": "Read VertiPaq statistics from an exported .vpax file for the rules that need them"
         },
         "path": {
           "type": "string",
