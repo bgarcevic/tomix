@@ -248,7 +248,8 @@ internal sealed class DeployCommand : ICommandModule
             if (previewFirst && operation.Failure is null)
             {
                 var preview = await CliSpinner.RunAsync(
-                    "Previewing deployment...", () => operation.PreviewAsync(cancellationToken), suppress: suppressSpinner);
+                    "Previewing deployment...", () => operation.PreviewAsync(cancellationToken), suppress: suppressSpinner,
+                    waitingOn: CliSpinner.WaitTarget(server));
                 var previewExit = CommandOutput.Render(
                     preview,
                     format,
@@ -266,7 +267,8 @@ internal sealed class DeployCommand : ICommandModule
             var result = await CliSpinner.RunAsync(
                 string.IsNullOrWhiteSpace(xmla) ? "Deploying model..." : "Writing deployment script...",
                 () => operation.ApplyAsync(cancellationToken),
-                suppress: suppressSpinner);
+                suppress: suppressSpinner,
+                waitingOn: CliSpinner.WaitTarget(server));
 
             if (result.Data is not null && result.Data.ScriptPath == "-" && result.Data.Script is not null)
             {
