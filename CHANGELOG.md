@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-18
+
 ### Fixed
 
 - Sign-in and tx's own HTTP requests no longer hang on networks that advertise IPv6 they cannot
@@ -1383,7 +1385,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/bgarcevic/tomix/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/bgarcevic/tomix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/bgarcevic/tomix/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/bgarcevic/tomix/compare/v0.9.0...v0.10.0
