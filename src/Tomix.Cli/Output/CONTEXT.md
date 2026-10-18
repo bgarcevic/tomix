@@ -28,7 +28,7 @@ Shared output wiring for all commands.
   examples, wrapping to the terminal width. `HelpGroups` tags options into named help sections;
   `HelpPlaceholders` names each option's value (`<path>`). Layout and text rules are enforced by
   `HelpLayoutTests` (see the Help section of `docs/cli-ux-guidelines.md`).
-- `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet).
+- `Spinner` — Spectre.Console Status spinner wrapper with auto-suppression (piped stdout, JSON/CSV, --quiet). Pass `waitingOn` (a host; `CliSpinner.WaitTarget(server)` for a remote server) on network-bound work: after 10s the label becomes "Still waiting for <host>... (Ctrl+C to cancel)".
 - `TraceWriter` / `NonDisposingTextWriter` — shared `--trace` destination plumbing for `refresh` and `query`: resolves the option value (bare/`-` → stderr, otherwise file) and opens the writer; the wrapper keeps `using` scopes from disposing the process-shared `Console.Error`.
 - `LsRenderer` — Spectre.Console tables for the `ls` command.
 - `QueryResultRenderer` — query rowset rendering for the `query` command (dynamic-column table, CSV, `-o` json/csv file output, stderr footer, and the `--trace`/`--runs` server-timings and benchmark summaries written to stderr).

@@ -142,7 +142,8 @@ internal sealed class AuthCommand : ICommandModule
             var result = await CliSpinner.RunAsync(
                 "Authenticating...",
                 () => handler.LoginAsync(options, cancellationToken),
-                suppress: quiet || OutputFormats.IsJson(format));
+                suppress: quiet || OutputFormats.IsJson(format),
+                waitingOn: "login.microsoftonline.com");
             return CommandOutput.Render(parseResult, result, format, RenderLogin, data => data.Identity);
         });
 
