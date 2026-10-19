@@ -51,6 +51,14 @@ and the API surface that major versions protect.
   unannotated model no longer lists them as "Not checked". A named `--ruleset` is used as given:
   `--ruleset standard` now skips them (#234).
 
+### Fixed
+
+- `tx test --tolerance` (and `tx: tolerance=`) now applies to measures whose data type is Variant.
+  Their results read back as `object` columns, which compared exactly, so floating-point noise
+  failed the test whatever the tolerance. Cells compare within the tolerance when both sides are
+  numbers; text, dates and booleans still compare exactly. `--ignore-row-order` sorts these
+  columns by value after the dimension columns, in a fixed BLANK, number, text order.
+
 ## [0.12.1] - 2026-10-18
 
 ### Fixed

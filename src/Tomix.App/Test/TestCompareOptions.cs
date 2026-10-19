@@ -43,7 +43,7 @@ public sealed record TestTolerance(double Value, bool Relative)
 /// defaults come from <c>tx test</c> options; a test overrides them with <c>tx:</c> directives
 /// in the comment lines that open its <c>.dax</c> file (see <see cref="WithDirectives"/>).
 /// </summary>
-/// <param name="Tolerance">Numeric tolerance for int64/double/decimal columns; null compares exactly.</param>
+/// <param name="Tolerance">Numeric tolerance for int64/double/decimal columns, and for numeric cells of object (Variant) columns; null compares exactly.</param>
 /// <param name="IgnoreRowOrder">Sort both rowsets by their values before comparing.</param>
 public sealed record TestCompareOptions(TestTolerance? Tolerance = null, bool IgnoreRowOrder = false)
 {

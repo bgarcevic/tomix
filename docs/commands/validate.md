@@ -584,10 +584,12 @@ floating-point measures can differ in their last digits between engine
 versions or refreshes; `--tolerance` accepts a numeric cell (`int64`,
 `double`, `decimal` columns) when it is within an absolute difference
 (`--tolerance 0.001`) or a percentage of the larger value
-(`--tolerance 0.1%`). `BLANK()` never matches a number, and text, date and
-boolean cells always compare exactly. With `--ignore-row-order`, both sides
-are sorted before comparing — text and date columns first, then numbers by
-value — and difference row numbers refer to that sorted order.
+(`--tolerance 0.1%`). A measure whose data type is Variant returns an
+`object` column; its cells get the tolerance whenever both sides are numbers.
+`BLANK()` never matches a number, and text, date and boolean cells always
+compare exactly. With `--ignore-row-order`, both sides are sorted before
+comparing — text and date columns first, then numeric and `object` columns
+by value — and difference row numbers refer to that sorted order.
 
 **Per-test settings.** A test sets its own comparison in `tx:` comment lines
 before the query; these override the command-line options for that test:

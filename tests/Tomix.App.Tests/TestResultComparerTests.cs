@@ -211,6 +211,70 @@ public sealed class TestResultComparerTests
         Assert.True(comparison.Passed);
     }
 
+    // ── Variant (object) columns ─────────────────────────────────────────────
+
+    // A Variant-typed measure (e.g. EVALUATE ROW("Hours", [Hours])) reads back as "object".
+    private static readonly IReadOnlyList<QueryColumn> VariantColumns = [new QueryColumn("[Hours]", "object")];
+
+    [Theory]
+    [InlineData("3805080.2499999995", 3805080.249999999, null, false)]   // exact: float noise fails
+    [InlineData("3805080.2499999995", 3805080.249999999, "0.0001%", true)]
+    [InlineData("100", 100.6, "0.5", false)]
+    [InlineData("abc", "abd", "1", false)]                                // text stays exact
+    [InlineData("true", true, "1", true)]
+    [InlineData(null, 0.0, "1", false)]                                   // BLANK never matches a number
+    public void Compare_VariantColumn_AppliesToleranceWhenBothCellsAreNumbers(
+        string? expected, object actual, string? tolerance, bool passes)
+    {
+        TestTolerance? parsed = null;
+        if (tolerance is not null)
+            Assert.True(TestTolerance.TryParse(tolerance, out parsed, out _));
+
+        var comparison = TestResultComparer.Compare(
+            new TestSnapshot(1, "hash", VariantColumns, [[expected]]),
+            Actual(VariantColumns, [actual]),
+            new TestCompareOptions(Tolerance: parsed));
+
+        Assert.Equal(passes, comparison.Passed);
+    }
+
+    [Fact]
+    public void Compare_IgnoreRowOrder_SortsVariantMeasuresAfterDimensions()
+    {
+        // Same as the double case: a Variant measure must not order rows by its noisy text.
+        IReadOnlyList<QueryColumn> columns = [new QueryColumn("[Avg]", "object"), new QueryColumn("Sales[Region]", "string")];
+        var comparison = TestResultComparer.Compare(
+            new TestSnapshot(1, "hash", columns, [["2", "A"], ["2", "B"]]),
+            Actual(columns, [2.0000001, "A"], [2.0, "B"]),
+            new TestCompareOptions(new TestTolerance(1e-3, Relative: false), IgnoreRowOrder: true));
+
+        Assert.True(comparison.Passed);
+    }
+
+    [Fact]
+    public void Compare_IgnoreRowOrder_OrdersMixedVariantCellsTheSameWayFromAnyInputOrder()
+    {
+        // Numbers and text mixed in one column: comparing number-vs-text by text but
+        // number-vs-number by value would be cyclic (9 < 10 < "1A" < 9) and order by input.
+        IReadOnlyList<string?>[] expected = [["10"], ["9"], ["1A"], [null]];
+        IReadOnlyList<object?>[][] inputs =
+        [
+            [[10L], [9L], ["1A"], [null]],
+            [["1A"], [9L], [null], [10L]],
+            [[9L], ["1A"], [10L], [null]],
+        ];
+
+        foreach (var rows in inputs)
+        {
+            var comparison = TestResultComparer.Compare(
+                new TestSnapshot(1, "hash", VariantColumns, expected),
+                Actual(VariantColumns, rows),
+                new TestCompareOptions(IgnoreRowOrder: true));
+
+            Assert.True(comparison.Passed);
+        }
+    }
+
     // ── Canonical value formatting ──────────────────────────────────────────
 
     [Fact]
