@@ -35,7 +35,9 @@ public static class TestResultComparer
 {
     public const int DefaultMaxDifferences = 10;
 
-    private static readonly HashSet<string> NumericTypes = new(StringComparer.Ordinal) { "int64", "double", "decimal" };
+    // "object" is a Variant-typed measure: its cells compare by value whenever both parse as
+    // numbers, and exactly otherwise (text, booleans, dates).
+    private static readonly HashSet<string> NumericTypes = new(StringComparer.Ordinal) { "int64", "double", "decimal", "object" };
 
     public static TestComparison Compare(
         TestSnapshot expected,
@@ -143,7 +145,8 @@ public static class TestResultComparer
     /// <summary>
     /// Orders rows for <see cref="TestCompareOptions.IgnoreRowOrder"/>: non-numeric columns first
     /// (ordinal), then numeric columns by value, so tolerance-sized noise in a measure cannot
-    /// reorder rows that a dimension column already separates. BLANK sorts first.
+    /// reorder rows that a dimension column already separates. Within a numeric column BLANK
+    /// sorts first, then numbers by value, then any text (a Variant column can mix them).
     /// </summary>
     private sealed class RowComparer(bool[] numeric) : IComparer<IReadOnlyList<string?>>
     {
@@ -165,9 +168,15 @@ public static class TestResultComparer
             return 0;
         }
 
+        // Ranks BLANK, numbers, text rather than falling back to ordinal per pair, which would
+        // be cyclic for mixed cells (9 < 10 < "1A" < 9) and leave the order to the input.
         private static int CompareNumbers(string? x, string? y)
-            => TryParseNumber(x, out var a) && TryParseNumber(y, out var b)
-                ? a.CompareTo(b)
-                : string.CompareOrdinal(x, y);
+            => (TryParseNumber(x, out var a), TryParseNumber(y, out var b)) switch
+            {
+                (true, true) => a.CompareTo(b),
+                (true, false) => y is null ? 1 : -1,
+                (false, true) => x is null ? -1 : 1,
+                _ => string.CompareOrdinal(x, y)
+            };
     }
 }
