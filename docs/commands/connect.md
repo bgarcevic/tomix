@@ -103,6 +103,7 @@ script, so it neither previews nor asks.
 | `--bpa-rules <file>` | Additional BPA rule files for this deploy, alongside the built-in ruleset, `bpa.rules`, and `TOMIX_BPA_RULES`; they override those for the same rule ID. |
 | `--bpa-fail-on <error\|warning>` | Severity threshold for the BPA gate: error (default) or warning. Applies before the deploy and again after `--fix-bpa` fixes. Rules that cannot be evaluated count as error-severity findings. |
 | `-p, --profile <name>` | Use a saved remote profile for this deploy only. List profiles with `tx profile list`; create one with `tx profile set <name> -s <workspace> -d <database>`. |
+| `--rollback-on-error` | Check the deployed model before it is committed, and roll the deploy back when an object is in an error state. See [Rolling back a broken deploy](#rolling-back-a-broken-deploy). |
 | `--ci <github\|vsts>` | Print CI annotations to stderr for post-deploy errors and warnings. |
 
 After a deploy runs, `deploy` re-reads the deployed model and checks the state the server
@@ -142,6 +143,32 @@ tx deploy ./model.tmdl --profile prod --yes     # deploy without the preview (CI
 tx deploy --server MyWorkspace --database Sales
 tx deploy ./model.bim --xmla deploy.xmla
 tx deploy ./model.tmdl --bpa-fail-on warning
+```
+
+### Rolling back a broken deploy
+
+Without `--rollback-on-error`, the check above runs after the deploy has committed, so a
+model with errors is already live on the target when `deploy` reports it. With
+`--rollback-on-error`, the check runs before the change is kept, and a deploy with an error
+never reaches the target:
+
+- **Existing model.** The deploy runs inside a server transaction. It applies the same merged
+  model as an ordinary deploy, including everything [granular deployment](#granular-deployment)
+  preserves. While the transaction is open, the server already reports the state of the
+  uncommitted objects. If an object is in an error state, the transaction rolls back and the
+  target keeps its previous definition and data. Otherwise it commits.
+- **New model.** The server cannot create a database inside a transaction. The deploy creates
+  the model and checks it, and if an object is in an error state it deletes the model again.
+
+A rolled-back deploy fails with `TOMIX_DEPLOY_ROLLED_BACK` (exit `1`), lists the broken
+objects, and reports `"status": "rolled-back"` in JSON. A check that cannot read the model
+also rolls back, because nothing proves the model works. Warnings (incomplete objects) and
+unprocessed objects do not roll back. The flag cannot change a model's compatibility level,
+because that change commits on its own; deploy once without the flag to upgrade the level.
+`--rollback-on-error` cannot be combined with `--xmla`.
+
+```sh
+tx deploy ./model.tmdl --profile prod --yes --rollback-on-error
 ```
 
 ### Granular deployment

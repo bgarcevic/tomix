@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Throwaway spike for docs/design/adr-0005-deploy-validate-before-commit.md. Not part of
+       Tomix.slnx and not shipped; delete once the decision is settled. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Tomix.App\Tomix.App.csproj" />
+    <ProjectReference Include="..\..\src\Tomix.Auth\Tomix.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Tomix.Provider.Tom\Tomix.Provider.Tom.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AnalysisServices" />
+    <PackageReference Include="Microsoft.AnalysisServices.AdomdClient" />
+  </ItemGroup>
+
+</Project>

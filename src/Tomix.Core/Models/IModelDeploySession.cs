@@ -71,12 +71,16 @@ public sealed record ModelDeployOptions(
           && DeployRoles && DeployRoleMembers && DeployPolicyPartitions);
 }
 
+/// <param name="RollbackOnError">Check the deployed model before it is committed and undo the
+/// deploy when the server reports an object in an error state, so a broken model never reaches
+/// the target (ADR 0005).</param>
 public sealed record ModelDeployRequest(
     string Server,
     string? Database,
     bool CreateOnly,
     bool Force,
-    ModelDeployOptions? Options = null)
+    ModelDeployOptions? Options = null,
+    bool RollbackOnError = false)
 {
     /// <summary>Effective options; a null <see cref="Options"/> means preserve-by-default.</summary>
     public ModelDeployOptions EffectiveOptions => Options ?? ModelDeployOptions.Preserve;
@@ -85,7 +89,8 @@ public sealed record ModelDeployRequest(
 /// <summary>
 /// <paramref name="Validation"/> is the server's post-deploy view of the deployed objects; null
 /// when the provider does not inspect them. <paramref name="ValidationError"/> says why the
-/// inspection could not run after a deploy that did — the deploy itself still succeeded.
+/// inspection could not run after a deploy that did — the deploy itself still succeeded, unless
+/// <paramref name="Status"/> is <see cref="RolledBack"/>.
 /// </summary>
 public sealed record ModelDeployResult(
     string Server,
@@ -93,4 +98,9 @@ public sealed record ModelDeployResult(
     string Status,
     long DurationMs,
     DeployValidation? Validation = null,
-    string? ValidationError = null);
+    string? ValidationError = null)
+{
+    /// <summary>The status of a deploy that <see cref="ModelDeployRequest.RollbackOnError"/>
+    /// undid: the target holds what it held before.</summary>
+    public const string RolledBack = "rolled-back";
+}

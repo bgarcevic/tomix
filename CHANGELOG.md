@@ -20,6 +20,11 @@ and the API surface that major versions protect.
   (`TOMIX_DEPLOY_VALIDATION_WARNINGS`); unprocessed ones point at `tx refresh`. A check that
   cannot run warns with `TOMIX_DEPLOY_VALIDATION_UNAVAILABLE`. `--ci vsts|github` now prints
   annotations for post-deploy errors and warnings.
+- `tx deploy --rollback-on-error` checks the deployed model before the deploy is kept. On an
+  existing model the deploy runs inside a server transaction and rolls back when an object is in
+  an error state, leaving the target's definition and data unchanged. A new model is deleted
+  again. A rolled-back deploy fails with `TOMIX_DEPLOY_ROLLED_BACK` and `"status": "rolled-back"`.
+  See ADR 0005.
 - `tx format` style options (#229): `--separators us|eu` shows DAX with `;` list and `,`
   decimal separators (display only; models always store the US form, and an explicit
   `--separators eu` with `--save`, `--save-to`, `--stage` or `--revert` fails with the new

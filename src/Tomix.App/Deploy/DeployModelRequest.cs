@@ -15,4 +15,5 @@ public sealed record DeployModelRequest(
     string? Ci,
     bool Preview = false,
     ModelDeployOptions? DeployOptions = null,
-    string? BpaFailOn = null);
+    string? BpaFailOn = null,
+    bool RollbackOnError = false);

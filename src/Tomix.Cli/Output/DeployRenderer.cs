@@ -57,8 +57,12 @@ internal static class DeployRenderer
 
         AnsiConsole.MarkupLine(Styling.Value(
             $"Deploying {modelName} to {result.Server} / {result.Database}..."));
-        AnsiConsole.MarkupLine(Styling.Success(
-            $"Deployed: {result.Status} ({result.DurationMs}ms)"));
+        if (result.Status == ModelDeployResult.RolledBack)
+            AnsiConsole.MarkupLine(Styling.Warning(
+                $"Rolled back: the target is unchanged ({result.DurationMs}ms)"));
+        else
+            AnsiConsole.MarkupLine(Styling.Success(
+                $"Deployed: {result.Status} ({result.DurationMs}ms)"));
 
         if (result.Validation is { } validation)
             RenderValidation(validation);

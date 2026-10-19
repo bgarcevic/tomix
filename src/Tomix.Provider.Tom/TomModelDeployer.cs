@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Microsoft.AnalysisServices.Tabular;
 using Tomix.Core.Authentication;
 using Tomix.Core.Models;
@@ -34,25 +35,25 @@ public static class TomModelDeployer
                     $"Model '{targetName}' already exists on '{request.Server}'. Remove --create-only to overwrite.");
             }
 
+            if (request.RollbackOnError && existing is not null)
+                return DeployInTransaction(server, sourceDatabase, existing, request, sw);
+
             var status = existing is not null ? "updated" : "created";
             var script = BuildScript(sourceDatabase, existing, targetName, request, forExecution: true);
-            var results = server.Execute(script);
+            Execute(server, script);
 
-            // AMO's Execute returns a result collection that may contain errors/warnings even
-            // when no exception is thrown. Surface them so deploys don't silently no-op.
-            var serverErrors = new List<string>();
-            XmlaResultHelper.ExtractMessages(results, serverErrors);
-            if (serverErrors.Count > 0)
+            var deployName = existing?.Name ?? targetName;
+            var (validation, validationError) = InspectDeployed(server, deployName);
+
+            // A new database cannot be created inside a transaction (ADR 0005), so undoing it
+            // means dropping it: the target held no such database before, and holds none again.
+            if (request.RollbackOnError && ShouldRollBack(validation))
             {
-                var message = serverErrors.Count == 1
-                    ? serverErrors[0]
-                    : string.Join("; ", serverErrors);
-                throw new InvalidOperationException(message);
+                Execute(server, DeleteDatabaseScript(deployName));
+                status = ModelDeployResult.RolledBack;
             }
 
             sw.Stop();
-            var deployName = existing?.Name ?? targetName;
-            var (validation, validationError) = InspectDeployed(server, deployName);
             return new ModelDeployResult(
                 request.Server, deployName, status, sw.ElapsedMilliseconds, validation, validationError);
         }
@@ -63,6 +64,137 @@ public static class TomModelDeployer
             server.Dispose();
         }
     }
+
+    /// <summary>
+    /// <c>--rollback-on-error</c> against an existing database (ADR 0005). The Power BI endpoint
+    /// commits a database-level <c>createOrReplace</c> on its own, ending any open transaction,
+    /// so the merged model is applied as object-level changes instead: copied over the live
+    /// model and saved inside an explicit transaction, where the server already reports the
+    /// uncommitted objects' states. Errors roll the transaction back; otherwise it commits.
+    /// </summary>
+    private static ModelDeployResult DeployInTransaction(
+        TabularServer server,
+        Database sourceDatabase,
+        TabularDatabase existing,
+        ModelDeployRequest request,
+        Stopwatch sw)
+    {
+        existing.Refresh(true);
+        var merged = BuildMergedDatabase(sourceDatabase, existing, request);
+        if (merged.CompatibilityLevel != existing.CompatibilityLevel)
+        {
+            // A database-level change commits on its own, so it cannot be undone with the rest.
+            throw new InvalidOperationException(
+                $"--rollback-on-error cannot change the compatibility level of '{existing.Name}' "
+                + $"({existing.CompatibilityLevel} to {merged.CompatibilityLevel}). Deploy once without it to change the level.");
+        }
+
+        server.BeginTransaction();
+        var open = true;
+        try
+        {
+            merged.Model.CopyTo(existing.Model);
+            existing.Model.SaveChanges();
+
+            DeployValidation? validation = null;
+            string? validationError = null;
+            try
+            {
+                // Inside the transaction the server reports the uncommitted objects' states.
+                existing.Refresh(true);
+                validation = TomDeployValidator.Inspect(existing);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                validationError = ex.InnerException?.Message ?? ex.Message;
+            }
+
+            var rollBack = ShouldRollBack(validation);
+            open = false;
+            if (rollBack)
+                server.RollbackTransaction();
+            else
+                server.CommitTransaction();
+
+            sw.Stop();
+            return new ModelDeployResult(
+                request.Server, existing.Name, rollBack ? ModelDeployResult.RolledBack : "updated",
+                sw.ElapsedMilliseconds, validation, validationError);
+        }
+        catch when (open)
+        {
+            // Anything that fails before the decision leaves the target as it was.
+            TryRollback(server);
+            throw;
+        }
+    }
+
+    private static void TryRollback(TabularServer server)
+    {
+        try
+        {
+            server.RollbackTransaction();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The original failure is the one to report; an ended session rolls back as well.
+        }
+    }
+
+    /// <summary>
+    /// Under <c>--rollback-on-error</c>, an object in an error state undoes the deploy, and so
+    /// does a check that could not run: the flag promises a broken model never lands, and an
+    /// unchecked one might be broken. Warnings and unprocessed objects do not.
+    /// </summary>
+    internal static bool ShouldRollBack(DeployValidation? validation)
+        => validation is null || validation.Errors > 0;
+
+    /// <summary>
+    /// The model a deploy leaves on <paramref name="existing"/>, as a detached database: the
+    /// same merge <see cref="BuildScript"/> executes, with restricted information so preserved
+    /// connection strings survive.
+    /// </summary>
+    internal static TabularDatabase BuildMergedDatabase(
+        Database sourceDatabase, TabularDatabase existing, ModelDeployRequest request)
+    {
+        var options = request.EffectiveOptions;
+        var clone = sourceDatabase.Clone();
+        clone.Name = existing.Name;
+        var restricted = new SerializeOptions { IncludeRestrictedInformation = true };
+
+        var node = TmslDeployScriptBuilder.BuildDatabaseNode(
+            TabularJsonSerializer.SerializeDatabase(clone, restricted),
+            options.RequiresTargetRead ? TabularJsonSerializer.SerializeDatabase(existing, restricted) : null,
+            existing.Name,
+            existing.ID,
+            options,
+            stripRoleMemberIds: IsCloudEndpoint(request.Server));
+
+        return TabularJsonSerializer.DeserializeDatabase(node.ToJsonString());
+    }
+
+    private static void Execute(TabularServer server, string script)
+    {
+        var results = server.Execute(script);
+
+        // AMO's Execute returns a result collection that may contain errors/warnings even
+        // when no exception is thrown. Surface them so deploys don't silently no-op.
+        var serverErrors = new List<string>();
+        XmlaResultHelper.ExtractMessages(results, serverErrors);
+        if (serverErrors.Count > 0)
+        {
+            var message = serverErrors.Count == 1
+                ? serverErrors[0]
+                : string.Join("; ", serverErrors);
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    internal static string DeleteDatabaseScript(string name)
+        => new JsonObject
+        {
+            ["delete"] = new JsonObject { ["object"] = new JsonObject { ["database"] = name } }
+        }.ToJsonString();
 
     /// <summary>
     /// Re-reads the deployed database on the open connection and runs the post-deploy pass
