@@ -215,6 +215,48 @@ public sealed class BpaProjectConfigTests
     }
 
     [Fact]
+    public async Task RulesList_ShowsTheProjectRulesAndDisables()
+    {
+        var (root, _) = Repository();
+        using var __ = root;
+        using var config = new TempConfigDir();
+        var model = SampleModel.CopyTo(root, Path.Combine("models", "sales", "model"));
+        root.WriteFile(Path.Combine("bpa", "team.json"), Rule("TEAM_WARNING", severity: 2));
+        root.WriteFile("tomix.json", """
+            { "bpa": { "rules": ["bpa/team.json"], "disabledRuleIds": ["HIDE_FOREIGN_KEYS"] } }
+            """);
+
+        var result = await new BpaRulesListHandler(
+                [new TmdlModelProvider()], new BpaUserRuleState(config.Path), configDirectory: config.Path,
+                environment: NoEnvironment)
+            .HandleAsync(new BpaRulesListRequest(new ModelReference(model), All: true), CancellationToken.None);
+
+        Assert.True(result.Success);
+        var team = Assert.Single(result.Data!.Rules, r => r.Id == "TEAM_WARNING");
+        Assert.Equal(BpaProjectConfig.FileName, team.Source);
+        Assert.Equal("disabled", Assert.Single(result.Data.Rules, r => r.Id == "HIDE_FOREIGN_KEYS").Status);
+    }
+
+    [Fact]
+    public async Task RulesList_BrokenProjectConfig_IsReportedNotFatal()
+    {
+        var (root, _) = Repository();
+        using var __ = root;
+        using var config = new TempConfigDir();
+        var model = SampleModel.CopyTo(root, Path.Combine("models", "sales", "model"));
+        var tomixJson = root.WriteFile("tomix.json", """{ "bpa": """);
+
+        var result = await new BpaRulesListHandler(
+                [new TmdlModelProvider()], new BpaUserRuleState(config.Path), configDirectory: config.Path,
+                environment: NoEnvironment)
+            .HandleAsync(new BpaRulesListRequest(new ModelReference(model)), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotEmpty(result.Data!.Rules);
+        Assert.Contains(result.Data.Diagnostics!, d => d.Contains(tomixJson));
+    }
+
+    [Fact]
     public async Task Save_FixBpa_AppliesTheProjectRulesAndDisables()
     {
         var (root, _) = Repository();

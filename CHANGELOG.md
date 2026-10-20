@@ -19,7 +19,9 @@ and the API surface that major versions protect.
   nearest file, then files above it, then the file `TOMIX_PROJECT_CONFIG` names, then your own
   settings. Output names the files used (`TOMIX_PROJECT_CONFIG_LOADED`), a deploy with the gate
   turned off by a file warns (`TOMIX_BPA_GATE_DISABLED`), and an invalid file fails with
-  `TOMIX_PROJECT_CONFIG_INVALID`. Rule sources gain the `project` origin.
+  `TOMIX_PROJECT_CONFIG_INVALID`. Rule sources gain the `project` origin. `tx bpa rules list`
+  and `show` list the project's rules (source `tomix.json`) and show its `disabledRuleIds` as
+  disabled.
 
 - `tx deploy` checks the deployed model after it lands: it re-reads the target and reports every
   object the server holds in an error, incomplete, or unprocessed state, in the text output and

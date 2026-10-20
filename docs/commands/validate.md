@@ -299,15 +299,19 @@ A missing file or failed download stops the run with
 
 The other commands read the same settings:
 
-- `bpa rules list` and `show` list the rules from `bpa.rules` and
-  `TOMIX_BPA_RULES` with source `bpa.rules` or `TOMIX_BPA_RULES`. A source that
-  can't be loaded is reported as a diagnostic, and the listing still shows
-  every other source.
+- `bpa rules list` and `show` list the rules from `bpa.rules`,
+  `TOMIX_BPA_RULES`, and the project's `tomix.json` with source `bpa.rules`,
+  `TOMIX_BPA_RULES`, or `tomix.json`, and show a rule in the project's
+  `disabledRuleIds` as `disabled`. They look for `tomix.json` from the model's
+  folder, or the working directory without a model. A source that can't be
+  loaded, or an invalid `tomix.json`, is reported as a diagnostic, and the
+  listing still shows every other source.
 - `bpa rules list` shows each rule ID once, from the source that wins by the
   same order as `bpa run`. A team or model rule that replaces another source's
   copy says so (`overrides standard`; JSON `overrides`). `bpa rules show` still
   prints every source's copy, so you can compare an override with the original.
-- `bpa rules ignore` accepts IDs from their local files.
+- `bpa rules ignore` accepts IDs from their local files, including the
+  `tomix.json` rules found from the working directory.
 - The `deploy` BPA gate checks the `standard` ruleset, then `bpa.rules`,
   `TOMIX_BPA_RULES`, the project's `tomix.json` rules, and `--bpa-rules`, with
   the same override order. It doesn't load your personal config-dir
