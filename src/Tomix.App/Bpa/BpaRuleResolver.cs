@@ -34,6 +34,9 @@ public enum BpaRuleOrigin
     /// <summary>The <c>TOMIX_BPA_RULES</c> environment variable.</summary>
     Environment,
 
+    /// <summary>The <c>bpa.rules</c> key of a project's <c>tomix.json</c> (#236).</summary>
+    Project,
+
     /// <summary>A <c>--rules</c> option on the command line.</summary>
     Option,
 

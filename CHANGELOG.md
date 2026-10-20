@@ -14,6 +14,17 @@ and the API surface that major versions protect.
 
 ### Added
 
+- Project BPA config in a committed `tomix.json` (#236): `bpa.enabled`, `bpa.failOn`,
+  `bpa.disabledRuleIds` and `bpa.rules` tune `tx bpa run`, the `tx deploy` gate and
+  `tx save --fix-bpa` once per repository. tx reads every `tomix.json` from the model's folder up
+  to the repository root; the more local a setting, the more it wins: the command line, then the
+  nearest file, then files above it, then the file `TOMIX_PROJECT_CONFIG` names, then your own
+  settings. Output names the files used (`TOMIX_PROJECT_CONFIG_LOADED`), a deploy with the gate
+  turned off by a file warns (`TOMIX_BPA_GATE_DISABLED`), and an invalid file fails with
+  `TOMIX_PROJECT_CONFIG_INVALID`. Rule sources gain the `project` origin. `tx bpa rules list`
+  and `show` list the project's rules (source `tomix.json`) and show its `disabledRuleIds` as
+  disabled.
+
 - `tx deploy` checks the deployed model after it lands: it re-reads the target and reports every
   object the server holds in an error, incomplete, or unprocessed state, in the text output and
   as `validation` in the JSON result. Objects in an error state (a measure whose DAX does not
