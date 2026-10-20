@@ -280,8 +280,11 @@ columns.
    resolve against the config directory (`~/.tomix`, or `$TOMIX_CONFIG_DIR`).
 4. The `TOMIX_BPA_RULES` environment variable, in the same format. Use it in CI
    pipelines. Relative paths resolve against the working directory.
-5. `--rules` on the command line.
-6. The model's own rule annotations (see below).
+5. The `rules` of the project's `tomix.json` files (see
+   [Project config](#project-config-tomixjson)). Relative paths resolve against
+   the file's folder.
+6. `--rules` on the command line.
+7. The model's own rule annotations (see below).
 
 ```sh
 tx config set bpa.rules "team/bpa-rules.json;https://example.com/org-rules.json"
@@ -289,7 +292,8 @@ TOMIX_BPA_RULES=.devops/bpa-rules.json tx bpa run .
 ```
 
 When two sources define the same rule ID, the later source wins, so the
-command line overrides the pipeline, and the pipeline overrides your config.
+command line overrides the project, the project overrides the pipeline, and
+the pipeline overrides your config.
 A missing file or failed download stops the run with
 `TOMIX_BPA_RULES_LOAD_FAILED` and names the setting that pointed at it.
 
@@ -305,9 +309,11 @@ The other commands read the same settings:
   prints every source's copy, so you can compare an override with the original.
 - `bpa rules ignore` accepts IDs from their local files.
 - The `deploy` BPA gate checks the `standard` ruleset, then `bpa.rules`,
-  `TOMIX_BPA_RULES`, and `--bpa-rules`, with the same override order. It
-  doesn't load your personal config-dir `bpa-rules.json` or the model's rule
-  annotations.
+  `TOMIX_BPA_RULES`, the project's `tomix.json` rules, and `--bpa-rules`, with
+  the same override order. It doesn't load your personal config-dir
+  `bpa-rules.json` or the model's rule annotations.
+- `save --fix-bpa` checks the `standard` ruleset, the project's `tomix.json`
+  rules, and `--bpa-rules`.
 
 Every run says where its rules came from, so a pipeline log shows what was
 checked:
@@ -322,7 +328,58 @@ When a higher-precedence source replaced some of them, the count says so: with
 overridden) + full ruleset (70)`. In JSON, the same information is in
 `ruleSources`: one entry per source with `name`, `kind` (`machine`, `user`,
 `external`, or `modelEmbedded`), `origin` (`ruleset`, `userFile`, `config`,
-`environment`, `option`, or `model`), `rules`, and `overridden`.
+`environment`, `project`, `option`, or `model`), `rules`, and `overridden`.
+
+### Project config (`tomix.json`)
+
+Commit a `tomix.json` next to your models to set the team's BPA policy once,
+instead of repeating flags in every pipeline. `bpa run`, the `deploy` gate,
+and `save --fix-bpa` all read it:
+
+```json
+{
+  "bpa": {
+    "enabled": true,
+    "failOn": "warning",
+    "disabledRuleIds": ["AVOID_FLOATING_POINT_DATA_TYPES"],
+    "rules": ["bpa/team-rules.json", "https://example.com/org-rules.json"]
+  }
+}
+```
+
+| Key | Default | Applies to | Description |
+|-----|---------|------------|-------------|
+| `enabled` | `true` | `deploy` | `false` deploys without the BPA gate. The deploy warns with `TOMIX_BPA_GATE_DISABLED` and names the file, so the log never reads as a passed gate. |
+| `failOn` | `error` | `deploy`, `bpa run` | The severity that blocks: `error` or `warning`. |
+| `disabledRuleIds` | none | all three | Rule IDs to skip, in addition to `bpa rules ignore --user`. |
+| `rules` | none | all three | Rule files or URLs, loaded as a link of the [rule-source chain](#rule-sources). Relative paths resolve against the file's folder. |
+
+**Where tx looks.** tx starts in the model's folder (the TMDL folder, or the
+folder holding a `.bim` file; the working directory for a remote model) and reads
+every `tomix.json` from there up to the repository root, the first folder with a
+`.git` folder or file. Outside a repository, it looks up to the filesystem root.
+To point at a file outside the repository, for example a pipeline's shared
+policy, set `TOMIX_PROJECT_CONFIG` to its path.
+
+**Which setting wins.** The more local a setting, the more it wins:
+
+1. The command line: `--skip-bpa`, `--bpa-fail-on` (`--fail-on` for `bpa run`), and `--bpa-rules`/`--rules`.
+2. The `tomix.json` nearest the model.
+3. Each `tomix.json` above it, up to the repository root.
+4. The file `TOMIX_PROJECT_CONFIG` names.
+5. Your own settings: `bpa.rules`, `TOMIX_BPA_RULES`, and `bpa rules ignore --user`.
+
+Files merge key by key, so a `tomix.json` beside one model can raise `failOn`
+and keep the repository root's `rules`. `disabledRuleIds` combine across every
+file and with your own ignores. There is no flag that turns the gate back on
+once a file sets `"enabled": false`; to gate such a deploy, change the file.
+
+Keys match in any case, and comments and trailing commas are allowed. tx ignores
+top-level sections other than `bpa`, but an unknown key inside `bpa` fails, so a
+misspelled `failOn` can't leave the gate on its default. An invalid file stops the
+command with `TOMIX_PROJECT_CONFIG_INVALID` and names the file. When a
+`tomix.json` is in use, the output says which files with a
+`TOMIX_PROJECT_CONFIG_LOADED` info line.
 
 ### Ignoring rules
 
@@ -422,7 +479,8 @@ tx bpa rules remove MEASURE_DESCRIPTIONS . --save
 The BPA gate also runs automatically on `deploy` (`--skip-bpa` to bypass,
 `--fix-bpa` to auto-fix first, `--bpa-rules` to point at specific rule files,
 `--bpa-fail-on` to lower the blocking threshold to warnings — errors block by default).
-The deploy gate loads `bpa.rules` and `TOMIX_BPA_RULES` (see [Rule sources](#rule-sources))
+The deploy gate loads `bpa.rules`, `TOMIX_BPA_RULES`, and the project's `tomix.json` (see
+[Rule sources](#rule-sources) and [Project config](#project-config-tomixjson))
 and honors `bpa rules ignore --user` for the rules it loads. `bpa run` also loads your
 config-dir `bpa-rules.json` and the model's rules, so the commands may report different findings.
 A rule that cannot be compiled or evaluated is itself an error-severity finding

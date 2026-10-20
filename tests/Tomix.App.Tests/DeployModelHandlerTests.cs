@@ -835,6 +835,59 @@ public sealed class DeployModelHandlerTests
         Assert.Contains(BpaRuleSources.EnvironmentVariable, result.Diagnostics[0].Message);
     }
 
+    /// <summary>
+    /// #236: a project's tomix.json tunes the gate with no flags; the command line still wins.
+    /// The stub model has warning-severity findings only, so the threshold decides whether they
+    /// block; the project's own rule (team.json) is an error, so it blocks unless disabled.
+    /// </summary>
+    [Theory]
+    // The file alone: its threshold, rules, and disables apply.
+    [InlineData("""{ "bpa": { "failOn": "warning" } }""", null, false, "TOMIX_BPA_VIOLATIONS")]
+    [InlineData("""{ "bpa": { "failOn": "error" } }""", null, false, null)]
+    [InlineData("""{ "bpa": { "rules": ["team.json"] } }""", null, false, "TOMIX_BPA_VIOLATIONS")]
+    [InlineData("""{ "bpa": { "rules": ["team.json"], "disabledRuleIds": ["team_error"] } }""", null, false, null)]
+    // --bpa-fail-on beats the file's threshold, in both directions.
+    [InlineData("""{ "bpa": { "failOn": "warning" } }""", "error", false, null)]
+    [InlineData("""{ "bpa": { "failOn": "error" } }""", "warning", false, "TOMIX_BPA_VIOLATIONS")]
+    // --skip-bpa beats "enabled": true; "enabled": false skips without a flag.
+    [InlineData("""{ "bpa": { "enabled": true, "rules": ["team.json"] } }""", null, true, null)]
+    [InlineData("""{ "bpa": { "enabled": false, "rules": ["team.json"] } }""", null, false, null)]
+    // A broken file stops the deploy before it opens the model.
+    [InlineData("""{ "bpa": { "failOn": "sometimes" } }""", null, false, "TOMIX_PROJECT_CONFIG_INVALID")]
+    public async Task HandleAsync_BpaGate_HonorsTheProjectConfig(string tomixJson, string? bpaFailOn, bool skipBpa, string? failure)
+    {
+        using var root = new TempDir();
+        root.CreateSubdirectory(".git");
+        var model = root.CreateSubdirectory("model");
+        File.Move(WriteRuleFile(root, "TEAM_ERROR", severity: 3), root.Combine("team.json"));
+        root.WriteFile("tomix.json", tomixJson);
+
+        var result = await DeployThroughGate(rulesPath: null, bpaFailOn, model: model, skipBpa: skipBpa);
+
+        Assert.Equal(failure, result.Success ? null : result.Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BpaGate_DisabledByTheProjectConfig_SaysWhichFile()
+    {
+        using var root = new TempDir();
+        root.CreateSubdirectory(".git");
+        var model = root.CreateSubdirectory("model");
+        var tomixJson = root.WriteFile("tomix.json", """{ "bpa": { "enabled": false } }""");
+
+        var result = await DeployThroughGate(rulesPath: null, bpaFailOn: null, model: model);
+
+        Assert.True(result.Success);
+        var disabled = Assert.Single(result.Diagnostics, d => d.Code == "TOMIX_BPA_GATE_DISABLED");
+        Assert.Equal(Core.Diagnostics.DiagnosticSeverity.Warning, disabled.Severity);
+        Assert.Contains(tomixJson, disabled.Message);
+        Assert.Contains(result.Diagnostics, d => d.Code == "TOMIX_PROJECT_CONFIG_LOADED");
+
+        // --skip-bpa already says the gate is off, so the file adds no warning.
+        var skipped = await DeployThroughGate(rulesPath: null, bpaFailOn: null, model: model, skipBpa: true);
+        Assert.DoesNotContain(skipped.Diagnostics, d => d.Code == "TOMIX_BPA_GATE_DISABLED");
+    }
+
     private static string WriteBrokenRuleFile(TempDir dir, string id)
     {
         var path = dir.Combine($"{id.ToLowerInvariant()}.json");
@@ -853,7 +906,9 @@ public sealed class DeployModelHandlerTests
         string? bpaFailOn,
         BpaUserRuleState? bpaRules = null,
         string? configDirectory = null,
-        Func<string, string?>? environment = null)
+        Func<string, string?>? environment = null,
+        string model = "samples/basic-tmdl",
+        bool skipBpa = false)
     {
         var session = new StubDeployOnlySession();
         var handler = new DeployModelHandler(
@@ -861,12 +916,12 @@ public sealed class DeployModelHandlerTests
             configDirectory: configDirectory, environment: environment ?? (_ => null));
         var result = await handler.HandleAsync(
             new DeployModelRequest(
-                new ModelReference("samples/basic-tmdl"),
+                new ModelReference(model),
                 Server: "my-workspace",
                 Database: "my-model",
                 Profile: null,
                 CreateOnly: false,
-                SkipBpa: false,
+                SkipBpa: skipBpa,
                 FixBpa: false,
                 BpaRules: rulesPath is null ? null : [rulesPath],
                 XmlaOutput: null,

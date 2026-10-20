@@ -57,7 +57,19 @@ public sealed class BpaRunHandler
         BpaRunRequest request,
         CancellationToken cancellationToken)
     {
-        if (!BpaFailOn.TryParse(request.FailOn, "--fail-on", out var failOnSeverity, out var failOnError))
+        // #236: the project's tomix.json rules, disables and threshold apply here as they do to
+        // the deploy gate, so the two agree; the command line still wins.
+        BpaProjectSettings project;
+        try
+        {
+            project = BpaProjectConfig.Resolve(request.Model, _environment);
+        }
+        catch (BpaProjectConfigException ex)
+        {
+            return TomixResult<BpaRunResult>.Fail(BpaProjectConfig.InvalidCode, ex.Message, exitCode: 2);
+        }
+
+        if (!BpaFailOn.TryParse(request.FailOn ?? project.FailOn, "--fail-on", out var failOnSeverity, out var failOnError))
             return TomixResult<BpaRunResult>.Fail(
                 "TOMIX_BPA_INVALID_FAIL_ON",
                 failOnError!,
@@ -132,7 +144,7 @@ public sealed class BpaRunHandler
         async Task<TomixResult<BpaRunResult>> RunAsync(IModelSession session)
         {
             var snapshot = await session.GetSnapshotAsync(cancellationToken);
-            var diagnostics = new List<TomixDiagnostic>();
+            var diagnostics = new List<TomixDiagnostic>(project.Attribution);
             var evaluated = snapshot;
             if (vpaxStats is not null)
             {
@@ -167,7 +179,7 @@ public sealed class BpaRunHandler
             IReadOnlyList<string> loadDiagnostics;
             try
             {
-                (resolved, loadDiagnostics) = await LoadRulesAsync(request, snapshot, BpaEngine.HasVertipaqStats(evaluated), ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
+                (resolved, loadDiagnostics) = await LoadRulesAsync(request, project, snapshot, BpaEngine.HasVertipaqStats(evaluated), ruleBaseDirectory, cancellationToken).ConfigureAwait(false);
             }
             // InvalidOperationException: a corrupt config file, which carries the bpa.rules key.
             catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
@@ -179,7 +191,7 @@ public sealed class BpaRunHandler
             }
 
             var rules = resolved.Rules;
-            var userDisabled = _userRules.GetDisabled().ToList();
+            List<string> userDisabled = [.. _userRules.GetDisabled(), .. project.DisabledRuleIds];
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var engine = new BpaEngine();
@@ -343,6 +355,7 @@ public sealed class BpaRunHandler
 
     private async Task<(BpaResolvedRules Resolved, IReadOnlyList<string> Diagnostics)> LoadRulesAsync(
         BpaRunRequest request,
+        BpaProjectSettings project,
         ModelSnapshot snapshot,
         bool hasVertipaqStats,
         string? modelRuleBaseDirectory,
@@ -372,7 +385,7 @@ public sealed class BpaRunHandler
                 collections.Add(new BpaRuleCollection(BpaRuleSourceKind.User, userRulesPath, userRules, BpaRuleOrigin.UserFile));
         }
 
-        foreach (var entry in BpaRuleSources.Resolve(_configDirectory, _environment, request.RulesFiles))
+        foreach (var entry in BpaRuleSources.Resolve(_configDirectory, _environment, request.RulesFiles, projectRules: project.Rules))
             collections.Add(new BpaRuleCollection(
                 BpaRuleSourceKind.User, entry.Location,
                 await BpaRuleSources.LoadEntryAsync(entry, _httpClient, cancellationToken).ConfigureAwait(false),
