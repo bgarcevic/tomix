@@ -320,6 +320,11 @@ internal sealed class FormatCommand : ICommandModule
                 WriteFailureDetails(model.Results);
                 break;
 
+            // A single-expression check answers with its exit code alone; the formatted text is
+            // what a run without --check prints.
+            case InlineFormatResult or ObjectFormatResult when check:
+                break;
+
             case InlineFormatResult inline:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
                     HighlightLanguage(inline.Language), inline.Formatted));

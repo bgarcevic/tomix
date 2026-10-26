@@ -70,6 +70,18 @@ public sealed partial class FormatFlagBindingTests
     }
 
     [Theory]
+    [InlineData("-e", "SUM ( Sales[Amount] )")]
+    [InlineData("--path", "Sales/Total Sales")]
+    public void Check_SingleExpression_PrintsNothingToStdout(string option, string value)
+    {
+        var captured = ConsoleCapture.Invoke(
+            BuildRoot().Parse(["format", "-m", SampleTmdl, option, value, "--check"]),
+            captureAnsiConsole: true);
+
+        Assert.Equal("", StripAnsi(captured.Stdout).Trim());
+    }
+
+    [Theory]
     [InlineData("--save")]
     [InlineData("--stage")]
     public void Check_WithWriteOption_IsUsageError(string write)

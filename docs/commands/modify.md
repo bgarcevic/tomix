@@ -632,8 +632,9 @@ Error: 3 of 4 expressions are not formatted.
 
 It checks what the same command without `--check` would format, measures by default,
 and uses the same style (`--long`, `--function-spacing`, and the `format.*` config keys),
-so run it with the style your team formats with. With `-e`, a trailing newline on piped
-input does not count as a change.
+so run it with the style your team formats with. With `-e` or `--path` it prints nothing
+and answers with its exit code alone; run without `--check` to see the formatted expression.
+With `-e`, a trailing newline on piped input does not count as a change.
 
 A piped expression is read only when nothing else names what to format: with a
 model, `--path`, `--save`, `--save-to`, `--stage`, or `--revert`, `format` leaves
