@@ -55,6 +55,34 @@ public sealed partial class FormatFlagBindingTests
     }
 
     [Fact]
+    public void Check_ListsUnformattedMeasures_ExitsOneAndDoesNotStage()
+    {
+        var captured = ConsoleCapture.Invoke(
+            BuildRoot().Parse(["format", "-m", SampleTmdl, "--check"]),
+            captureAnsiConsole: true);
+
+        Assert.Equal(1, captured.ExitCode);
+        var output = StripAnsi(captured.Stdout);
+        Assert.Contains("Not formatted: 4", output);
+        Assert.Contains("  Sales/Total Sales", output);
+        Assert.DoesNotContain("Not saved", output);
+        Assert.Contains("4 of 4 expressions are not formatted.", StripAnsi(captured.Stderr));
+    }
+
+    [Theory]
+    [InlineData("--save")]
+    [InlineData("--stage")]
+    public void Check_WithWriteOption_IsUsageError(string write)
+    {
+        var captured = ConsoleCapture.Invoke(
+            BuildRoot().Parse(["format", "-m", SampleTmdl, "--check", write]),
+            captureAnsiConsole: true);
+
+        Assert.Equal(2, captured.ExitCode);
+        Assert.Contains("--check cannot be combined", StripAnsi(captured.Stderr));
+    }
+
+    [Fact]
     public void SweepFailure_TextOutput_PrintsErrorDetailToStderr()
     {
         // Issue #200: a uniform sweep failure printed only "Failed: 4" and hid the formatter's

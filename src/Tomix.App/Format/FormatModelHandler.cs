@@ -45,7 +45,7 @@ public sealed class FormatModelHandler
 
         if (!string.IsNullOrWhiteSpace(request.Path))
         {
-            return await MutationRunner.RunAsync(
+            var single = await MutationRunner.RunAsync(
                 _sessions, request.Model, options, "format", _stores,
                 async (mutator, session, _) =>
                 {
@@ -71,7 +71,7 @@ public sealed class FormatModelHandler
                         throw new ExpressionFormatFailedException(obj.Path, formatted);
 
                     var status = Status(obj.Expression!, formatted.Formatted);
-                    if (status == "formatted")
+                    if (status == "formatted" && !request.Check)
                     {
                         mutator.SetProperty(new ModelObjectSetRequest(
                             obj.Path,
@@ -79,7 +79,7 @@ public sealed class FormatModelHandler
                             obj.Kind));
                     }
 
-                    return (status == "formatted", $"format {obj.Path}",
+                    return (status == "formatted" && !request.Check, $"format {obj.Path}",
                         outcome => (IFormatModelResult)new ObjectFormatResult(
                             formatted.Success, obj.Path, FormatterLanguages.DisplayName(language),
                             status, ForDisplay(formatted.Formatted, language, request.Separators))
@@ -87,6 +87,10 @@ public sealed class FormatModelHandler
                 },
                 outcome => (IFormatModelResult)new ObjectFormatResult(false, "", "", "", "") { Outcome = outcome },
                 cancellationToken);
+
+            return request.Check && single.Data is ObjectFormatResult { FormatStatus: "formatted" }
+                ? FormatFailure.CheckFailed(single, unformatted: 1, total: 1)
+                : single;
         }
 
         var sweep = await MutationRunner.RunAsync(
@@ -135,7 +139,8 @@ public sealed class FormatModelHandler
                             objects.Count, formattedCount, unchangedCount, failedCount, results)
                         { Outcome = outcome });
 
-                foreach (var (obj, value) in successful)
+                // A check never writes, not even into a live session that would keep it unsaved.
+                foreach (var (obj, value) in successful.Where(_ => !request.Check))
                 {
                     mutator.SetProperty(new ModelObjectSetRequest(
                         obj.Path,
@@ -143,7 +148,7 @@ public sealed class FormatModelHandler
                         obj.Kind));
                 }
 
-                return (formattedCount > 0, $"format {formattedCount} expressions",
+                return (formattedCount > 0 && !request.Check, $"format {formattedCount} expressions",
                     outcome => (IFormatModelResult)new ModelFormatResult(
                         objects.Count, formattedCount, unchangedCount, failedCount,
                         results)
@@ -154,9 +159,14 @@ public sealed class FormatModelHandler
 
         // One failure applies nothing, so the run failed: keep the rows (they say where each
         // expression breaks) but exit 1 so CI does not pass over a broken expression.
-        return sweep.Data is ModelFormatResult { Failed: > 0 } model
-            ? FormatFailure.NothingApplied(sweep, model.Failed, model.Total)
-            : sweep;
+        // A check reports what --save would change, so it fails on the same rows a save writes.
+        return sweep.Data switch
+        {
+            ModelFormatResult { Failed: > 0 } model => FormatFailure.NothingApplied(sweep, model.Failed, model.Total),
+            ModelFormatResult { Formatted: > 0 } model when request.Check
+                => FormatFailure.CheckFailed(sweep, model.Formatted, model.Total),
+            _ => sweep,
+        };
     }
 
     private async Task<TomixResult<IFormatModelResult>> FormatInlineAsync(
@@ -181,12 +191,18 @@ public sealed class FormatModelHandler
                 formatted.SyntaxErrors);
         }
 
-        return TomixResult<IFormatModelResult>.Ok(
+        var result = TomixResult<IFormatModelResult>.Ok(
             new InlineFormatResult(
                 formatted.Success,
                 ForDisplay(formatted.Formatted, language, request.Separators),
                 FormatterLanguages.DisplayName(language)),
             exitCode: 0);
+
+        // Piped text usually ends with a newline the formatter does not emit; that is not a change.
+        return request.Check && Status(request.Expression!.TrimEnd(), formatted.Formatted.TrimEnd()) == "formatted"
+            ? FormatFailure.CheckFailed(result, unformatted: 1, total: 1,
+                hint: "Run without --check to print the formatted expression.")
+            : result;
     }
 
     private Task<ExpressionFormatResponse> FormatExpressionAsync(

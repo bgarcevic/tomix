@@ -90,6 +90,10 @@ internal sealed class FormatCommand : ICommandModule
         var stageOption = LifecycleOptions.Stage();
         var revertOption = LifecycleOptions.Revert();
         var noSyncOption = LifecycleOptions.NoSync();
+        var checkOption = new Option<bool>("--check")
+        {
+            Description = "Change nothing; exit 1 when an expression is not formatted (for CI)"
+        };
 
         var command = new Command("format", "Pretty-print DAX and M expressions")
         {
@@ -108,7 +112,8 @@ internal sealed class FormatCommand : ICommandModule
             overwriteOption,
             stageOption,
             revertOption,
-            noSyncOption
+            noSyncOption,
+            checkOption
         };
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -133,6 +138,17 @@ internal sealed class FormatCommand : ICommandModule
                          || !string.IsNullOrWhiteSpace(parseResult.GetValue(saveToOption))
                          || parseResult.GetValue(stageOption)
                          || parseResult.GetValue(revertOption);
+            var check = parseResult.GetValue(checkOption);
+            if (check && writes)
+            {
+                WriteUsageError(
+                    "TOMIX_USAGE",
+                    "--check cannot be combined with --save, --save-to, --stage or --revert.",
+                    "Use --check in CI to fail on unformatted expressions, and --save to format them.",
+                    GlobalOptions.ErrorFormatValue(parseResult, formatValue));
+                return 2;
+            }
+
             if (!TryResolveStyle(
                     parseResult.GetValue(separatorsOption),
                     parseResult.GetValue(functionSpacingOption),
@@ -179,7 +195,8 @@ internal sealed class FormatCommand : ICommandModule
                         Revert: parseResult.GetValue(revertOption),
                         NoSync: parseResult.GetValue(noSyncOption),
                         Separators: style.Separators,
-                        FunctionSpacing: style.FunctionSpacing),
+                        FunctionSpacing: style.FunctionSpacing,
+                        Check: check),
                     cancellationToken),
                 suppress: quiet || OutputFormats.IsJson(formatValue) || OutputFormats.IsCsv(formatValue));
 
@@ -187,7 +204,7 @@ internal sealed class FormatCommand : ICommandModule
             var exitCode = CommandOutput.Render(
                 result,
                 formatValue,
-                Render,
+                data => Render(data, check),
                 data => (object)data,
                 renderCsv: null,
                 errorFormat);
@@ -289,10 +306,20 @@ internal sealed class FormatCommand : ICommandModule
     private static ExpressionLanguage HighlightLanguage(string language)
         => FormatterLanguages.IsDax(language) ? ExpressionLanguage.Dax : ExpressionLanguage.M;
 
-    internal static void Render(IFormatModelResult result)
+    internal static void Render(IFormatModelResult result, bool check = false)
     {
         switch (result)
         {
+            // A check changed nothing, so it names what --save would format instead of counting it.
+            case ModelFormatResult model when check:
+                AnsiConsole.MarkupLine(Styling.Success($"Already formatted: {model.Unchanged}"));
+                AnsiConsole.MarkupLine(Styling.Warning($"Not formatted: {model.Formatted}"));
+                foreach (var row in model.Results.Where(r => r.Status == "formatted"))
+                    AnsiConsole.MarkupLine($"  {Markup.Escape($"{row.Table}/{row.Measure ?? row.Partition}")}");
+                AnsiConsole.MarkupLine(Styling.Error($"Failed: {model.Failed}"));
+                WriteFailureDetails(model.Results);
+                break;
+
             case InlineFormatResult inline:
                 AnsiConsole.MarkupLine(Styling.ExpressionMarkup(
                     HighlightLanguage(inline.Language), inline.Formatted));

@@ -90,6 +90,40 @@ public sealed class BpaRuleCoverageTests
     }
 
     [Fact]
+    public void DaxUnusedVariables_FlagsMeasuresColumnsAndItemsWithADeadVar()
+    {
+        var dead = "VAR unused = 1 VAR used = 2 RETURN used";
+        var snapshot = new ModelSnapshot("M", 1601,
+        [
+            Table("Sales",
+                Measure("Dead", "Sales", dead),
+                Measure("Clean", "Sales", "VAR used = 2 RETURN used"),
+                CalculatedColumn("Calc", "Sales", dead)),
+            CalculationGroupTable("Time", CalculationItem("YTD", "Time", dead)),
+        ]);
+
+        Assert.Equal(
+            ["Sales/Calc", "Sales/Dead", "Time/YTD"],
+            Flagged(BundledRule("DAX_UNUSED_VARIABLES"), snapshot));
+    }
+
+    [Fact]
+    public void DaxRedundantCalculate_SkipsCalculatedColumns()
+    {
+        // A calculated column has a row context, so its top-level CALCULATE transitions.
+        var redundant = "CALCULATE(SUM(Sales[Amount]))";
+        var snapshot = new ModelSnapshot("M", 1601,
+        [
+            Table("Sales",
+                Measure("Wrapped", "Sales", redundant),
+                Measure("Filtered", "Sales", "CALCULATE(SUM(Sales[Amount]), Sales[Qty] > 1)"),
+                CalculatedColumn("Calc", "Sales", redundant)),
+        ]);
+
+        Assert.Equal(["Sales/Wrapped"], Flagged(BundledRule("DAX_REDUNDANT_CALCULATE"), snapshot));
+    }
+
+    [Fact]
     public void UnnecessaryColumns_FlagsHiddenUnreferenced_ButNotHierarchyColumns()
     {
         var orphan = Column("orphan", "T", hidden: true);

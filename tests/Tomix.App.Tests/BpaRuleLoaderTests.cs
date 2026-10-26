@@ -23,7 +23,7 @@ public sealed class BpaRuleLoaderTests
 
         // Exactly the curated IDs must resolve against the catalog — a drop below 24 means a
         // curated ID drifted from the bundled rule IDs.
-        Assert.Equal(24, standard.Count);
+        Assert.Equal(25, standard.Count);
         Assert.True(standard.Count < catalog.Count);
         Assert.Contains(standard, r => r.Id == "HIDE_FOREIGN_KEYS");
     }
