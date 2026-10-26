@@ -7,6 +7,10 @@ namespace Tomix.App.Test;
 /// <param name="Parameters">Query parameters applied to every test, referenced as <c>@name</c> in DAX.</param>
 /// <param name="MaxRows">Per-query row cap; a query exceeding it is a per-test error, not a truncated comparison.</param>
 /// <param name="Compare">Run-wide comparison defaults; a test's own <c>tx:</c> directives override them.</param>
+/// <param name="BaselineServer">Baseline mode: run every test on this model too and compare with its result
+/// instead of a snapshot. Defaults to the primary target's server when only <paramref name="BaselineDatabase"/> is given.</param>
+/// <param name="BaselineDatabase">The baseline model's database; defaults to the primary target's database.</param>
+/// <param name="BaselineProfile">The saved profile the baseline target came from, reported in the result.</param>
 public sealed record TestRunRequest(
     string? Model,
     string? Server,
@@ -18,4 +22,12 @@ public sealed record TestRunRequest(
     IReadOnlyDictionary<string, string>? Parameters = null,
     int MaxRows = 10000,
     TestCompareOptions? Compare = null,
-    bool UpdateMissing = false);
+    bool UpdateMissing = false,
+    string? BaselineServer = null,
+    string? BaselineDatabase = null,
+    string? BaselineProfile = null)
+{
+    /// <summary>True when tests compare with a second live model instead of their snapshots.</summary>
+    public bool HasBaseline
+        => !string.IsNullOrWhiteSpace(BaselineServer) || !string.IsNullOrWhiteSpace(BaselineDatabase);
+}

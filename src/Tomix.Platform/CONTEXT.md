@@ -6,6 +6,7 @@ Dependency-free platform primitives shared by outer projects.
 
 - Resolve well-known local tomix paths from process and operating-system state.
 - Provide crash-safe atomic file replacement for filesystem-backed stores.
+- Find project files by walking up from a folder to the repository root (`ProjectFiles`).
 - Provide dual-stack networking (`Networking/`): the Happy Eyeballs connector behind every
   `HttpClient` tx builds (`DualStackHttp`), so a network with unroutable IPv6 falls back to IPv4.
 

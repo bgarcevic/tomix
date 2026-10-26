@@ -14,7 +14,7 @@ public sealed class TestCommandParseTests
     {
         IReadOnlyList<IModelProvider> providers = [];
         var services = TestServices.Create();
-        var root = TestRoot.With(new TestCommand(providers, services.LoadCurrentSession).Build());
+        var root = TestRoot.With(new TestCommand(providers, services.State, services.LoadCurrentSession).Build());
         return root.Parse(args);
     }
 
@@ -89,5 +89,35 @@ public sealed class TestCommandParseTests
         var result = Parse("test", "--update", "--update-missing");
 
         Assert.Contains(result.Errors, e => e.Message.Contains("--update and --update-missing cannot be combined"));
+    }
+
+    [Fact]
+    public void Test_BaselineOptionsBind()
+    {
+        var result = Parse("test", "--baseline", "prod", "--baseline-database", "Sales");
+
+        Assert.Empty(result.Errors);
+        Assert.Equal("prod", result.GetValue<string?>("--baseline"));
+        Assert.Equal("Sales", result.GetValue<string?>("--baseline-database"));
+    }
+
+    [Theory]
+    [InlineData("--update", "--baseline", "prod")]
+    [InlineData("--update-missing", "--baseline", "prod")]
+    [InlineData("--update", "--baseline-server", "Prod")]
+    [InlineData("--update-missing", "--baseline-database", "Sales")]
+    public void Test_UpdateWithBaseline_FailsAtParseTime(string update, string baselineOption, string value)
+    {
+        var result = Parse("test", update, baselineOption, value);
+
+        Assert.Contains(result.Errors, e => e.Message.Contains("cannot be combined with a baseline model"));
+    }
+
+    [Fact]
+    public void Test_BaselineWithBaselineServer_FailsAtParseTime()
+    {
+        var result = Parse("test", "--baseline", "prod", "--baseline-server", "Prod");
+
+        Assert.Contains(result.Errors, e => e.Message.Contains("--baseline and --baseline-server cannot be combined"));
     }
 }

@@ -82,6 +82,16 @@ deploy on the team's rules. The gate honors `bpa rules ignore --user`: it skips 
 ignore locally when that rule is among the gate's loaded rules. `bpa run` also loads your
 config-dir `bpa-rules.json` and the model's rules, so the commands may report different findings.
 
+To set the gate once per repository instead of in every pipeline, commit a `tomix.json`
+next to the model. It can turn the gate off (`enabled`), set the threshold (`failOn`),
+skip rules (`disabledRuleIds`), and add rule files (`rules`). The command line wins over the
+file, and the file nearest the model wins over ones above it (see
+[Project config](validate.md#project-config-tomixjson)):
+
+```json
+{ "bpa": { "failOn": "warning", "disabledRuleIds": ["AVOID_FLOATING_POINT_DATA_TYPES"] } }
+```
+
 Without `-s/--server`, the target comes from the active connection: a remote connection
 deploys to itself, and a local connection with a workspace-mode mirror deploys to the
 mirror.

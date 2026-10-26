@@ -12,6 +12,14 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx test --baseline <profile>` (or `--baseline-server`/`--baseline-database`) compares two
+  live models instead of snapshots (#470): each `.dax` test runs on the tested model and the
+  baseline at once, and the baseline's result takes the place of `.expected.json`. Snapshots are
+  neither read nor written, and `--update`/`--update-missing` are rejected with a baseline.
+  `--tolerance`, `--ignore-row-order` and `tx:` directives apply as usual. A failure's difference
+  table is headed Baseline/Actual, an error names the side that failed, and the JSON result gains
+  `baseline` and a per-test `side`. A profile without a server fails with
+  `TOMIX_TEST_BASELINE_NO_SERVER`.
 - `tx format --check` changes nothing and exits 1 with `TOMIX_FORMAT_CHECK_FAILED` when an
   expression is not formatted the way `tx format` would format it, so DAX formatting can gate a PR.
 - BPA rules `DAX_UNUSED_VARIABLES` (in the `standard` ruleset) and `DAX_REDUNDANT_CALCULATE`, backed by
@@ -23,6 +31,17 @@ and the API surface that major versions protect.
 ## [0.13.0] - 2026-10-19
 
 ### Added
+
+- Project BPA config in a committed `tomix.json` (#236): `bpa.enabled`, `bpa.failOn`,
+  `bpa.disabledRuleIds` and `bpa.rules` tune `tx bpa run`, the `tx deploy` gate and
+  `tx save --fix-bpa` once per repository. tx reads every `tomix.json` from the model's folder up
+  to the repository root; the more local a setting, the more it wins: the command line, then the
+  nearest file, then files above it, then the file `TOMIX_PROJECT_CONFIG` names, then your own
+  settings. Output names the files used (`TOMIX_PROJECT_CONFIG_LOADED`), a deploy with the gate
+  turned off by a file warns (`TOMIX_BPA_GATE_DISABLED`), and an invalid file fails with
+  `TOMIX_PROJECT_CONFIG_INVALID`. Rule sources gain the `project` origin. `tx bpa rules list`
+  and `show` list the project's rules (source `tomix.json`) and show its `disabledRuleIds` as
+  disabled.
 
 - `tx deploy` checks the deployed model after it lands: it re-reads the target and reports every
   object the server holds in an error, incomplete, or unprocessed state, in the text output and

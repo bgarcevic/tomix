@@ -5,7 +5,7 @@ namespace Tomix.App.Bpa;
 /// <summary>
 /// The rule IDs a <c>bpa rules ignore</c> target can name: the whole bundled catalog, the user's
 /// config-dir <c>bpa-rules.json</c>, the files <c>bpa.rules</c> and <c>TOMIX_BPA_RULES</c> name,
-/// the selected rules file, and, with a model, its embedded and local external rules. Guards against a typo silently disabling or ignoring nothing.
+/// the project's <c>tomix.json</c> rules, the selected rules file, and, with a model, its embedded and local external rules. Guards against a typo silently disabling or ignoring nothing.
 /// </summary>
 public sealed class BpaKnownRules
 {
@@ -54,6 +54,19 @@ public sealed class BpaKnownRules
                 // A corrupt config file: the configured sources are unknown, so stay permissive.
                 complete = false;
             }
+        }
+
+        // The project's tomix.json rules (#236), found from the working directory. A broken file
+        // leaves the check permissive, as an unreadable source does.
+        try
+        {
+            foreach (var entry in BpaProjectConfig.Resolve(
+                         Environment.CurrentDirectory, environment ?? Environment.GetEnvironmentVariable).Rules)
+                complete &= AddFileRules(entry.Location, ids);
+        }
+        catch (BpaProjectConfigException)
+        {
+            complete = false;
         }
 
         // An explicit file may be missing or remote. Keep validation permissive when its IDs

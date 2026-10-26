@@ -80,9 +80,24 @@ public sealed class BpaRulesListHandler
     {
         IReadOnlyList<BpaRuleCollection> rules;
         var sourceDiagnostics = new List<string>();
+
+        // #236: the project's tomix.json, found from the model's folder (the working directory
+        // without one). A broken file is reported, not fatal, like any other unloadable source.
+        var project = BpaProjectSettings.None;
         try
         {
-            rules = await LoadRulesAsync(request, sourceDiagnostics, cancellationToken).ConfigureAwait(false);
+            project = request.Model is null
+                ? BpaProjectConfig.Resolve(Environment.CurrentDirectory, _environment)
+                : BpaProjectConfig.Resolve(request.Model, _environment);
+        }
+        catch (BpaProjectConfigException ex)
+        {
+            sourceDiagnostics.Add(ex.Message);
+        }
+
+        try
+        {
+            rules = await LoadRulesAsync(request, project, sourceDiagnostics, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException)
         {
@@ -99,6 +114,7 @@ public sealed class BpaRulesListHandler
             // alongside the ruleset. Remote external files are never fetched here; the loader
             // reports them as skipped.
             var disabled = new HashSet<string>(_userRules.GetDisabled(), StringComparer.OrdinalIgnoreCase);
+            disabled.UnionWith(project.DisabledRuleIds);
             var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var diagnostics = new List<string>(sourceDiagnostics);
             var loaded = new List<BpaRuleCollection>(rules);
@@ -227,11 +243,12 @@ public sealed class BpaRulesListHandler
 
     /// <summary>
     /// The listed sources in precedence order, as <c>bpa run</c> loads them: each preset, the
-    /// user file, <c>bpa.rules</c>, <c>TOMIX_BPA_RULES</c>, then the selected <c>--rules-file</c>
-    /// (last, so the file being authored shows as it is).
+    /// user file, <c>bpa.rules</c>, <c>TOMIX_BPA_RULES</c>, the project's <c>tomix.json</c> rules,
+    /// then the selected <c>--rules-file</c> (last, so the file being authored shows as it is).
     /// </summary>
     private async Task<IReadOnlyList<BpaRuleCollection>> LoadRulesAsync(
         BpaRulesListRequest request,
+        BpaProjectSettings project,
         List<string> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -277,6 +294,22 @@ public sealed class BpaRulesListHandler
                 {
                     diagnostics.Add(ex.Message);
                 }
+            }
+        }
+
+        foreach (var entry in project.Rules)
+        {
+            try
+            {
+                rules.Add(new BpaRuleCollection(
+                    BpaRuleSourceKind.User,
+                    BpaProjectConfig.FileName,
+                    await BpaRuleSources.LoadEntryAsync(entry, httpClient, cancellationToken).ConfigureAwait(false),
+                    entry.Origin));
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
+            {
+                diagnostics.Add(ex.Message);
             }
         }
 
