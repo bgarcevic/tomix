@@ -56,7 +56,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
         ["refresh"] = "Runs an automatic refresh unless --refresh-type says otherwise.",
         ["serve"] = "Speaks the tomix session protocol (JSON-RPC 2.0, Content-Length framing) on stdin and stdout; see docs/protocol.md. Without a model, the client opens one with session.open. The log goes to stderr unless --log names a file. When tx ui holds the model, it joins that session instead of opening another.",
         ["ui"] = "Prints the page's URL, with the session token, on stdout; agents join the same session through tx serve. Stops on Ctrl+C (asking again when changes are unsaved), or --grace seconds after the last client leaves, unless changes are unsaved.",
-        ["test"] = "--update records snapshots; --trx and --ci produce pipeline output.",
+        ["test"] = "--update records snapshots; --baseline compares two live models; --trx and --ci produce pipeline output.",
         ["skills"] = "Writes the skill to .claude/skills/tomix (Claude Code) and .agents/skills/tomix (Codex and other Agent Skills harnesses). Copies you edited are left alone unless you pass --force.",
         ["validate"] = "--ci prints CI log groups; --trx writes a test-results file.",
     };
@@ -104,6 +104,7 @@ internal sealed class SpectreHelpAction : SynchronousCommandLineAction
             "tx test ./tests -s MyWorkspace -d MyModel",
             "tx test ./tests --update",
             "tx test ./tests --filter \"totals/*\" --trx results.trx --ci vsts",
+            "tx test ./tests -s Dev -d Sales --baseline prod",
         ],
         ["add"] = [
             "tx add Sales/Revenue -t Measure -e \"SUM(Sales[Amount])\"",

@@ -237,7 +237,8 @@ Emitted by `test` (DAX regression tests against a live model).
 |------|------|---------|
 | `TOMIX_TEST_PATH_NOT_FOUND` | 2 | The path argument does not exist. |
 | `TOMIX_TEST_NONE_FOUND` | 2 | No `.dax` test files were found under the path (or none match `--filter`). |
-| `TOMIX_TEST_CONFLICTING_OPTIONS` | 2 | `--update` and `--update-missing` were both passed. |
+| `TOMIX_TEST_CONFLICTING_OPTIONS` | 2 | `--update` and `--update-missing` were both passed, or a baseline (`--baseline`, `--baseline-server`, `--baseline-database`) was combined with either. |
+| `TOMIX_TEST_BASELINE_NO_SERVER` | 2 | `--baseline` named a profile without a server; a baseline must be a live model. |
 | `TOMIX_TEST_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_TEST_NO_REMOTE_TARGET` | 2 | `test` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
 | `TOMIX_TEST_UNSUPPORTED` | 2 | The provider session does not support queries (e.g. a local TMDL/BIM model). |
@@ -245,7 +246,7 @@ Emitted by `test` (DAX regression tests against a live model).
 
 Test failures themselves carry **no** diagnostic code: a run whose tests fail (or are missing
 their snapshot) renders the full report and exits `1`, mirroring `bpa run`. `test` also reuses
-`TOMIX_NO_PROVIDER` and `TOMIX_AUTH_REQUIRED`.
+`TOMIX_NO_PROVIDER`, `TOMIX_AUTH_REQUIRED` and, for `--baseline`, `TOMIX_PROFILE_NOT_FOUND`.
 
 ## Incremental Refresh Codes (`TOMIX_REFRESH_POLICY_*`)
 

@@ -518,6 +518,9 @@ single test file or a directory searched recursively for `.dax` files
 | `--max-rows <n>` | Per-query row cap; a query exceeding it fails as an error (default: `10000`). |
 | `--tolerance <value>` | Accept numeric cells within this difference: absolute (`0.01`) or relative to the larger value (`0.1%`). Applies to every test unless it sets its own. |
 | `--ignore-row-order` | Sort rows by their values before comparing, so queries need no `ORDER BY`. |
+| `--baseline <profile>` | Compare with the live model of a saved profile (`tx profile set`) instead of snapshots. See [Comparing two models](#comparing-two-models). |
+| `--baseline-server <server>` | Compare with a live model on this server or workspace instead of snapshots (default: the tested model's server). Cannot be combined with `--baseline`. |
+| `--baseline-database <model>` | The baseline model's database (default: the profile's, or the tested model's). |
 | `--ci <github\|vsts>` | Print CI log-group commands to stderr so failures annotate the PR. |
 | `--trx <path>` | Write results to a `.trx` test-run file. |
 
@@ -607,12 +610,46 @@ Directives are `tolerance=<value>` (`tolerance=0` compares exactly) and
 statement are read. An unknown directive or a bad value fails the test as
 `ERR`, so a typo never silently compares exactly.
 
+### Comparing two models
+
+Snapshots compare a model with its own past. To prove that two models return
+the same results *now* — a refactor in Dev against Prod, a migration (AAS to
+Fabric, Import to Direct Lake), a deploy candidate against production — name
+a baseline model:
+
+```sh
+tx test ./tests -s Dev -d Sales --baseline prod
+tx test ./tests -s Dev -d Sales --baseline-server Prod --baseline-database Sales
+tx test ./tests -s Dev -d Sales --baseline-database Sales_v1   # same workspace
+```
+
+`--baseline` names a saved profile; `--baseline-server` and
+`--baseline-database` give an ad-hoc target, and each defaults to the tested
+model's server and database. `--baseline-database` also overrides the
+profile's database. The tested model resolves as usual (`-s`/`-d` or the
+active session). Both must be live models.
+
+Each `.dax` file runs on both models at once, and the baseline's result takes
+the place of `.expected.json`: snapshots are neither read nor written, so
+there is no `MISS` and no orphan check, and `--update`/`--update-missing`
+are rejected (exit `2`). Comparison is unchanged — `--tolerance`,
+`--ignore-row-order` and `tx:` directives all apply. A `FAIL` shows the
+difference table headed Baseline/Actual. An `ERROR` means a query failed on
+either side; its message starts with `Actual model:` or `Baseline model:`.
+
+In JSON, the result gains a `baseline` object (`server`, `database`,
+`profile`), and an error test gains `side`: `Actual`, `Baseline` or `Both`.
+Both are `null` in a snapshot run. The difference fields keep their names, so
+in a baseline run `differences[].expected` holds the baseline model's value
+and `actual` the tested model's.
+
 ```sh
 tx test ./tests
 tx test ./tests/totals/sales.dax --update
 tx test ./tests --update-missing
 tx test ./tests --filter "totals/*" --trx results.trx --ci vsts
 tx test ./tests --tolerance 0.01% --ignore-row-order
+tx test ./tests -s Dev -d Sales --baseline prod
 ```
 
 ## `vertipaq` — storage statistics
