@@ -19,6 +19,9 @@ internal static class TestRunRenderer
             // Banner is commentary: stderr keeps `tx test > file` down to the outcomes.
             var err = StdErr.Console();
             err.MarkupLine(Styling.Title($"DAX tests · {result.Database}"));
+            if (result.Baseline is { } baseline)
+                err.MarkupLine(Styling.Muted($"compared with baseline {baseline.Database}"
+                    + (baseline.Profile is null ? $" on {baseline.Server}" : $" (profile {baseline.Profile})")));
             err.MarkupLine(Styling.Muted($"{result.Tests.Count} test(s) from {result.Path}"));
             err.WriteLine();
         }
@@ -36,10 +39,11 @@ internal static class TestRunRenderer
                 Styling.Muted($"({test.DurationMs} ms)"));
 
             if ((!passing || test.Outcome == TestOutcome.Updated) && !string.IsNullOrEmpty(test.Message))
-                AnsiConsole.MarkupLine("        {0}", Styling.Muted(test.Message));
+                WriteMessage(test.Message);
 
             if (test.Differences is { Count: > 0 } differences)
-                RenderDifferences(differences, test.TotalDifferences, updated: test.Outcome == TestOutcome.Updated);
+                RenderDifferences(differences, test.TotalDifferences, updated: test.Outcome == TestOutcome.Updated,
+                    expectedHeader: result.Baseline is null ? "Expected" : "Baseline");
         }
 
         AnsiConsole.WriteLine();
@@ -56,12 +60,22 @@ internal static class TestRunRenderer
             StdErr.MarkupLine(Styling.Guidance("  Run  tx test --update-missing  to record missing snapshots."));
     }
 
-    // A re-recorded snapshot's differences run from the old snapshot to the new one.
-    private static void RenderDifferences(IReadOnlyList<TestDifference> differences, int total, bool updated)
+    // Server errors span several lines ("Technical Details: ..."), and a baseline error carries
+    // one per model; indent every line so the message stays under its test.
+    private static void WriteMessage(string message)
+    {
+        foreach (var line in message.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n'))
+            AnsiConsole.MarkupLine("        {0}", Styling.Muted(line));
+    }
+
+    // A re-recorded snapshot's differences run from the old snapshot to the new one; a
+    // baseline run's from the baseline model to the tested one.
+    private static void RenderDifferences(
+        IReadOnlyList<TestDifference> differences, int total, bool updated, string expectedHeader)
     {
         var table = updated
             ? Styling.NewTable("Kind", "Row", "Column", "Before", "After")
-            : Styling.NewTable("Kind", "Row", "Column", "Expected", "Actual");
+            : Styling.NewTable("Kind", "Row", "Column", expectedHeader, "Actual");
         foreach (var difference in differences)
             table.AddRow(
                 Styling.MarkupEscape(difference.Kind),
@@ -122,10 +136,10 @@ internal static class TestRunRenderer
                     TestOutcome.Error => TrxWriter.TrxOutcome.Error,
                     _ => TrxWriter.TrxOutcome.Passed
                 },
-                TrxMessage(test)))
+                TrxMessage(test, ExpectedLabel(result))))
             .ToList();
 
-    private static string? TrxMessage(TestCaseResult test)
+    private static string? TrxMessage(TestCaseResult test, string expectedLabel)
     {
         if (IsPassing(test.Outcome))
             return null;
@@ -135,7 +149,7 @@ internal static class TestRunRenderer
             lines.Add(test.Message);
 
         foreach (var difference in test.Differences ?? [])
-            lines.Add(DescribeDifference(difference));
+            lines.Add(DescribeDifference(difference, expectedLabel));
 
         return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
     }
@@ -147,7 +161,7 @@ internal static class TestRunRenderer
             .Select(test =>
             {
                 var summary = test.Differences is { Count: > 0 } differences
-                    ? $"{test.Message} First: {DescribeDifference(differences[0])}"
+                    ? $"{test.Message} First: {DescribeDifference(differences[0], ExpectedLabel(result))}"
                     : test.Message ?? test.Outcome.ToString();
                 return new CiAnnotation(IsError: true, $"tx test {test.Name}: {summary}");
             })
@@ -156,7 +170,10 @@ internal static class TestRunRenderer
         CiAnnotations.Emit(ci, annotations, Console.Error);
     }
 
-    private static string DescribeDifference(TestDifference difference)
+    // A baseline run compares with the baseline model, not with an expected snapshot.
+    private static string ExpectedLabel(TestRunResult result) => result.Baseline is null ? "expected" : "baseline";
+
+    private static string DescribeDifference(TestDifference difference, string expectedLabel)
     {
         var location = difference.Kind switch
         {
@@ -164,7 +181,7 @@ internal static class TestRunRenderer
             "column" => difference.Column is null ? "columns" : $"column {difference.Column}",
             _ => "row count"
         };
-        return $"{location}: expected {Describe(difference.Expected)}, actual {Describe(difference.Actual)}";
+        return $"{location}: {expectedLabel} {Describe(difference.Expected)}, actual {Describe(difference.Actual)}";
     }
 
     private static string Describe(string? value)

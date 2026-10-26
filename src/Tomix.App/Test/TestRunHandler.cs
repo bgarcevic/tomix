@@ -14,7 +14,9 @@ namespace Tomix.App.Test;
 /// live model (same target resolution as <see cref="QueryModelHandler"/>), and either compares
 /// the rowset to the paired <c>.expected.json</c> snapshot or re-records it (<c>--update</c>, or
 /// <c>--update-missing</c> for tests without one). A re-recorded snapshot reports what it changed,
-/// and snapshots whose test is gone are reported as orphans.
+/// and snapshots whose test is gone are reported as orphans. With a baseline model
+/// (<c>--baseline</c>) each query runs on both models at once and the baseline's result takes
+/// the snapshot's place: no snapshot is read or written and no orphans are reported.
 /// Per-test problems are result data (like BPA violations) so the run continues and the full
 /// report renders; only authentication failures abort. Any non-passing test yields exit code 1
 /// via the Ok-with-exit-code pattern from <see cref="Bpa.BpaRunHandler"/>.
@@ -41,6 +43,13 @@ public sealed class TestRunHandler
                 exitCode: 2,
                 hint: "--update-missing records only tests without a snapshot; --update re-records every snapshot.");
 
+        if (request.HasBaseline && (request.Update || request.UpdateMissing))
+            return TomixResult<TestRunResult>.Fail(
+                "TOMIX_TEST_CONFLICTING_OPTIONS",
+                "--update and --update-missing cannot be combined with a baseline model; a baseline run reads and writes no snapshots.",
+                exitCode: 2,
+                hint: "Drop --baseline to record snapshots, or drop --update/--update-missing to compare with the baseline.");
+
         if (!File.Exists(request.Path) && !Directory.Exists(request.Path))
             return TomixResult<TestRunResult>.Fail(
                 "TOMIX_TEST_PATH_NOT_FOUND",
@@ -58,11 +67,16 @@ public sealed class TestRunHandler
                     ? $"No .dax test files found under: {request.Path}"
                     : $"No .dax test files match --filter {request.Filter} under: {request.Path}",
                 exitCode: 2,
-                hint: "Each test is a .dax file with a sibling .expected.json snapshot (record with 'tx test --update-missing').");
+                hint: request.HasBaseline
+                    ? "Each test is a .dax file; with a baseline model it needs no .expected.json snapshot."
+                    : "Each test is a .dax file with a sibling .expected.json snapshot (record with 'tx test --update-missing').");
 
-        var orphans = TestDiscovery.FindOrphans(request.Path)
-            .Where(orphan => TestDiscovery.MatchesFilter(orphan.Name, request.Filter))
-            .ToList();
+        // A baseline run ignores snapshots, so a snapshot without a test is no concern of it.
+        var orphans = request.HasBaseline
+            ? []
+            : TestDiscovery.FindOrphans(request.Path)
+                .Where(orphan => TestDiscovery.MatchesFilter(orphan.Name, request.Filter))
+                .ToList();
 
         var target = QueryModelHandler.ResolveTarget(
             request.Model, request.Database, request.Server, new ActiveModelResolver(_resolveSession));
@@ -80,17 +94,47 @@ public sealed class TestRunHandler
                 $"No provider can open remote endpoint: {target.Value}",
                 exitCode: 2);
 
+        ModelReference? baselineTarget = null;
+        IModelProvider? baselineProvider = null;
+        if (request.HasBaseline)
+        {
+            baselineTarget = ResolveBaselineTarget(request, target);
+            baselineProvider = _providers.ResolveSingleProvider(baselineTarget);
+            if (!baselineTarget.IsRemote || baselineProvider is null)
+                return TomixResult<TestRunResult>.Fail(
+                    "TOMIX_NO_PROVIDER",
+                    $"No provider can open the baseline endpoint: {baselineTarget.Value}",
+                    exitCode: 2,
+                    hint: "Name the baseline with --baseline <profile> or --baseline-server <workspace> --baseline-database <model>.");
+        }
+
         try
         {
             await using var connection = await QueryConnection.OpenAsync(provider, target, cancellationToken).ConfigureAwait(false);
             if (connection is null)
-                return TomixResult<TestRunResult>.Fail(
-                    "TOMIX_TEST_UNSUPPORTED",
-                    $"Provider session does not support queries: {target.Value}",
-                    exitCode: 2,
-                    hint: "Tests run only on live models connected via XMLA (-s <workspace> -d <model>).");
+                return Unsupported(target, side: "");
 
-            return await RunTestsAsync(request, target, connection.Queries, tests, orphans, cancellationToken).ConfigureAwait(false);
+            if (baselineTarget is null)
+                return await RunTestsAsync(request, target, connection.Queries, baseline: null, tests, orphans, cancellationToken).ConfigureAwait(false);
+
+            QueryConnection? baselineConnection;
+            try
+            {
+                baselineConnection = await QueryConnection.OpenAsync(baselineProvider!, baselineTarget, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ModelConnectionException ex)
+            {
+                return OnBaseline(ProviderConnectionGuard.ConnectionFailure<TestRunResult>(baselineTarget, ex));
+            }
+
+            await using (baselineConnection)
+            {
+                if (baselineConnection is null)
+                    return Unsupported(baselineTarget, side: "of the baseline model ");
+
+                return await RunTestsAsync(
+                    request, target, connection.Queries, (baselineConnection.Queries, baselineTarget), tests, orphans, cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (ModelConnectionException ex)
         {
@@ -106,10 +150,35 @@ public sealed class TestRunHandler
         }
     }
 
+    // The baseline defaults to the tested model's server and database, so --baseline-database
+    // alone compares two models in one workspace.
+    private static ModelReference ResolveBaselineTarget(TestRunRequest request, ModelReference target)
+        => new(
+            string.IsNullOrWhiteSpace(request.BaselineServer)
+                ? target.Value
+                : ModelReference.NormalizeEndpoint(request.BaselineServer),
+            string.IsNullOrWhiteSpace(request.BaselineDatabase) ? target.Database : request.BaselineDatabase);
+
+    private static TomixResult<TestRunResult> Unsupported(ModelReference target, string side)
+        => TomixResult<TestRunResult>.Fail(
+            "TOMIX_TEST_UNSUPPORTED",
+            $"Provider session {side}does not support queries: {target.Value}",
+            exitCode: 2,
+            hint: "Tests run only on live models connected via XMLA (-s <workspace> -d <model>).");
+
+    // Names the baseline in a connection failure, which otherwise reads like one on the tested model.
+    private static TomixResult<TestRunResult> OnBaseline(TomixResult<TestRunResult> failure)
+    {
+        var diagnostic = failure.Diagnostics[0];
+        return TomixResult<TestRunResult>.Fail(
+            diagnostic.Code, $"Baseline model: {diagnostic.Message}", failure.ExitCode, diagnostic.Hint);
+    }
+
     private static async Task<TomixResult<TestRunResult>> RunTestsAsync(
         TestRunRequest request,
         ModelReference target,
         IModelQuerySession querySession,
+        (IModelQuerySession Queries, ModelReference Target)? baseline,
         IReadOnlyList<DiscoveredTest> tests,
         IReadOnlyList<OrphanedSnapshot> orphans,
         CancellationToken cancellationToken)
@@ -119,6 +188,8 @@ public sealed class TestRunHandler
         var results = new List<TestCaseResult>(tests.Count);
         string? server = null;
         string? database = null;
+        string? baselineServer = null;
+        string? baselineDatabase = null;
 
         foreach (var test in tests)
         {
@@ -151,32 +222,38 @@ public sealed class TestRunHandler
                 continue;
             }
 
-            ModelQueryResult actual;
-            try
-            {
-                actual = await querySession.ExecuteQueryAsync(
-                    new ModelQueryRequest(query, request.Parameters, maxRows),
-                    traceWriter: null,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException and not AuthenticationRequiredException)
-            {
-                var message = ex is InvalidOperationException ? ex.Message : ex.InnerException?.Message ?? ex.Message;
-                results.Add(Case(test, TestOutcome.Error, watch, $"Query failed: {message}"));
-                continue;
-            }
-
-            server ??= actual.Server;
-            database ??= actual.Database;
-
-            if (actual.Truncated)
-            {
-                results.Add(Case(test, TestOutcome.Error, watch,
-                    $"Result exceeded --max-rows ({maxRows}). Regression queries should return small, stable rowsets."));
-                continue;
-            }
-
+            var queryRequest = new ModelQueryRequest(query, request.Parameters, maxRows);
             var queryHash = TestSnapshotFile.ComputeQueryHash(query);
+
+            if (baseline is { } other)
+            {
+                // Both sides at once; the loop still finishes one test before the next, so the
+                // report order is the discovery order.
+                var actualRun = ExecuteAsync(querySession, queryRequest, cancellationToken);
+                var baselineRun = ExecuteAsync(other.Queries, queryRequest, cancellationToken);
+                await Task.WhenAll(actualRun, baselineRun).ConfigureAwait(false);
+                var (actualResult, actualError) = actualRun.Result;
+                var (baselineResult, baselineError) = baselineRun.Result;
+
+                server ??= actualResult?.Server;
+                database ??= actualResult?.Database;
+                baselineServer ??= baselineResult?.Server;
+                baselineDatabase ??= baselineResult?.Database;
+
+                results.Add(CompareBaseline(test, actualResult, actualError, baselineResult, baselineError, queryHash, compare, watch));
+                continue;
+            }
+
+            var (result, error) = await ExecuteAsync(querySession, queryRequest, cancellationToken).ConfigureAwait(false);
+            server ??= result?.Server;
+            database ??= result?.Database;
+            if (error is not null)
+            {
+                results.Add(Case(test, TestOutcome.Error, watch, error));
+                continue;
+            }
+
+            var actual = result!;
             if (request.Update || (request.UpdateMissing && !File.Exists(test.ExpectedPath)))
             {
                 results.Add(UpdateSnapshot(test, actual, queryHash, watch, out var writeError));
@@ -203,10 +280,71 @@ public sealed class TestRunHandler
             Errored: results.Count(r => r.Outcome == TestOutcome.Error),
             Updated: results.Count(r => r.Outcome == TestOutcome.Updated),
             DurationMs: runWatch.ElapsedMilliseconds,
-            Orphans: orphans);
+            Orphans: orphans,
+            Baseline: baseline is { } compared
+                ? new TestBaselineTarget(
+                    baselineServer ?? compared.Target.Value,
+                    baselineDatabase ?? compared.Target.Database ?? "",
+                    request.BaselineProfile)
+                : null);
 
         var anyNotPassed = results.Any(r => r.Outcome is TestOutcome.Failed or TestOutcome.Missing or TestOutcome.Error);
         return TomixResult<TestRunResult>.Ok(runResult, exitCode: anyNotPassed ? 1 : 0);
+    }
+
+    /// <summary>
+    /// Runs one test query. A failed or truncated query comes back as an error message (with the
+    /// result, when there is one, for its server and database); cancellation and authentication
+    /// failures still throw and abort the run.
+    /// </summary>
+    private static async Task<(ModelQueryResult? Result, string? Error)> ExecuteAsync(
+        IModelQuerySession session,
+        ModelQueryRequest request,
+        CancellationToken cancellationToken)
+    {
+        ModelQueryResult result;
+        try
+        {
+            result = await session.ExecuteQueryAsync(request, traceWriter: null, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not AuthenticationRequiredException)
+        {
+            var message = ex is InvalidOperationException ? ex.Message : ex.InnerException?.Message ?? ex.Message;
+            return (null, $"Query failed: {message}");
+        }
+
+        return result.Truncated
+            ? (result, $"Result exceeded --max-rows ({request.MaxRows}). Regression queries should return small, stable rowsets.")
+            : (result, null);
+    }
+
+    /// <summary>
+    /// Baseline mode: the baseline model's result stands in for the snapshot, compared exactly as
+    /// one would be. An error on either side fails the test as an error naming that side.
+    /// </summary>
+    private static TestCaseResult CompareBaseline(
+        DiscoveredTest test,
+        ModelQueryResult? actual,
+        string? actualError,
+        ModelQueryResult? baseline,
+        string? baselineError,
+        string queryHash,
+        TestCompareOptions compare,
+        Stopwatch watch)
+    {
+        if (actualError is not null && baselineError is not null)
+            return Case(test, TestOutcome.Error, watch,
+                $"Actual model: {actualError}{Environment.NewLine}{Environment.NewLine}Baseline model: {baselineError}", side: TestSide.Both);
+        if (actualError is not null)
+            return Case(test, TestOutcome.Error, watch, $"Actual model: {actualError}", side: TestSide.Actual);
+        if (baselineError is not null)
+            return Case(test, TestOutcome.Error, watch, $"Baseline model: {baselineError}", side: TestSide.Baseline);
+
+        var comparison = TestResultComparer.Compare(TestSnapshotFile.FromResult(baseline!, queryHash), actual!, compare);
+        return comparison.Passed
+            ? Case(test, TestOutcome.Passed, watch)
+            : Case(test, TestOutcome.Failed, watch, $"{comparison.TotalDifferences} difference(s) from the baseline model.",
+                comparison.Differences, comparison.TotalDifferences);
     }
 
     private static TestCaseResult CompareSnapshot(
@@ -282,6 +420,7 @@ public sealed class TestRunHandler
         Stopwatch watch,
         string? message = null,
         IReadOnlyList<TestDifference>? differences = null,
-        int totalDifferences = 0)
-        => new(test.Name, test.DaxPath, outcome, watch.ElapsedMilliseconds, message, differences, totalDifferences);
+        int totalDifferences = 0,
+        TestSide? side = null)
+        => new(test.Name, test.DaxPath, outcome, watch.ElapsedMilliseconds, message, differences, totalDifferences, side);
 }

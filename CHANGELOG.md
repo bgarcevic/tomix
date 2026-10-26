@@ -10,6 +10,17 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Added
+
+- `tx test --baseline <profile>` (or `--baseline-server`/`--baseline-database`) compares two
+  live models instead of snapshots (#470): each `.dax` test runs on the tested model and the
+  baseline at once, and the baseline's result takes the place of `.expected.json`. Snapshots are
+  neither read nor written, and `--update`/`--update-missing` are rejected with a baseline.
+  `--tolerance`, `--ignore-row-order` and `tx:` directives apply as usual. A failure's difference
+  table is headed Baseline/Actual, an error names the side that failed, and the JSON result gains
+  `baseline` and a per-test `side`. A profile without a server fails with
+  `TOMIX_TEST_BASELINE_NO_SERVER`.
+
 ## [0.13.0] - 2026-10-19
 
 ### Added

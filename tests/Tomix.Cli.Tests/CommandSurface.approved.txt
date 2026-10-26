@@ -548,6 +548,9 @@ Run DAX regression tests against a live model
   opt --ignore-row-order  Sort rows by their values before comparing, so queries need no ORDER BY
   opt --ci <system>  Print CI log-group commands to stderr for the given system: vsts or github
   opt --trx <file>  Write results to a .trx test-run file at this path
+  opt --baseline <profile>  Compare with the live model of this saved profile instead of .expected.json snapshots
+  opt --baseline-server <workspace>  Compare with a live model on this server or workspace instead of snapshots (default: the tested model's server)
+  opt --baseline-database <name>  Database of the baseline model (default: the profile's, or the tested model's)
 
 # tx ui
 Share a model session with a browser and agents

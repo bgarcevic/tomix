@@ -293,7 +293,7 @@ internal static class Program
             new SkillsCommand(version),
             new SummaryCommand(providers, services.State),
             new StageCommand(providers, services.State, services.Staging, services.ConfigStore.ValidateOnSaveEnabled),
-            new TestCommand(providers, loadCurrentSession),
+            new TestCommand(providers, services.State, loadCurrentSession),
             new UiCommand(
                 providers,
                 services.State,

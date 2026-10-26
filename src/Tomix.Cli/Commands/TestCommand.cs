@@ -17,11 +17,14 @@ internal sealed class TestCommand : ICommandModule
 {
     private readonly IReadOnlyList<IModelProvider> _providers;
 
+    private readonly CliStateStore _state;
+
     private readonly Func<CliConnectionState?> _loadCurrentSession;
 
-    public TestCommand(IReadOnlyList<IModelProvider> providers, Func<CliConnectionState?> loadCurrentSession)
+    public TestCommand(IReadOnlyList<IModelProvider> providers, CliStateStore state, Func<CliConnectionState?> loadCurrentSession)
     {
         _providers = providers;
+        _state = state;
         _loadCurrentSession = loadCurrentSession;
     }
 
@@ -90,6 +93,21 @@ internal sealed class TestCommand : ICommandModule
             Description = "Write results to a .trx test-run file at this path"
         };
 
+        var baselineOption = new Option<string?>("--baseline")
+        {
+            Description = "Compare with the live model of this saved profile instead of .expected.json snapshots"
+        };
+
+        var baselineServerOption = new Option<string?>("--baseline-server")
+        {
+            Description = "Compare with a live model on this server or workspace instead of snapshots (default: the tested model's server)"
+        };
+
+        var baselineDatabaseOption = new Option<string?>("--baseline-database")
+        {
+            Description = "Database of the baseline model (default: the profile's, or the tested model's)"
+        };
+
         var command = new Command("test", "Run DAX regression tests against a live model")
         {
             pathArgument,
@@ -101,13 +119,26 @@ internal sealed class TestCommand : ICommandModule
             toleranceOption,
             ignoreRowOrderOption,
             ciOption,
-            trxOption
+            trxOption,
+            baselineOption,
+            baselineServerOption,
+            baselineDatabaseOption
         };
 
         command.Validators.Add(result =>
         {
             if (result.GetValue(updateOption) && result.GetValue(updateMissingOption))
                 result.AddError("--update and --update-missing cannot be combined; choose one.");
+
+            var hasBaseline = !string.IsNullOrWhiteSpace(result.GetValue(baselineOption))
+                || !string.IsNullOrWhiteSpace(result.GetValue(baselineServerOption))
+                || !string.IsNullOrWhiteSpace(result.GetValue(baselineDatabaseOption));
+            if (hasBaseline && (result.GetValue(updateOption) || result.GetValue(updateMissingOption)))
+                result.AddError("--update and --update-missing cannot be combined with a baseline model; a baseline run reads and writes no snapshots.");
+
+            if (!string.IsNullOrWhiteSpace(result.GetValue(baselineOption))
+                && !string.IsNullOrWhiteSpace(result.GetValue(baselineServerOption)))
+                result.AddError("--baseline and --baseline-server cannot be combined; the profile names the baseline server.");
         });
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -134,6 +165,21 @@ internal sealed class TestCommand : ICommandModule
                 return 2;
             }
 
+            // A profile is resolved once, before any model opens, like deploy --profile.
+            var baselineProfile = parseResult.GetValue(baselineOption);
+            var baselineServer = parseResult.GetValue(baselineServerOption);
+            var baselineDatabase = parseResult.GetValue(baselineDatabaseOption);
+            if (!string.IsNullOrWhiteSpace(baselineProfile))
+            {
+                var resolved = TestBaselineProfileResolver.Resolve(_state, baselineProfile);
+                if (!resolved.Success)
+                    return CommandOutput.Render(resolved, format, errorFormat, _ => { });
+
+                baselineServer = resolved.Data!.Server;
+                if (string.IsNullOrWhiteSpace(baselineDatabase))
+                    baselineDatabase = resolved.Data.Database;
+            }
+
             var request = new TestRunRequest(
                 Model: GlobalOptions.ModelValue(parseResult),
                 Server: parseResult.GetValue(GlobalOptions.Server),
@@ -145,7 +191,10 @@ internal sealed class TestCommand : ICommandModule
                 Parameters: parameters.Count > 0 ? parameters : null,
                 MaxRows: parseResult.GetValue(maxRowsOption) ?? 10000,
                 Compare: CompareOptions(parseResult.GetValue(toleranceOption), parseResult.GetValue(ignoreRowOrderOption)),
-                UpdateMissing: parseResult.GetValue(updateMissingOption));
+                UpdateMissing: parseResult.GetValue(updateMissingOption),
+                BaselineServer: baselineServer,
+                BaselineDatabase: baselineDatabase,
+                BaselineProfile: string.IsNullOrWhiteSpace(baselineProfile) ? null : baselineProfile);
 
             // Name the session-resolved target on stderr before the model opens; an explicit
             // model/--server target is the user's own and stays silent.
