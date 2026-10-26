@@ -85,6 +85,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
+| `TOMIX_BPA_GATE_DISABLED` | 0 | Warning, not a failure. A `tomix.json` set `"enabled": false`, so `deploy` ran without the BPA gate. The message names the file. |
 | `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` or `--bpa-fail-on` value (expected: error, warning). |
 | `TOMIX_BPA_RULE_EXISTS` | 2 | `bpa rules add` was given an ID the rules file (or the model's `BestPracticeAnalyzer` annotation) already has. Change it with `bpa rules set`, or remove it first. |
 | `TOMIX_BPA_RULE_FIELD_REQUIRED` | 2 | `bpa rules add` is missing `--name`, `--scope`, or `--expression` (the message names which); `bpa rules set` was given no field to change; or a name or expression was set to an empty value. |
@@ -305,6 +306,8 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 |------|------|---------|
 | `TOMIX_CONFIG_INVALID_VALUE` | 2 | `config set` called with an invalid value. |
 | `TOMIX_CONFIG_UNKNOWN_KEY` | 2 | `config set` called with an unknown configuration key. |
+| `TOMIX_PROJECT_CONFIG_INVALID` | 2 | A `tomix.json` (or the file `TOMIX_PROJECT_CONFIG` names) is missing, is not valid JSON, has an unknown key in its `bpa` section, or has an invalid value such as a `failOn` other than `error` or `warning`. The message names the file. |
+| `TOMIX_PROJECT_CONFIG_LOADED` | 0 | Info. `bpa run` or `deploy` applied settings from the `tomix.json` files the message names, nearest first. |
 
 ## Profile Codes
 
@@ -426,6 +429,7 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 | `TOMIX_AUTH_TENANT` | Azure AD tenant id for service principal auth. |
 | `TOMIX_SESSION` | Session id for persisting the active model connection. Unset, the session is scoped to the git repository/worktree root or the current folder. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
+| `TOMIX_PROJECT_CONFIG` | Path to a `tomix.json`-format file applied below the project's own `tomix.json` files. |
 | `TOMIX_NO_UPDATE_CHECK` | Set (any value) to disable the throttled update check and notice. |
 
 ## Migration: Unified Mutation Error Codes

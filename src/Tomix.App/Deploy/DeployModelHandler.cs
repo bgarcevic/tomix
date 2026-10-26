@@ -97,9 +97,21 @@ public sealed class DeployModelHandler
                 "--rollback-on-error cannot be combined with --xmla: a script is not deployed, so there is nothing to roll back.",
                 exitCode: 2));
 
+        // #236: the project's tomix.json tunes the gate; the command line still wins over it.
+        BpaProjectSettings project;
+        try
+        {
+            project = BpaProjectConfig.Resolve(request.Model, _environment);
+        }
+        catch (BpaProjectConfigException ex)
+        {
+            return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
+                BpaProjectConfig.InvalidCode, ex.Message, exitCode: 2));
+        }
+
         // Validated even when --skip-bpa makes the threshold unused, so a typo fails as a usage
-        // error instead of being silently ignored.
-        if (!BpaFailOn.TryParse(request.BpaFailOn, "--bpa-fail-on", out var bpaFailOn, out var bpaFailOnError))
+        // error instead of being silently ignored. The file's own value was validated on load.
+        if (!BpaFailOn.TryParse(request.BpaFailOn ?? project.FailOn, "--bpa-fail-on", out var bpaFailOn, out var bpaFailOnError))
             return DeployOperation.Failed(TomixResult<DeployModelResult>.Fail(
                 "TOMIX_BPA_INVALID_FAIL_ON",
                 bpaFailOnError!,
@@ -126,16 +138,20 @@ public sealed class DeployModelHandler
 
             // Non-fatal gate findings (rules the gate could not check) ride along on every
             // successful outcome, so a deploy never looks fully gated when it was not.
-            IReadOnlyList<TomixDiagnostic> warnings = [];
-            if (!request.SkipBpa)
+            IReadOnlyList<TomixDiagnostic> warnings = project.Attribution;
+            if (!request.SkipBpa && !project.Enabled)
             {
-                var (bpaResult, notChecked) = await RunBpaGate(session, request, bpaFailOn, cancellationToken);
+                warnings = [.. warnings, GateDisabledWarning(project.EnabledSetting!)];
+            }
+            else if (!request.SkipBpa)
+            {
+                var (bpaResult, notChecked) = await RunBpaGate(session, request, project, bpaFailOn, cancellationToken);
                 if (bpaResult is not null)
                 {
                     await session.DisposeAsync();
                     return DeployOperation.Failed(bpaResult);
                 }
-                warnings = MissingVertipaqStatsWarning(notChecked);
+                warnings = [.. warnings, .. MissingVertipaqStatsWarning(notChecked)];
             }
 
             if (session is not IModelDeploySession deployer)
@@ -201,6 +217,17 @@ public sealed class DeployModelHandler
             ];
 
     /// <summary>
+    /// A committed <c>"enabled": false</c> deploys ungated; say so, and which file did it, so the
+    /// CI log never reads as a passed gate.
+    /// </summary>
+    internal static TomixDiagnostic GateDisabledWarning(string setting)
+        => new(
+            BpaProjectConfig.GateDisabledCode,
+            DiagnosticSeverity.Warning,
+            $"BPA gate skipped: disabled by {setting}.",
+            Hint: "Set it to true, or remove it, to gate deploys again.");
+
+    /// <summary>
     /// A dotted two-part target such as <c>Sales.Prod</c> deploys to the Analysis Services server
     /// of that name, but reads just as well as a Power BI workspace. Say which one it went to, and
     /// how to pick the other, so a misrouted deploy is visible in the CI log.
@@ -220,6 +247,7 @@ public sealed class DeployModelHandler
     private async Task<(TomixResult<DeployModelResult>? Failure, IReadOnlyList<BpaResult> NotChecked)> RunBpaGate(
         IModelSession session,
         DeployModelRequest request,
+        BpaProjectSettings project,
         RuleSeverity failOn,
         CancellationToken cancellationToken)
     {
@@ -231,7 +259,7 @@ public sealed class DeployModelHandler
             // they reach `bpa run`, so a pipeline that sets them checks what it deploys.
             rules = (await BpaRuleSources.LoadGateRulesAsync(
                     _configDirectory, _environment, request.BpaRules, "--bpa-rules", _httpClient, cancellationToken,
-                    hasVertipaqStats: BpaEngine.HasVertipaqStats(snapshot))
+                    hasVertipaqStats: BpaEngine.HasVertipaqStats(snapshot), projectRules: project.Rules)
                 .ConfigureAwait(false)).Rules;
         }
         catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or HttpRequestException or JsonException or InvalidOperationException)
@@ -246,7 +274,8 @@ public sealed class DeployModelHandler
         // Issue #254: user-level disables (`bpa rules ignore --user`) must reach the gate exactly as
         // they reach `bpa run`, so the two agree on the same machine. A handler built without
         // the state disables nothing; the path/rule filters stay empty — a gate evaluates all.
-        var userDisabled = _bpaRules?.GetDisabled().ToList();
+        // #236: the project's disabledRuleIds add to the user's.
+        List<string> userDisabled = [.. _bpaRules?.GetDisabled() ?? Enumerable.Empty<string>(), .. project.DisabledRuleIds];
         var options = new BpaEngineOptions(rules, null, null, userDisabled);
         var result = engine.Evaluate(snapshot, options);
 

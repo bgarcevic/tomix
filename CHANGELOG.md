@@ -20,6 +20,22 @@ and the API surface that major versions protect.
   table is headed Baseline/Actual, an error names the side that failed, and the JSON result gains
   `baseline` and a per-test `side`. A profile without a server fails with
   `TOMIX_TEST_BASELINE_NO_SERVER`.
+
+## [0.13.0] - 2026-10-19
+
+### Added
+
+- Project BPA config in a committed `tomix.json` (#236): `bpa.enabled`, `bpa.failOn`,
+  `bpa.disabledRuleIds` and `bpa.rules` tune `tx bpa run`, the `tx deploy` gate and
+  `tx save --fix-bpa` once per repository. tx reads every `tomix.json` from the model's folder up
+  to the repository root; the more local a setting, the more it wins: the command line, then the
+  nearest file, then files above it, then the file `TOMIX_PROJECT_CONFIG` names, then your own
+  settings. Output names the files used (`TOMIX_PROJECT_CONFIG_LOADED`), a deploy with the gate
+  turned off by a file warns (`TOMIX_BPA_GATE_DISABLED`), and an invalid file fails with
+  `TOMIX_PROJECT_CONFIG_INVALID`. Rule sources gain the `project` origin. `tx bpa rules list`
+  and `show` list the project's rules (source `tomix.json`) and show its `disabledRuleIds` as
+  disabled.
+
 - `tx deploy` checks the deployed model after it lands: it re-reads the target and reports every
   object the server holds in an error, incomplete, or unprocessed state, in the text output and
   as `validation` in the JSON result. Objects in an error state (a measure whose DAX does not
@@ -1442,7 +1458,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/bgarcevic/tomix/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/bgarcevic/tomix/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/bgarcevic/tomix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/bgarcevic/tomix/compare/v0.10.0...v0.11.0
