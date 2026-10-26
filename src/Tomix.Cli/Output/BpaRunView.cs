@@ -195,6 +195,7 @@ internal static class BpaRunView
                 BpaRuleOrigin.UserFile => $"user rules file ({count})",
                 BpaRuleOrigin.Config => $"{source.Name} via {ConfigKeys.BpaRules} ({count})",
                 BpaRuleOrigin.Environment => $"{source.Name} via {BpaRuleSources.EnvironmentVariable} ({count})",
+                BpaRuleOrigin.Project => $"{source.Name} via {BpaProjectConfig.FileName} ({count})",
                 _ => $"{source.Name} via --rules ({count})",
             });
         }

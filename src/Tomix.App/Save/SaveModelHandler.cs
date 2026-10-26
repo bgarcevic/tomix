@@ -12,9 +12,11 @@ public sealed class SaveModelHandler
 {
     private readonly IModelSessionSource _sessions;
     private readonly HttpClient? _httpClient;
+    private readonly Func<string, string?> _environment;
 
-    public SaveModelHandler(IEnumerable<IModelProvider> providers, HttpClient? httpClient = null)
-        : this(new OneShotSessionSource(providers), httpClient)
+    public SaveModelHandler(
+        IEnumerable<IModelProvider> providers, HttpClient? httpClient = null, Func<string, string?>? environment = null)
+        : this(new OneShotSessionSource(providers), httpClient, environment)
     {
     }
 
@@ -22,10 +24,13 @@ public sealed class SaveModelHandler
     /// Saves the model <paramref name="sessions"/> leases. In a live session, writing back to the
     /// source makes the current state the save point, and <c>--fix-bpa</c> fixes become one undo step.
     /// </summary>
-    public SaveModelHandler(IModelSessionSource sessions, HttpClient? httpClient = null)
+    /// <param name="environment">Reads <c>TOMIX_PROJECT_CONFIG</c>; defaults to the process environment.</param>
+    public SaveModelHandler(
+        IModelSessionSource sessions, HttpClient? httpClient = null, Func<string, string?>? environment = null)
     {
         _sessions = sessions;
         _httpClient = httpClient;
+        _environment = environment ?? Environment.GetEnvironmentVariable;
     }
 
     public Task<TomixResult<SaveModelResult>> HandleAsync(
@@ -124,12 +129,26 @@ public sealed class SaveModelHandler
         SaveModelRequest request,
         CancellationToken cancellationToken)
     {
+        // #236: the project's tomix.json rules and disables apply to the fixes a save makes, as
+        // they do to bpa run and the deploy gate.
+        BpaProjectSettings project;
+        try
+        {
+            project = BpaProjectConfig.Resolve(request.Model, _environment);
+        }
+        catch (BpaProjectConfigException ex)
+        {
+            return TomixResult<SaveModelResult>.Fail(BpaProjectConfig.InvalidCode, ex.Message, exitCode: 2);
+        }
+
         IReadOnlyList<BpaRule> rules;
         try
         {
             rules = await BpaRuleLoader
                 .LoadRulesetAsync(null, _httpClient, cancellationToken)
                 .ConfigureAwait(false);
+            foreach (var entry in project.Rules)
+                rules = [.. rules, .. await BpaRuleSources.LoadEntryAsync(entry, _httpClient, cancellationToken).ConfigureAwait(false)];
             if (request.BpaRules is not null)
             {
                 foreach (var file in request.BpaRules)
@@ -152,7 +171,7 @@ public sealed class SaveModelHandler
 
         var snapshot = await session.GetSnapshotAsync(cancellationToken);
         var engine = new BpaEngine();
-        var result = engine.Evaluate(snapshot, new BpaEngineOptions(rules, null, null));
+        var result = engine.Evaluate(snapshot, new BpaEngineOptions(rules, null, null, [.. project.DisabledRuleIds]));
 
         if (result.Violations.Count == 0)
             return null;
