@@ -64,18 +64,67 @@ Flags that matter in pipelines:
 - `--non-interactive` — never prompts; fails with an error saying what to
   provide instead of hanging.
 - `--quiet` — suppress spinners, progress, and hints.
-- `--ci github` / `--ci vsts` on `validate`, `test`, and `deploy` — print
+- `--ci github` / `--ci vsts` on `validate`, `bpa run`, `test`, and `deploy` — print
   CI log-group commands to stderr, so findings annotate the PR.
 - `--trx <path>` on `validate`, `test`, and `bpa run` — write results to a
   `.trx` test-run file.
+- `--fail-on <level>` on `bpa run` — the lowest severity that fails the run.
+- `--check` on `format` — change nothing and exit `1` when an expression is
+  not formatted.
 - Color is stripped automatically when output is not a TTY, and the
   [`NO_COLOR`](https://no-color.org/) convention is honored.
 
+### Linting DAX on every PR
+
+Three offline checks make a DAX linter, and none of them needs a server or
+credentials:
+
+- `tx validate` fails on broken DAX and M: syntax errors and references to
+  tables, columns and measures that do not exist
+  ([codes](../error-codes.md#validate-issue-codes)).
+- `tx bpa run` checks the [best-practice rules](../commands/validate.md#bpa-best-practice-analyzer),
+  including the DAX rules: `IFERROR`, `/` instead of `DIVIDE`, `INTERSECT`
+  instead of `TREATAS`, unused variables, `CALCULATE` without filters, and more.
+  Tune which rules run with `bpa rules ignore` and a rules file checked into the repo.
+- `tx format --check` fails when a measure is not formatted the way `tx format`
+  would format it.
+
 ```yaml
-# GitHub Actions: lint and validate a model on every PR
-- run: tx bpa run -m ./model.tmdl --non-interactive
-- run: tx validate -m ./model.tmdl --ci github --non-interactive
+# GitHub Actions: lint a model on every PR
+name: DAX lint
+on: pull_request
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool install --global Tomix.Cli
+      - run: tx validate ./MyModel.SemanticModel --ci github --non-interactive
+      - run: tx bpa run ./MyModel.SemanticModel --ci github --fail-on warning --non-interactive
+      - run: tx format ./MyModel.SemanticModel --check --non-interactive
 ```
+
+```yaml
+# Azure DevOps: the same checks, with BPA results published as a test run
+- script: tx validate ./MyModel.SemanticModel --ci vsts --non-interactive
+  displayName: Validate DAX
+- script: >
+    tx bpa run ./MyModel.SemanticModel --ci vsts --fail-on warning
+    --trx $(Agent.TempDirectory)/bpa.trx --non-interactive
+  displayName: Best practices
+- script: tx format ./MyModel.SemanticModel --check --non-interactive
+  displayName: DAX formatting
+- task: PublishTestResults@2
+  condition: always()
+  inputs:
+    testResultsFormat: VSTest
+    testResultsFiles: $(Agent.TempDirectory)/bpa.trx
+```
+
+Run each check as its own step so one failure does not hide the others.
 
 ### DAX regression tests as a PR gate
 

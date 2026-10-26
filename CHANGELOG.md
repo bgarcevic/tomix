@@ -20,6 +20,13 @@ and the API surface that major versions protect.
   table is headed Baseline/Actual, an error names the side that failed, and the JSON result gains
   `baseline` and a per-test `side`. A profile without a server fails with
   `TOMIX_TEST_BASELINE_NO_SERVER`.
+- `tx format --check` changes nothing and exits 1 with `TOMIX_FORMAT_CHECK_FAILED` when an
+  expression is not formatted the way `tx format` would format it, so DAX formatting can gate a PR.
+- BPA rules `DAX_UNUSED_VARIABLES` (in the `standard` ruleset) and `DAX_REDUNDANT_CALCULATE`, backed by
+  the DAX parser rather than regex. Custom rules can call them as `DaxLint.HasUnusedVariables` and
+  `DaxLint.HasRedundantCalculate`.
+- The scripting guide shows a DAX lint workflow (validate, BPA, format check) for GitHub Actions and
+  Azure DevOps.
 
 ## [0.13.0] - 2026-10-19
 

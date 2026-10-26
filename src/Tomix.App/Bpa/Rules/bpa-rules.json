@@ -363,6 +363,26 @@
     "CompatibilityLevel": 1200
   },
   {
+    "ID": "DAX_UNUSED_VARIABLES",
+    "Name": "[DAX Expressions] Remove variables that are never used",
+    "Category": "DAX Expressions",
+    "Description": "A VAR that no later variable and no RETURN reads is dead code, usually left over from an edit. It hides what the expression actually computes. Remove it, or use it where it was meant to be used.",
+    "Severity": 2,
+    "Scope": "Measure, CalculatedColumn, CalculationItem",
+    "Expression": "DaxLint.HasUnusedVariables(Expression)",
+    "CompatibilityLevel": 1200
+  },
+  {
+    "ID": "DAX_REDUNDANT_CALCULATE",
+    "Name": "[DAX Expressions] Remove CALCULATE calls that have no filters",
+    "Category": "DAX Expressions",
+    "Description": "CALCULATE or CALCULATETABLE without filter arguments changes nothing when there is no row context to transition from: around a measure reference, which already transitions (CALCULATE([Sales])), or at the top level of a measure or calculation item (CALCULATE(SUM(Sales[Amount]))). Remove the wrapper. Calls inside iterators are not flagged, since there the context transition is the point.",
+    "Severity": 1,
+    "Scope": "Measure, CalculationItem",
+    "Expression": "DaxLint.HasRedundantCalculate(Expression)",
+    "CompatibilityLevel": 1200
+  },
+  {
     "ID": "DATA_COLUMNS_MUST_HAVE_A_SOURCE_COLUMN",
     "Name": "[Error Prevention] Data columns must have a source column",
     "Category": "Error Prevention",

@@ -452,6 +452,19 @@ removes an optional field. `add` creates the file when it doesn't exist; `set` a
 existing file unless you pass `--overwrite`. Built-in rules can't be edited or removed.
 Turn one off with `bpa rules ignore`, or override it by adding a rule with the same ID.
 
+Besides `RegEx.IsMatch(field, pattern)`, an expression can call DAX lint checks that
+read the parsed DAX instead of its text, so a match inside a string or a comment never
+counts. Both return `false` for an expression with a syntax error, which `tx validate`
+reports instead.
+
+| Function | True when | Used by |
+|----------|-----------|---------|
+| `DaxLint.HasUnusedVariables(Expression)` | A `VAR` is read by no later variable and not by `RETURN`. | `DAX_UNUSED_VARIABLES` (`standard`) |
+| `DaxLint.HasRedundantCalculate(Expression)` | `CALCULATE`/`CALCULATETABLE` has no filter arguments and nothing to transition from: around a measure reference, or outside every function call. Scope it to measures and calculation items; a calculated column's top level has a row context. | `DAX_REDUNDANT_CALCULATE` (`full`) |
+
+Tabular Editor does not know these functions, so a rules file that uses them is
+tx-only.
+
 ```sh
 tx bpa rules add --id MEASURE_DESCRIPTIONS --name "Measures need a description" --scope Measure --expression "string.IsNullOrWhitespace(Description)"
 tx bpa rules set MEASURE_DESCRIPTIONS --severity error

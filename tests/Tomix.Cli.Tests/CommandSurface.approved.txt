@@ -316,6 +316,7 @@ Pretty-print DAX and M expressions
   opt --stage  Stage the change instead of saving it (commit with 'tx stage commit')
   opt --revert  Discard this model's staged changes
   opt --no-sync  Skip workspace sync when workspace mode is active
+  opt --check  Change nothing; exit 1 when an expression is not formatted (for CI)
 
 # tx get
 Read model objects and their properties
