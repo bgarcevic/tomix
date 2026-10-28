@@ -10,6 +10,8 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-28
+
 ### Added
 
 - `tx test --baseline <profile>` (or `--baseline-server`/`--baseline-database`) compares two
@@ -1465,7 +1467,8 @@ development that are worth knowing about if you followed `main`.
   nonexistent option; `ls --type` help lists `calculatedcolumn`; the `--output-format`
   description typo "tTomix" is `tmdl` again.
 
-[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/bgarcevic/tomix/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/bgarcevic/tomix/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/bgarcevic/tomix/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/bgarcevic/tomix/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/bgarcevic/tomix/compare/v0.11.0...v0.12.0
