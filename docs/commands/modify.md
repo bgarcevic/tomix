@@ -603,13 +603,38 @@ copy back into a model.
 | `--separators <us\|eu>` | DAX separators to show (display only). |
 | `--function-spacing <space\|none>` | `IF (` or `IF(` in DAX. |
 | `-t, --type <type>` | Disambiguate `--path` when it matches several objects under a table. |
+| `--check` | Change nothing; exit `1` when an expression is not formatted. Cannot be combined with `--save`, `--save-to`, `--stage`, or `--revert`. |
 
 ```sh
 tx format -e "CALCULATE(sum(sales[amt]))"
 tx format --path "Sales/Total Sales" --save
 tx format --save                     # whole model
+tx format --check                    # CI: fail on unformatted measures
 cat measure.dax | tx format          # piped expression
 ```
+
+`--check` formats in memory and compares, the way `dotnet format --verify-no-changes`
+does, so a CI step can fail a PR whose expressions `tx format --save` would change. It
+writes nothing, not even into a live session. Over a whole model it lists the objects
+that are not formatted and fails with `TOMIX_FORMAT_CHECK_FAILED`:
+
+```console
+$ tx format ./model --check
+Already formatted: 1
+Not formatted: 3
+  Sales/Order Count
+  Sales/Avg Sale
+  Sales/Distinct Customers
+Failed: 0
+Error: 3 of 4 expressions are not formatted.
+  → Run the same command with --save instead of --check to format them.
+```
+
+It checks what the same command without `--check` would format, measures by default,
+and uses the same style (`--long`, `--function-spacing`, and the `format.*` config keys),
+so run it with the style your team formats with. With `-e` or `--path` it prints nothing
+and answers with its exit code alone; run without `--check` to see the formatted expression.
+With `-e`, a trailing newline on piped input does not count as a change.
 
 A piped expression is read only when nothing else names what to format: with a
 model, `--path`, `--save`, `--save-to`, `--stage`, or `--revert`, `format` leaves

@@ -19,4 +19,5 @@ public sealed record FormatModelRequest(
     bool Revert = false,
     bool NoSync = false,
     DaxSeparators Separators = DaxSeparators.Us,
-    DaxFunctionSpacing FunctionSpacing = DaxFunctionSpacing.Space);
+    DaxFunctionSpacing FunctionSpacing = DaxFunctionSpacing.Space,
+    bool Check = false);

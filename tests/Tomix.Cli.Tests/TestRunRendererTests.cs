@@ -121,6 +121,55 @@ public sealed class TestRunRendererTests
         Assert.Contains("totals/old.expected.json", output);
     }
 
+    [Theory]
+    [InlineData(false, "Expected", "expected '1'")]
+    [InlineData(true, "Baseline", "baseline '1'")]
+    public void Render_FailedTest_NamesTheExpectedSide(bool baseline, string header, string description)
+    {
+        var run = Run(Case(
+            TestOutcome.Failed,
+            message: "1 difference(s).",
+            differences: [new TestDifference("cell", Row: 1, Column: "[Total]", Expected: "1", Actual: "2")],
+            totalDifferences: 1)) with
+        {
+            Baseline = baseline ? new TestBaselineTarget("prod-server", "Sales", "prod") : null
+        };
+
+        var output = Render(run);
+        Assert.Contains(header, output);
+        Assert.DoesNotContain(baseline ? "Expected" : "Baseline", output);
+        Assert.Contains(description, Assert.Single(TestRunRenderer.ToTrxTests(run)).Message);
+    }
+
+    [Fact]
+    public void Render_MultiLineMessage_IndentsEveryLine()
+    {
+        var run = Run(Case(TestOutcome.Error, message: "Actual model: boom\r\nTechnical Details:\n\nBaseline model: bang\n"));
+
+        var captured = ConsoleCapture.Run(
+            () =>
+            {
+                TestRunRenderer.Render(run, quiet: true);
+                return 0;
+            },
+            captureAnsiConsole: true);
+        var lines = Regex.Replace(captured.Stdout, @"\x1b\[[0-9;]*m", "").ReplaceLineEndings("\n").Split('\n');
+
+        Assert.Contains("        Actual model: boom", lines);
+        Assert.Contains("        Technical Details:", lines);
+        Assert.Contains("        Baseline model: bang", lines);
+    }
+
+    [Theory]
+    [InlineData("prod", "compared with baseline Sales (profile prod)")]
+    [InlineData(null, "compared with baseline Sales on prod-server")]
+    public void Render_BannerNamesTheBaseline(string? profile, string expected)
+    {
+        var run = Run(Case(TestOutcome.Passed)) with { Baseline = new TestBaselineTarget("prod-server", "Sales", profile) };
+
+        Assert.Contains(expected, Render(run, stderr: true));
+    }
+
     [Fact]
     public void Render_PointsMissingTestsAtUpdateMissing()
         => Assert.Contains("tx test --update-missing", Render(Run(Case(TestOutcome.Missing)), stderr: true));

@@ -85,6 +85,7 @@ Emitted by `get`, `deps`, and `format --path` when a model object path fails to 
 
 | Code | Exit | Trigger |
 |------|------|---------|
+| `TOMIX_BPA_GATE_DISABLED` | 0 | Warning, not a failure. A `tomix.json` set `"enabled": false`, so `deploy` ran without the BPA gate. The message names the file. |
 | `TOMIX_BPA_INVALID_FAIL_ON` | 2 | Invalid `--fail-on` or `--bpa-fail-on` value (expected: error, warning). |
 | `TOMIX_BPA_RULE_EXISTS` | 2 | `bpa rules add` was given an ID the rules file (or the model's `BestPracticeAnalyzer` annotation) already has. Change it with `bpa rules set`, or remove it first. |
 | `TOMIX_BPA_RULE_FIELD_REQUIRED` | 2 | `bpa rules add` is missing `--name`, `--scope`, or `--expression` (the message names which); `bpa rules set` was given no field to change; or a name or expression was set to an empty value. |
@@ -237,7 +238,8 @@ Emitted by `test` (DAX regression tests against a live model).
 |------|------|---------|
 | `TOMIX_TEST_PATH_NOT_FOUND` | 2 | The path argument does not exist. |
 | `TOMIX_TEST_NONE_FOUND` | 2 | No `.dax` test files were found under the path (or none match `--filter`). |
-| `TOMIX_TEST_CONFLICTING_OPTIONS` | 2 | `--update` and `--update-missing` were both passed. |
+| `TOMIX_TEST_CONFLICTING_OPTIONS` | 2 | `--update` and `--update-missing` were both passed, or a baseline (`--baseline`, `--baseline-server`, `--baseline-database`) was combined with either. |
+| `TOMIX_TEST_BASELINE_NO_SERVER` | 2 | `--baseline` named a profile without a server; a baseline must be a live model. |
 | `TOMIX_TEST_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
 | `TOMIX_TEST_NO_REMOTE_TARGET` | 2 | `test` could not resolve a live endpoint (default connection is local and no remote workspace-mode secondary is set). |
 | `TOMIX_TEST_UNSUPPORTED` | 2 | The provider session does not support queries (e.g. a local TMDL/BIM model). |
@@ -245,7 +247,7 @@ Emitted by `test` (DAX regression tests against a live model).
 
 Test failures themselves carry **no** diagnostic code: a run whose tests fail (or are missing
 their snapshot) renders the full report and exits `1`, mirroring `bpa run`. `test` also reuses
-`TOMIX_NO_PROVIDER` and `TOMIX_AUTH_REQUIRED`.
+`TOMIX_NO_PROVIDER`, `TOMIX_AUTH_REQUIRED` and, for `--baseline`, `TOMIX_PROFILE_NOT_FOUND`.
 
 ## Incremental Refresh Codes (`TOMIX_REFRESH_POLICY_*`)
 
@@ -304,6 +306,8 @@ Policy commands also reuse `TOMIX_OBJECT_NOT_FOUND` (table missing), `TOMIX_REFR
 |------|------|---------|
 | `TOMIX_CONFIG_INVALID_VALUE` | 2 | `config set` called with an invalid value. |
 | `TOMIX_CONFIG_UNKNOWN_KEY` | 2 | `config set` called with an unknown configuration key. |
+| `TOMIX_PROJECT_CONFIG_INVALID` | 2 | A `tomix.json` (or the file `TOMIX_PROJECT_CONFIG` names) is missing, is not valid JSON, has an unknown key in its `bpa` section, or has an invalid value such as a `failOn` other than `error` or `warning`. The message names the file. |
+| `TOMIX_PROJECT_CONFIG_LOADED` | 0 | Info. `bpa run` or `deploy` applied settings from the `tomix.json` files the message names, nearest first. |
 
 ## Profile Codes
 
@@ -373,6 +377,7 @@ come from structural integrity checks.
 | `TOMIX_SET_PROPERTY_REQUIRED` | 2 | `set` called without a property to set. |
 | `TOMIX_FORMAT_UNSUPPORTED_LANGUAGE` | 2 | `format` called with an unsupported expression language. |
 | `TOMIX_FORMAT_SEPARATORS_DISPLAY_ONLY` | 2 | `format --separators eu` was combined with `--save`, `--save-to`, `--stage`, or `--revert`. EU separators only change what is shown; models always store DAX with US separators. Drop `--separators eu` to write, or preview without the write flag. |
+| `TOMIX_FORMAT_CHECK_FAILED` | 1 | `format --check` found expressions that formatting would change. Nothing was written; the result rows say which (`status: "formatted"`). Run the same command with `--save` instead of `--check` to format them. |
 | `TOMIX_FORMAT_FAILED` | 1 | `format` could not format the inline expression (`--expression`) or the object (`--path`), or a whole-model run had failed expressions and applied nothing (the result rows are still written; each failed row's `error` says why). DAX and M are both formatted offline. The message includes the formatter's error details; DAX or M that does not lex or parse also carries `line`, `column`, and `syntaxErrors` (plus `objectPath` for `--path`). |
 | `TOMIX_COMPLETION_UNSUPPORTED_SHELL` | 2 | `completion` called with an unsupported shell name. |
 | `TOMIX_COMPLETION_SHELL_REQUIRED` | 2 | `completion` called without its required shell argument. |
@@ -425,6 +430,7 @@ The following `TOMIX_*` tokens are **environment variables**, not diagnostic cod
 | `TOMIX_AUTH_TENANT` | Azure AD tenant id for service principal auth. |
 | `TOMIX_SESSION` | Session id for persisting the active model connection. Unset, the session is scoped to the git repository/worktree root or the current folder. |
 | `TOMIX_CONFIG_DIR` | Custom path to the configuration directory. |
+| `TOMIX_PROJECT_CONFIG` | Path to a `tomix.json`-format file applied below the project's own `tomix.json` files. |
 | `TOMIX_NO_UPDATE_CHECK` | Set (any value) to disable the throttled update check and notice. |
 
 ## Migration: Unified Mutation Error Codes

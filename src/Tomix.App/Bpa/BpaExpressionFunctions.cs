@@ -1,6 +1,7 @@
 using System.Linq.Dynamic.Core.CustomTypeProviders;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Tomix.Core.Dax;
 
 namespace Tomix.App.Bpa;
 
@@ -15,8 +16,23 @@ public static class RegEx
 }
 
 /// <summary>
+/// DAX lint checks exposed to rule expressions as <c>DaxLint.HasUnusedVariables(Expression)</c>.
+/// They read the parsed expression (<see cref="DaxPatterns"/>), so text inside a string or a
+/// comment never matches, and they return <c>false</c> for null or unparsable input.
+/// </summary>
+public static class DaxLint
+{
+    public static bool HasUnusedVariables(string? expression)
+        => DaxPatterns.UnusedVariables(expression).Count > 0;
+
+    /// <summary>A filterless <c>CALCULATE</c>; assumes no row context at the top level (measures, calculation items).</summary>
+    public static bool HasRedundantCalculate(string? expression)
+        => DaxPatterns.RedundantCalculates(expression).Count > 0;
+}
+
+/// <summary>
 /// Exposes the small set of types a BPA rule <c>Expression</c> may call into
-/// (<see cref="RegEx"/>, <see cref="Convert"/>, <see cref="Math"/>, <see cref="string"/>) to the
+/// (<see cref="RegEx"/>, <see cref="DaxLint"/>, <see cref="Convert"/>, <see cref="Math"/>, <see cref="string"/>) to the
 /// dynamic expression parser. Enum-style literals (<c>DataType.Decimal</c>,
 /// <c>CrossFilteringBehavior.BothDirections</c>, …) are handled by string normalization in
 /// <see cref="BpaExpressionEvaluator"/>, so they need no type here.
@@ -30,6 +46,7 @@ internal sealed class BpaTypeProvider : IDynamicLinqCustomTypeProvider
         var types = new HashSet<Type>
         {
             typeof(RegEx),
+            typeof(DaxLint),
             typeof(Convert),
             typeof(Math),
             typeof(string),

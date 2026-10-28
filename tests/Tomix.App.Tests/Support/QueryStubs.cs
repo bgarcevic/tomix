@@ -90,6 +90,24 @@ public static class QueryStubs
             => Task.FromResult<IModelSession>(session);
     }
 
+    /// <summary>
+    /// Claims remote references and opens the session <paramref name="route"/> picks for each,
+    /// for handlers that open two models (<c>tx test --baseline</c>). A null route has no session
+    /// that can query. Records every reference it opened.
+    /// </summary>
+    public sealed class RoutingProvider(Func<ModelReference, Session?> route) : IModelProvider
+    {
+        public List<ModelReference> Opened { get; } = [];
+
+        public bool CanOpen(ModelReference reference) => reference.IsRemote;
+
+        public Task<IModelSession> OpenAsync(ModelReference reference, CancellationToken cancellationToken)
+        {
+            Opened.Add(reference);
+            return Task.FromResult<IModelSession>((IModelSession?)route(reference) ?? new NonQuerySession());
+        }
+    }
+
     /// <summary>Claims remote references but opens a session with no query capability.</summary>
     public sealed class NonQueryProvider : IModelProvider
     {

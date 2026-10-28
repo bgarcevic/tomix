@@ -455,6 +455,68 @@ public sealed class FormatModelHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_CheckSweepWithUnformattedMeasures_FailsWithoutWriting()
+    {
+        var session = new StubSession(Snapshot());
+        var handler = new FormatModelHandler([new StubProvider(session)], new RecordingFormatter(), TestStores);
+
+        var result = await handler.HandleAsync(CheckRequest(expression: null), CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        var diagnostic = Assert.Single(result.Diagnostics, d => d.Code == "TOMIX_FORMAT_CHECK_FAILED");
+        Assert.Equal("2 of 2 expressions are not formatted.", diagnostic.Message);
+        var model = Assert.IsType<ModelFormatResult>(result.Data);
+        Assert.All(model.Results, row => Assert.Equal("formatted", row.Status));
+        Assert.Empty(session.SetRequests);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CheckSweepAlreadyFormatted_Passes()
+    {
+        var handler = new FormatModelHandler(
+            [new StubProvider(new StubSession(LineEndingsSnapshot()))], new CrlfFormatter(), TestStores);
+
+        var result = await handler.HandleAsync(CheckRequest(expression: null), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "TOMIX_FORMAT_CHECK_FAILED");
+    }
+
+    [Theory]
+    [InlineData("CALCULATE (\n    [Sales]\n)\n", 0)] // a trailing newline from a pipe is not a change
+    [InlineData("CALCULATE([Sales])", 1)]
+    public async Task HandleAsync_CheckInline_FailsOnlyWhenFormattingChangesIt(string expression, int exitCode)
+    {
+        var handler = new FormatModelHandler([], new FixedFormatter("CALCULATE (\n    [Sales]\n)"), TestStores);
+
+        var result = await handler.HandleAsync(CheckRequest(expression), CancellationToken.None);
+
+        Assert.Equal(exitCode, result.ExitCode);
+        Assert.Equal(exitCode == 1, result.Diagnostics.Any(d => d.Code == "TOMIX_FORMAT_CHECK_FAILED"));
+    }
+
+    private static FormatModelRequest CheckRequest(string? expression) => new(
+        new ModelReference(expression is null ? "any" : ""),
+        Expression: expression,
+        Path: null,
+        Language: expression is null ? "" : "dax",
+        Type: null,
+        Long: false,
+        Save: false,
+        SaveTo: null,
+        Check: true);
+
+    private sealed class FixedFormatter(string output) : IExpressionFormatterClient
+    {
+        public bool CanFormat(string language) => language == "dax";
+
+        public Task<ExpressionFormatResponse> FormatAsync(
+            ExpressionFormatRequest request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new ExpressionFormatResponse(true, output, []));
+    }
+
+    [Fact]
     public async Task HandleAsync_ExpressionDiffersOnlyInLineEndings_ReportsUnchangedAndSkipsWrite()
     {
         // TMDL stores LF while the formatter emits the platform's CRLF; that difference is not a

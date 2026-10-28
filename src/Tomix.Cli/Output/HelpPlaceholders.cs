@@ -15,6 +15,9 @@ internal static class HelpPlaceholders
     internal static readonly Dictionary<string, string> Names = new(StringComparer.Ordinal)
     {
         ["--auth"] = "method",
+        ["--baseline"] = "profile",
+        ["--baseline-database"] = "name",
+        ["--baseline-server"] = "workspace",
         ["--bpa-fail-on"] = "level",
         ["--bpa-rules"] = "file",
         ["--category"] = "name",

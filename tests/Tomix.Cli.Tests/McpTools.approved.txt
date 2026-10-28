@@ -625,6 +625,10 @@
         "type": {
           "type": "string",
           "description": "Type to pick when the path matches several objects under a table"
+        },
+        "check": {
+          "type": "boolean",
+          "description": "Change nothing; exit 1 when an expression is not formatted (for CI)"
         }
       },
       "additionalProperties": false

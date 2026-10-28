@@ -72,6 +72,31 @@ internal static class FormatFailure
         };
 
     /// <summary>
+    /// A <c>--check</c> run that found expressions the formatter would change. Nothing was
+    /// written; the result keeps its rows, adds a <c>TOMIX_FORMAT_CHECK_FAILED</c> error and exits 1.
+    /// </summary>
+    public static TomixResult<T> CheckFailed<T>(
+        TomixResult<T> result,
+        int unformatted,
+        int total,
+        string hint = "Run the same command with --save instead of --check to format them.")
+        => result with
+        {
+            ExitCode = 1,
+            Diagnostics =
+            [
+                .. result.Diagnostics,
+                new TomixDiagnostic(
+                    "TOMIX_FORMAT_CHECK_FAILED",
+                    DiagnosticSeverity.Error,
+                    total == 1
+                        ? "The expression is not formatted."
+                        : $"{unformatted} of {total} expressions are not formatted.",
+                    Hint: hint)
+            ]
+        };
+
+    /// <summary>
     /// A <c>TOMIX_FORMAT_FAILED</c> result. The diagnostic's line and column are the first syntax
     /// error's, and every syntax error rides along so machine output can point at all of them.
     /// </summary>

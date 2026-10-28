@@ -11,7 +11,7 @@ public sealed record BpaRuleSourceEntry(string Location, BpaRuleOrigin Origin, s
 /// <summary>
 /// The configured rule-source chain (#233), lowest to highest precedence: the config-dir
 /// <c>bpa-rules.json</c>, the <c>bpa.rules</c> config key, the <c>TOMIX_BPA_RULES</c> environment
-/// variable, then <c>--rules</c>. All links load as user rules, so for the same rule id a later
+/// variable, the project's <c>tomix.json</c> files (#236), then <c>--rules</c>. All links load as user rules, so for the same rule id a later
 /// link overrides an earlier one; the model's own annotations still override them all.
 /// </summary>
 public static class BpaRuleSources
@@ -27,11 +27,13 @@ public static class BpaRuleSources
     /// </summary>
     /// <param name="configDirectory">Where <c>bpa.rules</c> is read from; null skips that link.</param>
     /// <param name="optionName">The command's option for <paramref name="optionFiles"/>, named in errors.</param>
+    /// <param name="projectRules">The <c>tomix.json</c> rule entries (<see cref="BpaProjectSettings.Rules"/>).</param>
     public static IReadOnlyList<BpaRuleSourceEntry> Resolve(
         string? configDirectory,
         Func<string, string?> environment,
         IReadOnlyList<string>? optionFiles,
-        string optionName = "--rules")
+        string optionName = "--rules",
+        IReadOnlyList<BpaRuleSourceEntry>? projectRules = null)
     {
         var entries = new List<BpaRuleSourceEntry>();
 
@@ -46,6 +48,8 @@ public static class BpaRuleSources
 
         foreach (var location in Split(environment(EnvironmentVariable)))
             entries.Add(new BpaRuleSourceEntry(location, BpaRuleOrigin.Environment, EnvironmentVariable));
+
+        entries.AddRange(projectRules ?? []);
 
         foreach (var location in optionFiles ?? [])
             if (!string.IsNullOrWhiteSpace(location))
@@ -77,8 +81,8 @@ public static class BpaRuleSources
 
     /// <summary>
     /// The rules a deploy gate checks: the <c>standard</c> ruleset (with <c>vertipaq</c> when the
-    /// model has statistics), then <c>bpa.rules</c>,
-    /// <c>TOMIX_BPA_RULES</c>, and the command's own rule files, resolved like <c>bpa run</c> so
+    /// model has statistics), then <c>bpa.rules</c>, <c>TOMIX_BPA_RULES</c>, the project's
+    /// <c>tomix.json</c> rules, and the command's own rule files, resolved like <c>bpa run</c> so
     /// a later source overrides an earlier one for the same id. The personal config-dir
     /// <c>bpa-rules.json</c> and the model's annotations stay <c>bpa run</c>-only.
     /// </summary>
@@ -89,7 +93,8 @@ public static class BpaRuleSources
         string optionName,
         HttpClient? httpClient,
         CancellationToken cancellationToken,
-        bool hasVertipaqStats = false)
+        bool hasVertipaqStats = false,
+        IReadOnlyList<BpaRuleSourceEntry>? projectRules = null)
     {
         var collections = new List<BpaRuleCollection>();
         foreach (var preset in BpaRuleLoader.ResolveRulesets(null, hasVertipaqStats))
@@ -98,7 +103,7 @@ public static class BpaRuleSources
                 await BpaRuleLoader.LoadRulesetAsync(preset, httpClient, cancellationToken).ConfigureAwait(false),
                 BpaRuleOrigin.Ruleset));
 
-        foreach (var entry in Resolve(configDirectory, environment, optionFiles, optionName))
+        foreach (var entry in Resolve(configDirectory, environment, optionFiles, optionName, projectRules))
             collections.Add(new BpaRuleCollection(
                 BpaRuleSourceKind.User, entry.Location,
                 await LoadEntryAsync(entry, httpClient, cancellationToken).ConfigureAwait(false),
@@ -111,10 +116,10 @@ public static class BpaRuleSources
         => (value ?? "").Split(Separator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
-    /// A relative <c>bpa.rules</c> path is anchored at the config directory, so the setting means
-    /// the same file from any working directory. URLs and absolute paths pass through.
+    /// A relative path in a settings file is anchored at that file's directory, so the setting
+    /// means the same file from any working directory. URLs and absolute paths pass through.
     /// </summary>
-    private static string AnchorAt(string configDirectory, string location)
+    internal static string AnchorAt(string configDirectory, string location)
         => Uri.TryCreate(location, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
             || Path.IsPathRooted(location)
             ? location
