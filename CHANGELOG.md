@@ -10,8 +10,6 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
-## [0.14.0] - 2026-10-28
-
 ### Added
 
 - `tx test init [path] [--from-model] [--force]` scaffolds a test folder (#235). It writes a
@@ -30,6 +28,17 @@ and the API surface that major versions protect.
   recorded snapshot alongside the assertions. `// tx: expect-error`
   (or `expect-error=<regex>`) makes a negative test, which passes only when the query fails with
   a matching error. Broken assertions fail the test as `FAIL`, one message per assertion.
+
+### Fixed
+
+- `tx query` no longer rejects a query over `INFO.*` or `COLUMNSTATISTICS()` because a bare column such
+  as `[ErrorMessage]` is not in the model; the server defines those columns. `tx validate` no longer
+  warns about them in a calculated table either.
+
+## [0.14.0] - 2026-10-28
+
+### Added
+
 - `tx test --baseline <profile>` (or `--baseline-server`/`--baseline-database`) compares two
   live models instead of snapshots (#470): each `.dax` test runs on the tested model and the
   baseline at once, and the baseline's result takes the place of `.expected.json`. Snapshots are
@@ -45,12 +54,6 @@ and the API surface that major versions protect.
   `DaxLint.HasRedundantCalculate`.
 - The scripting guide shows a DAX lint workflow (validate, BPA, format check) for GitHub Actions and
   Azure DevOps.
-
-### Fixed
-
-- `tx query` no longer rejects a query over `INFO.*` or `COLUMNSTATISTICS()` because a bare column such
-  as `[ErrorMessage]` is not in the model; the server defines those columns. `tx validate` no longer
-  warns about them in a calculated table either.
 
 ## [0.13.0] - 2026-10-19
 
