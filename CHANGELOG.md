@@ -12,6 +12,22 @@ and the API surface that major versions protect.
 
 ### Added
 
+- `tx test init [path] [--from-model] [--force]` scaffolds a test folder (#235). It writes a
+  README and a connection smoke test, and with `--from-model` it adds a `rows=0` check that no
+  measure is broken (read from `INFO.MEASURES()`, so no measure is calculated) and one that no
+  table is empty. None of them needs a snapshot. It works offline for TMDL and BIM models and
+  never overwrites a changed file without `--force` (`TOMIX_TEST_INIT_EXISTS`, exit `2`).
+- `tx test list [path]` lists the tests a run would execute, offline, with each test's tags and
+  what decides it (snapshot, assertions or expected error).
+- `// tx: tags=smoke,nightly` tags a test, and `tx test --tag smoke` (repeatable) runs only the
+  tests with any of the given tags.
+- `tx test` assertion directives: a test can state `// tx: rows=<n>`, `rows>=<n>`, `rows<=<n>` or
+  `columns=<names>` instead of keeping a snapshot. Data can then change without failing the test,
+  as long as its shape holds. `--update-missing` records no snapshot for such a test, and
+  `--update` re-records an existing one only while the assertions hold. Add `snapshot` to keep a
+  recorded snapshot alongside the assertions. `// tx: expect-error`
+  (or `expect-error=<regex>`) makes a negative test, which passes only when the query fails with
+  a matching error. Broken assertions fail the test as `FAIL`, one message per assertion.
 - `tx test --baseline <profile>` (or `--baseline-server`/`--baseline-database`) compares two
   live models instead of snapshots (#470): each `.dax` test runs on the tested model and the
   baseline at once, and the baseline's result takes the place of `.expected.json`. Snapshots are
@@ -27,6 +43,12 @@ and the API surface that major versions protect.
   `DaxLint.HasRedundantCalculate`.
 - The scripting guide shows a DAX lint workflow (validate, BPA, format check) for GitHub Actions and
   Azure DevOps.
+
+### Fixed
+
+- `tx query` no longer rejects a query over `INFO.*` or `COLUMNSTATISTICS()` because a bare column such
+  as `[ErrorMessage]` is not in the model; the server defines those columns. `tx validate` no longer
+  warns about them in a calculated table either.
 
 ## [0.13.0] - 2026-10-19
 

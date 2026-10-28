@@ -17,8 +17,9 @@ namespace Tomix.App.Query;
 /// It blocks the query, so it reports only what the server would reject too: a reference
 /// whose name nothing in the model or the query itself defines. Anything it cannot judge
 /// passes — a query that does not parse (the server reports the syntax), a DMV query, a model
-/// with no tables, columns of a calculated or query-defined table, and a bare <c>[X]</c> that
-/// matches a column the query builds itself, wherever it is used.
+/// with no tables, columns of a calculated or query-defined table, a bare <c>[X]</c> that
+/// matches a column the query builds itself, wherever it is used, and any bare <c>[X]</c> in a
+/// query over a server-defined table such as <c>INFO.MEASURES()</c>.
 /// </remarks>
 internal static class QueryPreflight
 {
@@ -45,6 +46,7 @@ internal static class QueryPreflight
 
         var defined = QueryDefinitions.Read(query);
         IReadOnlyDictionary<int, DaxQueryColumnScope>? queryColumns = null;
+        bool? serverColumns = null;
         var misses = new List<Miss>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -77,6 +79,11 @@ internal static class QueryPreflight
                     // whether it is in scope where it is used is the server's call.
                     queryColumns ??= DaxQueryColumns.Analyze(query);
                     if (queryColumns.ContainsKey(reference.Start))
+                        break;
+
+                    // INFO.MEASURES() and the like bring columns only the server knows.
+                    serverColumns ??= DaxQueryColumns.UsesServerDefinedColumns(query);
+                    if (serverColumns.Value)
                         break;
 
                     var suggestion = Closest(reference.Object!, index.MeasureNames.Concat(index.ColumnNames));

@@ -88,6 +88,20 @@ public static class TestDiscovery
         return Regex.IsMatch(name, regex, RegexOptions.IgnoreCase);
     }
 
+    /// <summary>
+    /// "found " for an unfiltered selection, otherwise what narrowed it, for example
+    /// "match --filter totals/* and --tag smoke ", to complete "No .dax test files ... under".
+    /// </summary>
+    public static string Selection(string? filter, IReadOnlyList<string>? tags)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(filter))
+            parts.Add($"--filter {filter}");
+        if (tags is { Count: > 0 })
+            parts.Add($"--tag {string.Join(", ", tags)}");
+        return parts.Count == 0 ? "found " : $"match {string.Join(" and ", parts)} ";
+    }
+
     private static string ExpectedPathFor(string daxPath)
         => Path.ChangeExtension(daxPath, SnapshotSuffix);
 }

@@ -81,6 +81,25 @@ public sealed class QueryPreflightTests
         Assert.Empty(QueryPreflight.Check(query, Model()));
     }
 
+    // The server defines these functions' result columns, so a bare [X] may be one of them.
+    [Theory]
+    [InlineData("EVALUATE SELECTCOLUMNS(INFO.MEASURES(), \"Name\", [Name], \"Error\", [ErrorMessage])")]
+    [InlineData("EVALUATE FILTER(INFO.VIEW.TABLES(), [IsHidden])")]
+    [InlineData("EVALUATE FILTER(COLUMNSTATISTICS(), [Cardinality] > 100)")]
+    public void Check_FindsNothing_ForColumnsOfServerDefinedTables(string query)
+    {
+        Assert.Empty(QueryPreflight.Check(query, Model()));
+    }
+
+    [Fact]
+    public void Check_StillReportsQualifiedMisses_NextToServerDefinedTables()
+    {
+        var miss = Assert.Single(QueryPreflight.Check(
+            "EVALUATE ADDCOLUMNS(INFO.TABLES(), \"x\", SUM(Sales[Amout]))", Model()));
+
+        Assert.Equal("Sales[Amout]", miss.Reference);
+    }
+
     [Fact]
     public void Check_StaysQuiet_OnAModelWithNoTables()
     {

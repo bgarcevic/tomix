@@ -63,6 +63,7 @@ internal static class ModelValidation
         }
 
         IReadOnlyDictionary<int, DaxQueryColumnScope>? queryColumns = null;
+        bool? serverColumns = null;
         var ownTable = OwnTable(obj, site);
         var lone = new LoneColumnResolver(
             site.Expression,
@@ -158,6 +159,11 @@ internal static class ModelValidation
                         }
                         break;
                     }
+
+                    // INFO.VIEW.MEASURES() and the like bring columns only the server knows.
+                    serverColumns ??= DaxQueryColumns.UsesServerDefinedColumns(site.Expression);
+                    if (scope == DaxQueryColumnScope.NotDefined && serverColumns.Value)
+                        break;
 
                     issues.Add(ValidationRules.UnresolvedReference.Issue(
                         scope == DaxQueryColumnScope.OutOfScope

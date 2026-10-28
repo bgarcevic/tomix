@@ -11,6 +11,7 @@ namespace Tomix.App.Test;
 /// instead of a snapshot. Defaults to the primary target's server when only <paramref name="BaselineDatabase"/> is given.</param>
 /// <param name="BaselineDatabase">The baseline model's database; defaults to the primary target's database.</param>
 /// <param name="BaselineProfile">The saved profile the baseline target came from, reported in the result.</param>
+/// <param name="Tags">Run only tests with any of these <c>tags=</c> (case-insensitive); null or empty runs every test.</param>
 public sealed record TestRunRequest(
     string? Model,
     string? Server,
@@ -25,7 +26,8 @@ public sealed record TestRunRequest(
     bool UpdateMissing = false,
     string? BaselineServer = null,
     string? BaselineDatabase = null,
-    string? BaselineProfile = null)
+    string? BaselineProfile = null,
+    IReadOnlyList<string>? Tags = null)
 {
     /// <summary>True when tests compare with a second live model instead of their snapshots.</summary>
     public bool HasBaseline

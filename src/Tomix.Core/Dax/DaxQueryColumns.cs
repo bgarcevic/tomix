@@ -80,6 +80,20 @@ public static class DaxQueryColumns
         };
     }
 
+    /// <summary>
+    /// Whether <paramref name="dax"/> calls a table function whose result columns the server
+    /// defines — <c>INFO.*</c> (including <c>INFO.VIEW.*</c>) and <c>COLUMNSTATISTICS</c> — so a
+    /// bare <c>[Name]</c> may be one of those columns and cannot be judged offline.
+    /// </summary>
+    public static bool UsesServerDefinedColumns(string dax)
+        => UsesServerDefinedColumns(DaxParser.Parse(dax));
+
+    private static bool UsesServerDefinedColumns(DaxNode node)
+        => node is DaxCall { FunctionName: var f }
+           && (f.StartsWith("INFO.", StringComparison.OrdinalIgnoreCase)
+               || f.Equals("COLUMNSTATISTICS", StringComparison.OrdinalIgnoreCase))
+           || Children(node).Any(UsesServerDefinedColumns);
+
     private static readonly IReadOnlySet<string> Empty = new HashSet<string>();
 
     /// <summary>

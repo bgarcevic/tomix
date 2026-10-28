@@ -52,6 +52,8 @@ internal sealed class TestCommand : ICommandModule
             Description = "Run only tests whose name matches a * wildcard pattern (case-insensitive)"
         };
 
+        var tagOption = TagOption("Run only tests with any of these tx: tags (case-insensitive). Repeatable.");
+
         var paramOption = new Option<string[]>("--param")
         {
             Description = "Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.",
@@ -114,6 +116,7 @@ internal sealed class TestCommand : ICommandModule
             updateOption,
             updateMissingOption,
             filterOption,
+            tagOption,
             paramOption,
             maxRowsOption,
             toleranceOption,
@@ -194,7 +197,8 @@ internal sealed class TestCommand : ICommandModule
                 UpdateMissing: parseResult.GetValue(updateMissingOption),
                 BaselineServer: baselineServer,
                 BaselineDatabase: baselineDatabase,
-                BaselineProfile: string.IsNullOrWhiteSpace(baselineProfile) ? null : baselineProfile);
+                BaselineProfile: string.IsNullOrWhiteSpace(baselineProfile) ? null : baselineProfile,
+                Tags: Tags(parseResult.GetValue(tagOption)));
 
             // Name the session-resolved target on stderr before the model opens; an explicit
             // model/--server target is the user's own and stays silent.
@@ -223,6 +227,135 @@ internal sealed class TestCommand : ICommandModule
                 result,
                 format,
                 data => TestRunRenderer.Render(data, quiet),
+                data => data,
+                renderCsv: null,
+                errorFormat: errorFormat);
+        });
+
+        command.Subcommands.Add(BuildListCommand());
+        command.Subcommands.Add(BuildInitCommand());
+
+        return command;
+    }
+
+    private static Argument<string> PathArgument(string description, string defaultPath)
+        => new("path")
+        {
+            Description = description,
+            Arity = ArgumentArity.ZeroOrOne,
+            DefaultValueFactory = _ => defaultPath
+        };
+
+    private static Option<string[]> TagOption(string description)
+    {
+        var option = new Option<string[]>("--tag")
+        {
+            Description = description,
+            Arity = ArgumentArity.ZeroOrMore
+        };
+        option.Validators.Add(result =>
+        {
+            foreach (var tag in Tags(result.GetValueOrDefault<string[]>()) ?? [])
+            {
+                if (!TestTags.IsValid(tag))
+                    result.AddError($"Invalid --tag '{tag}': a tag holds only letters, digits, '-' and '_'.");
+            }
+        });
+        return option;
+    }
+
+    // --tag smoke --tag nightly and --tag smoke,nightly both select either tag.
+    private static IReadOnlyList<string>? Tags(string[]? values)
+    {
+        var tags = (values ?? [])
+            .SelectMany(value => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .ToList();
+        return tags.Count > 0 ? tags : null;
+    }
+
+    private static Command BuildListCommand()
+    {
+        var pathArgument = PathArgument("Test file or directory searched recursively for .dax tests (default: current directory)", ".");
+        var filterOption = new Option<string?>("--filter")
+        {
+            Description = "List only tests whose name matches a * wildcard pattern (case-insensitive)"
+        };
+        var tagOption = TagOption("List only tests with any of these tx: tags (case-insensitive). Repeatable.");
+
+        var command = new Command("list", "List the DAX tests in a folder")
+        {
+            pathArgument,
+            filterOption,
+            tagOption
+        };
+
+        command.SetAction(parseResult =>
+        {
+            var format = GlobalOptions.OutputFormatValue(parseResult);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "test list", OutputFormats.Text, OutputFormats.Json))
+                return 2;
+
+            var result = new TestListHandler().Handle(new TestListRequest(
+                parseResult.GetValue(pathArgument)!,
+                parseResult.GetValue(filterOption),
+                Tags(parseResult.GetValue(tagOption))));
+
+            var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+            return CommandOutput.Render(
+                result,
+                format,
+                data => TestScaffoldRenderer.RenderList(data, quiet),
+                data => data,
+                renderCsv: null,
+                errorFormat: errorFormat);
+        });
+
+        return command;
+    }
+
+    private Command BuildInitCommand()
+    {
+        var pathArgument = PathArgument("Folder to create the tests in (default: ./tests)", "./tests");
+        var fromModelOption = new Option<bool>("--from-model")
+        {
+            Description = "Also write smoke tests over the model's measures and tables (the --model path or active connection)"
+        };
+        var forceOption = new Option<bool>("--force")
+        {
+            Description = "Overwrite scaffold files that already exist with other content"
+        };
+
+        var command = new Command("init", "Scaffold a DAX test folder")
+        {
+            pathArgument,
+            fromModelOption,
+            forceOption
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var format = GlobalOptions.OutputFormatValue(parseResult);
+            var errorFormat = GlobalOptions.ErrorFormatValue(parseResult, format);
+            var quiet = parseResult.GetValue(GlobalOptions.Quiet);
+            if (!CommandOutput.TryValidateFormat(parseResult, format, "test init", OutputFormats.Text, OutputFormats.Json))
+                return 2;
+
+            ModelReference? model = null;
+            if (parseResult.GetValue(fromModelOption)
+                && !RecentConnections.TryResolveModel(parseResult, GlobalOptions.ModelValue(parseResult), _state, out model, out var exitCode))
+                return exitCode;
+
+            var request = new TestInitRequest(parseResult.GetValue(pathArgument)!, model, parseResult.GetValue(forceOption));
+            var result = await CliSpinner.RunAsync(
+                "Reading the model...",
+                () => new TestInitHandler(_providers).HandleAsync(request, cancellationToken),
+                suppress: quiet || OutputFormats.IsJson(format) || model is null);
+
+            return CommandOutput.Render(
+                result,
+                format,
+                data => TestScaffoldRenderer.RenderInit(data, quiet),
                 data => data,
                 renderCsv: null,
                 errorFormat: errorFormat);

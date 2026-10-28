@@ -52,24 +52,59 @@ public sealed record TestCompareOptions(TestTolerance? Tolerance = null, bool Ig
     private const string DirectivePrefix = "tx:";
 
     /// <summary>
-    /// Applies the test's own directives on top of these options. Directives sit in the
-    /// <c>//</c> or <c>--</c> comment lines before the first statement, for example
-    /// <c>// tx: tolerance=0.01 ignore-row-order</c>. Returns null with an
-    /// <paramref name="error"/> on an unknown key or bad value, so a typo fails the test
-    /// instead of silently comparing exactly.
+    /// Applies the test's own comparison directives on top of these options, ignoring its
+    /// assertions (see <see cref="WithDirectives(string, out TestAssertions, out string?)"/>).
     /// </summary>
     public TestCompareOptions? WithDirectives(string query, out string? error)
+        => WithDirectives(query, out _, out error);
+
+    /// <summary>
+    /// Applies the test's own directives on top of these options and reads its assertions.
+    /// Directives sit in the <c>//</c> or <c>--</c> comment lines before the first statement,
+    /// for example <c>// tx: tolerance=0.01 ignore-row-order</c>. <c>columns=</c> and
+    /// <c>expect-error=</c> take the rest of their line, since column names and patterns hold
+    /// spaces and commas. Returns null with an <paramref name="error"/> on an unknown key or bad
+    /// value, so a typo fails the test instead of silently comparing exactly.
+    /// </summary>
+    public TestCompareOptions? WithDirectives(string query, out TestAssertions assertions, out string? error)
+    {
+        var directives = ReadDirectives(query, out error);
+        assertions = directives?.Assertions ?? TestAssertions.None;
+        return directives?.Compare;
+    }
+
+    /// <summary>
+    /// Reads all of a test's <c>tx:</c> directives: its comparison settings on top of these
+    /// options, its assertions, and its tags. Null with an <paramref name="error"/> as for
+    /// <see cref="WithDirectives(string, out TestAssertions, out string?)"/>.
+    /// </summary>
+    public TestDirectives? ReadDirectives(string query, out string? error)
     {
         var options = this;
+        var assertions = TestAssertions.None;
+        var tags = new List<string>();
         error = null;
 
         var lines = query.ReplaceLineEndings("\n").Split('\n');
         foreach (var body in lines.Take(HeaderLength(lines)).Select(DirectiveBody).OfType<string>())
         {
-            foreach (var directive in body.Split(' ', '\t', ','))
+            foreach (var directive in SplitDirectives(body))
             {
-                if (directive.Length == 0)
+                if (directive.StartsWith(TagsKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!TryReadTags(directive, tags, out error))
+                        return null;
                     continue;
+                }
+
+                var applied = TryApplyAssertion(directive, assertions, out var handled, out error);
+                if (error is not null)
+                    return null;
+                if (handled)
+                {
+                    assertions = applied!;
+                    continue;
+                }
 
                 options = options.Apply(directive, out error);
                 if (options is null)
@@ -77,7 +112,129 @@ public sealed record TestCompareOptions(TestTolerance? Tolerance = null, bool Ig
             }
         }
 
-        return options;
+        if (assertions.ExpectError && (assertions.ChecksResult || assertions.Snapshot))
+        {
+            error = "Invalid directives: expect-error cannot be combined with rows, columns or snapshot, since a query expected to fail returns no result.";
+            return null;
+        }
+
+        return new TestDirectives(options, assertions, tags.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
+    private static readonly char[] DirectiveSeparators = [' ', '\t', ','];
+
+    private static readonly char[] Whitespace = [' ', '\t'];
+
+    private static readonly string[] RestOfLineKeys = ["columns=", "expect-error="];
+
+    private const string TagsKey = "tags=";
+
+    /// <summary>
+    /// Splits a directive line on spaces and commas; a rest-of-line directive keeps everything
+    /// after it, and <c>tags=</c> keeps its comma-separated list up to the next space.
+    /// </summary>
+    private static IEnumerable<string> SplitDirectives(string body)
+    {
+        var rest = body;
+        while (true)
+        {
+            rest = rest.TrimStart(DirectiveSeparators);
+            if (rest.Length == 0)
+                yield break;
+
+            if (RestOfLineKeys.Any(key => rest.StartsWith(key, StringComparison.OrdinalIgnoreCase)))
+            {
+                yield return rest.TrimEnd();
+                yield break;
+            }
+
+            var end = rest.StartsWith(TagsKey, StringComparison.OrdinalIgnoreCase)
+                ? rest.IndexOfAny(Whitespace)
+                : rest.IndexOfAny(DirectiveSeparators);
+            yield return end < 0 ? rest : rest[..end];
+            rest = end < 0 ? "" : rest[end..];
+        }
+    }
+
+    /// <summary>
+    /// Adds the names of a <c>tags=a,b</c> directive to <paramref name="tags"/>. A tag is letters,
+    /// digits, <c>-</c> and <c>_</c>, so it reads the same in a <c>--tag</c> option.
+    /// </summary>
+    private static bool TryReadTags(string directive, List<string> tags, out string? error)
+    {
+        var names = directive[TagsKey.Length..].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var bad = names.FirstOrDefault(name => !TestTags.IsValid(name));
+        if (names.Length == 0 || bad is not null)
+        {
+            error = bad is null
+                ? "Invalid directive 'tags=': it takes tag names, for example tags=smoke,nightly."
+                : $"Invalid directive '{directive}': tag '{bad}' may hold only letters, digits, '-' and '_'.";
+            return false;
+        }
+
+        tags.AddRange(names);
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Applies <paramref name="directive"/> to <paramref name="assertions"/> when it is an
+    /// assertion; <paramref name="handled"/> is false for any other key. Returns null with an
+    /// <paramref name="error"/> on a bad value.
+    /// </summary>
+    private static TestAssertions? TryApplyAssertion(
+        string directive, TestAssertions assertions, out bool handled, out string? error)
+    {
+        handled = true;
+        error = null;
+        var separator = directive.IndexOf('=');
+        var key = (separator < 0 ? directive : directive[..separator]).ToLowerInvariant();
+        var value = separator < 0 ? null : directive[(separator + 1)..].Trim();
+
+        switch (key)
+        {
+            case "rows" or "rows>" or "rows<":
+                if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var count))
+                {
+                    error = $"Invalid directive '{directive}': {key}= takes a whole number of rows, for example {key}=1.";
+                    return null;
+                }
+
+                return key switch
+                {
+                    "rows" => assertions with { Rows = count },
+                    "rows>" => assertions with { MinRows = count },
+                    _ => assertions with { MaxRows = count },
+                };
+
+            case "columns":
+                var columns = (value ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                if (columns.Length == 0)
+                {
+                    error = "Invalid directive 'columns': it takes the column names, for example columns=Sales[Region], [Total Sales].";
+                    return null;
+                }
+
+                return assertions with { Columns = columns };
+
+            case "snapshot" when value is null:
+                return assertions with { Snapshot = true };
+
+            case "snapshot":
+                error = $"Invalid directive '{directive}': snapshot takes no value.";
+                return null;
+
+            case "expect-error" when string.IsNullOrEmpty(value):
+                return assertions with { ExpectError = true, ErrorPattern = null };
+
+            case "expect-error":
+                var pattern = TestAssertions.ParsePattern(value!, out error);
+                return pattern is null ? null : assertions with { ExpectError = true, ErrorPattern = pattern };
+
+            default:
+                handled = false;
+                return null;
+        }
     }
 
     /// <summary>
@@ -149,7 +306,7 @@ public sealed record TestCompareOptions(TestTolerance? Tolerance = null, bool Ig
                 return null;
 
             default:
-                error = $"Unknown directive '{directive}'. Supported: tolerance=<value>, ignore-row-order[=true|false].";
+                error = $"Unknown directive '{directive}'. Supported: tolerance=<value>, ignore-row-order[=true|false], rows=<n>, rows>=<n>, rows<=<n>, columns=<names>, snapshot, expect-error[=<regex>], tags=<names>.";
                 return null;
         }
     }
