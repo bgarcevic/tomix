@@ -543,6 +543,7 @@ Run DAX regression tests against a live model
   opt --update  Record mode: run each query and (re)write its .expected.json snapshot from the actual result, listing what changed
   opt --update-missing  Record snapshots only for tests that have none yet; compare all other tests as usual
   opt --filter <pattern>  Run only tests whose name matches a * wildcard pattern (case-insensitive)
+  opt --tag <tag>  Run only tests with any of these tx: tags (case-insensitive). Repeatable.
   opt --param <name=value>  Query parameter as name=value, referenced as @name in DAX. Applied to every test. Repeatable.
   opt --max-rows <n>  Per-query row cap; a query exceeding it fails as an error (default: 10000)
   opt --tolerance <value>  Accept numeric cells within this difference: absolute (0.01) or relative to the larger value (0.1%)
@@ -552,6 +553,18 @@ Run DAX regression tests against a live model
   opt --baseline <profile>  Compare with the live model of this saved profile instead of .expected.json snapshots
   opt --baseline-server <workspace>  Compare with a live model on this server or workspace instead of snapshots (default: the tested model's server)
   opt --baseline-database <name>  Database of the baseline model (default: the profile's, or the tested model's)
+
+# tx test list
+List the DAX tests in a folder
+  arg [path]  Test file or directory searched recursively for .dax tests (default: current directory)
+  opt --filter <pattern>  List only tests whose name matches a * wildcard pattern (case-insensitive)
+  opt --tag <tag>  List only tests with any of these tx: tags (case-insensitive). Repeatable.
+
+# tx test init
+Scaffold a DAX test folder
+  arg [path]  Folder to create the tests in (default: ./tests)
+  opt --from-model  Also write smoke tests over the model's measures and tables (the --model path or active connection)
+  opt --force  Overwrite scaffold files that already exist with other content
 
 # tx ui
 Share a model session with a browser and agents

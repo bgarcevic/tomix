@@ -84,6 +84,7 @@ internal static class HelpPlaceholders
         ["--server"] = "workspace",
         ["--set"] = "name=value",
         ["--source"] = "provider",
+        ["--tag"] = "tag",
         ["--source-database"] = "name",
         ["--source-schema"] = "name",
         ["--source-table"] = "name",

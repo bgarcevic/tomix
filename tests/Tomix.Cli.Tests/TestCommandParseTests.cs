@@ -120,4 +120,47 @@ public sealed class TestCommandParseTests
 
         Assert.Contains(result.Errors, e => e.Message.Contains("--baseline and --baseline-server cannot be combined"));
     }
+
+    [Theory]
+    [InlineData("test", "--tag", "smoke", "--tag", "nightly")]
+    [InlineData("test", "list", "./tests", "--tag", "smoke,nightly")]
+    public void Test_TagsBind(params string[] args)
+    {
+        var result = Parse(args);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(["smoke", "nightly"], result.GetValue<string[]>("--tag")!.SelectMany(t => t.Split(',')));
+    }
+
+    [Theory]
+    [InlineData("test", "--tag", "smo ke")]
+    [InlineData("test", "list", "--tag", "a.b")]
+    public void Test_InvalidTag_FailsAtParseTime(params string[] args)
+        => Assert.Contains(Parse(args).Errors, e => e.Message.Contains("Invalid --tag"));
+
+    [Fact]
+    public void TestList_PathDefaultsToCurrentDirectory()
+    {
+        var result = Parse("test", "list", "--filter", "totals/*");
+
+        Assert.Empty(result.Errors);
+        Assert.Equal("list", result.CommandResult.Command.Name);
+        Assert.Equal(".", result.GetValue<string>("path"));
+        Assert.Equal("totals/*", result.GetValue<string?>("--filter"));
+    }
+
+    [Fact]
+    public void TestInit_DefaultsToTestsFolder_AndBindsItsOptions()
+    {
+        var defaults = Parse("test", "init");
+        Assert.Empty(defaults.Errors);
+        Assert.Equal("./tests", defaults.GetValue<string>("path"));
+
+        var result = Parse("test", "init", "./qa", "--from-model", "--force");
+        Assert.Empty(result.Errors);
+        Assert.Equal("init", result.CommandResult.Command.Name);
+        Assert.Equal("./qa", result.GetValue<string>("path"));
+        Assert.True(result.GetValue<bool>("--from-model"));
+        Assert.True(result.GetValue<bool>("--force"));
+    }
 }

@@ -589,6 +589,7 @@ single test file or a directory searched recursively for `.dax` files
 | `--update` | Record mode: run each query and (re)write its `.expected.json` from the actual result, listing what each rewrite changed. Byte-identical snapshots are left untouched. |
 | `--update-missing` | Record snapshots only for tests that have none yet, and compare every other test as usual. Cannot be combined with `--update`. |
 | `--filter <pattern>` | Run only tests whose name matches a `*` wildcard pattern (case-insensitive). |
+| `--tag <tag>` | Run only tests with any of these [tags](#tags) (case-insensitive). Repeatable, or comma-separated: `--tag smoke,nightly`. |
 | `--param <name=value>` | Query parameter applied to every test, referenced as `@name` in DAX. Repeatable. |
 | `--max-rows <n>` | Per-query row cap; a query exceeding it fails as an error (default: `10000`). |
 | `--tolerance <value>` | Accept numeric cells within this difference: absolute (`0.01`) or relative to the larger value (`0.1%`). Applies to every test unless it sets its own. |
@@ -604,8 +605,9 @@ instance — never on TMDL/BIM files. Target the model with `-s <workspace>
 -d <model>` or the active session. Read access is enough: the Viewer role
 with Build permission on the model.
 
-**Workflow.** Add a test by writing a `.dax` file (any `EVALUATE` query),
-then record its snapshot:
+**Workflow.** Start a test folder with [`tx test init`](#test-init), or add a
+test by writing a `.dax` file (any `EVALUATE` query), then record its
+snapshot:
 
 ```sh
 tx test ./tests --update-missing -s MyWorkspace -d MyModel   # record new snapshots
@@ -613,7 +615,7 @@ tx test ./tests -s MyWorkspace -d MyModel                    # verify: all PASS,
 ```
 
 A test without a snapshot fails the run as `MISS` (a new test must not
-silently pass); a result that drifts from its snapshot fails as `FAIL` with a
+silently pass), unless it states [assertions](#assertions) instead; a result that drifts from its snapshot fails as `FAIL` with a
 difference table. `--update-missing` records only the `MISS` tests and still
 compares the rest, so it never accepts a failing test and its exit code still
 reports regressions.
@@ -685,6 +687,156 @@ Directives are `tolerance=<value>` (`tolerance=0` compares exactly) and
 statement are read. An unknown directive or a bad value fails the test as
 `ERR`, so a typo never silently compares exactly.
 
+### Assertions
+
+A snapshot pins every value, so it fails whenever the data changes. To check
+only what must hold, such as "the table has rows" or "the result has these
+columns", state it in a `tx:` line. A test with an assertion needs no
+snapshot:
+
+```dax
+// Sales loads after a refresh, whatever the figures
+// tx: rows>=1
+// tx: columns=Sales[Region], [Total Sales]
+EVALUATE
+SUMMARIZECOLUMNS ( Sales[Region], "Total Sales", [Total Sales] )
+```
+
+| Directive | Passes when |
+|-----------|-------------|
+| `rows=<n>` | The result has exactly `n` rows. |
+| `rows>=<n>` | The result has at least `n` rows. |
+| `rows<=<n>` | The result has at most `n` rows. Combine with `rows>=` for a range. |
+| `columns=<names>` | Every listed column is in the result, in any order. Other columns may appear too. Separate names with commas and write them as the query returns them: `Sales[Region]` for a column, `[Total Sales]` for a measure or an added column. Names compare case-insensitively, and `'Sales'[Region]` matches `Sales[Region]`. |
+| `expect-error` | The query fails. |
+| `expect-error=<regex>` | The query fails with an error message the regular expression matches (case-insensitive, anywhere in the message). |
+
+`columns=` and `expect-error=` take the rest of their line, so write either one
+last on its line. A test that breaks an assertion fails as `FAIL`, with one
+line per broken assertion (`Expected at least 1 row(s), got 0.`).
+
+**With a snapshot.** Assertions normally replace the snapshot, so recording
+never creates one for a test with a result assertion: `--update-missing`
+skips it, and `--update` only re-records a snapshot the test already has. To
+pin the values as well, add `snapshot`:
+
+```dax
+// tx: rows=12 snapshot
+EVALUATE SUMMARIZECOLUMNS ( 'Date'[Month], "Sales", [Total Sales] )
+```
+
+The test then works like any snapshot test, with its assertions checked too:
+it is `MISS` until recorded, and `--update`/`--update-missing` record it. In
+every case nothing is recorded while an assertion fails, because a broken
+assertion is fixed in the `.dax` file, not accepted by recording. `snapshot`
+takes no value, and on a test without result assertions it changes nothing.
+
+**Negative tests.** `expect-error` proves that a query *fails*. For example,
+it can check that a removed column is gone, or that an `ERROR()` guard in a
+measure fires:
+
+```dax
+// The Legacy table was dropped in v2
+// tx: expect-error=cannot be found
+EVALUATE Legacy
+```
+
+The test fails if the query returns a result (a result cut off by
+`--max-rows` counts as one), or if it fails with an error that doesn't match.
+A test that expects an error has no snapshot and is never recorded, and
+`expect-error` cannot be combined with `rows`, `columns` or `snapshot`.
+
+**With a baseline model.** Assertions check the tested model only. A
+`rows`/`columns` test is also compared with the baseline, and an
+`expect-error` test runs only on the tested model.
+
+### Tags
+
+Group tests with a `tags=` directive and run a group with `--tag`:
+
+```dax
+// tx: tags=smoke,nightly rows>=1
+EVALUATE Sales
+```
+
+```sh
+tx test ./tests --tag smoke                # tests tagged smoke
+tx test ./tests --tag smoke --tag nightly  # tagged smoke or nightly
+```
+
+A tag holds letters, digits, `-` and `_`, and compares case-insensitively.
+Separate several with commas and no spaces; other directives may follow on
+the same line after a space. `--tag` combines with `--filter`: a test must
+match both. A test whose directives are invalid always runs, so its `ERR`
+shows instead of the test silently dropping out. A tagged run doesn't report
+orphaned snapshots, because an orphan has no `.dax` file to carry tags.
+
+### `test list`
+
+```
+tx test list [path] [--filter <pattern>] [--tag <tag>]
+```
+
+Lists the tests `tx test` would run. It only reads the folder, so it needs no
+model or connection. For each test it shows the tags and what decides it:
+`snapshot`, `assertions`, `assertions+snapshot` or `expect-error`. It also
+flags a test that still needs a snapshot recorded, and a test whose
+directives are invalid (with the error).
+
+| Option | Description |
+|--------|-------------|
+| `--filter <pattern>` | List only tests whose name matches a `*` wildcard pattern. |
+| `--tag <tag>` | List only tests with any of these tags. |
+
+In JSON, each entry in `tests` has `name`, `file`, `tags`, `checks`,
+`hasSnapshot` and `error` (`checks` is `null` for an invalid test).
+
+### `test init`
+
+```
+tx test init [path] [--from-model] [--force]
+```
+
+Scaffolds a test folder at `path` (default: `./tests`). It writes:
+
+- `README.md`: the test format, the record and verify workflow, the `tx:`
+  directives, and a CI command.
+- `smoke/connection.dax`: `EVALUATE ROW ( "Ok", 1 )` with `rows=1`, which
+  proves the target answers queries and needs no snapshot.
+
+With `--from-model`, it also reads the model named by `--model` (or the active
+connection) and adds two more tests. For a TMDL folder or a `.bim` file this
+works offline.
+
+- `smoke/measure-errors.dax`: lists the measures whose DAX is broken (a
+  syntax error, or a reference to a column or measure that no longer
+  exists), with `rows=0`. It reads `INFO.MEASURES()`, so it calculates no
+  measure and stays cheap on any model size, and it covers hidden measures
+  too. It needs a server with the `INFO` functions: Power BI, Fabric or a
+  recent Analysis Services. It catches broken definitions, not errors that
+  appear only when a value is calculated or wrong numbers; pin those with
+  your own tests. Written only when the model has measures.
+- `smoke/table-rows.dax`: lists the tables that have no rows, with `rows=0`,
+  so it fails when a refresh loads nothing and passes without a snapshot.
+  Calculation groups are left out. To see which tables are empty, run the
+  file with `tx query --file`.
+
+Every scaffolded test is tagged `smoke` and is decided by `tx:` assertions,
+so none needs a snapshot and none breaks when the data refreshes. `init`
+never runs a query. It prints what to run next: `tx test <path>`.
+
+| Option | Description |
+|--------|-------------|
+| `--from-model` | Also write the measure and table tests from the model. |
+| `--force` | Overwrite scaffold files that already exist with other content. |
+
+`init` adds to a folder that already has tests. A scaffold file that already
+exists with the same content is left alone and reported as existing. One
+that exists with other content stops `init` before it writes anything (exit
+`2`, `TOMIX_TEST_INIT_EXISTS`, naming the files), unless you pass `--force`.
+In JSON the result is `path`, `created`, `skipped` (files already in place)
+and `nextSteps`.
+
 ### Comparing two models
 
 Snapshots compare a model with its own past. To prove that two models return
@@ -725,6 +877,9 @@ tx test ./tests --update-missing
 tx test ./tests --filter "totals/*" --trx results.trx --ci vsts
 tx test ./tests --tolerance 0.01% --ignore-row-order
 tx test ./tests -s Dev -d Sales --baseline prod
+tx test ./tests --tag smoke
+tx test list ./tests
+tx test init --from-model -m ./MyModel.SemanticModel
 ```
 
 ## `vertipaq` — storage statistics

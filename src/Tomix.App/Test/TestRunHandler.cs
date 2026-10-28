@@ -17,6 +17,9 @@ namespace Tomix.App.Test;
 /// and snapshots whose test is gone are reported as orphans. With a baseline model
 /// (<c>--baseline</c>) each query runs on both models at once and the baseline's result takes
 /// the snapshot's place: no snapshot is read or written and no orphans are reported.
+/// A test's <c>tx:</c> assertions (<see cref="TestAssertions"/>) are checked on the tested model
+/// in every mode; one with a result assertion needs no snapshot unless it states <c>snapshot</c>,
+/// and one that expects an error is never compared or recorded.
 /// Per-test problems are result data (like BPA violations) so the run continues and the full
 /// report renders; only authentication failures abort. Any non-passing test yields exit code 1
 /// via the Ok-with-exit-code pattern from <see cref="Bpa.BpaRunHandler"/>.
@@ -24,6 +27,8 @@ namespace Tomix.App.Test;
 public sealed class TestRunHandler
 {
     private static readonly string[] ValidLeadingKeywords = ["DEFINE", "EVALUATE", "SELECT"];
+
+    private const string QueryFailedPrefix = "Query failed: ";
 
     private readonly IReadOnlyList<IModelProvider> _providers;
     private readonly Func<CliConnectionState?> _resolveSession;
@@ -57,22 +62,23 @@ public sealed class TestRunHandler
                 exitCode: 2,
                 hint: "Pass a .dax file or a directory containing .dax test files.");
 
-        var tests = TestDiscovery.Discover(request.Path)
-            .Where(test => TestDiscovery.MatchesFilter(test.Name, request.Filter))
-            .ToList();
+        var tests = TestTags.Select(
+            TestDiscovery.Discover(request.Path)
+                .Where(test => TestDiscovery.MatchesFilter(test.Name, request.Filter))
+                .ToList(),
+            request.Tags);
         if (tests.Count == 0)
             return TomixResult<TestRunResult>.Fail(
                 "TOMIX_TEST_NONE_FOUND",
-                string.IsNullOrWhiteSpace(request.Filter)
-                    ? $"No .dax test files found under: {request.Path}"
-                    : $"No .dax test files match --filter {request.Filter} under: {request.Path}",
+                $"No .dax test files {TestDiscovery.Selection(request.Filter, request.Tags)}under: {request.Path}",
                 exitCode: 2,
                 hint: request.HasBaseline
                     ? "Each test is a .dax file; with a baseline model it needs no .expected.json snapshot."
                     : "Each test is a .dax file with a sibling .expected.json snapshot (record with 'tx test --update-missing').");
 
-        // A baseline run ignores snapshots, so a snapshot without a test is no concern of it.
-        var orphans = request.HasBaseline
+        // A baseline run ignores snapshots, so a snapshot without a test is no concern of it; and
+        // an orphan has no .dax to carry tags, so a tagged run cannot tell whether it is in scope.
+        var orphans = request.HasBaseline || request.Tags is { Count: > 0 }
             ? []
             : TestDiscovery.FindOrphans(request.Path)
                 .Where(orphan => TestDiscovery.MatchesFilter(orphan.Name, request.Filter))
@@ -206,7 +212,7 @@ public sealed class TestRunHandler
                 continue;
             }
 
-            var compare = (request.Compare ?? TestCompareOptions.Exact).WithDirectives(query, out var directiveError);
+            var compare = (request.Compare ?? TestCompareOptions.Exact).WithDirectives(query, out var assertions, out var directiveError);
             if (compare is null)
             {
                 results.Add(Case(test, TestOutcome.Error, watch, directiveError));
@@ -225,6 +231,17 @@ public sealed class TestRunHandler
             var queryRequest = new ModelQueryRequest(query, request.Parameters, maxRows);
             var queryHash = TestSnapshotFile.ComputeQueryHash(query);
 
+            // A test that expects an error checks only the tested model: it has no result to
+            // compare with a snapshot or a baseline model.
+            if (assertions.ExpectError)
+            {
+                var (failedResult, failure) = await ExecuteAsync(querySession, queryRequest, cancellationToken).ConfigureAwait(false);
+                server ??= failedResult?.Server;
+                database ??= failedResult?.Database;
+                results.Add(CheckExpectedError(test, failedResult, failure, assertions, watch));
+                continue;
+            }
+
             if (baseline is { } other)
             {
                 // Both sides at once; the loop still finishes one test before the next, so the
@@ -240,7 +257,7 @@ public sealed class TestRunHandler
                 baselineServer ??= baselineResult?.Server;
                 baselineDatabase ??= baselineResult?.Database;
 
-                results.Add(CompareBaseline(test, actualResult, actualError, baselineResult, baselineError, queryHash, compare, watch));
+                results.Add(CompareBaseline(test, actualResult, actualError, baselineResult, baselineError, queryHash, compare, assertions, watch));
                 continue;
             }
 
@@ -254,7 +271,16 @@ public sealed class TestRunHandler
             }
 
             var actual = result!;
-            if (request.Update || (request.UpdateMissing && !File.Exists(test.ExpectedPath)))
+            var assertionFailures = assertions.Check(actual);
+
+            // A test whose assertions stand in for a snapshot never gets one from recording; --update
+            // still re-records one it has. Nothing is recorded while an assertion fails (fix that in
+            // the .dax).
+            var hasSnapshot = File.Exists(test.ExpectedPath);
+            var record = assertionFailures.Count == 0 && (assertions.UsesSnapshot
+                ? request.Update || (request.UpdateMissing && !hasSnapshot)
+                : request.Update && hasSnapshot);
+            if (record)
             {
                 results.Add(UpdateSnapshot(test, actual, queryHash, watch, out var writeError));
                 if (writeError is not null)
@@ -265,7 +291,7 @@ public sealed class TestRunHandler
             }
             else
             {
-                results.Add(CompareSnapshot(test, actual, queryHash, compare, watch));
+                results.Add(CompareSnapshot(test, actual, queryHash, compare, assertions, assertionFailures, watch));
             }
         }
 
@@ -310,7 +336,7 @@ public sealed class TestRunHandler
         catch (Exception ex) when (ex is not OperationCanceledException and not AuthenticationRequiredException)
         {
             var message = ex is InvalidOperationException ? ex.Message : ex.InnerException?.Message ?? ex.Message;
-            return (null, $"Query failed: {message}");
+            return (null, QueryFailedPrefix + message);
         }
 
         return result.Truncated
@@ -330,6 +356,7 @@ public sealed class TestRunHandler
         string? baselineError,
         string queryHash,
         TestCompareOptions compare,
+        TestAssertions assertions,
         Stopwatch watch)
     {
         if (actualError is not null && baselineError is not null)
@@ -340,11 +367,10 @@ public sealed class TestRunHandler
         if (baselineError is not null)
             return Case(test, TestOutcome.Error, watch, $"Baseline model: {baselineError}", side: TestSide.Baseline);
 
+        // The assertions hold the tested model to the test's own rules; the baseline only to agreement.
         var comparison = TestResultComparer.Compare(TestSnapshotFile.FromResult(baseline!, queryHash), actual!, compare);
-        return comparison.Passed
-            ? Case(test, TestOutcome.Passed, watch)
-            : Case(test, TestOutcome.Failed, watch, $"{comparison.TotalDifferences} difference(s) from the baseline model.",
-                comparison.Differences, comparison.TotalDifferences);
+        return Verdict(test, assertions.Check(actual!), comparison, watch,
+            $"{comparison.TotalDifferences} difference(s) from the baseline model.");
     }
 
     private static TestCaseResult CompareSnapshot(
@@ -352,26 +378,72 @@ public sealed class TestRunHandler
         ModelQueryResult actual,
         string queryHash,
         TestCompareOptions compare,
+        TestAssertions assertions,
+        IReadOnlyList<string> assertionFailures,
         Stopwatch watch)
     {
         if (!File.Exists(test.ExpectedPath))
-            return Case(test, TestOutcome.Missing, watch,
-                "No snapshot recorded. Run 'tx test --update-missing' to record it.");
+        {
+            // A broken assertion outranks the missing snapshot: recording would not fix it.
+            if (!assertions.UsesSnapshot || assertionFailures.Count > 0)
+                return Verdict(test, assertionFailures, comparison: null, watch, differencesMessage: "");
+
+            return Case(test, TestOutcome.Missing, watch, assertions.Snapshot
+                ? "No snapshot recorded. Run 'tx test --update-missing' to record it."
+                : "No snapshot recorded. Run 'tx test --update-missing' to record it, or check the result with a tx: rows or columns assertion instead.");
+        }
 
         var snapshot = TestSnapshotFile.Load(test.ExpectedPath, out var loadError);
         if (snapshot is null)
             return Case(test, TestOutcome.Error, watch, loadError);
 
         var comparison = TestResultComparer.Compare(snapshot, actual, compare);
-        if (comparison.Passed)
-            return Case(test, TestOutcome.Passed, watch);
-
         var message = $"{comparison.TotalDifferences} difference(s).";
         if (!string.Equals(snapshot.QuerySha256, queryHash, StringComparison.Ordinal))
             message += " The query changed since the snapshot was recorded — run 'tx test --update' if intended.";
 
-        return Case(test, TestOutcome.Failed, watch, message,
-            comparison.Differences, comparison.TotalDifferences);
+        return Verdict(test, assertionFailures, comparison, watch, message);
+    }
+
+    /// <summary>
+    /// Passed when every assertion holds and the comparison (if any) found no difference;
+    /// otherwise Failed, with the broken assertions first and then the differences.
+    /// </summary>
+    private static TestCaseResult Verdict(
+        DiscoveredTest test,
+        IReadOnlyList<string> assertionFailures,
+        TestComparison? comparison,
+        Stopwatch watch,
+        string differencesMessage)
+    {
+        var differs = comparison is { Passed: false };
+        if (assertionFailures.Count == 0 && !differs)
+            return Case(test, TestOutcome.Passed, watch);
+
+        var message = string.Join(" ", differs ? assertionFailures.Append(differencesMessage) : assertionFailures);
+        return differs
+            ? Case(test, TestOutcome.Failed, watch, message, comparison!.Differences, comparison.TotalDifferences)
+            : Case(test, TestOutcome.Failed, watch, message);
+    }
+
+    /// <summary>
+    /// An <c>expect-error</c> test passes when its query fails with a matching error. A query
+    /// cut off by <c>--max-rows</c> still ran, so it counts as one that succeeded.
+    /// </summary>
+    private static TestCaseResult CheckExpectedError(
+        DiscoveredTest test,
+        ModelQueryResult? result,
+        string? error,
+        TestAssertions assertions,
+        Stopwatch watch)
+    {
+        var queryError = result is null && error is not null
+            ? error.StartsWith(QueryFailedPrefix, StringComparison.Ordinal) ? error[QueryFailedPrefix.Length..] : error
+            : null;
+        var failure = assertions.CheckError(result, queryError);
+        return failure is null
+            ? Case(test, TestOutcome.Passed, watch)
+            : Case(test, TestOutcome.Failed, watch, failure);
     }
 
     private static TestCaseResult UpdateSnapshot(

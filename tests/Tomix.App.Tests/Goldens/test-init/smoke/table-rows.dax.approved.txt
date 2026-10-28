@@ -1,0 +1,12 @@
+// Lists the tables that have no rows; passes when there are none, so a refresh that
+// loads nothing fails it. To see which tables are empty, run it with 'tx query'.
+// tx: tags=smoke rows=0
+EVALUATE
+FILTER (
+    {
+        ( "Customers", COUNTROWS ( 'Customers' ) ),
+        ( "Products", COUNTROWS ( 'Products' ) ),
+        ( "Sales", COUNTROWS ( 'Sales' ) )
+    },
+    ISBLANK ( [Value2] )
+)

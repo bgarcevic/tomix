@@ -1,0 +1,4 @@
+// Proves the model answers queries. The tx: line asserts on the result, so this test
+// needs no snapshot.
+// tx: tags=smoke rows=1
+EVALUATE ROW ( "Ok", 1 )

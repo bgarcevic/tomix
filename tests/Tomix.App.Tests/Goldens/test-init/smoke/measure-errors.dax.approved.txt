@@ -1,0 +1,11 @@
+// Lists the measures whose DAX is broken: a syntax error, or a reference to a column or
+// measure that no longer exists. It reads the model's metadata and calculates no measure,
+// so it stays cheap on any model size. It needs INFO functions (Power BI, Fabric or a
+// recent Analysis Services). To see which measures are broken, run it with 'tx query'.
+// tx: tags=smoke rows=0
+EVALUATE
+SELECTCOLUMNS (
+    FILTER ( INFO.MEASURES (), NOT ISBLANK ( [ErrorMessage] ) ),
+    "Measure", [Name],
+    "Error", [ErrorMessage]
+)

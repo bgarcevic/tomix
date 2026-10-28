@@ -81,4 +81,90 @@ public sealed class TestCompareOptionsTests
         Assert.Null(options);
         Assert.Contains(message, error);
     }
+
+    [Theory]
+    [InlineData("// tx: rows=3", 3, null, null)]
+    [InlineData("// tx: rows>=1", null, 1, null)]
+    [InlineData("// tx: rows<=10", null, null, 10)]
+    [InlineData("// tx: rows>=1 rows<=10", null, 1, 10)]
+    [InlineData("// tx: rows=0, rows>=0", 0, 0, null)]
+    [InlineData("-- TX: Rows>=2", null, 2, null)]
+    [InlineData("// tx: rows=1\n// tx: rows=4", 4, null, null)]  // the last one wins
+    public void WithDirectives_ReadsRowAssertions(string header, int? rows, int? minRows, int? maxRows)
+    {
+        TestCompareOptions.Exact.WithDirectives(header + "\nEVALUATE T", out var assertions, out var error);
+
+        Assert.Null(error);
+        Assert.Equal((rows, minRows, maxRows), (assertions.Rows, assertions.MinRows, assertions.MaxRows));
+        Assert.True(assertions.ChecksResult);
+    }
+
+    [Fact]
+    public void WithDirectives_ColumnsTakeTheRestOfTheLine()
+    {
+        var options = TestCompareOptions.Exact.WithDirectives(
+            "// tx: tolerance=0.01 columns='Sales Data'[Region],  [Total Sales] ,[Margin %]\nEVALUATE T",
+            out var assertions, out var error);
+
+        Assert.Null(error);
+        Assert.Equal(0.01, options!.Tolerance?.Value);
+        Assert.Equal(["'Sales Data'[Region]", "[Total Sales]", "[Margin %]"], assertions.Columns);
+    }
+
+    [Theory]
+    [InlineData("// tx: expect-error", null)]
+    [InlineData("// tx: expect-error ignore-row-order", null)]
+    [InlineData("// tx: expect-error=Column 'Foo', in table .*", "Column 'Foo', in table .*")]
+    public void WithDirectives_ReadsExpectError(string header, string? pattern)
+    {
+        TestCompareOptions.Exact.WithDirectives(header + "\nEVALUATE T", out var assertions, out var error);
+
+        Assert.Null(error);
+        Assert.True(assertions.ExpectError);
+        Assert.Equal(pattern, assertions.ErrorPattern?.ToString());
+        Assert.False(assertions.ChecksResult);
+    }
+
+    [Theory]
+    [InlineData("// tx: rows>=1", false, false)]
+    [InlineData("// tx: rows>=1 snapshot", true, true)]
+    [InlineData("// tx: SNAPSHOT\n// tx: columns=[A]", true, true)]
+    [InlineData("// tx: snapshot", true, true)]
+    [InlineData("// tx: tolerance=0.01", false, true)]
+    public void WithDirectives_ReadsSnapshot(string header, bool snapshot, bool usesSnapshot)
+    {
+        TestCompareOptions.Exact.WithDirectives(header + "\nEVALUATE T", out var assertions, out var error);
+
+        Assert.Null(error);
+        Assert.Equal((snapshot, usesSnapshot), (assertions.Snapshot, assertions.UsesSnapshot));
+    }
+
+    [Fact]
+    public void WithDirectives_HasNoAssertions_WhenTheTestSetsNone()
+    {
+        TestCompareOptions.Exact.WithDirectives("// tx: tolerance=0.01\nEVALUATE T", out var assertions, out _);
+
+        Assert.Same(TestAssertions.None, assertions);
+    }
+
+    [Theory]
+    [InlineData("// tx: rows", "takes a whole number")]
+    [InlineData("// tx: rows=-1", "takes a whole number")]
+    [InlineData("// tx: rows>=many", "rows>= takes a whole number")]
+    [InlineData("// tx: rows<=", "rows<= takes a whole number")]
+    [InlineData("// tx: rows<3", "Unknown directive 'rows<3'")]
+    [InlineData("// tx: columns=", "takes the column names")]
+    [InlineData("// tx: columns= , ", "takes the column names")]
+    [InlineData("// tx: expect-error=([unclosed", "not a valid regular expression")]
+    [InlineData("// tx: expect-error\n// tx: rows=0", "cannot be combined")]
+    [InlineData("// tx: columns=[A]\n// tx: expect-error", "cannot be combined")]
+    [InlineData("// tx: snapshot expect-error", "cannot be combined")]
+    [InlineData("// tx: snapshot=true", "snapshot takes no value")]
+    public void WithDirectives_RejectsBadAssertions(string header, string message)
+    {
+        var options = TestCompareOptions.Exact.WithDirectives(header + "\nEVALUATE T", out _, out var error);
+
+        Assert.Null(options);
+        Assert.Contains(message, error);
+    }
 }

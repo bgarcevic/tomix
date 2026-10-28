@@ -431,6 +431,8 @@ public sealed class ValidateModelHandlerTests
     // Built by the expression, but used outside the table that has it.
     [InlineData("COUNTROWS(FILTER(ADDCOLUMNS(Sales, \"@Required\", 1), TRUE())) + [@Required]", "@Required")]
     [InlineData("VAR T = ADDCOLUMNS(Sales, \"@Required\", 1) RETURN SUMX(T, [@Required])", null)]
+    // The server defines INFO.* columns, so a bare name there cannot be judged offline.
+    [InlineData("COUNTROWS(FILTER(INFO.VIEW.MEASURES(), [IsHidden]))", null)]
     public async Task HandleAsync_AcceptsQueryScopedColumns(string expression, string? warnedName)
     {
         var result = await ValidateAsync(SalesSnapshot(Measure("Total", expression)));

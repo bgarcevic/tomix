@@ -237,7 +237,10 @@ Emitted by `test` (DAX regression tests against a live model).
 | Code | Exit | Trigger |
 |------|------|---------|
 | `TOMIX_TEST_PATH_NOT_FOUND` | 2 | The path argument does not exist. |
-| `TOMIX_TEST_NONE_FOUND` | 2 | No `.dax` test files were found under the path (or none match `--filter`). |
+| `TOMIX_TEST_NONE_FOUND` | 2 | No `.dax` test files were found under the path (or none match `--filter` or `--tag`). |
+| `TOMIX_TEST_INIT_EXISTS` | 2 | `test init` would overwrite files that already exist with other content; pass `--force` to overwrite them. |
+| `TOMIX_TEST_INIT_NOT_A_DIRECTORY` | 2 | The `test init` path is an existing file, not a folder. |
+| `TOMIX_TEST_INIT_WRITE_FAILED` | 1 | A `test init` scaffold file could not be written. |
 | `TOMIX_TEST_CONFLICTING_OPTIONS` | 2 | `--update` and `--update-missing` were both passed, or a baseline (`--baseline`, `--baseline-server`, `--baseline-database`) was combined with either. |
 | `TOMIX_TEST_BASELINE_NO_SERVER` | 2 | `--baseline` named a profile without a server; a baseline must be a live model. |
 | `TOMIX_TEST_BAD_PARAM` | 2 | A `--param` value was not formatted as `name=value`. |
