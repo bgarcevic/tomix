@@ -131,7 +131,8 @@ public sealed class BpaRulesListHandler
                     allowExternal: false,
                     BpaRuleHintContext.List,
                     _httpClient,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    request.Model).ConfigureAwait(false);
                 loaded.AddRange(model.Collections);
                 diagnostics.AddRange(model.Diagnostics);
             }

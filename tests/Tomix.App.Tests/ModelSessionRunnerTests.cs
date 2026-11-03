@@ -24,6 +24,19 @@ public sealed class ModelSessionRunnerTests
     }
 
     [Fact]
+    public async Task OneShotLease_EmptyModel_ReportsNoModelInsteadOfBlankPath()
+    {
+        // An omitted model with no active connection arrives as an empty reference.
+        var source = new OneShotSessionSource([new StubProvider(new RecordingSession())]);
+
+        var ex = await Assert.ThrowsAsync<ModelSessionUnavailableException>(
+            () => source.LeaseAsync(new ModelReference(""), CancellationToken.None));
+
+        Assert.Equal("TOMIX_NO_MODEL", ex.Code);
+        Assert.Equal("No model specified and no active connection.", ex.Message);
+    }
+
+    [Fact]
     public async Task RunAsync_OpensRunsAndDisposesSession()
     {
         var session = new RecordingSession();
