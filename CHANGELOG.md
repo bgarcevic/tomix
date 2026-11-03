@@ -10,6 +10,16 @@ and the API surface that major versions protect.
 
 ## [Unreleased]
 
+### Fixed
+
+- `bpa run` and `bpa rules list` now find a model's external rule files
+  (`BestPracticeAnalyzer_ExternalRuleFiles`) when the path is written relative to the
+  `X.SemanticModel` folder, as Tabular Editor resolves it, as well as relative to the TMDL
+  `definition` folder. A missing file now lists every path that was tried, and the suggested
+  `tx set` fix names the analyzed model instead of `.`.
+- Running a model command with no model and no active connection now reports "No model specified
+  and no active connection." instead of `No provider can open model:` with a blank path.
+
 ## [0.15.0] - 2026-10-28
 
 ### Added

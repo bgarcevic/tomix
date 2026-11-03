@@ -92,6 +92,51 @@ public sealed class BpaModelRuleLoaderTests
     }
 
     [Fact]
+    public async Task LoadAsync_PbipPathAnchoredAtSemanticModelFolder_ResolvesFromDefinitionFolder()
+    {
+        // Tabular Editor anchors a TMDL model's paths at the folder containing the definition
+        // folder, so a PBIP annotation reaches one level less far than it would from definition.
+        using var root = new TempDir();
+        var definition = root.CreateSubdirectory("Sales.SemanticModel", "definition");
+        root.WriteFile(Path.Combine(".devops", "bpa-rules.json"), OneRuleJson);
+        var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"..\\\\.devops\\\\bpa-rules.json\"]"));
+
+        var outcome = await BpaModelRuleLoader.LoadAsync(props, definition, allowExternal: false, CancellationToken.None);
+
+        Assert.Equal("R1", Assert.Single(Assert.Single(outcome.Collections).Rules).Id);
+        Assert.Empty(outcome.Diagnostics);
+    }
+
+    [Fact]
+    public async Task LoadAsync_MissingExternalFile_ListsEveryResolvedCandidate()
+    {
+        using var root = new TempDir();
+        var definition = root.CreateSubdirectory("Sales.SemanticModel", "definition");
+        var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"rules.json\"]"));
+
+        var outcome = await BpaModelRuleLoader.LoadAsync(props, definition, allowExternal: false, CancellationToken.None);
+
+        var diagnostic = Assert.Single(outcome.Diagnostics);
+        Assert.Contains(Path.Combine(definition, "rules.json"), diagnostic);
+        Assert.Contains(Path.Combine(root.Path, "Sales.SemanticModel", "rules.json"), diagnostic);
+    }
+
+    [Theory]
+    [InlineData(@".\Finans.SemanticModel\", @"tx set .\Finans.SemanticModel --set")]
+    [InlineData(@"C:\BI\Semantic Models\Finans.SemanticModel", "tx set \"C:\\BI\\Semantic Models\\Finans.SemanticModel\" --set")]
+    [InlineData("powerbi://api.powerbi.com/v1.0/myorg/WS", "tx set --set")]
+    public async Task LoadAsync_MissingExternalFile_RemedyTargetsTheAnalyzedModel(string model, string expected)
+    {
+        var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"does-not-exist.json\"]"));
+
+        var outcome = await BpaModelRuleLoader.LoadAsync(
+            props, Path.GetTempPath(), allowExternal: false, BpaRuleHintContext.Run,
+            httpClient: null, CancellationToken.None, new ModelReference(model));
+
+        Assert.Contains(expected, Assert.Single(outcome.Diagnostics));
+    }
+
+    [Fact]
     public async Task LoadAsync_MissingExternalFile_ReportsDiagnosticWithRemedies()
     {
         var props = Annotations((BpaModelRuleLoader.ExternalFilesKey, "[\"does-not-exist.json\"]"));

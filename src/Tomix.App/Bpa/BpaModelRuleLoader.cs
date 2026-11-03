@@ -79,14 +79,15 @@ public static class BpaModelRuleLoader
         bool allowExternal,
         BpaRuleHintContext hints,
         HttpClient? httpClient,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ModelReference? model = null)
     {
         var collections = new List<BpaRuleCollection>();
         var diagnostics = new List<string>();
 
         LoadEmbedded(modelProperties, collections, diagnostics);
         await LoadExternalAsync(
-                modelProperties, baseDirectory, allowExternal, hints, collections, diagnostics, httpClient, cancellationToken)
+                modelProperties, baseDirectory, allowExternal, hints, model, collections, diagnostics, httpClient, cancellationToken)
             .ConfigureAwait(false);
 
         return new Outcome(collections, diagnostics);
@@ -118,6 +119,7 @@ public static class BpaModelRuleLoader
         string? baseDirectory,
         bool allowExternal,
         BpaRuleHintContext hints,
+        ModelReference? model,
         List<BpaRuleCollection> collections,
         List<string> diagnostics,
         HttpClient? httpClient,
@@ -171,16 +173,15 @@ public static class BpaModelRuleLoader
                 // Community tooling writes these paths with Windows separators; normalize so a
                 // "..\..\rules.json" entry resolves on every platform.
                 var normalized = entry.Replace('\\', Path.DirectorySeparatorChar);
-                var path = Path.IsPathRooted(normalized)
-                    ? normalized
-                    : Path.Combine(baseDirectory ?? Directory.GetCurrentDirectory(), normalized);
+                var candidates = Candidates(normalized, baseDirectory);
+                var path = candidates.FirstOrDefault(File.Exists);
 
-                if (!File.Exists(path))
+                if (path is null)
                 {
                     diagnostics.Add(
-                        $"External rule file not found: {entry} (resolved: {Path.GetFullPath(path)}). "
+                        $"External rule file not found: {entry} (resolved: {string.Join(" or ", candidates)}). "
                         + (hints == BpaRuleHintContext.Run ? "Skip with --no-model-rules, or remove" : "Remove")
-                        + " the reference: tx set . --set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save");
+                        + $" the reference: tx set {SetTarget(model)}--set annotation:BestPracticeAnalyzer_ExternalRuleFiles= --save");
                     continue;
                 }
 
@@ -193,6 +194,45 @@ public static class BpaModelRuleLoader
                 diagnostics.Add($"Failed to load external rule file '{entry}': {ex.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Where a relative entry may live, most specific first. Tools disagree on the anchor for a
+    /// folder-based model: some resolve against the model folder itself (the TMDL definition
+    /// folder), while Tabular Editor resolves against the folder containing it, so a PBIP
+    /// annotation written there points one level higher (from X.SemanticModel). Both are tried.
+    /// </summary>
+    private static IReadOnlyList<string> Candidates(string normalized, string? baseDirectory)
+    {
+        if (Path.IsPathRooted(normalized))
+            return [Path.GetFullPath(normalized)];
+
+        var anchor = Path.GetFullPath(baseDirectory ?? Directory.GetCurrentDirectory());
+        var own = Path.GetFullPath(Path.Combine(anchor, normalized));
+        return Path.GetDirectoryName(anchor) is { } parent
+            ? [own, Path.GetFullPath(Path.Combine(parent, normalized))]
+            : [own];
+    }
+
+    /// <summary>
+    /// The model argument for the remedy's 'tx set', followed by a space: the local path as the user
+    /// passed it (quoted when needed), or nothing for a connected model, which set reaches through
+    /// the active connection. A trailing separator is dropped so a quoted Windows path does not end
+    /// in \" and escape its own quote.
+    /// </summary>
+    private static string SetTarget(ModelReference? model)
+    {
+        if (model is null)
+            return ". ";
+        if (!model.IsLocalPath)
+            return "";
+
+        var path = model.Value.TrimEnd('\\', '/');
+        if (path.Length == 0)
+            path = model.Value;
+        return path.Any(c => char.IsWhiteSpace(c) || c is '\'' or '"' or '&' or ';' or '(' or ')')
+            ? $"\"{path}\" "
+            : path + " ";
     }
 
     private static string? Annotation(IReadOnlyDictionary<string, string>? properties, string name)

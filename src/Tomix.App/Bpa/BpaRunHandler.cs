@@ -399,7 +399,8 @@ public sealed class BpaRunHandler
                 request.AllowExternalRules,
                 BpaRuleHintContext.Run,
                 _httpClient,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                request.Model).ConfigureAwait(false);
 
             collections.AddRange(model.Collections);
             diagnostics.AddRange(model.Diagnostics);

@@ -25,6 +25,15 @@ public sealed class OneShotSessionSource : IModelSessionSource
 
     public async Task<ModelSessionLease> LeaseAsync(ModelReference model, CancellationToken cancellationToken)
     {
+        // An omitted model with no active connection reaches here as an empty reference; say
+        // that instead of "No provider can open model: " with nothing after it.
+        if (string.IsNullOrWhiteSpace(model.Value))
+            throw new ModelSessionUnavailableException(
+                "TOMIX_NO_MODEL",
+                "No model specified and no active connection.",
+                exitCode: 2,
+                "Pass a model path (a TMDL folder or .bim file), use --server and --database, or connect first with 'tx connect'.");
+
         var provider = Providers.ResolveSingleProvider(model)
             ?? throw new ModelSessionUnavailableException(
                 "TOMIX_NO_PROVIDER",
